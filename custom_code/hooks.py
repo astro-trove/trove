@@ -10,6 +10,6 @@ def target_post_save(target, created):
     logger.info('Target post save hook: %s created: %s', target, created)
 
     qprob, qso, qoffset = static_cats_query([target.ra], [target.dec])
-    TargetExtra(target=target, key='qprob', value=qprob).save()
-    TargetExtra(target=target, key='qso', value=qso).save()
-    TargetExtra(target=target, key='qoffset', value=qoffset).save()
+    TargetExtra(target=target, key='QSO Match', value=qso[0]).save()
+    TargetExtra(target=target, key='QSO Prob.', value=qprob[0]).save()
+    TargetExtra(target=target, key='QSO Offset', value=qoffset[0]).save()
