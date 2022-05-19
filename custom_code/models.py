@@ -3,7 +3,7 @@ from dateutil.parser import parse
 
 from django.conf import settings
 from django.db import models
-from tom_targets.models import TargetList
+from tom_targets.models import Target, TargetList
 
 
 def _target_list_save(self, *args, **kwargs):
@@ -105,3 +105,32 @@ class TargetListExtra(models.Model):
             return self.time_value
 
         return self.value
+
+
+class Candidate(models.Model):
+    candidatenumber = models.IntegerField(null=True)
+    filename = models.CharField(max_length=128, null=True)
+    elongation = models.FloatField(null=True)
+    ra = models.FloatField(null=True)
+    dec = models.FloatField(null=True)
+    fwhm = models.FloatField(null=True)
+    snr = models.FloatField(null=True)
+    mag = models.FloatField(null=True)
+    magerr = models.FloatField(null=True)
+    rawfilename = models.CharField(max_length=128, null=True)
+    obsdate = models.DateTimeField(null=False, default=datetime.now)
+    field = models.CharField(max_length=32, null=True)
+    classification = models.IntegerField(null=True)
+    cx = models.FloatField(null=True)
+    cy = models.FloatField(null=True)
+    cz = models.FloatField(null=True)
+    htm16id = models.BigIntegerField(null=True)
+    target = models.ForeignKey(Target, null=True, on_delete=models.SET_NULL, db_column='targetid')
+    mjdmid = models.FloatField(null=True)
+    mlscore = models.FloatField(null=True)
+    ncombine = models.IntegerField(null=True)
+    gladeid = models.IntegerField(null=True)
+    exclude = models.IntegerField(null=True)
+
+    class Meta:
+        db_table = 'candidates'
