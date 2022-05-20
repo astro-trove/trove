@@ -3,10 +3,13 @@ import logging
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic.edit import CreateView
-from guardian.shortcuts import assign_perm
+from django_filters.views import FilterView
 from django.shortcuts import redirect
+from guardian.mixins import PermissionListMixin
 
 from tom_targets.models import Target, TargetList
+from custom_code.models import Candidate
+from custom_code.filters import CandidateFilter
 from .forms import TargetListExtraFormset
 
 logger = logging.getLogger(__name__)
@@ -53,4 +56,19 @@ class TargetGroupingCreateView(LoginRequiredMixin, CreateView):
         """
         context = super(TargetGroupingCreateView, self).get_context_data(**kwargs)
         context['extra_form'] = TargetListExtraFormset()
+        return context
+
+
+class CandidateListView(PermissionListMixin, FilterView):
+    """
+    View for listing candidates in the TOM.
+    """
+    template_name = 'tom_targets/candidate_list.html'
+    paginate_by = 25
+    strict = False
+    model = Candidate
+    filterset_class = CandidateFilter
+
+    def get_context_data(self, *args, **kwargs):
+        context = super().get_context_data(*args, **kwargs)
         return context

@@ -11,7 +11,10 @@ For customization instructions, see tom_common/base.html
     <a class="nav-link" href="{% url 'custom_code:targetgrouping' %}">GW Events</a>
 </li>
 <li class="nav-item {% if request.resolver_match.namespace == 'targets' and request.resolver_match.url_name == 'list' %}active{% endif %}">
-    <a class="nav-link" href="{% url 'targets:list' %}">Candidates</a>
+    <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
+</li>
+<li class="nav-item {% if request.resolver_match.url_name == 'candidates' %}active{% endif %}">
+    <a class="nav-link" href="{% url 'custom_code:candidates' %}">Candidates</a>
 </li>
 <li class="nav-item {% if request.resolver_match.namespace == 'alerts' %}active{% endif %}">
     <a class="nav-link" href="{% url 'alerts:list' %}">Alerts</a>

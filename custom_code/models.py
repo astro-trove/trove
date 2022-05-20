@@ -134,3 +134,4 @@ class Candidate(models.Model):
 
     class Meta:
         db_table = 'candidates'
+        ordering = ['-obsdate', '-candidatenumber']
