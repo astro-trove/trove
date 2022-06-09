@@ -1,0 +1,3 @@
+tom-toolkit
+psycopg2-binary
+git+https://github.com/SAGUARO-MMA/kne-cand-vetting
