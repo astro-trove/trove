@@ -105,8 +105,8 @@ WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('POSTGRES_DB', 'saguaro'),
-        'USER': os.getenv('POSTGRES_USER', 'saguaro'),
+        'NAME': os.getenv('POSTGRES_DB', 'sassy'),
+        'USER': os.getenv('POSTGRES_USER', 'sassy'),
         'PASSWORD': os.environ['POSTGRES_PASSWORD'],
         'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
         'PORT': os.getenv('POSTGRES_PORT', ''),
