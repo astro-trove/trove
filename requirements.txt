@@ -1,3 +1,3 @@
-tom-toolkit
+tomtoolkit
 psycopg2-binary
-git+https://github.com/SAGUARO-MMA/kne-cand-vetting
+kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
