@@ -1,0 +1,5 @@
+{% if target.name|slice:":2" != "AT" and target.name|slice:":2" != "SN" %}
+    <a href="{% url 'custom_code:report' pk=target.id %}" title="Report target to TNS" class="btn btn-secondary">Report</a>
+{% endif %}
+<a href="{% url 'tom_targets:update' pk=target.id %}" title="Update target details" class="btn  btn-primary">Update</a>
+<a href="{% url 'tom_targets:delete' pk=target.id %}" title="Delete target" class="btn  btn-warning">Delete</a>
