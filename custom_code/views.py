@@ -159,7 +159,7 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
 
         # update the target name
         target = Target.objects.get(pk=self.kwargs['pk'])
-        target.name = f'{prefix} {objname}'
+        target.name = prefix + objname
         target.save()
         return redirect(self.get_success_url())
 
