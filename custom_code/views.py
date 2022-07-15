@@ -4,13 +4,16 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic.edit import CreateView
 from django_filters.views import FilterView
+from django.views.generic.detail import DetailView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
 from tom_targets.models import Target, TargetList
+from tom_common.mixins import Raise403PermissionRequiredMixin
 from custom_code.models import Candidate
 from custom_code.filters import CandidateFilter
 from .forms import TargetListExtraFormset
+from tom_observations.observation_template import ApplyObservationTemplateForm
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +61,32 @@ class TargetGroupingCreateView(LoginRequiredMixin, CreateView):
         context['extra_form'] = TargetListExtraFormset()
         return context
 
+class TargetDetailView(Raise403PermissionRequiredMixin, DetailView):
+    """
+    View that handles the display of the target details. Requires authorization.
+    """
+    permission_required = 'tom_targets.view_target'
+    model = Target
+    template_name = 'tom_targets/target_detail.html'
+
+    def get_context_data(self, *args, **kwargs):
+        """
+        Adds the ``DataProductUploadForm`` to the context and prepopulates the hidden fields.
+
+        :returns: context object
+        :rtype: dict
+        """
+        context = super().get_context_data(*args, **kwargs)
+        observation_template_form = ApplyObservationTemplateForm(initial={'target': self.get_object()})
+        if any(self.request.GET.get(x) for x in ['observation_template', 'cadence_strategy', 'cadence_frequency']):
+            initial = {'target': self.object}
+            initial.update(self.request.GET)
+            observation_template_form = ApplyObservationTemplateForm(
+                initial=initial
+            )
+        observation_template_form.fields['target'].widget = HiddenInput()
+        context['observation_template_form'] = observation_template_form
+        return context
 
 class CandidateListView(PermissionListMixin, FilterView):
     """

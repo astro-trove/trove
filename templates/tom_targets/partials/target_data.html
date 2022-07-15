@@ -1,0 +1,34 @@
+{% load tom_common_extras targets_extras %}
+<dl class="row">
+  {% for target_name in target.names %}
+    {% if forloop.first %}
+      <dt class="col-sm-6">Names</dt>
+    {% else %}
+      <dt class="col-sm-6">&nbsp;</dt>
+    {% endif %}
+    <dd class="col-sm-6">{{ target_name }}</dd>
+  {% endfor %}
+  {% for key, value in target.as_dict.items %}
+  {% if value and key != 'name' and key != 'epoch' and value != 'SIDEREAL' %}
+  <dt class="col-sm-6">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">{{ value|truncate_number }}</dd>
+  {% endif %}
+  {% endfor %}
+</dl>
+<dl class="row">
+{% for key, value in extras.items %}
+  <dt class="col-sm-6">{{ key }}</dt>
+  <dd class="col-sm-6">{{ value }}</dd>
+{% endfor %}
+</dl>
+{% if target.tags %}
+<h4 style='color:#FF69B4'>Catalog Crossmatching</h4>
+<dl class="row">
+{% for key, value in target.tags.items %}
+{% if key|slice:':4' != 'Host' and key|slice:':4' != 'Best' %}
+<dt class="col-sm-6">{{ key }}</dt>
+<dd class="col-sm-6">{{ value }}</dd>
+{% endif %}
+{% endfor %}
+</dl>
+{% endif %}
