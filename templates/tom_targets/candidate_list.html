@@ -1,46 +1,45 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 %}
+{% load bootstrap4 candidate_extras %}
 {% block title %}Candidates{% endblock %}
 {% block content %}
 <h1>Candidates</h1>
 <div class="row">
   <div class="col-md-10">
+  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     <table class="table table-hover">
       <thead>
         <tr>
           <th><input type="checkbox" id="selectPage" onClick="select_page(this, {{ target_count }})" /></th>
-          <th>RA</th>
-          <th>Dec.</th>
+          <th>Target</th>
+          <th>Obs. Date</th>
+          <th>Magnitude</th>
           <th>FWHM</th>
           <th>S/N</th>
-          <th>Magnitude</th>
-          <th>Obs. Date</th>
-          <th>Field</th>
-          <th>Class.</th>
           <th>ML Score</th>
-          <th>Target</th>
+          <th>Image</th>
+          <th>Reference</th>
+          <th>Difference</th>
         </tr>
       </thead>
       <tbody>
         {% for candidate in object_list %}
         <tr>
           <td><input type="checkbox" name="selected-target" value="{{ target.id }}" onClick="single_select()"/></td>
-          <td>{{ candidate.ra|floatformat:"5" }}&deg; </td>
-          <td>{{ candidate.dec|floatformat:"5" }}&deg; </td>
-          <td>{{ candidate.fwhm|floatformat:"1" }}</td>
-          <td>{{ candidate.snr|floatformat:"1" }}</td>
-          <td>{{ candidate.mag|floatformat:"1" }} &pm; {{ candidate.magerr|floatformat:"1" }}</td>
-          <td>{{ candidate.obsdate }}</td>
-          <td>{{ candidate.field }}</td>
-          <td>{{ candidate.classification }}</td>
-          <td>{{ candidate.mlscore|floatformat:"2" }}</td>
           <td>
             {% if candidate.target is not None %}
-              <a href="{% url 'targets:detail' candidate.targetid %}" title="{{ candidate.target.name }}">{{ candidate.target.name }}</a>
+              <a href="{% url 'targets:detail' candidate.target.id %}" title="{{ candidate.target.name }}">{{ candidate.target.name }}</a>
             {% else %}
               None
             {% endif %}
           </td>
+          <td>{{ candidate.obsdate|date:"Y-m-d" }}</td>
+          <td>{{ candidate.mag|floatformat:"1" }} &pm; {{ candidate.magerr|floatformat:"1" }}</td>
+          <td>{{ candidate.fwhm|floatformat:"1" }}</td>
+          <td>{{ candidate.snr|floatformat:"1" }}</td>
+          <td>{{ candidate.mlscore|floatformat:"2" }}</td>
+          <td><img src="{{ candidate|thumbnail_url }}_img.png" height="80"></td>
+          <td><img src="{{ candidate|thumbnail_url }}_ref.png" height="80"></td>
+          <td><img src="{{ candidate|thumbnail_url }}_diff.png" height="80"></td>
         </tr>
         {% empty %}
         <tr>
@@ -55,6 +54,7 @@
         {% endfor %}
       </tbody>
     </table>
+  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
   </div>
   {{ filter.fields }}
   <div class="col-md-2">
