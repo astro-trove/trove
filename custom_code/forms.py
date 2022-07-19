@@ -3,6 +3,7 @@ from django.forms import inlineformset_factory
 from tom_targets.models import TargetList
 from .models import TargetListExtra
 from datetime import datetime
+import json
 
 
 TargetListExtraFormset = inlineformset_factory(TargetList, TargetListExtra, fields=('key', 'value'),
@@ -33,6 +34,7 @@ TNS_FILTER_CHOICES = [
 TNS_INSTRUMENT_CHOICES = [
     (0, "Other"),
 ]
+
 
 class TargetReportForm(forms.Form):
     ra = forms.FloatField()
@@ -82,3 +84,49 @@ class TargetReportForm(forms.Form):
     exptime = forms.FloatField(required=False)
     observer = forms.CharField(required=False)
     comments = forms.CharField(required=False)
+
+    def generate_tns_report(self):
+        """
+        Generate TNS bulk transient report according to the schema in this manual:
+        https://sandbox.wis-tns.org/sites/default/files/api/TNS_bulk_reports_manual.pdf
+
+        Returns the report as a JSON-formatted string
+        """
+        report_data = {
+            "at_report": {
+                "0": {
+                    "ra": {
+                        "value": self.cleaned_data['ra'],
+                    },
+                    "dec": {
+                        "value": self.cleaned_data['dec'],
+                    },
+                    "reporting_group_id": self.cleaned_data['reporting_group_id'],
+                    "discovery_data_source_id": self.cleaned_data['discovery_data_source_id'],
+                    "reporter": self.cleaned_data['reporter'],
+                    "discovery_datetime": self.cleaned_data['discovery_datetime'].strftime('%Y-%m-%d %H:%M:%S'),
+                    "at_type": self.cleaned_data['at_type'],
+                    "non_detection": {
+                        "archiveid": self.cleaned_data['non_detection__archiveid'],
+                        "archival_remarks": self.cleaned_data['non_detection__archival_remarks'],
+                    },
+                    "photometry": {
+                        "photometry_group": {
+                            "0": {
+                                "obsdate": self.cleaned_data['obsdate'].strftime('%Y-%m-%d %H:%M:%S'),
+                                "flux": self.cleaned_data['flux'],
+                                "flux_error": self.cleaned_data['flux_error'],
+                                "flux_units": self.cleaned_data['flux_units'],
+                                "filter_value": self.cleaned_data['filter_value'],
+                                "instrument_value": self.cleaned_data['instrument_value'],
+                                "limiting_flux": self.cleaned_data['limiting_flux'],
+                                "exptime": self.cleaned_data['exptime'],
+                                "observer": self.cleaned_data['observer'],
+                                "comments": self.cleaned_data['comments'],
+                            },
+                        }
+                    },
+                }
+            }
+        }
+        return json.dumps(report_data)

@@ -15,9 +15,11 @@ from .forms import TargetListExtraFormset, TargetReportForm, TNS_FILTER_CHOICES,
 import json
 import requests
 from saguaro_tom import settings
+import time
 # from tom_catalogs.harvesters.tns import TNS_URL
 TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
 TNS = settings.BROKERS['TNS']  # includes the API credentials
+TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
 
@@ -105,63 +107,37 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
         return initial
 
     def form_valid(self, form):
-        report_data = {
-            "at_report": {
-                "0": {
-                    "ra": {
-                        "value": form.cleaned_data['ra'],
-                    },
-                    "dec": {
-                        "value": form.cleaned_data['dec'],
-                    },
-                    "reporting_group_id": form.cleaned_data['reporting_group_id'],
-                    "discovery_data_source_id": form.cleaned_data['discovery_data_source_id'],
-                    "reporter": form.cleaned_data['reporter'],
-                    "discovery_datetime": form.cleaned_data['discovery_datetime'].strftime('%Y-%m-%d %H:%M:%S'),
-                    "at_type": form.cleaned_data['at_type'],
-                    "non_detection": {
-                        "archiveid": form.cleaned_data['non_detection__archiveid'],
-                        "archival_remarks": form.cleaned_data['non_detection__archival_remarks'],
-                    },
-                    "photometry": {
-                        "photometry_group": {
-                            "0": {
-                                "obsdate": form.cleaned_data['obsdate'].strftime('%Y-%m-%d %H:%M:%S'),
-                                "flux": form.cleaned_data['flux'],
-                                "flux_error": form.cleaned_data['flux_error'],
-                                "flux_units": form.cleaned_data['flux_units'],
-                                "filter_value": form.cleaned_data['filter_value'],
-                                "instrument_value": form.cleaned_data['instrument_value'],
-                                "limiting_flux": form.cleaned_data['limiting_flux'],
-                                "exptime": form.cleaned_data['exptime'],
-                                "observer": form.cleaned_data['observer'],
-                                "comments": form.cleaned_data['comments'],
-                            },
-                        }
-                    },
-                }
-            }
-        }
-
         # submit the data to the TNS
-        tns_marker = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
-        json_data = {'api_key': TNS['api_key'], 'data': json.dumps(report_data)}
-        response = requests.post(TNS_URL + '/bulk-report', headers={'User-Agent': tns_marker}, data=json_data)
+        json_data = {'api_key': TNS['api_key'], 'data': form.generate_tns_report()}
+        response = requests.post(TNS_URL + '/bulk-report', headers={'User-Agent': TNS_MARKER}, data=json_data)
         response.raise_for_status()
+        report_id = response.json()['data']['report_id']
+        logger.info(f'Sent TNS report ID {report_id:d}')
 
         # get the response from the TNS
-        json_data = {'api_key': TNS['api_key'], 'report_id': response.json()['data']['report_id']}
-        response = requests.post(TNS_URL + '/bulk-report-reply', headers={'User-Agent': tns_marker}, data=json_data)
+        json_data = {'api_key': TNS['api_key'], 'report_id': report_id}
+        for _ in range(6):
+            time.sleep(5)
+            response = requests.post(TNS_URL + '/bulk-report-reply', headers={'User-Agent': TNS_MARKER}, data=json_data)
+            if response.ok:
+                break
         response.raise_for_status()
         feedback = response.json()['data']['feedback']['at_report'][0]
-        for msg in feedback.values():
-            prefix = msg['prefix']
-            objname = msg['objname']
+        if '100' in feedback:  # transient object was inserted
+            iau_name = 'AT' + feedback['100']['objname']
+            logger.info(f'New transient {iau_name} was created')
+        elif '101' in feedback:  # transient object exists
+            iau_name = feedback['101']['prefix'] + feedback['101']['objname']
+            logger.info(f'Existing transient {iau_name} was reported')
+        else:  # this should never happen
+            iau_name = None
+            logger.warning('Problem getting response from TNS')
 
         # update the target name
-        target = Target.objects.get(pk=self.kwargs['pk'])
-        target.name = prefix + objname
-        target.save()
+        if iau_name is not None:
+            target = Target.objects.get(pk=self.kwargs['pk'])
+            target.name = iau_name
+            target.save()
         return redirect(self.get_success_url())
 
     def get_success_url(self):
