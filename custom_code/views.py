@@ -88,19 +88,20 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
 
     def get_initial(self):
         target = Target.objects.get(pk=self.kwargs['pk'])
-        reduced_datum = target.reduceddatum_set.latest()
         initial = {
             'ra': target.ra,
             'dec': target.dec,
             'reporter': f'{self.request.user.get_full_name()}, on behalf of SAGUARO',
-            'obsdate': reduced_datum.timestamp,
-            'flux': reduced_datum.value['magnitude'],
-            'flux_error': reduced_datum.value['error'],
-            'filter_value': (TNS_FILTER_IDS.get(reduced_datum.value['filter'], 0),
-                             reduced_datum.value['filter']),
-            'instrument_value': (TNS_INSTRUMENT_IDS.get(reduced_datum.value['instrument'], 0),
-                                 reduced_datum.value['instrument']),
         }
+        if target.reduceddatum_set.exists():
+            reduced_datum = target.reduceddatum_set.latest()
+            initial['obsdate'] = reduced_datum.timestamp
+            initial['flux'] = reduced_datum.value['magnitude']
+            initial['flux_error'] = reduced_datum.value['error']
+            initial['filter_value'] = (TNS_FILTER_IDS.get(reduced_datum.value['filter'], 0),
+                                       reduced_datum.value['filter'])
+            initial['instrument_value'] = (TNS_INSTRUMENT_IDS.get(reduced_datum.value['instrument'], 0),
+                                           reduced_datum.value['instrument'])
         return initial
 
     def form_valid(self, form):
