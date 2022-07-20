@@ -81,6 +81,44 @@ class CandidateListView(PermissionListMixin, FilterView):
     filterset_class = CandidateFilter
 
 
+def send_tns_report(data):
+    """
+    Send a JSON bulk report to the Transient Name Server according to this manual:
+    https://sandbox.wis-tns.org/sites/default/files/api/TNS_bulk_reports_manual.pdf
+    """
+    json_data = {'api_key': TNS['api_key'], 'data': data}
+    response = requests.post(TNS_URL + '/bulk-report', headers={'User-Agent': TNS_MARKER}, data=json_data)
+    response.raise_for_status()
+    report_id = response.json()['data']['report_id']
+    logger.info(f'Sent TNS report ID {report_id:d}')
+    return report_id
+
+
+def get_tns_report_reply(report_id):
+    """
+    Get feedback from the Transient Name Server in response to a bulk report according to this manual:
+    https://sandbox.wis-tns.org/sites/default/files/api/TNS_bulk_reports_manual.pdf
+    """
+    json_data = {'api_key': TNS['api_key'], 'report_id': report_id}
+    for _ in range(6):
+        time.sleep(5)
+        response = requests.post(TNS_URL + '/bulk-report-reply', headers={'User-Agent': TNS_MARKER}, data=json_data)
+        if response.ok:
+            break
+    response.raise_for_status()
+    feedback = response.json()['data']['feedback']['at_report'][0]
+    if '100' in feedback:  # transient object was inserted
+        iau_name = 'AT' + feedback['100']['objname']
+        logger.info(f'New transient {iau_name} was created')
+    elif '101' in feedback:  # transient object exists
+        iau_name = feedback['101']['prefix'] + feedback['101']['objname']
+        logger.info(f'Existing transient {iau_name} was reported')
+    else:  # this should never happen
+        iau_name = None
+        logger.warning('Problem getting response from TNS')
+    return iau_name
+
+
 class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, ProcessFormView):
     """
     View that handles reporting a target to the TNS.
@@ -109,31 +147,8 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
         return initial
 
     def form_valid(self, form):
-        # submit the data to the TNS
-        json_data = {'api_key': TNS['api_key'], 'data': form.generate_tns_report()}
-        response = requests.post(TNS_URL + '/bulk-report', headers={'User-Agent': TNS_MARKER}, data=json_data)
-        response.raise_for_status()
-        report_id = response.json()['data']['report_id']
-        logger.info(f'Sent TNS report ID {report_id:d}')
-
-        # get the response from the TNS
-        json_data = {'api_key': TNS['api_key'], 'report_id': report_id}
-        for _ in range(6):
-            time.sleep(5)
-            response = requests.post(TNS_URL + '/bulk-report-reply', headers={'User-Agent': TNS_MARKER}, data=json_data)
-            if response.ok:
-                break
-        response.raise_for_status()
-        feedback = response.json()['data']['feedback']['at_report'][0]
-        if '100' in feedback:  # transient object was inserted
-            iau_name = 'AT' + feedback['100']['objname']
-            logger.info(f'New transient {iau_name} was created')
-        elif '101' in feedback:  # transient object exists
-            iau_name = feedback['101']['prefix'] + feedback['101']['objname']
-            logger.info(f'Existing transient {iau_name} was reported')
-        else:  # this should never happen
-            iau_name = None
-            logger.warning('Problem getting response from TNS')
+        report_id = send_tns_report(form.generate_tns_report())
+        iau_name = get_tns_report_reply(report_id)
 
         # update the target name
         if iau_name is not None:
