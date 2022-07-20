@@ -12,7 +12,7 @@
           <th><input type="checkbox" id="selectPage" onClick="select_page(this, {{ target_count }})" /></th>
           <th>Target</th>
           <th>Obs. Date</th>
-          <th>Magnitude</th>
+          <th>Mag.</th>
           <th>FWHM</th>
           <th>S/N</th>
           <th>ML Score</th>
@@ -33,7 +33,7 @@
             {% endif %}
           </td>
           <td>{{ candidate.obsdate|date:"Y-m-d" }}</td>
-          <td>{{ candidate.mag|floatformat:"1" }} &pm; {{ candidate.magerr|floatformat:"1" }}</td>
+          <td>{{ candidate.mag|floatformat:"1" }}</td>
           <td>{{ candidate.fwhm|floatformat:"1" }}</td>
           <td>{{ candidate.snr|floatformat:"1" }}</td>
           <td>{{ candidate.mlscore|floatformat:"2" }}</td>
