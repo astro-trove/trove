@@ -10,7 +10,8 @@ from guardian.mixins import PermissionListMixin
 from tom_targets.models import Target, TargetList
 from custom_code.models import Candidate
 from custom_code.filters import CandidateFilter
-from .forms import TargetListExtraFormset, TargetReportForm, TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES
+from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
+from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 
 import json
 import requests
@@ -22,6 +23,7 @@ TNS = settings.BROKERS['TNS']  # includes the API credentials
 TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
+TNS_CLASSIFICATION_IDS = {name: cid for cid, name in TNS_CLASSIFICATION_CHOICES}
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,19 @@ class CandidateListView(PermissionListMixin, FilterView):
     filterset_class = CandidateFilter
 
 
+def upload_files_to_tns(files):
+    """
+    Upload files to the Transient Name Server according to this manual:
+    https://sandbox.wis-tns.org/sites/default/files/api/TNS_bulk_reports_manual.pdf
+    """
+    json_data = {'api_key': TNS['api_key']}
+    response = requests.post(TNS_URL + '/file-upload', headers={'User-Agent': TNS_MARKER}, data=json_data, files=files)
+    response.raise_for_status()
+    new_filenames = response.json()['data']
+    logger.info(f"Uploaded {', '.join(new_filenames)} to the TNS")
+    return new_filenames
+
+
 def send_tns_report(data):
     """
     Send a JSON bulk report to the Transient Name Server according to this manual:
@@ -106,13 +121,25 @@ def get_tns_report_reply(report_id):
         if response.ok:
             break
     response.raise_for_status()
-    feedback = response.json()['data']['feedback']['at_report'][0]
-    if '100' in feedback:  # transient object was inserted
-        iau_name = 'AT' + feedback['100']['objname']
-        logger.info(f'New transient {iau_name} was created')
-    elif '101' in feedback:  # transient object exists
-        iau_name = feedback['101']['prefix'] + feedback['101']['objname']
-        logger.info(f'Existing transient {iau_name} was reported')
+    feedback_section = response.json()['data']['feedback']
+    feedbacks = []
+    if 'at_report' in feedback_section:
+        feedbacks += feedback_section['at_report']
+    if 'classification_report' in feedback_section:
+        feedbacks += feedback_section['classification_report'][0]['classification_messages']
+    for feedback in feedbacks:
+        if '100' in feedback:  # transient object was inserted
+            iau_name = 'AT' + feedback['100']['objname']
+            logger.info(f'New transient {iau_name} was created')
+            break
+        elif '101' in feedback:  # transient object exists
+            iau_name = feedback['101']['prefix'] + feedback['101']['objname']
+            logger.info(f'Existing transient {iau_name} was reported')
+            break
+        elif '121' in feedback:  # object name prefix has changed
+            iau_name = feedback['121']['new_object_name']
+            logger.info(f'Transient name changed to {iau_name}')
+            break
     else:  # this should never happen
         iau_name = None
         logger.warning('Problem getting response from TNS')
@@ -133,8 +160,9 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
             'dec': target.dec,
             'reporter': f'{self.request.user.get_full_name()}, on behalf of SAGUARO',
         }
-        if target.reduceddatum_set.exists():
-            reduced_datum = target.reduceddatum_set.latest()
+        photometry = target.reduceddatum_set.filter(data_type='photometry')
+        if photometry.exists():
+            reduced_datum = photometry.latest()
             initial['obsdate'] = reduced_datum.timestamp
             initial['flux'] = reduced_datum.value['magnitude']
             initial['flux_error'] = reduced_datum.value['error']
@@ -148,6 +176,50 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
 
     def form_valid(self, form):
         report_id = send_tns_report(form.generate_tns_report())
+        iau_name = get_tns_report_reply(report_id)
+
+        # update the target name
+        if iau_name is not None:
+            target = Target.objects.get(pk=self.kwargs['pk'])
+            target.name = iau_name
+            target.save()
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse_lazy('targets:detail', kwargs=self.kwargs)
+
+
+class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, ProcessFormView):
+    """
+    View that handles classifying a target on the TNS.
+    """
+    form_class = TargetClassifyForm
+    template_name = 'tom_targets/targetclassify_form.html'
+
+    def get_initial(self):
+        target = Target.objects.get(pk=self.kwargs['pk'])
+        initial = {
+            'name': target.name.replace('AT', '').replace('SN', ''),
+            'classifier': f'{self.request.user.get_full_name()}, on behalf of SAGUARO',
+        }
+        classifications = target.targetextra_set.filter(key='classification')
+        if classifications.exists():
+            classification = classifications.first().value
+            if classification in TNS_CLASSIFICATION_IDS:
+                initial['classification'] = (TNS_CLASSIFICATION_IDS[classification], classification)
+        redshift = target.targetextra_set.filter(key='redshift')
+        if redshift.exists():
+            initial['redshift'] = redshift.first().value
+        spectra = target.reduceddatum_set.filter(data_type='spectroscopy')
+        if spectra.exists():
+            spectrum = spectra.latest()
+            initial['observation_date'] = spectrum.timestamp
+            initial['ascii_file'] = spectrum.data_product.data
+        return initial
+
+    def form_valid(self, form):
+        new_filenames = upload_files_to_tns(form.files_to_upload())
+        report_id = send_tns_report(form.generate_tns_report(new_filenames))
         iau_name = get_tns_report_reply(report_id)
 
         # update the target name
