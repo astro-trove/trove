@@ -100,10 +100,12 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
             initial['obsdate'] = reduced_datum.timestamp
             initial['flux'] = reduced_datum.value['magnitude']
             initial['flux_error'] = reduced_datum.value['error']
-            initial['filter_value'] = (TNS_FILTER_IDS.get(reduced_datum.value['filter'], 0),
-                                       reduced_datum.value['filter'])
-            initial['instrument_value'] = (TNS_INSTRUMENT_IDS.get(reduced_datum.value['instrument'], 0),
-                                           reduced_datum.value['instrument'])
+            filter_name = reduced_datum.value.get('filter')
+            if filter_name in TNS_FILTER_IDS:
+                initial['filter_value'] = (TNS_FILTER_IDS[filter_name], filter_name)
+            instrument_name = reduced_datum.value.get('instrument')
+            if instrument_name in TNS_INSTRUMENT_IDS:
+                initial['instrument_value'] = (TNS_INSTRUMENT_IDS[instrument_name], instrument_name)
         return initial
 
     def form_valid(self, form):
