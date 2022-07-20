@@ -1,5 +1,6 @@
 import logging
 
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView
@@ -109,10 +110,12 @@ def send_tns_report(data):
     return report_id
 
 
-def get_tns_report_reply(report_id):
+def get_tns_report_reply(report_id, request):
     """
     Get feedback from the Transient Name Server in response to a bulk report according to this manual:
     https://sandbox.wis-tns.org/sites/default/files/api/TNS_bulk_reports_manual.pdf
+
+    Posts an informational message in a banner on the page using ``request``
     """
     json_data = {'api_key': TNS['api_key'], 'report_id': report_id}
     for _ in range(6):
@@ -130,19 +133,27 @@ def get_tns_report_reply(report_id):
     for feedback in feedbacks:
         if '100' in feedback:  # transient object was inserted
             iau_name = 'AT' + feedback['100']['objname']
-            logger.info(f'New transient {iau_name} was created')
+            log_message = f'New transient {iau_name} was created'
+            logger.info(log_message)
+            messages.success(request, log_message)
             break
         elif '101' in feedback:  # transient object exists
             iau_name = feedback['101']['prefix'] + feedback['101']['objname']
-            logger.info(f'Existing transient {iau_name} was reported')
+            log_message = f'Existing transient {iau_name} was reported'
+            logger.info(log_message)
+            messages.info(request, log_message)
             break
         elif '121' in feedback:  # object name prefix has changed
             iau_name = feedback['121']['new_object_name']
-            logger.info(f'Transient name changed to {iau_name}')
+            log_message = f'Transient name changed to {iau_name}'
+            logger.info(log_message)
+            messages.success(request, log_message)
             break
     else:  # this should never happen
         iau_name = None
-        logger.warning('Problem getting response from TNS')
+        log_message = 'Problem getting response from TNS'
+        logger.error(log_message)
+        messages.error(request, log_message)
     return iau_name
 
 
@@ -176,7 +187,7 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
 
     def form_valid(self, form):
         report_id = send_tns_report(form.generate_tns_report())
-        iau_name = get_tns_report_reply(report_id)
+        iau_name = get_tns_report_reply(report_id, self.request)
 
         # update the target name
         if iau_name is not None:
@@ -220,7 +231,7 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
     def form_valid(self, form):
         new_filenames = upload_files_to_tns(form.files_to_upload())
         report_id = send_tns_report(form.generate_tns_report(new_filenames))
-        iau_name = get_tns_report_reply(report_id)
+        iau_name = get_tns_report_reply(report_id, self.request)
 
         # update the target name
         if iau_name is not None:
