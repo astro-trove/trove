@@ -288,7 +288,10 @@ HARVESTERS = {
 #     {'name': 'eligible', 'type': 'boolean'},
 #     {'name': 'dicovery_date', 'type': 'datetime'}
 # ]
-EXTRA_FIELDS = []
+EXTRA_FIELDS = [
+    {'name': 'Classification', 'type': 'string'},
+    {'name': 'Redshift', 'type': 'number'},
+]
 
 # Authentication strategy can either be LOCKED (required login for all views)
 # or READ_ONLY (read only access to views)

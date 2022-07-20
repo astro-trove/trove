@@ -202,12 +202,12 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
             'name': target.name.replace('AT', '').replace('SN', ''),
             'classifier': f'{self.request.user.get_full_name()}, on behalf of SAGUARO',
         }
-        classifications = target.targetextra_set.filter(key='classification')
+        classifications = target.targetextra_set.filter(key='Classification')
         if classifications.exists():
             classification = classifications.first().value
             if classification in TNS_CLASSIFICATION_IDS:
                 initial['classification'] = (TNS_CLASSIFICATION_IDS[classification], classification)
-        redshift = target.targetextra_set.filter(key='redshift')
+        redshift = target.targetextra_set.filter(key='Redshift')
         if redshift.exists():
             initial['redshift'] = redshift.first().value
         spectra = target.reduceddatum_set.filter(data_type='spectroscopy')
