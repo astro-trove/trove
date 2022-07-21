@@ -1,3 +1,4 @@
 tomtoolkit
 psycopg2-binary
 kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
+lightcurve-fitting
