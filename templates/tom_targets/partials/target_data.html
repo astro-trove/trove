@@ -22,7 +22,7 @@
 {% endfor %}
 </dl>
 {% if target.tags %}
-<h4 style='color:#FF69B4'>Catalog Crossmatching</h4>
+<h4>Catalog Crossmatching</h4>
 <dl class="row">
 {% for key, value in target.tags.items %}
 {% if key|slice:':4' != 'Host' and key|slice:':4' != 'Best' %}
