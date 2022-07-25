@@ -1,0 +1,38 @@
+{% load tom_common_extras targets_extras %}
+<dl class="row">
+  {% for target_name in target.names %}
+    {% if forloop.first %}
+      <dt class="col-sm-6">Names</dt>
+    {% else %}
+      <dt class="col-sm-6">&nbsp;</dt>
+    {% endif %}
+    {% if target_name|slice:":2" == "AT" or target_name|slice:":2" == "SN" %}
+      <dd class="col-sm-9"><a href="https://sandbox.wis-tns.org/object/{{ target_name|slice:"2:" }}" target="_blank">{{ target_name }}</a></dd>
+    {% else %}
+      <dd class="col-sm-9">{{ target_name }}</dd>
+    {% endif %}
+  {% endfor %}
+  <dt class="col-sm-3">Coords.</dt>
+  <dd class="col-sm-4">{{ target.ra|deg_to_sexigesimal:"hms" }}</dd>
+  <dd class="col-sm-5">{{ target.dec|deg_to_sexigesimal:"dms" }}</dd>
+  <dt class="col-sm-3">&nbsp;</dt>
+  <dd class="col-sm-4">{{ target.ra|floatformat:6 }}</dd>
+  <dd class="col-sm-5">{{ target.dec|floatformat:6 }}</dd>
+</dl>
+<dl class="row">
+{% for key, value in extras.items %}
+  <dt class="col-sm-6">{{ key }}</dt>
+  <dd class="col-sm-6">{{ value }}</dd>
+{% endfor %}
+</dl>
+{% if target.tags %}
+<h4>Catalog Crossmatching</h4>
+<dl class="row">
+{% for key, value in target.tags.items %}
+{% if key|slice:':4' != 'Host' and key|slice:':4' != 'Best' %}
+<dt class="col-sm-6">{{ key }}</dt>
+<dd class="col-sm-6">{{ value }}</dd>
+{% endif %}
+{% endfor %}
+</dl>
+{% endif %}
