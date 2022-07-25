@@ -2,9 +2,9 @@
 <dl class="row">
   {% for target_name in target.names %}
     {% if forloop.first %}
-      <dt class="col-sm-6">Names</dt>
+      <dt class="col-sm-3">Names</dt>
     {% else %}
-      <dt class="col-sm-6">&nbsp;</dt>
+      <dt class="col-sm-3">&nbsp;</dt>
     {% endif %}
     {% if target_name|slice:":2" == "AT" or target_name|slice:":2" == "SN" %}
       <dd class="col-sm-9"><a href="https://sandbox.wis-tns.org/object/{{ target_name|slice:"2:" }}" target="_blank">{{ target_name }}</a></dd>
