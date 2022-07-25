@@ -3,12 +3,14 @@ import logging
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
+from django.http import HttpResponseRedirect
+from django.views.generic.base import RedirectView
 from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
-from tom_targets.models import Target, TargetList
+from tom_targets.models import Target, TargetList, TargetExtra
 from custom_code.models import Candidate
 from custom_code.filters import CandidateFilter
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
@@ -18,6 +20,10 @@ import json
 import requests
 from saguaro_tom import settings
 import time
+
+from kne_cand_vetting.catalogs import static_cats_query
+from kne_cand_vetting.galaxy_matching import galaxy_search
+
 # from tom_catalogs.harvesters.tns import TNS_URL
 TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
 TNS = settings.BROKERS['TNS']  # includes the API credentials
@@ -242,3 +248,50 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
 
     def get_success_url(self):
         return reverse_lazy('targets:detail', kwargs=self.kwargs)
+
+
+def update_or_create_target_extra(target, key, value):
+    """
+    Check if a ``TargetExtra`` with the given key exists for a given target. If it exists, update the value. If it does
+    not exist, create it with the input value.
+    """
+    te, created = TargetExtra.objects.get_or_create(target=target, key=key)
+    te.value = value
+    te.save()
+
+
+class TargetVettingView(LoginRequiredMixin, RedirectView):
+    """
+    View that runs or reruns the kilonova candidate vetting code and stores the results
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view. Calls the kilonova vetting code.
+        """
+        target = Target.objects.get(pk=kwargs['pk'])
+        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec])
+
+        update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
+        if qso[0] != 'None':
+            update_or_create_target_extra(target=target, key='QSO Prob.', value=qprob[0])
+            update_or_create_target_extra(target=target, key='QSO Offset', value=qoffset[0])
+
+        update_or_create_target_extra(target=target, key='ASASSN Match', value=asassn[0])
+        if asassn[0] != 'None':
+            update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
+            update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
+
+        matches, hostdict = galaxy_search([target.ra], [target.dec])
+        update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
+
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer
