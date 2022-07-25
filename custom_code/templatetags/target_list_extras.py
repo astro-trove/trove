@@ -31,6 +31,6 @@ def galaxy_table(target):
 
 @register.filter
 def get_host_galaxies(target):
-    te = TargetExtra.objects.get(target=target, key='Host Galaxies')
-    # print(json.loads(te.value))
-    return json.loads(te.value)
+    te = TargetExtra.objects.filter(target=target, key='Host Galaxies')
+    if te.exists():
+        return json.loads(te.first().value)

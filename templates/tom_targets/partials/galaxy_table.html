@@ -23,7 +23,6 @@
       <td> </td>
     </tr>
   </thead>
-  <!-- <tr>{{ target|target_extra_field:"Host Galaxies"}}</tr> -->
   {% for galaxy in target|get_host_galaxies %}
     <tr>
       <td>{{ galaxy.PCC|floatformat:5 }}</td>
@@ -35,5 +34,7 @@
       <td>{{ galaxy.Filter }}</td>
       <td>{{ galaxy.Source }}</td>
     </tr>
+  {% empty %}
+    <tr><td colspan=8>No host galaxies stored</td></tr>
   {% endfor %}
 </table>
