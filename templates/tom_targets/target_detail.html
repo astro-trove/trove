@@ -44,6 +44,9 @@ $(document).ready(function(){
   <div class="col-md-8">
     <ul class="nav nav-tabs" role="tablist" id="tabs">
       <li class="nav-item">
+        <a class="nav-link" id="candidates-tab" href="#candidates" role="tab" data-toggle="tab">Candidates</a>
+      </li>
+      <li class="nav-item">
         <a class="nav-link" id="host-galaxy-tab" href="#host-galaxy" role="tab" data-toggle="tab">Host Galaxies</a>
       </li>
       <li class="nav-item">
@@ -82,6 +85,10 @@ $(document).ready(function(){
         {% elif target.type == 'NON_SIDEREAL' %}
           <p>Airmass plotting for non-sidereal targets is not currently supported. If you would like to add this functionality, please check out the <a href="https://github.com/TOMToolkit/tom_nonsidereal_airmass" target="_blank">non-sidereal airmass plugin.</a></p>
         {% endif %}
+      </div>
+      <div class="tab-pane" id='candidates'>
+        <h4>Candidates</h4>
+        {% candidates_table object %}
       </div>
       <div class="tab-pane" id='host-galaxy'>
         <h4>Host Galaxies with Lowest Probability of Chance Coincidence</h4>
