@@ -2,3 +2,4 @@ tomtoolkit
 psycopg2-binary
 kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
+mmtapi @ git+https://github.com/swyatt7/mmtapi  # the latest version is not on PyPI

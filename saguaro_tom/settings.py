@@ -223,6 +223,9 @@ FACILITIES = {
             },
         },
     },
+    'MMT': {
+        'api_key': os.getenv('MMT_API_TOKEN'),
+    }
 }
 
 # Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
@@ -243,7 +246,8 @@ TOM_FACILITY_CLASSES = [
     'tom_observations.facilities.lco.LCOFacility',
     'tom_observations.facilities.gemini.GEMFacility',
     'tom_observations.facilities.soar.SOARFacility',
-    'tom_observations.facilities.lt.LTFacility'
+    'tom_observations.facilities.lt.LTFacility',
+    'custom_code.mmt.MMTFacility',
 ]
 
 TOM_ALERT_CLASSES = [
