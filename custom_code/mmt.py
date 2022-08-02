@@ -144,7 +144,18 @@ class MMTFacility(BaseRoboticObservationFacility):
         return self.observation_forms.get(observation_type, MMTBaseObservationForm)
 
     def get_observation_status(self, observation_id):
-        return {'state': 'UNKNOWN', 'scheduled_start': None, 'scheduled_end': None}
+        target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload={'targetid': observation_id})
+        if not target.request.ok:
+            status = 'UNKNOWN'
+        elif target.disabled:
+            status = 'CANCELED'
+        elif target.iscomplete:
+            status = 'COMPLETED'
+        elif target.percentcompleted:
+            status = f'{target.percentcompleted:.0f}% COMPLETE'
+        else:
+            status = 'PENDING'
+        return {'state': status, 'scheduled_start': None, 'scheduled_end': None}
 
     def submit_observation(self, observation_payload):
         target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)
@@ -158,7 +169,7 @@ class MMTFacility(BaseRoboticObservationFacility):
         return []
 
     def get_terminal_observing_states(self):
-        return []
+        return ['CANCELED', 'COMPLETED']
 
     def get_observing_sites(self):
         return self.SITES
@@ -168,7 +179,8 @@ class MMTFacility(BaseRoboticObservationFacility):
         target.delete()
 
     def get_observation_url(self, observation_id):
-        pass
+        # javascript is required to get to the observation_id level, but this is close enough
+        return f"https://scheduler.mmto.arizona.edu/catalog.php?token={MMT_SETTINGS['api_key']}"
 
     def get_facility_status(self):
         response = requests.get('https://scheduler.mmto.arizona.edu/APIv2/trimester//schedule/all')
