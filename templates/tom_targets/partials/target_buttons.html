@@ -4,4 +4,5 @@
     <a href="{% url 'custom_code:report' pk=target.id %}" title="Report target to TNS" class="btn btn-secondary">Report</a>
 {% endif %}
 <a href="{% url 'tom_targets:update' pk=target.id %}" title="Update target details" class="btn  btn-primary">Update</a>
+<a href="{% url 'custom_code:vet' pk=target.id %}" title="Run kilonova candidate vetting" class="btn  btn-info">Vet</a>
 <a href="{% url 'tom_targets:delete' pk=target.id %}" title="Delete target" class="btn  btn-warning">Delete</a>
