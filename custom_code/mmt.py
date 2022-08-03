@@ -135,16 +135,17 @@ class MMTFacility(BaseRoboticObservationFacility):
     }
 
     def data_products(self, observation_id, product_id=None):
-        response = requests.get(f"https://scheduler.mmto.arizona.edu/APIv2/data/list/catalogtarget/{observation_id}/"
-                                f"token/{MMT_SETTINGS['api_key']}/type/reduced")
+        datalist = mmtapi.Datalist(token=MMT_SETTINGS['api_key'])
+        datalist.get(targetid=observation_id, data_type='reduced')
 
         # flatten the dictionary structure across all data sets
         data_products = []
-        for datalist in response.json():
+        for datalist in datalist.data:
             datafiles = datalist['datafiles']
             for file_info in datafiles:
-                file_info['url'] = f"https://scheduler.mmto.arizona.edu/APIv2/data/download/datafile/" \
-                                   f"{file_info['id']}/token/{MMT_SETTINGS['api_key']}"
+                image = mmtapi.Image(token=MMT_SETTINGS['api_key'])
+                image._build_url({'datafileid': file_info['id'], 'token': MMT_SETTINGS['api_key']})
+                file_info['url'] = image.url
             data_products += datafiles
 
         return data_products
