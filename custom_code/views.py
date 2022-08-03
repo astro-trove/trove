@@ -9,6 +9,7 @@ from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
 from tom_targets.models import Target, TargetList
+from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from custom_code.models import Candidate
 from custom_code.filters import CandidateFilter
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
@@ -242,3 +243,16 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
 
     def get_success_url(self):
         return reverse_lazy('targets:detail', kwargs=self.kwargs)
+
+
+class ObservationCreateView(OldObservationCreateView):
+    """
+    Modify the built-in ObservationCreateView to populate any "magnitude" field with the latest observed magnitude
+    """
+    def get_initial(self):
+        initial = super().get_initial()
+        target = self.get_target()
+        photometry = target.reduceddatum_set.filter(data_type='photometry')
+        if photometry.exists():
+            initial['magnitude'] = photometry.latest().value['magnitude']
+        return initial
