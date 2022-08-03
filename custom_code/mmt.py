@@ -77,6 +77,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
         ('Longslit1_5', '1.50'),
         ('Longslit5', '5.00'),
     ])
+    finder_chart = forms.FileField()
 
     def layout(self):
         return Layout(
@@ -87,7 +88,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
                 Column(AppendedText('slit_width', 'arcsec'))
             ),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('target_of_opportunity')),
+            Row(Column('target_of_opportunity'), Column('finder_chart')),
         )
 
     def observation_payload(self):
@@ -117,8 +118,14 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
+            'finder_chart': self.cleaned_data['finder_chart'],
         }
         return payload
+
+    def serialize_parameters(self) -> dict:
+        parameters = super().serialize_parameters()
+        parameters['finder_chart'] = parameters['finder_chart'].name
+        return parameters
 
 
 class MMTFacility(BaseRoboticObservationFacility):
@@ -170,8 +177,10 @@ class MMTFacility(BaseRoboticObservationFacility):
         return {'state': status, 'scheduled_start': None, 'scheduled_end': None}
 
     def submit_observation(self, observation_payload):
+        finder_chart = observation_payload.pop('finder_chart')
         target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)
         target.post()
+        target.upload_finder(finder_chart)
         return [target.id]
 
     def validate_observation(self, observation_payload):
