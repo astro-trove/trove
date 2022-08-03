@@ -25,6 +25,13 @@ class MMTBaseObservationForm(BaseRoboticObservationForm):
     ], initial=(3, 'low'))
     target_of_opportunity = forms.BooleanField(initial=True)
 
+    def is_valid(self):
+        super().is_valid()
+        facility = MMTFacility()
+        observation_payload = self.observation_payload()
+        errors = facility.validate_observation(observation_payload)
+        self.add_error(None, errors)
+
 
 class MMTImagingForm(MMTBaseObservationForm):
     filter = forms.ChoiceField(choices=[('g', 'g'), ('r', 'r'), ('i', 'i'), ('z', 'z')])
@@ -165,10 +172,9 @@ class MMTFacility(BaseRoboticObservationFacility):
         return [target.id]
 
     def validate_observation(self, observation_payload):
-        mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)  # validate is called by __init__
-        # TODO: It would be better if Target.validate could return the errors instead of printing them.
-        # TODO: Then we could capture them here and display them as a banner on the web page.
-        return []
+        # Target.validate is automatically called by Target.__init__
+        target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)
+        return target.message['Errors']
 
     def get_terminal_observing_states(self):
         return ['CANCELED', 'COMPLETED']
