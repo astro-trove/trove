@@ -37,13 +37,13 @@
           <td>{{ candidate.fwhm|floatformat:"1" }}</td>
           <td>{{ candidate.snr|floatformat:"1" }}</td>
           <td>{{ candidate.mlscore|floatformat:"2" }}</td>
-          <td><img src="{{ candidate|thumbnail_url }}_img.png" height="80"></td>
-          <td><img src="{{ candidate|thumbnail_url }}_ref.png" height="80"></td>
-          <td><img src="{{ candidate|thumbnail_url }}_diff.png" height="80"></td>
+          <td><img alt="new image" src="{{ candidate|thumbnail_url }}_img.png" height="80"></td>
+          <td><img alt="reference image" src="{{ candidate|thumbnail_url }}_ref.png" height="80"></td>
+          <td><img alt="difference image" src="{{ candidate|thumbnail_url }}_diff.png" height="80"></td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="5">
+          <td colspan="10">
             {% if target_count == 0 %}
             No candidates yet.
             {% else %}
