@@ -26,11 +26,13 @@ class MMTBaseObservationForm(BaseRoboticObservationForm):
     target_of_opportunity = forms.BooleanField(initial=True)
 
     def is_valid(self):
-        super().is_valid()
+        self.full_clean()
         facility = MMTFacility()
         observation_payload = self.observation_payload()
         errors = facility.validate_observation(observation_payload)
-        self.add_error(None, errors)
+        if errors:
+            self.add_error(None, errors)
+        return super().is_valid()
 
 
 class MMTImagingForm(MMTBaseObservationForm):
