@@ -245,6 +245,14 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
             target = Target.objects.get(pk=self.kwargs['pk'])
             target.name = iau_name
             target.save()
+
+            classification = dict(TNS_CLASSIFICATION_CHOICES)[int(form.cleaned_data['classification'])]
+            update_or_create_target_extra(target, 'Classification', classification)
+            messages.success(self.request, f"Classification set to {classification}")
+            if form.cleaned_data['redshift']:
+                update_or_create_target_extra(target, 'Redshift', form.cleaned_data['redshift'])
+                messages.success(self.request, f"Redshift set to {form.cleaned_data['redshift']}")
+
         return redirect(self.get_success_url())
 
     def get_success_url(self):
