@@ -25,6 +25,15 @@ class MMTBaseObservationForm(BaseRoboticObservationForm):
     ], initial=(3, 'low'))
     target_of_opportunity = forms.BooleanField(initial=True)
 
+    def is_valid(self):
+        self.full_clean()
+        facility = MMTFacility()
+        observation_payload = self.observation_payload()
+        errors = facility.validate_observation(observation_payload)
+        if errors:
+            self.add_error(None, errors)
+        return super().is_valid()
+
 
 class MMTImagingForm(MMTBaseObservationForm):
     filter = forms.ChoiceField(choices=[('g', 'g'), ('r', 'r'), ('i', 'i'), ('z', 'z')])
@@ -68,6 +77,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
         ('Longslit1_5', '1.50'),
         ('Longslit5', '5.00'),
     ])
+    finder_chart = forms.FileField()
 
     def layout(self):
         return Layout(
@@ -78,7 +88,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
                 Column(AppendedText('slit_width', 'arcsec'))
             ),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('target_of_opportunity')),
+            Row(Column('target_of_opportunity'), Column('finder_chart')),
         )
 
     def observation_payload(self):
@@ -108,8 +118,14 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
+            'finder_chart': self.cleaned_data['finder_chart'],
         }
         return payload
+
+    def serialize_parameters(self) -> dict:
+        parameters = super().serialize_parameters()
+        parameters['finder_chart'] = parameters['finder_chart'].name
+        return parameters
 
 
 class MMTFacility(BaseRoboticObservationFacility):
@@ -129,14 +145,17 @@ class MMTFacility(BaseRoboticObservationFacility):
 
     def data_products(self, observation_id, product_id=None):
         datalist = mmtapi.Datalist(token=MMT_SETTINGS['api_key'])
-        datalist.get(targetid=observation_id)
+        datalist.get(targetid=observation_id, data_type='reduced')
 
-        # flatten the dictionary structure across all "queues"
+        # flatten the dictionary structure across all data sets
         data_products = []
-        for dp in datalist.data:
-            file_info = dp['datafiles']
-            file_info['id'] = file_info['datafileid']
-            data_products += file_info
+        for datalist in datalist.data:
+            datafiles = datalist['datafiles']
+            for file_info in datafiles:
+                image = mmtapi.Image(token=MMT_SETTINGS['api_key'])
+                image._build_url({'datafileid': file_info['id'], 'token': MMT_SETTINGS['api_key']})
+                file_info['url'] = image.url
+            data_products += datafiles
 
         return data_products
 
@@ -158,15 +177,16 @@ class MMTFacility(BaseRoboticObservationFacility):
         return {'state': status, 'scheduled_start': None, 'scheduled_end': None}
 
     def submit_observation(self, observation_payload):
+        finder_chart = observation_payload.pop('finder_chart')
         target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)
         target.post()
+        target.upload_finder(finder_chart)
         return [target.id]
 
     def validate_observation(self, observation_payload):
-        mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)  # validate is called by __init__
-        # TODO: It would be better if Target.validate could return the errors instead of printing them.
-        # TODO: Then we could capture them here and display them as a banner on the web page.
-        return []
+        # Target.validate is automatically called by Target.__init__
+        target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)
+        return target.message['Errors']
 
     def get_terminal_observing_states(self):
         return ['CANCELED', 'COMPLETED']
