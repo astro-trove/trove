@@ -1,0 +1,32 @@
+{% load tom_common_extras candidate_extras target_list_extras %}
+
+<table class="table table-hover">
+  <thead>
+    <tr>
+      <th>Obs. Date</th>
+      <th>Mag.</th>
+      <th>FWHM</th>
+      <th>S/N</th>
+      <th>ML Score</th>
+      <th>Image</th>
+      <th>Reference</th>
+      <th>Difference</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for candidate in candidates %}
+    <tr>
+      <td>{{ candidate.obsdate|date:"Y-m-d" }}</td>
+      <td>{{ candidate.mag|floatformat:"1" }}</td>
+      <td>{{ candidate.fwhm|floatformat:"1" }}</td>
+      <td>{{ candidate.snr|floatformat:"1" }}</td>
+      <td>{{ candidate.mlscore|floatformat:"2" }}</td>
+      <td><img alt="new image" src="{{ candidate|thumbnail_url }}_img.png" height="80"></td>
+      <td><img alt="reference image" src="{{ candidate|thumbnail_url }}_ref.png" height="80"></td>
+      <td><img alt="difference image" src="{{ candidate|thumbnail_url }}_diff.png" height="80"></td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="8">No candidates yet.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>

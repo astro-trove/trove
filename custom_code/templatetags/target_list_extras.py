@@ -1,5 +1,5 @@
 from django import template
-from ..models import TargetListExtra
+from ..models import Candidate, TargetListExtra
 from tom_targets.models import TargetExtra
 import json
 
@@ -28,3 +28,12 @@ def galaxy_table(target):
     else:
         galaxies = None
     return {'galaxies': galaxies}
+
+
+@register.inclusion_tag('tom_targets/partials/candidates_table.html')
+def candidates_table(target):
+    """
+    Displays a table of all the candidates (detections) associated with a given target, including thumbnails
+    """
+    candidates = Candidate.objects.filter(target=target).all()
+    return {'candidates': candidates}
