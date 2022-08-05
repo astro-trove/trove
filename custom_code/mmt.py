@@ -150,12 +150,12 @@ class MMTFacility(BaseRoboticObservationFacility):
         # flatten the dictionary structure across all data sets
         data_products = []
         for datalist in datalist.data:
-            datafiles = datalist['datafiles']
-            for file_info in datafiles:
+            for file_info in datalist['datafiles']:
                 image = mmtapi.Image(token=MMT_SETTINGS['api_key'])
                 image._build_url({'datafileid': file_info['id'], 'token': MMT_SETTINGS['api_key']})
                 file_info['url'] = image.url
-            data_products += datafiles
+                if product_id is None or file_info['id'] == int(product_id):  # None means get all of them
+                    data_products.append(file_info)
 
         return data_products
 
