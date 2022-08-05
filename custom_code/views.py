@@ -11,6 +11,7 @@ from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
 from tom_targets.models import Target, TargetList, TargetExtra
+from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from custom_code.models import Candidate
 from custom_code.filters import CandidateFilter
@@ -317,3 +318,14 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         """
         referer = self.request.META.get('HTTP_REFERER', '/')
         return referer
+
+
+class TargetNameSearchView(OldTargetNameSearchView):
+    """
+    View for searching by target name. If the search returns one result, the view redirects to the corresponding
+    TargetDetailView. Otherwise, the view redirects to the TargetListView.
+    """
+
+    def get(self, request, *args, **kwargs):
+        self.kwargs['name'] = request.GET.get('name').strip()
+        return super().get(request, *args, **kwargs)
