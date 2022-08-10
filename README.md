@@ -37,7 +37,7 @@ Welcome to the saguaro_tom toolkit for GW follow-up candidate(s) searches.
   ```bash
     % cd /var/www/saguaro_tom
     % source env.sh `pwd` test
-    % python3 manage.py runserver
+    % PYTHONPATH=saguaro_tom/ python3 manage.py runserver
   ```
 
 ## Enabling WSGI under Apache2
