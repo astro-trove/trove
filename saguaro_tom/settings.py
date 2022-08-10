@@ -10,6 +10,9 @@ https://docs.djangoproject.com/en/2.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.1/ref/settings/
 """
+
+from settings_local import *
+
 import logging.config
 import os
 import tempfile
@@ -22,13 +25,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = ')i)n1dx46#f+7qow!6t=^ig_q39zidlj8#183f$o2y7vwdc=3!'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [f'{POSTGRES_HOST}', 'localhost']
 
 
 # Application definition
@@ -105,11 +105,11 @@ WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('POSTGRES_DB', 'sassy'),
-        'USER': os.getenv('POSTGRES_USER', 'sassy'),
-        'PASSWORD': os.environ['POSTGRES_PASSWORD'],
-        'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
-        'PORT': os.getenv('POSTGRES_PORT', ''),
+        'NAME': os.getenv('POSTGRES_DB', f'{POSTGRES_DB}'),
+        'USER': os.getenv('POSTGRES_USER', f'{POSTGRES_USER}'),
+        'PASSWORD': os.getenv('POSTGRES_USER', f'{POSTGRES_PASSWORD}'),
+        'HOST': os.getenv('POSTGRES_HOST', f'{POSTGRES_HOST}'),
+        'PORT': os.getenv('POSTGRES_PORT', int(f'{POSTGRES_PORT}')),
     }
 }
 
@@ -200,7 +200,7 @@ TARGET_TYPE = 'SIDEREAL'
 FACILITIES = {
     'LCO': {
         'portal_url': 'https://observe.lco.global',
-        'api_key': '',
+        'api_key': f'{LCO_API_KEY}',
     },
     'GEM': {
         'portal_url': {
@@ -208,8 +208,8 @@ FACILITIES = {
             'GN': 'https://128.171.88.221:8443',
         },
         'api_key': {
-            'GS': '',
-            'GN': '',
+            'GS': f'{GEM_S_API_KEY}',
+            'GN': f'{GEM_N_API_KEY}',
         },
         'user_email': '',
         'programs': {
@@ -224,7 +224,7 @@ FACILITIES = {
         },
     },
     'MMT': {
-        'api_key': os.getenv('MMT_API_TOKEN'),
+        'api_key': os.getenv('MMT_API_TOKEN', f'{MMT_API_KEY}'),
     }
 }
 
@@ -264,7 +264,7 @@ TOM_ALERT_CLASSES = [
 
 BROKERS = {
     'TNS': {
-        'api_key': '9e1d03ae6bd16ecd5305138286b652e833ad5be2',
+        'api_key': f'{TNS_API_KEY}',
         'bot_id': '60911',
         'bot_name': 'SAGUARO_Bot1',
     }
@@ -279,7 +279,7 @@ TOM_HARVESTER_CLASSES = [
 
 HARVESTERS = {
     'TNS': {
-        'api_key': '9e1d03ae6bd16ecd5305138286b652e833ad5be2'
+        'api_key': f'{TNS_API_KEY}'
     }
 }
 
