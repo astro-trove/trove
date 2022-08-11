@@ -136,8 +136,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/saguaro_tom'
-LOGOUT_REDIRECT_URL = '/saguaro_tom'
+LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + '/'
+LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + '/'
 
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
