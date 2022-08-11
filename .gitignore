@@ -2,5 +2,6 @@ db.sqlite3
 **/__pycache__
 .idea
 data/
+_static/
 env.sh
 saguaro_tom/settings_local.py
