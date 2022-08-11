@@ -5,7 +5,7 @@ For customization instructions, see tom_common/base.html
 {% endcomment %}
 
 <li class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
-    <a class="nav-link" href="/">Home <span class="sr-only">(current)</span></a>
+    <a class="nav-link" href="{% url 'home' %}">Home <span class="sr-only">(current)</span></a>
 </li>
 <li class="nav-item {% if request.resolver_match.url_name == 'targetgrouping' %}active{% endif %}">
     <a class="nav-link" href="{% url 'custom_code:targetgrouping' %}">GW Events</a>
