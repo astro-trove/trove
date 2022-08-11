@@ -26,7 +26,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [f'{POSTGRES_HOST}', 'localhost']
 
@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
     'django.contrib.sites',
     'django_extensions',
@@ -65,6 +66,7 @@ SITE_ID = 1
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -163,7 +165,7 @@ DATE_FORMAT = 'Y-m-d'
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+STATIC_ROOT = os.path.join(BASE_DIR, '_static')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 MEDIA_ROOT = os.path.join(BASE_DIR, 'data')
 MEDIA_URL = '/data/'
