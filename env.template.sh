@@ -37,7 +37,7 @@ export TNS_API_KEY=''
 # +
 # credential(s)
 # -
-if [[ ! -f ${SAGUARO_TOM_CODE}/settings_local.py ]]; then
+if [[ ! -f ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py ]]; then
   echo "#!/usr/bin/env python3"                     >> ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
   echo "GEM_N_API_KEY = '${GEM_N_API_KEY}'"         >> ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
   echo "GEM_S_API_KEY = '${GEM_S_API_KEY}'"         >> ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
