@@ -9,6 +9,7 @@ from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMix
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
+from guardian.shortcuts import get_objects_for_user
 
 from tom_targets.models import Target, TargetList, TargetExtra
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
@@ -81,7 +82,7 @@ class TargetGroupingCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class CandidateListView(PermissionListMixin, FilterView):
+class CandidateListView(FilterView):
     """
     View for listing candidates in the TOM.
     """
@@ -90,6 +91,17 @@ class CandidateListView(PermissionListMixin, FilterView):
     strict = False
     model = Candidate
     filterset_class = CandidateFilter
+
+    def get_queryset(self):
+        """
+        Gets the set of ``Candidate`` objects associated with ``Target`` objects that the user has permission to view.
+
+        :returns: Set of ``Candidate`` objects
+        :rtype: QuerySet
+        """
+        return super().get_queryset().filter(
+            target__in=get_objects_for_user(self.request.user, 'tom_targets.view_target')
+        )
 
 
 def upload_files_to_tns(files):
