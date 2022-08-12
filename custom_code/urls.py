@@ -2,7 +2,7 @@ from django.urls import path
 
 from tom_targets.views import TargetGroupingView, TargetGroupingDeleteView
 from .views import TargetGroupingCreateView, CandidateListView, TargetReportView, TargetClassifyView, TargetVettingView
-from .views import ObservationCreateView, TargetNameSearchView
+from .views import ObservationCreateView, TargetNameSearchView, TargetListView
 
 from tom_common.api_router import SharedAPIRootRouter
 
@@ -19,5 +19,6 @@ urlpatterns = [
     path('targets/<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
     path('targets/<int:pk>/vet/', TargetVettingView.as_view(), name='vet'),
     path('targets/search/', TargetNameSearchView.as_view(), name='search'),
+    path('targets/', TargetListView.as_view(), name='list'),
     path('observations/<str:facility>/create/', ObservationCreateView.as_view(), name='create'),
 ]
