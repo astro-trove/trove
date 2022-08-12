@@ -26,6 +26,7 @@ export POSTGRES_PORT=''
 export POSTGRES_USER=''
 export SECRET_KEY=''
 export TNS_API_KEY=''
+export ATLASFORCED_SECRET_KEY = ''
 
 
 # +
@@ -50,5 +51,6 @@ if [[ ! -f ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py ]]; then
   echo "POSTGRES_USER = '${POSTGRES_USER}'"         >> ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
   echo "SECRET_KEY = '${SECRET_KEY}'"               >> ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
   echo "TNS_API_KEY = '${TNS_API_KEY}'"             >> ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
+  echo "ATLASFORCED_SECRET_KEY = '${ATLASFORCED_SECRET_KEY}'" >> ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
   chown www-data:www-data ${SAGUARO_TOM_CODE}/saguaro_tom/settings_local.py
 fi
