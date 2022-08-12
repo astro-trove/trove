@@ -7,6 +7,21 @@ from tom_dataproducts.models import ReducedDatum
 
 register = template.Library()
 
+COLOR_MAP = {
+    'g': 'green',
+    'r': 'red',
+    'i': 'darkred',
+    'c': 'cyan',
+    'o': 'orange',
+}
+MARKER_MAP = {
+    'limit': 50,  # arrow-bar-down
+    'ATLAS': 2,  # diamond
+    'MARS': 1,  # square
+    'SAGUARO pipeline': 0,  # circle
+    'ZTF': 1,  # square
+}
+
 
 @register.inclusion_tag('tom_dataproducts/partials/recent_photometry.html', takes_context=True)
 def recent_photometry(context, target, limit=1):
@@ -57,16 +72,6 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     :param grid: Whether to show grid lines.
     :type grid: bool
     """
-
-    color_map = {
-        'r': 'red',
-        'g': 'green',
-        'i': 'black',
-        'c': 'blue',
-        'o': 'orange'
-    }
-
-    photometry_data = {}
     if settings.TARGET_PERMISSIONS_ONLY:
         datums = ReducedDatum.objects.filter(target=target, data_type=settings.DATA_PRODUCT_TYPES['photometry'][0])
     else:
@@ -76,22 +81,33 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                                         target=target,
                                         data_type=settings.DATA_PRODUCT_TYPES['photometry'][0]))
 
+    detections = {}
+    limits = {}
     for datum in datums:
-        photometry_data.setdefault(datum.value['filter'], {})
-        photometry_data[datum.value['filter']].setdefault('time', []).append(datum.timestamp)
-        photometry_data[datum.value['filter']].setdefault('magnitude', []).append(datum.value.get('magnitude'))
-        photometry_data[datum.value['filter']].setdefault('error', []).append(datum.value.get('error'))
-        photometry_data[datum.value['filter']].setdefault('limit', []).append(datum.value.get('limit'))
+        if 'magnitude' in datum.value:
+            detections.setdefault(datum.source_name, {})
+            detections[datum.source_name].setdefault(datum.value['filter'], {})
+            filter_data = detections[datum.source_name][datum.value['filter']]
+            filter_data.setdefault('time', []).append(datum.timestamp)
+            filter_data.setdefault('magnitude', []).append(datum.value['magnitude'])
+            filter_data.setdefault('error', []).append(datum.value.get('error'))
+        elif 'limit' in datum.value:
+            limits.setdefault(datum.source_name, {})
+            limits[datum.source_name].setdefault(datum.value['filter'], {})
+            filter_data = limits[datum.source_name][datum.value['filter']]
+            filter_data.setdefault('time', []).append(datum.timestamp)
+            filter_data.setdefault('limit', []).append(datum.value['limit'])
 
     plot_data = []
-    for filter_name, filter_values in photometry_data.items():
-        if filter_values['magnitude']:
+    for source_name, source_values in detections.items():
+        for filter_name, filter_values in source_values.items():
             series = go.Scatter(
                 x=filter_values['time'],
                 y=filter_values['magnitude'],
                 mode='markers',
-                marker=dict(color=color_map.get(filter_name)),
-                name=filter_name,
+                marker=dict(color=COLOR_MAP.get(filter_name)),
+                marker_symbol=MARKER_MAP.get(source_name),
+                name=f'{source_name} {filter_name}',
                 error_y=dict(
                     type='data',
                     array=filter_values['error'],
@@ -99,15 +115,16 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                 )
             )
             plot_data.append(series)
-        if filter_values['limit']:
+    for source_name, source_values in limits.items():
+        for filter_name, filter_values in source_values.items():
             series = go.Scatter(
                 x=filter_values['time'],
                 y=filter_values['limit'],
                 mode='markers',
                 opacity=0.5,
-                marker=dict(color=color_map.get(filter_name)),
-                marker_symbol=6,  # upside down triangle
-                name=filter_name + ' non-detection',
+                marker=dict(color=COLOR_MAP.get(filter_name)),
+                marker_symbol=MARKER_MAP['limit'],
+                name=f'{source_name} {filter_name} limits',
             )
             plot_data.append(series)
 
