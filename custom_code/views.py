@@ -9,9 +9,10 @@ from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMix
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
+from guardian.shortcuts import get_objects_for_user
 
 from tom_targets.models import Target, TargetList, TargetExtra
-from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
+from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_dataproducts.models import ReducedDatum
 from custom_code.models import Candidate
@@ -85,7 +86,7 @@ class TargetGroupingCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class CandidateListView(PermissionListMixin, FilterView):
+class CandidateListView(FilterView):
     """
     View for listing candidates in the TOM.
     """
@@ -94,6 +95,17 @@ class CandidateListView(PermissionListMixin, FilterView):
     strict = False
     model = Candidate
     filterset_class = CandidateFilter
+
+    def get_queryset(self):
+        """
+        Gets the set of ``Candidate`` objects associated with ``Target`` objects that the user has permission to view.
+
+        :returns: Set of ``Candidate`` objects
+        :rtype: QuerySet
+        """
+        return super().get_queryset().filter(
+            target__in=get_objects_for_user(self.request.user, 'tom_targets.view_target')
+        )
 
 
 def upload_files_to_tns(files):
@@ -380,3 +392,13 @@ class TargetNameSearchView(OldTargetNameSearchView):
     def get(self, request, *args, **kwargs):
         self.kwargs['name'] = request.GET.get('name').strip()
         return super().get(request, *args, **kwargs)
+
+
+class TargetListView(OldTargetListView):
+    """
+    View for listing targets in the TOM. Only shows targets that the user is authorized to view. Requires authorization.
+
+    Identical to the built-in TargetListView but does not display unconfirmed candidates (names starting with "J")
+    """
+    def get_queryset(self):
+        return super().get_queryset().exclude(name__startswith='J')

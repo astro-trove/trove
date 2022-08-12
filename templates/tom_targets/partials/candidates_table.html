@@ -21,9 +21,9 @@
       <td>{{ candidate.fwhm|floatformat:"1" }}</td>
       <td>{{ candidate.snr|floatformat:"1" }}</td>
       <td>{{ candidate.mlscore|floatformat:"2" }}</td>
-      <td><img alt="new image" src="{{ candidate|thumbnail_url }}_img.png" height="80"></td>
-      <td><img alt="reference image" src="{{ candidate|thumbnail_url }}_ref.png" height="80"></td>
-      <td><img alt="difference image" src="{{ candidate|thumbnail_url }}_diff.png" height="80"></td>
+      <td><img alt="new image" src="{{ candidate|thumbnail_url:'img' }}" height="80"></td>
+      <td><img alt="reference image" src="{{ candidate|thumbnail_url:'ref' }}" height="80"></td>
+      <td><img alt="difference image" src="{{ candidate|thumbnail_url:'diff' }}" height="80"></td>
     </tr>
     {% empty %}
     <tr><td colspan="8">No candidates yet.</td></tr>

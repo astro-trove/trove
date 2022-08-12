@@ -1,12 +1,15 @@
 from django import template
+import requests
+import base64
 
 register = template.Library()
 
 
 @register.filter
-def thumbnail_url(candidate):
-    """Returns the base (without _img.png, _ref.png, _diff.png, _scorr.png) of the thumbnail URL"""
+def thumbnail_url(candidate, suffix):
+    """Returns an image thumbnail as a data URL"""
     visit = candidate.filename.split('_')[4]
-    url = 'http://beast.as.arizona.edu:5013/api/png/'
-    url += f'{candidate.obsdate.strftime("%Y/%m/%d")}/{candidate.field}/{candidate.candidatenumber}_{visit}'
-    return url
+    url = f'http://beast.as.arizona.edu:5013/api/png/{candidate.obsdate.strftime("%Y/%m/%d")}/'
+    url += f'{candidate.field}/{candidate.candidatenumber}_{visit}_{suffix}.png'
+    response = requests.get(url)
+    return 'data:image/png;base64,' + base64.b64encode(response.content).decode() if response.ok else ''

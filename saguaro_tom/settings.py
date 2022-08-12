@@ -135,9 +135,9 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/saguaro_tom'
-LOGOUT_REDIRECT_URL = '/saguaro_tom'
+LOGIN_URL = FORCE_SCRIPT_NAME + '/accounts/login/'
+LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + '/'
+LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + '/'
 
 AUTHENTICATION_BACKENDS = (
     'django.contrib.auth.backends.ModelBackend',
@@ -164,8 +164,8 @@ DATE_FORMAT = 'Y-m-d'
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
-WHITENOISE_STATIC_PREFIX = '/static/'
-STATIC_URL = '/saguaro_tom/static/'
+WHITENOISE_STATIC_PREFIX = '/static/'  # TODO: delete this when whitenoise Issue #271 is resolved
+STATIC_URL = FORCE_SCRIPT_NAME + '/static/'  # FORCE_SCRIPT_NAME is defined in settings_local.py
 STATIC_ROOT = os.path.join(BASE_DIR, '_static')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 MEDIA_ROOT = os.path.join(BASE_DIR, 'data')

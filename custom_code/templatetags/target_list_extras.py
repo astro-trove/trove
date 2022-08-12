@@ -1,6 +1,7 @@
 from django import template
 from ..models import Candidate, TargetListExtra
 from tom_targets.models import TargetExtra
+from guardian.shortcuts import get_objects_for_user
 import json
 
 register = template.Library()
@@ -37,3 +38,14 @@ def candidates_table(target):
     """
     candidates = Candidate.objects.filter(target=target).all()
     return {'candidates': candidates}
+
+
+@register.inclusion_tag('tom_targets/partials/recent_targets.html', takes_context=True)
+def recent_confirmed_targets(context, limit=10):
+    """
+    Displays a list of the most recently created targets in the TOM up to the given limit, or 10 if not specified.
+    """
+    user = context['request'].user
+    targets_for_user = get_objects_for_user(user, 'tom_targets.view_target')
+    confirmed_targets_for_user = targets_for_user.exclude(name__startswith='J')
+    return {'targets': confirmed_targets_for_user.order_by('-created')[:limit]}
