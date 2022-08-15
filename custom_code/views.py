@@ -22,7 +22,6 @@ from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATIO
 
 import json
 import requests
-from saguaro_tom import settings
 import time
 
 from kne_cand_vetting.catalogs import static_cats_query
@@ -30,10 +29,13 @@ from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import ATLAS_forcedphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
+from saguaro_tom.settings import BROKERS, DB_USER, DB_PASS, DB_HOST, DB_PORT, DB_NAME, ATLASFORCED_SECRET_KEY
+
+DB_CONNECT = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 # from tom_catalogs.harvesters.tns import TNS_URL
 TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
-TNS = settings.BROKERS['TNS']  # includes the API credentials
+TNS = BROKERS['TNS']  # includes the API credentials
 TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
@@ -298,6 +300,7 @@ def update_or_create_target_extra(target, key, value):
     te.value = value
     te.save()
 
+
 class TargetVettingView(LoginRequiredMixin, RedirectView):
     """
     View that runs or reruns the kilonova candidate vetting code and stores the results
@@ -307,7 +310,8 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec])
+        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query(target.ra, target.dec,
+                                                                                  db_connect=DB_CONNECT)
 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
         if qso[0] != 'None':
@@ -334,6 +338,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         referer = self.request.META.get('HTTP_REFERER', '/')
         return referer
 
+
 class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
     """
     View that runs ATLAS forced photometry over past 200 days and stores result.
@@ -344,7 +349,7 @@ class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
         Converts micro-Jansky values to AB magnitude and separates detections and non-detections.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        atlasphot = ATLAS_forcedphot(target.ra, target.dec)
+        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=ATLASFORCED_SECRET_KEY)
 
         if len(atlasphot)>1:
             for candidate in atlasphot:
@@ -382,6 +387,7 @@ class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
         """
         referer = self.request.META.get('HTTP_REFERER', '/')
         return referer
+
 
 class TargetNameSearchView(OldTargetNameSearchView):
     """
