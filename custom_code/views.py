@@ -310,7 +310,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query(target.ra, target.dec,
+        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec],
                                                                                   db_connect=DB_CONNECT)
 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])

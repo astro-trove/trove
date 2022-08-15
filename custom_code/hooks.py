@@ -17,7 +17,7 @@ def target_post_save(target, created):
     logger.info('Target post save hook: %s created: %s', target, created)
 
     if created:
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query(target.ra, target.dec,
+        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec],
                                                                                   db_connect=DB_CONNECT)
         TargetExtra(target=target, key='QSO Match', value=qso[0]).save()
         if qso[0] != 'None':
