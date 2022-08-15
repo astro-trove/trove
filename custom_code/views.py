@@ -14,6 +14,7 @@ from guardian.shortcuts import get_objects_for_user
 from tom_targets.models import Target, TargetList, TargetExtra
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
+from tom_dataproducts.models import ReducedDatum
 from custom_code.models import Candidate
 from custom_code.filters import CandidateFilter
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
@@ -21,15 +22,20 @@ from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATIO
 
 import json
 import requests
-from saguaro_tom import settings
 import time
 
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
+from kne_cand_vetting.survey_phot import ATLAS_forcedphot
+import numpy as np
+from astropy.time import Time, TimezoneInfo
+from saguaro_tom.settings import BROKERS, DATABASES, ATLASFORCED_SECRET_KEY
+
+DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
 
 # from tom_catalogs.harvesters.tns import TNS_URL
 TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
-TNS = settings.BROKERS['TNS']  # includes the API credentials
+TNS = BROKERS['TNS']  # includes the API credentials
 TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
@@ -304,7 +310,8 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec])
+        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec],
+                                                                                  db_connect=DB_CONNECT)
 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
         if qso[0] != 'None':
@@ -316,8 +323,58 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
             update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
 
-        matches, hostdict = galaxy_search([target.ra], [target.dec])
+        matches, hostdict = galaxy_search([target.ra], [target.dec], db_connect=DB_CONNECT)
         update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
+
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer
+
+
+class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
+    """
+    View that runs ATLAS forced photometry over past 200 days and stores result.
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view. Calls the ATLAS forced photometry function.
+        Converts micro-Jansky values to AB magnitude and separates detections and non-detections.
+        """
+        target = Target.objects.get(pk=kwargs['pk'])
+        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=ATLASFORCED_SECRET_KEY)
+
+        if len(atlasphot)>1:
+            for candidate in atlasphot:
+                if candidate['uJy'] >= 5*candidate['duJy']:
+                    nondetection = False
+                elif candidate['uJy'] < 5*candidate['duJy']:
+                    nondetection = True
+                else:
+                    continue
+                mjd = Time(candidate['mjd'], format='mjd', scale='utc')
+                mjd.to_datetime(timezone=TimezoneInfo())
+                value = {
+                    'filter': candidate['F']
+                }
+                if nondetection:
+                    value['limit'] = candidate['mag5sig']
+                else:
+                    value['magnitude'] = -2.5*np.log10(candidate['uJy'] * 1e-29) - 48.6
+                    value['error'] = 1.09 * candidate['duJy'] / candidate['uJy']
+                rd, _ = ReducedDatum.objects.get_or_create(
+                    timestamp=mjd.to_datetime(timezone=TimezoneInfo()),
+                    value=value,
+                    source_name='ATLAS',
+                    data_type='photometry',
+                    target=target)
 
         return HttpResponseRedirect(self.get_redirect_url())
 

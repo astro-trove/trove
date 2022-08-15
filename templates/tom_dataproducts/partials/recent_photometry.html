@@ -1,0 +1,25 @@
+{% load tom_common_extras photometry_extras %}
+<div class="card">
+    <div class="card-header">
+      Recent Photometry
+    </div>
+    <table class="table">
+        <thead><tr><th>Timestamp</th><th>Magnitude</th></tr></thead>
+        <tbody>
+        {% for datum in data %}
+        <tr>
+            <td>{{ datum.timestamp }}</td>
+            {% if datum.magnitude %}
+            <td>{{ datum.magnitude|floatformat:2 }}</td>
+            {% elif datum.limit %}
+            <td>&gt;{{ datum.limit|floatformat:2 }}</td>
+            {% endif %}
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="2">No recent photometry.</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>

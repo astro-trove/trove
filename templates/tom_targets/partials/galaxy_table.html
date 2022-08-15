@@ -3,19 +3,19 @@
 <table class="table table-hover">
   <thead>
     <tr>
+      <th scope="col">ID</th>
       <th scope="col">PCC</th>
-      <th scope="col">R.A.</th>
-      <th scope="col">Dec.</th>
+      <th scope="col">Offset</th>
       <th scope="col">Dist.</th>
       <th scope="col">Err.</th>
-      <th scope="col">Mag</th>
-      <th scope="col">Filter</th>
+      <th scope="col">Filt.</th>
+      <th scope="col">Mag.</th>
       <th scope="col">Source</th>
     </tr>
     <tr>
-      <th> </th>
-      <td>deg.</td>
-      <td>deg.</td>
+      <td> </td>
+      <td> </td>
+      <td>''</td>
       <td>Mpc</td>
       <td>Mpc</td>
       <td>AB</td>
@@ -25,13 +25,13 @@
   </thead>
   {% for galaxy in galaxies %}
     <tr>
+      <td>{{ galaxy.ID }}</td>
       <td>{{ galaxy.PCC|floatformat:5 }}</td>
-      <td>{{ galaxy.RA }}</td>
-      <td>{{ galaxy.Dec }}</td>
+      <td>{{ galaxy.Offset|floatformat:2 }}</td>
       <td>{{ galaxy.Dist|floatformat:1 }}</td>
       <td>{{ galaxy.DistErr|floatformat:1 }}</td>
-      <td>{{ galaxy.Mags|floatformat:2 }}</td>
       <td>{{ galaxy.Filter }}</td>
+      <td>{{ galaxy.Mags|floatformat:2 }}</td>
       <td>{{ galaxy.Source }}</td>
     </tr>
   {% empty %}
