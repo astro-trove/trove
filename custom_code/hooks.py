@@ -5,9 +5,9 @@ from kne_cand_vetting.survey_phot import query_ZTFpubphot
 from tom_targets.models import TargetExtra
 from tom_alerts.brokers.mars import MARSBroker
 import json
-from saguaro_tom.settings import DB_USER, DB_PASS, DB_HOST, DB_PORT, DB_NAME
+from saguaro_tom.settings import DATABASES
 
-DB_CONNECT = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
 
 logger = logging.getLogger(__name__)
 

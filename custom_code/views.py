@@ -29,9 +29,9 @@ from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import ATLAS_forcedphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
-from saguaro_tom.settings import BROKERS, DB_USER, DB_PASS, DB_HOST, DB_PORT, DB_NAME, ATLASFORCED_SECRET_KEY
+from saguaro_tom.settings import BROKERS, DATABASES, ATLASFORCED_SECRET_KEY
 
-DB_CONNECT = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
 
 # from tom_catalogs.harvesters.tns import TNS_URL
 TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
