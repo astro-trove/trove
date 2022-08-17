@@ -209,10 +209,10 @@ class MMTFacility(BaseRoboticObservationFacility):
             start = datetime.strptime(run['start'], '%Y-%m-%d %H:%M:%S-%f')
             end = datetime.strptime(run['end'], '%Y-%m-%d')
             if start < datetime.now() < end:
-                if run['type'] == 'queue':
-                    status = run['title']
-                else:
+                if run.get('instrument') is not None:
                     status = f"{run['instrument']['name']} ({run['title']})"
+                else:
+                    status = run['title']
                 break
         else:
             status = 'NO RUN SCHEDULED'
