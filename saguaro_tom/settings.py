@@ -11,7 +11,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
-from settings_local import *
+from .settings_local import *
 import os
 import tempfile
 
