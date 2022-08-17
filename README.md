@@ -1,6 +1,6 @@
 # SAGUARO TOM #
 
-Welcome to the saguaro_tom toolkit for GW follow-up candidate(s) searches.
+Welcome to the SAGUARO target and observation manager for GW follow-up.
 
 ## Repositories of Interest:
 
@@ -17,12 +17,12 @@ Welcome to the saguaro_tom toolkit for GW follow-up candidate(s) searches.
     % git clone https://github.com/SAGUARO-MMA/saguaro_tom.git
   ```
 
- 2. Copy env.template.sh and edit as you see fit:
+ 2. Copy settings_local.template.py to settings_local.py and edit as you see fit:
 
   ```bash
-    % cd /var/www/saguaro_tom
-    % cp env.template.sh env.sh
-    % vi env.sh
+    % cd /var/www/saguaro_tom/saguaro_tom
+    % cp settings_local.template.py settings_local.py
+    % vi settings_local.py
   ```
 
   3. Install dependencies:
@@ -32,12 +32,11 @@ Welcome to the saguaro_tom toolkit for GW follow-up candidate(s) searches.
     % python3 -m pip install -r requirements.txt
   ```
 
-  4. Run the server:
+  4. Run the development server:
 
   ```bash
     % cd /var/www/saguaro_tom
-    % source env.sh `pwd` test
-    % PYTHONPATH=saguaro_tom/ python3 manage.py runserver
+    % python3 manage.py runserver
   ```
 
 ## Enabling WSGI under Apache2
@@ -45,9 +44,10 @@ Welcome to the saguaro_tom toolkit for GW follow-up candidate(s) searches.
 Enable WSGI within Apache2 in the usual way (there are plenty of web tutorials on this).
 
 Edit `saguaro_tom.conf` and `saguaro_tom-ssl.conf` as you see fit to reflect your source
-code directory and security certicates. You should probably rename 'localhost' to something
-more suitable. If you do, you will also need to add that name to /etc/hosts and, possibly,
-the ALLOWED_HOSTS list in `/var/www/saguaro_tom/settings.py`.
+code directory and security certificates. You should probably rename 'localhost' to something
+more suitable. If you do, you will also need to add that name to /etc/hosts and set 
+`ALLOWED_HOST` in `settings_local.py`. If you are hosting from a subdomain, you must also set
+`FORCE_SCRIPT_NAME` in `settings_local.py`. 
 
 
 Then (as root) enable the sites:

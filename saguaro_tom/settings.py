@@ -11,9 +11,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/2.1/ref/settings/
 """
 
-from saguaro_tom.settings_local import *
-
-import logging.config
+from settings_local import *
 import os
 import tempfile
 
@@ -25,10 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
-
-ALLOWED_HOSTS = [f'{POSTGRES_HOST}', 'localhost']
+ALLOWED_HOSTS = [ALLOWED_HOST, 'localhost', '127.0.0.1']
 
 
 # Application definition
@@ -107,11 +102,11 @@ WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('POSTGRES_DB', f'{POSTGRES_DB}'),
-        'USER': os.getenv('POSTGRES_USER', f'{POSTGRES_USER}'),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', f'{POSTGRES_PASSWORD}'),
-        'HOST': os.getenv('POSTGRES_HOST', f'{POSTGRES_HOST}'),
-        'PORT': os.getenv('POSTGRES_PORT', int(f'{POSTGRES_PORT}')),
+        'NAME': os.getenv('POSTGRES_DB', POSTGRES_DB),
+        'USER': os.getenv('POSTGRES_USER', POSTGRES_USER),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', POSTGRES_PASSWORD),
+        'HOST': os.getenv('POSTGRES_HOST', POSTGRES_HOST),
+        'PORT': os.getenv('POSTGRES_PORT', int(POSTGRES_PORT)),
     }
 }
 
@@ -165,7 +160,7 @@ DATE_FORMAT = 'Y-m-d'
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
 WHITENOISE_STATIC_PREFIX = '/static/'  # TODO: delete this when whitenoise Issue #271 is resolved
-STATIC_URL = FORCE_SCRIPT_NAME + '/static/'  # FORCE_SCRIPT_NAME is defined in settings_local.py
+STATIC_URL = FORCE_SCRIPT_NAME + '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, '_static')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 MEDIA_ROOT = os.path.join(BASE_DIR, 'data')
@@ -203,7 +198,7 @@ TARGET_TYPE = 'SIDEREAL'
 FACILITIES = {
     'LCO': {
         'portal_url': 'https://observe.lco.global',
-        'api_key': f'{LCO_API_KEY}',
+        'api_key': LCO_API_KEY,
     },
     'GEM': {
         'portal_url': {
@@ -211,8 +206,8 @@ FACILITIES = {
             'GN': 'https://128.171.88.221:8443',
         },
         'api_key': {
-            'GS': f'{GEM_S_API_KEY}',
-            'GN': f'{GEM_N_API_KEY}',
+            'GS': GEM_S_API_KEY,
+            'GN': GEM_N_API_KEY,
         },
         'user_email': '',
         'programs': {
@@ -227,7 +222,7 @@ FACILITIES = {
         },
     },
     'MMT': {
-        'api_key': os.getenv('MMT_API_TOKEN', f'{MMT_API_KEY}'),
+        'api_key': os.getenv('MMT_API_TOKEN', MMT_API_KEY),
     }
 }
 
@@ -267,7 +262,7 @@ TOM_ALERT_CLASSES = [
 
 BROKERS = {
     'TNS': {
-        'api_key': f'{TNS_API_KEY}',
+        'api_key': TNS_API_KEY,
         'bot_id': '60911',
         'bot_name': 'SAGUARO_Bot1',
     }
@@ -282,7 +277,7 @@ TOM_HARVESTER_CLASSES = [
 
 HARVESTERS = {
     'TNS': {
-        'api_key': f'{TNS_API_KEY}'
+        'api_key': TNS_API_KEY,
     }
 }
 
@@ -338,8 +333,3 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 100
 }
-
-try:
-    from local_settings import * # noqa
-except ImportError:
-    pass

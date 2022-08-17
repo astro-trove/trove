@@ -29,7 +29,7 @@ from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import ATLAS_forcedphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
-from saguaro_tom.settings import BROKERS, DATABASES, ATLASFORCED_SECRET_KEY
+from saguaro_tom.settings import BROKERS, DATABASES, ATLAS_API_KEY
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
 
@@ -349,7 +349,7 @@ class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
         Converts micro-Jansky values to AB magnitude and separates detections and non-detections.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=ATLASFORCED_SECRET_KEY)
+        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=ATLAS_API_KEY)
 
         if len(atlasphot)>1:
             for candidate in atlasphot:

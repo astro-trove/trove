@@ -3,5 +3,4 @@ db.sqlite3
 .idea
 data/
 _static/
-env.sh
 saguaro_tom/settings_local.py

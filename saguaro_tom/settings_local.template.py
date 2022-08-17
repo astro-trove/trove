@@ -1,0 +1,15 @@
+ALLOWED_HOST = ''       # hostname or IP address of the web server (leave blank for development)
+ATLAS_API_KEY = ''      # API key for the ATLAS forced photometry server
+DEBUG = False           # set to True to display error tracebacks in browser, leave False in production
+FORCE_SCRIPT_NAME = ''  # the subdomain where you will host the site (leave blank for development)
+GEM_N_API_KEY = ''      # API key for Gemini Observatory North
+GEM_S_API_KEY = ''      # API key for Gemini Observatory South
+LCO_API_KEY = ''        # API key for Las Cumbres Observatory
+MMT_API_KEY = ''        # API key for MMT Observatory
+POSTGRES_DB = ''        # name of the Postgres database
+POSTGRES_HOST = ''      # hostname or IP address of the Postgres database server
+POSTGRES_PASSWORD = ''  # password for the Postgres database
+POSTGRES_PORT = 5432    # port number for the Postgres database
+POSTGRES_USER = ''      # username for the Postgres database
+SECRET_KEY = ''         # see https://docs.djangoproject.com/en/4.1/ref/settings/#secret-key
+TNS_API_KEY = ''        # API key for the Transient Name Server
