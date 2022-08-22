@@ -287,7 +287,11 @@ class ObservationCreateView(OldObservationCreateView):
         target = self.get_target()
         photometry = target.reduceddatum_set.filter(data_type='photometry')
         if photometry.exists():
-            initial['magnitude'] = photometry.latest().value['magnitude']
+            latest_photometry = photometry.latest().value
+            if 'magnitude' in latest_photometry:
+                initial['magnitude'] = latest_photometry['magnitude']
+            elif 'limit' in latest_photometry:
+                initial['magnitude'] = latest_photometry['limit']
         return initial
 
 
