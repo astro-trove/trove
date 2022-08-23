@@ -3,7 +3,7 @@ django_extensions
 guardian
 flask_sqlalchemy
 fastavro
-tomtoolkit
+tomtoolkit @ git+https://github.com/griffin-h/tom_base  # use my fork until PRs are merged
 psycopg2-binary
 whitenoise
 kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
