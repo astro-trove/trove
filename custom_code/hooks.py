@@ -30,6 +30,10 @@ def target_post_save(target, created):
 
         matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         TargetExtra(target=target, key='Host Galaxies', value=json.dumps(hostdict)).save()
+        if hostdict:
+            target.distance = hostdict[0].get('Dist')
+            target.distance_err = hostdict[0].get('DistErr')
+            target.save()
 
         ztfphot = query_ZTFpubphot(target.ra, target.dec, db_connect=DB_CONNECT)
         if ztfphot:

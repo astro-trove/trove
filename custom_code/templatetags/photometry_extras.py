@@ -4,6 +4,7 @@ from guardian.shortcuts import get_objects_for_user
 from plotly import offline
 import plotly.graph_objs as go
 from tom_dataproducts.models import ReducedDatum
+import numpy as np
 
 register = template.Library()
 
@@ -40,11 +41,15 @@ def recent_photometry(context, target, limit=1):
     recent_det = {'data': []}
     for datum in datums.order_by('-timestamp')[:limit]:
         if 'magnitude' in datum.value.keys():
-            recent_det['data'].append({'timestamp': datum.timestamp, 'magnitude': datum.value['magnitude']})
+            phot_point = {'timestamp': datum.timestamp, 'magnitude': datum.value['magnitude']}
         elif 'limit' in datum.value.keys():
-            recent_det['data'].append({'timestamp': datum.timestamp, 'limit': datum.value['limit']})
-        else:
-            continue
+            phot_point = {'timestamp': datum.timestamp, 'limit': datum.value['limit']}
+
+        if target.distance is not None:
+            dm = 5. * (np.log10(target.distance) + 5.)
+            phot_point['absmag'] = (phot_point.get('magnitude') or phot_point.get('limit')) - dm
+
+        recent_det['data'].append(phot_point)
 
     return recent_det
 
