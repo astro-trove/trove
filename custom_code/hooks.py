@@ -5,6 +5,7 @@ from kne_cand_vetting.survey_phot import query_ZTFpubphot
 from tom_targets.models import TargetExtra
 from tom_alerts.brokers.mars import MARSBroker
 import json
+import numpy as np
 from saguaro_tom.settings import DATABASES
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
@@ -31,8 +32,12 @@ def target_post_save(target, created):
         matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         TargetExtra(target=target, key='Host Galaxies', value=json.dumps(hostdict)).save()
         if hostdict:
-            target.distance = hostdict[0].get('Dist')
-            target.distance_err = hostdict[0].get('DistErr')
+            dist = hostdict[0].get('Dist', np.nan)
+            if np.isfinite(dist):
+                target.distance = dist
+            disterr = hostdict[0].get('DistErr', np.nan)
+            if np.isfinite(disterr):
+                target.distance_err = disterr
             target.save()
 
         ztfphot = query_ZTFpubphot(target.ra, target.dec, db_connect=DB_CONNECT)
