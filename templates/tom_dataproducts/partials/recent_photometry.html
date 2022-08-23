@@ -4,7 +4,7 @@
       Recent Photometry
     </div>
     <table class="table">
-        <thead><tr><th>Timestamp</th><th>Magnitude</th></tr></thead>
+        <thead><tr><th>Time</th><th>Mag.</th><th>Abs. Mag.</th></tr></thead>
         <tbody>
         {% for datum in data %}
         <tr>
@@ -13,6 +13,11 @@
             <td>{{ datum.magnitude|floatformat:2 }}</td>
             {% elif datum.limit %}
             <td>&gt;{{ datum.limit|floatformat:2 }}</td>
+            {% endif %}
+            {% if datum.absmag %}
+            <td>{{ datum.absmag|floatformat:2 }}</td>
+            {% else %}
+            <td></td>
             {% endif %}
         </tr>
         {% empty %}
