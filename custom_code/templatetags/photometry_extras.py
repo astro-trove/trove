@@ -11,9 +11,12 @@ register = template.Library()
 COLOR_MAP = {
     'g': 'green',
     'r': 'red',
-    'i': 'darkred',
-    'c': 'cyan',
+    'i': 'black',
+    'c': 'dodgerblue',
     'o': 'orange',
+    'orange': 'orange',
+    'G': 'darkseagreen',
+    'cyan': 'dodgerblue'
 }
 MARKER_MAP = {
     'limit': 50,  # arrow-bar-down
