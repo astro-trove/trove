@@ -203,19 +203,23 @@ class MMTFacility(BaseRoboticObservationFacility):
         return f"https://scheduler.mmto.arizona.edu/catalog.php?token={MMT_SETTINGS['api_key']}"
 
     def get_facility_status(self):
-        response = requests.get('https://scheduler.mmto.arizona.edu/APIv2/trimester//schedule/all')
-        schedule = response.json()
-        for run in schedule['published']['runs']:
-            start = datetime.strptime(run['start'], '%Y-%m-%d %H:%M:%S-%f')
-            end = datetime.strptime(run['end'], '%Y-%m-%d')
-            if start < datetime.now() < end:
-                if run.get('instrument') is not None:
-                    status = f"{run['instrument']['name']} ({run['title']})"
-                else:
-                    status = run['title']
-                break
+        queues = mmtapi.Instruments().get_instruments()
+        if queues:
+            status = queues[0].get('name', 'UNKNOWN')
         else:
-            status = 'NO RUN SCHEDULED'
+            response = requests.get('https://scheduler.mmto.arizona.edu/APIv2/trimester//schedule/all')
+            schedule = response.json()
+            for run in schedule['published']['runs']:
+                start = datetime.strptime(run['start'], '%Y-%m-%d %H:%M:%S-%f')
+                end = datetime.strptime(run['end'], '%Y-%m-%d')
+                if start < datetime.now() < end:
+                    if run.get('instrument') is not None:
+                        status = f"{run['instrument']['name']} ({run['title']})"
+                    else:
+                        status = run['title']
+                    break
+            else:
+                status = 'NO RUN SCHEDULED'
         facility_status = {
             'code': 'MMT',
             'sites': [{
