@@ -14,7 +14,7 @@ For customization instructions, see tom_common/base.html
     <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
 </li>
 <li class="nav-item {% if request.resolver_match.url_name == 'candidates' %}active{% endif %}">
-    <a class="nav-link" href="{% url 'custom_code:candidates' %}">Candidates</a>
+    <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&order=-mlscore">Candidates</a>
 </li>
 <li class="nav-item {% if request.resolver_match.namespace == 'alerts' %}active{% endif %}">
     <a class="nav-link" href="{% url 'alerts:list' %}">Alerts</a>
