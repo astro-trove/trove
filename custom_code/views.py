@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
@@ -9,14 +10,18 @@ from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMix
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
-from guardian.shortcuts import get_objects_for_user
+from guardian.shortcuts import get_objects_for_user, assign_perm
 
+from tom_common.hooks import run_hook
 from tom_targets.models import Target, TargetList, TargetExtra
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
-from tom_dataproducts.models import ReducedDatum
+from tom_dataproducts.exceptions import InvalidFileFormatException
+from tom_dataproducts.models import DataProduct, ReducedDatum
+from tom_dataproducts.views import DataProductUploadView as OldDataProductUploadView
 from custom_code.models import Candidate
 from custom_code.filters import CandidateFilter
+from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 
@@ -452,3 +457,57 @@ class TargetListView(OldTargetListView):
     """
     def get_queryset(self):
         return super().get_queryset().exclude(name__startswith='J')
+
+
+class DataProductUploadView(OldDataProductUploadView):
+
+    def form_valid(self, form):
+        """
+        Runs after ``DataProductUploadForm`` is validated. Saves each ``DataProduct`` and calls ``run_data_processor``
+        on each saved file. Redirects to the previous page.
+        """
+        target = form.cleaned_data['target']
+        if not target:
+            observation_record = form.cleaned_data['observation_record']
+            target = observation_record.target
+        else:
+            observation_record = None
+        dp_type = form.cleaned_data['data_product_type']
+        data_product_files = self.request.FILES.getlist('files')
+        successful_uploads = []
+        for f in data_product_files:
+            dp = DataProduct(
+                target=target,
+                observation_record=observation_record,
+                data=f,
+                product_id=None,
+                data_product_type=dp_type
+            )
+            dp.save()
+            try:
+                run_hook('data_product_post_upload', dp)
+                reduced_data = run_data_processor(dp)
+                if not settings.TARGET_PERMISSIONS_ONLY:
+                    for group in form.cleaned_data['groups']:
+                        assign_perm('tom_dataproducts.view_dataproduct', group, dp)
+                        assign_perm('tom_dataproducts.delete_dataproduct', group, dp)
+                        assign_perm('tom_dataproducts.view_reduceddatum', group, reduced_data)
+                successful_uploads.append(str(dp))
+            except InvalidFileFormatException as iffe:
+                ReducedDatum.objects.filter(data_product=dp).delete()
+                dp.delete()
+                messages.error(
+                    self.request,
+                    'File format invalid for file {0} -- error was {1}'.format(str(dp), iffe)
+                )
+            except Exception:
+                ReducedDatum.objects.filter(data_product=dp).delete()
+                dp.delete()
+                messages.error(self.request, 'There was a problem processing your file: {0}'.format(str(dp)))
+        if successful_uploads:
+            messages.success(
+                self.request,
+                'Successfully uploaded: {0}'.format('\n'.join([p for p in successful_uploads]))
+            )
+
+        return redirect(form.cleaned_data.get('referrer', '/'))
