@@ -55,6 +55,8 @@ INSTALLED_APPS = [
     'tom_observations',
     'tom_dataproducts',
     'tom_alertstreams',
+    'tom_nonlocalizedevents',
+    'webpack_loader',
     'custom_code',
 ]
 
@@ -373,3 +375,15 @@ ALERT_STREAMS = [
         },
     }
 ]
+
+VUE_FRONTEND_DIR_TOM_NONLOCAL = os.path.join(STATIC_ROOT, 'tom_nonlocalizedevents/vue')
+WEBPACK_LOADER = {
+    'TOM_NONLOCALIZEDEVENTS': {
+        'CACHE': not DEBUG,
+        'BUNDLE_DIR_NAME': 'tom_nonlocalizedevents/vue/',  # must end with slash
+        'STATS_FILE': os.path.join(VUE_FRONTEND_DIR_TOM_NONLOCAL, 'webpack-stats.json'),
+        'POLL_INTERVAL': 0.1,
+        'TIMEOUT': None,
+        'IGNORE': [r'.+\.hot-update.js', r'.+\.map']
+    }
+}
