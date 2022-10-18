@@ -6,9 +6,11 @@ from tom_targets.models import TargetExtra
 from tom_alerts.brokers.mars import MARSBroker
 import json
 import numpy as np
+from astropy.cosmology import FlatLambdaCDM
 from saguaro_tom.settings import DATABASES
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
+COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
 
 logger = logging.getLogger(__name__)
 
@@ -52,3 +54,9 @@ def target_post_save(target, created):
             mars = MARSBroker()
             mars.name = 'ZTF'
             mars.process_reduced_data(target, alert)
+
+    redshift = target.targetextra_set.filter(key='Redshift')
+    if redshift.exists() and redshift.first().float_value >= 0.02 and target.distance is None:
+        logger.info(f'Updating distance of {target.name} based on redshift')
+        target.distance = COSMOLOGY.luminosity_distance(redshift.first().float_value).to('Mpc').value
+        target.save()
