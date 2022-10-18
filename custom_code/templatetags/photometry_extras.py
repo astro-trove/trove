@@ -107,6 +107,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
             filter_data.setdefault('limit', []).append(datum.value['limit'])
 
     plot_data = []
+    all_ydata = []
     for source_name, source_values in detections.items():
         for filter_name, filter_values in source_values.items():
             series = go.Scatter(
@@ -123,6 +124,8 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                 )
             )
             plot_data.append(series)
+            all_ydata.append(np.array(filter_values['magnitude']) + np.array(filter_values['error']))
+            all_ydata.append(np.array(filter_values['magnitude']) - np.array(filter_values['error']))
     for source_name, source_values in limits.items():
         for filter_name, filter_values in source_values.items():
             series = go.Scatter(
@@ -135,19 +138,65 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                 name=f'{source_name} {filter_name} limits',
             )
             plot_data.append(series)
+            all_ydata.append(filter_values['limit'])
+
+    # scale the y-axis manually so that we know the range ahead of time and can scale the secondary y-axis to match
+    if all_ydata:
+        all_ydata = np.concatenate(all_ydata)
+        ymin = np.min(all_ydata)
+        ymax = np.max(all_ydata)
+        yrange = ymax - ymin
+        ymin_view = ymin - 0.05 * yrange
+        ymax_view = ymax + 0.05 * yrange
+    else:
+        ymin_view = 0.
+        ymax_view = 0.
+    yaxis = {
+        'title': 'Apparent Magnitude',
+        'range': (ymax_view, ymin_view),
+        'showgrid': grid,
+        'color': label_color,
+        'showline': True,
+        'linecolor': label_color,
+        'mirror': True,
+    }
+    if target.distance is not None:
+        dm = 5. * (np.log10(target.distance) + 5.)
+        yaxis2 = {
+            'title': 'Absolute Magnitude',
+            'range': (ymax_view - dm, ymin_view - dm),
+            'showgrid': False,
+            'overlaying': 'y',
+            'side': 'right',
+        }
+        plot_data.append(go.Scatter(x=[], y=[], yaxis='y2'))  # dummy data set for abs mag axis
+    else:
+        yaxis2 = None
 
     layout = go.Layout(
-        yaxis=dict(autorange='reversed'),
+        xaxis={
+            'showgrid': grid,
+            'color': label_color,
+            'showline': True,
+            'linecolor': label_color,
+            'mirror': True,
+        },
+        yaxis=yaxis,
+        yaxis2=yaxis2,
         height=height,
         width=width,
         paper_bgcolor=background,
-        plot_bgcolor=background
-
+        plot_bgcolor=background,
+        legend={
+            'font_color': label_color,
+            'xanchor': 'center',
+            'yanchor': 'bottom',
+            'x': 0.5,
+            'y': 1.,
+            'orientation': 'h',
+        }
     )
-    layout.legend.font.color = label_color
     fig = go.Figure(data=plot_data, layout=layout)
-    fig.update_yaxes(showgrid=grid, color=label_color, showline=True, linecolor=label_color, mirror=True)
-    fig.update_xaxes(showgrid=grid, color=label_color, showline=True, linecolor=label_color, mirror=True)
     return {
         'target': target,
         'plot': offline.plot(fig, output_type='div', show_link=False)
