@@ -30,7 +30,7 @@ class SpectroscopyProcessor(OldSpectroscopyProcessor):
 
         serialized_spectrum = SpectrumSerializer().serialize(spectrum)
 
-        return [(obs_date, serialized_spectrum, None)]  # no support for source_name yet
+        return [(obs_date, serialized_spectrum, '')]  # no support for source_name yet
 
     def _process_spectrum_from_plaintext(self, data_product):
         """
