@@ -3,6 +3,7 @@ from django.conf import settings
 from guardian.shortcuts import get_objects_for_user
 from plotly import offline
 import plotly.graph_objs as go
+from plotly.express import colors
 from tom_dataproducts.models import ReducedDatum
 import numpy as np
 
@@ -25,6 +26,9 @@ MARKER_MAP = {
     'SAGUARO pipeline': 0,  # circle
     'ZTF': 1,  # square
 }
+OTHER_MARKERS = list(range(33))  # all filled markers in Plotly
+OTHER_MARKERS.remove(6)  # do not use triangle-down, too close to arrow-bar-down
+OTHER_COLORS = colors.qualitative.Plotly  # default Plotly color sequence
 
 
 @register.inclusion_tag('tom_dataproducts/partials/recent_photometry.html', takes_context=True)
@@ -110,11 +114,22 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     all_ydata = []
     for source_name, source_values in detections.items():
         for filter_name, filter_values in source_values.items():
+            # get unique color and marker for this data series
+            if filter_name not in COLOR_MAP:
+                for new_color in OTHER_COLORS:
+                    if new_color not in COLOR_MAP.values():
+                        COLOR_MAP[filter_name] = new_color
+                        break
+            if source_name not in MARKER_MAP:
+                for new_marker in OTHER_MARKERS:
+                    if new_marker not in MARKER_MAP.values():
+                        MARKER_MAP[source_name] = new_marker
+                        break
             series = go.Scatter(
                 x=filter_values['time'],
                 y=filter_values['magnitude'],
                 mode='markers',
-                marker=dict(color=COLOR_MAP.get(filter_name)),
+                marker_color=COLOR_MAP.get(filter_name),
                 marker_symbol=MARKER_MAP.get(source_name),
                 name=f'{source_name} {filter_name}',
                 error_y=dict(
@@ -128,12 +143,18 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
             all_ydata.append(np.array(filter_values['magnitude']) - np.array(filter_values['error']))
     for source_name, source_values in limits.items():
         for filter_name, filter_values in source_values.items():
+            # get unique color for this data series
+            if filter_name not in COLOR_MAP:
+                for new_color in OTHER_COLORS:
+                    if new_color not in COLOR_MAP.values():
+                        COLOR_MAP[filter_name] = new_color
+                        break
             series = go.Scatter(
                 x=filter_values['time'],
                 y=filter_values['limit'],
                 mode='markers',
                 opacity=0.5,
-                marker=dict(color=COLOR_MAP.get(filter_name)),
+                marker_color=COLOR_MAP.get(filter_name),
                 marker_symbol=MARKER_MAP['limit'],
                 name=f'{source_name} {filter_name} limits',
             )

@@ -1,10 +1,36 @@
+import mimetypes
 from specutils import Spectrum1D
+from tom_dataproducts.processors.data_serializers import SpectrumSerializer
 from tom_dataproducts.processors.spectroscopy_processor import SpectroscopyProcessor as OldSpectroscopyProcessor
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from lightcurve_fitting.speccal import readspec
 
 
 class SpectroscopyProcessor(OldSpectroscopyProcessor):
+
+    def process_data(self, data_product):
+        """
+        Routes a spectroscopy processing call to a method specific to a file-format, then serializes the returned data.
+
+        :param data_product: Spectroscopic DataProduct which will be processed into the specified format for database
+        ingestion
+        :type data_product: DataProduct
+
+        :returns: python list of 2-tuples, each with a timestamp and corresponding data
+        :rtype: list
+        """
+
+        mimetype = mimetypes.guess_type(data_product.data.path)[0]
+        if mimetype in self.FITS_MIMETYPES:
+            spectrum, obs_date = self._process_spectrum_from_fits(data_product)
+        elif mimetype in self.PLAINTEXT_MIMETYPES:
+            spectrum, obs_date = self._process_spectrum_from_plaintext(data_product)
+        else:
+            raise InvalidFileFormatException('Unsupported file type')
+
+        serialized_spectrum = SpectrumSerializer().serialize(spectrum)
+
+        return [(obs_date, serialized_spectrum, '')]  # no support for source_name yet
 
     def _process_spectrum_from_plaintext(self, data_product):
         """
