@@ -415,9 +415,10 @@ class TargetTNSPhotometry(LoginRequiredMixin, RedirectView):
                 value = {'filter': candidate['F']}
                 if candidate['mag']:  # detection
                     value['magnitude'] = candidate['mag']
-                    value['error'] = candidate['magerr']
                 else:
                     value['limit'] = candidate['limflux']
+                if candidate['magerr']:  # not empty or zero
+                    value['error'] = candidate['magerr']
                 rd, _ = ReducedDatum.objects.get_or_create(
                     timestamp=jd.to_datetime(timezone=TimezoneInfo()),
                     value=value,

@@ -102,7 +102,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
             filter_data = detections[datum.source_name][datum.value['filter']]
             filter_data.setdefault('time', []).append(datum.timestamp)
             filter_data.setdefault('magnitude', []).append(datum.value['magnitude'])
-            filter_data.setdefault('error', []).append(datum.value.get('error'))
+            filter_data.setdefault('error', []).append(datum.value.get('error', 0.))
         elif 'limit' in datum.value:
             limits.setdefault(datum.source_name, {})
             limits[datum.source_name].setdefault(datum.value['filter'], {})
