@@ -345,7 +345,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
             update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
 
-        matches, hostdict = galaxy_search([target.ra], [target.dec], db_connect=DB_CONNECT)
+        matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
 
         return HttpResponseRedirect(self.get_redirect_url())
