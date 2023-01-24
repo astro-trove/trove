@@ -315,7 +315,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec],
+        qprob, qso, qoffset, asassnprob, asassn, asassnoffset, tnsresults = static_cats_query([target.ra], [target.dec],
                                                                                   db_connect=DB_CONNECT)
 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
@@ -328,29 +328,30 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
             update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
 
-        # matches, hostdict = galaxy_search([target.ra], [target.dec], db_connect=DB_CONNECT)
-        # update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
+        matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
+        update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
 
         ztfphot = query_ZTFpubphot(target.ra, target.dec, db_connect=DB_CONNECT)
         newztfphot = []
         if ztfphot:
+            olddatetimes = [rd.timestamp for rd in target.reduceddatum_set.all()]
             for candidate in ztfphot:
                 jd = Time(candidate['candidate']['jd'], format='jd', scale='utc')
                 newdatetime = jd.to_datetime(timezone=TimezoneInfo())
-                olddatetimes = [rd.timestamp for rd in target.reduceddatum_set.all()]
                 if newdatetime not in olddatetimes:
-                    print('New ZTF point at {0}.'.format(newdatetime))
+                    logger.info('New ZTF point at {0}.'.format(newdatetime))
                     newztfphot.append(candidate)
 
-        alert = newztfphot[0]
-        alert['lco_id'] = alert.pop('zid')
-        if len(newztfphot) > 1:
-            alert['prv_candidate'] = newztfphot[1:]
+        if len(newztfphot) > 0:
+            alert = newztfphot[0]
+            alert['lco_id'] = alert.pop('zid')
+            if len(newztfphot) > 1:
+                alert['prv_candidate'] = newztfphot[1:]
 
-        # process using the built-in MARS broker interface
-        mars = MARSBroker()
-        mars.name = 'ZTF'
-        mars.process_reduced_data(target, alert)
+            # process using the built-in MARS broker interface
+            mars = MARSBroker()
+            mars.name = 'ZTF'
+            mars.process_reduced_data(target, alert)
 
         return HttpResponseRedirect(self.get_redirect_url())
 
