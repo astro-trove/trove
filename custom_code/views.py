@@ -24,6 +24,7 @@ from custom_code.filters import CandidateFilter
 from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
+from tom_alerts.brokers.mars import MARSBroker
 
 import json
 import requests
@@ -31,7 +32,7 @@ import time
 
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
-from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot
+from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot, query_ZTFpubphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
 from saguaro_tom.settings import BROKERS, DATABASES, ATLAS_API_KEY
@@ -347,6 +348,28 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
 
         matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
+
+        ztfphot = query_ZTFpubphot(target.ra, target.dec, db_connect=DB_CONNECT)
+        newztfphot = []
+        if ztfphot:
+            olddatetimes = [rd.timestamp for rd in target.reduceddatum_set.all()]
+            for candidate in ztfphot:
+                jd = Time(candidate['candidate']['jd'], format='jd', scale='utc')
+                newdatetime = jd.to_datetime(timezone=TimezoneInfo())
+                if newdatetime not in olddatetimes:
+                    logger.info('New ZTF point at {0}.'.format(newdatetime))
+                    newztfphot.append(candidate)
+
+        if len(newztfphot) > 0:
+            alert = newztfphot[0]
+            alert['lco_id'] = alert.pop('zid')
+            if len(newztfphot) > 1:
+                alert['prv_candidate'] = newztfphot[1:]
+
+            # process using the built-in MARS broker interface
+            mars = MARSBroker()
+            mars.name = 'ZTF'
+            mars.process_reduced_data(target, alert)
 
         return HttpResponseRedirect(self.get_redirect_url())
 
