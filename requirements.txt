@@ -1,9 +1,7 @@
 django
 django_extensions
 guardian
-flask_sqlalchemy
-fastavro
-tomtoolkit @ git+https://github.com/griffin-h/tom_base  # use my fork until PRs are merged
+tomtoolkit~=2.11.1
 tom-alertstreams
 tom-nonlocalizedevents
 psycopg2-binary
