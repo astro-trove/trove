@@ -8,9 +8,9 @@ import json
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
-from saguaro_tom.settings import DATABASES
+from django.conf import settings
 
-DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
+DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
 
 logger = logging.getLogger(__name__)

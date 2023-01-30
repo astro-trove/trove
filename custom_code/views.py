@@ -13,36 +13,32 @@ from guardian.mixins import PermissionListMixin
 from guardian.shortcuts import get_objects_for_user, assign_perm
 
 from tom_common.hooks import run_hook
-from tom_targets.models import Target, TargetList, TargetExtra
+from tom_targets.models import Target, TargetList
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from tom_dataproducts.models import DataProduct, ReducedDatum
 from tom_dataproducts.views import DataProductUploadView as OldDataProductUploadView
-from custom_code.models import Candidate
-from custom_code.filters import CandidateFilter
+from .models import Candidate
+from .filters import CandidateFilter
 from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
-from tom_alerts.brokers.mars import MARSBroker
 
 import json
 import requests
 import time
 
-from kne_cand_vetting.catalogs import static_cats_query
-from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot, query_ZTFpubphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
-from saguaro_tom.settings import BROKERS, DATABASES, ATLAS_API_KEY
 
-DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
+DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 
 # from tom_catalogs.harvesters.tns import TNS_URL
 TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
-TNS = BROKERS['TNS']  # includes the API credentials
+TNS = settings.BROKERS['TNS']  # includes the API credentials
 TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
@@ -337,7 +333,7 @@ class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
         Converts micro-Jansky values to AB magnitude and separates detections and non-detections.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=ATLAS_API_KEY)
+        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=settings.ATLAS_API_KEY)
 
         if len(atlasphot)>1:
             for candidate in atlasphot:

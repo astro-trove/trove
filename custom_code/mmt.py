@@ -5,12 +5,12 @@ from django import forms
 from crispy_forms.layout import Layout, Row, Column
 from crispy_forms.bootstrap import AppendedText
 from mmtapi import mmtapi
-from saguaro_tom.settings import FACILITIES
+from django.conf import settings
 import requests
 from datetime import datetime
 import re
 
-MMT_SETTINGS = FACILITIES['MMT']
+MMT_SETTINGS = settings.FACILITIES['MMT']
 
 
 class MMTBaseObservationForm(BaseRoboticObservationForm):

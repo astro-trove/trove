@@ -1,5 +1,5 @@
 import django_filters
-from custom_code.models import Candidate
+from .models import Candidate
 from tom_targets.utils import cone_search_filter
 
 
