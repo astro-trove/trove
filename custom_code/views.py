@@ -24,6 +24,7 @@ from custom_code.filters import CandidateFilter
 from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
+from .hooks import target_post_save, update_or_create_target_extra
 from tom_alerts.brokers.mars import MARSBroker
 
 import json
@@ -301,16 +302,6 @@ class ObservationCreateView(OldObservationCreateView):
         return initial
 
 
-def update_or_create_target_extra(target, key, value):
-    """
-    Check if a ``TargetExtra`` with the given key exists for a given target. If it exists, update the value. If it does
-    not exist, create it with the input value.
-    """
-    te, created = TargetExtra.objects.get_or_create(target=target, key=key)
-    te.value = value
-    te.save()
-
-
 class TargetVettingView(LoginRequiredMixin, RedirectView):
     """
     View that runs or reruns the kilonova candidate vetting code and stores the results
@@ -320,57 +311,9 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset, tns_results = \
-            static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
-
-        if tns_results[0] is not None:
-            iau_name, redshift, classification = tns_results[0]
-            if target.name != iau_name:
-                target.name = iau_name
-                target.save()
-                messages.success(self.request, f"Found a match in the TNS: {target.name}")
-            if classification is not None and target.extra_fields.get('Classification') != classification:
-                update_or_create_target_extra(target, 'Classification', classification)
-                messages.success(self.request, f"Classification set to {classification}")
-            if redshift is not None and target.extra_fields.get('Redshift') != redshift:
-                update_or_create_target_extra(target, 'Redshift', redshift)
-                messages.success(self.request, f"Redshift set to {redshift}")
-
-        update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
-        if qso[0] != 'None':
-            update_or_create_target_extra(target=target, key='QSO Prob.', value=qprob[0])
-            update_or_create_target_extra(target=target, key='QSO Offset', value=qoffset[0])
-
-        update_or_create_target_extra(target=target, key='ASASSN Match', value=asassn[0])
-        if asassn[0] != 'None':
-            update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
-            update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
-
-        matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
-        update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
-
-        ztfphot = query_ZTFpubphot(target.ra, target.dec, db_connect=DB_CONNECT)
-        newztfphot = []
-        if ztfphot:
-            olddatetimes = [rd.timestamp for rd in target.reduceddatum_set.all()]
-            for candidate in ztfphot:
-                jd = Time(candidate['candidate']['jd'], format='jd', scale='utc')
-                newdatetime = jd.to_datetime(timezone=TimezoneInfo())
-                if newdatetime not in olddatetimes:
-                    logger.info('New ZTF point at {0}.'.format(newdatetime))
-                    newztfphot.append(candidate)
-
-        if len(newztfphot) > 0:
-            alert = newztfphot[0]
-            alert['lco_id'] = alert.pop('zid')
-            if len(newztfphot) > 1:
-                alert['prv_candidate'] = newztfphot[1:]
-
-            # process using the built-in MARS broker interface
-            mars = MARSBroker()
-            mars.name = 'ZTF'
-            mars.process_reduced_data(target, alert)
-
+        banners = target_post_save(target, created=True)
+        for banner in banners:
+            messages.success(request, banner)
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):
