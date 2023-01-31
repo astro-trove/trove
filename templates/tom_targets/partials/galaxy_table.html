@@ -27,12 +27,12 @@
       <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
       {% if galaxy.Dist %}
-        <td>{{ galaxy.Dist|floatformat:1 }} &plusmn; {{ galaxy.DistErr|floatformat:1 }} </td>
+        <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr|floatformat:1 }} </td>
       {% else %}
         <td> </td>
       {% endif %}
       {% if galaxy.z %}
-        <td> {{ galaxy.z|floatformat:2 }} &plusmn; {{ galaxy.zErr|floatformat:2 }} </td>
+        <td> {{ galaxy.z|floatformat:2 }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr|floatformat:2 }} </td>
       {% else %}
         <td> </td>
       {% endif %}
