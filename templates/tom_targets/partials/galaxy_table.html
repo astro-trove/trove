@@ -7,8 +7,7 @@
       <th scope="col">PCC</th>
       <th scope="col">Offset</th>
       <th scope="col">Dist.</th>
-      <th scope="col">Err.</th>
-      <th scope="col">Filt.</th>
+      <th scope="col">z</th>
       <th scope="col">Mag.</th>
       <th scope="col">Source</th>
     </tr>
@@ -17,21 +16,27 @@
       <td> </td>
       <td>''</td>
       <td>Mpc</td>
-      <td>Mpc</td>
-      <td>AB</td>
       <td> </td>
+      <td>AB</td>
       <td> </td>
     </tr>
   </thead>
   {% for galaxy in galaxies %}
     <tr>
       <td>{{ galaxy.ID }}</td>
-      <td>{{ galaxy.PCC|floatformat:5 }}</td>
+      <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
-      <td>{{ galaxy.Dist|floatformat:1 }}</td>
-      <td>{{ galaxy.DistErr|floatformat:1 }}</td>
-      <td>{{ galaxy.Filter }}</td>
-      <td>{{ galaxy.Mags|floatformat:2 }}</td>
+      {% if galaxy.Dist %}
+        <td>{{ galaxy.Dist|floatformat:1 }} &plusmn {{ galaxy.DistErr|floatformat:1 }} </td>
+      {% else %}
+        <td> </td>
+      {% endif %}
+      {% if galaxy.z %}
+        <td> {{ galaxy.z|floatformat:2 }} &plusmn {{ galaxy.zErr|floatformat:2 }} </td>
+      {% else %}
+        <td> </td>
+      {% endif %}
+      <td>{{ galaxy.Filter }}={{ galaxy.Mags|floatformat:1 }}</td>
       <td>{{ galaxy.Source }}</td>
     </tr>
   {% empty %}
