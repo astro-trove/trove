@@ -11,8 +11,6 @@ import requests
 from datetime import datetime
 import re
 
-MMT_SETTINGS = settings.FACILITIES['MMT']
-
 
 class MMTBaseObservationForm(BaseRoboticObservationForm):
     magnitude = forms.FloatField()
@@ -24,7 +22,7 @@ class MMTBaseObservationForm(BaseRoboticObservationForm):
         (2, 'medium'),
         (1, 'high'),
     ], initial=(3, 'low'))
-    program = forms.ChoiceField(choices=MMT_SETTINGS['programs'])
+    program = forms.ChoiceField(choices=settings.FACILITIES['MMT']['programs'])
     target_of_opportunity = forms.BooleanField(initial=True)
 
     def is_valid(self):
