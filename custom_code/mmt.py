@@ -1,4 +1,5 @@
 from tom_observations.facility import BaseRoboticObservationForm, BaseRoboticObservationFacility
+from tom_observations.models import ObservationRecord
 from tom_targets.models import Target
 from astropy.coordinates import SkyCoord
 from django import forms
@@ -9,8 +10,6 @@ from django.conf import settings
 import requests
 from datetime import datetime
 import re
-
-MMT_SETTINGS = settings.FACILITIES['MMT']
 
 
 class MMTBaseObservationForm(BaseRoboticObservationForm):
@@ -23,6 +22,7 @@ class MMTBaseObservationForm(BaseRoboticObservationForm):
         (2, 'medium'),
         (1, 'high'),
     ], initial=(3, 'low'))
+    program = forms.ChoiceField(choices=settings.FACILITIES['MMT']['programs'])
     target_of_opportunity = forms.BooleanField(initial=True)
 
     def is_valid(self):
@@ -42,6 +42,7 @@ class MMTImagingForm(MMTBaseObservationForm):
         return Layout(
             Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
+            Row(Column('program')),
             Row(Column('target_of_opportunity')),
         )
 
@@ -88,6 +89,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
                 Column(AppendedText('slit_width', 'arcsec'))
             ),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
+            Row(Column('program')),
             Row(Column('target_of_opportunity'), Column('finder_chart')),
         )
 
@@ -119,6 +121,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'priority': self.cleaned_data['priority'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
             'finder_chart': self.cleaned_data['finder_chart'],
+            'program': self.cleaned_data['program'],
         }
         return payload
 
@@ -144,15 +147,16 @@ class MMTFacility(BaseRoboticObservationFacility):
     }
 
     def data_products(self, observation_id, product_id=None):
-        datalist = mmtapi.Datalist(token=MMT_SETTINGS['api_key'])
+        token = ObservationRecord.objects.get(observation_id=observation_id).parameters.get('program')
+        datalist = mmtapi.Datalist(token=token)
         datalist.get(targetid=observation_id, data_type='reduced')
 
         # flatten the dictionary structure across all data sets
         data_products = []
         for datalist in datalist.data:
             for file_info in datalist['datafiles']:
-                image = mmtapi.Image(token=MMT_SETTINGS['api_key'])
-                image._build_url({'datafileid': file_info['id'], 'token': MMT_SETTINGS['api_key']})
+                image = mmtapi.Image(token=token)
+                image._build_url({'datafileid': file_info['id'], 'token': token})
                 file_info['url'] = image.url
                 if product_id is None or file_info['id'] == int(product_id):  # None means get all of them
                     data_products.append(file_info)
@@ -163,7 +167,8 @@ class MMTFacility(BaseRoboticObservationFacility):
         return self.observation_forms.get(observation_type, MMTBaseObservationForm)
 
     def get_observation_status(self, observation_id):
-        target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload={'targetid': observation_id})
+        token = ObservationRecord.objects.get(observation_id=observation_id).parameters.get('program')
+        target = mmtapi.Target(token=token, payload={'targetid': observation_id})
         if not target.request.ok:
             status = 'UNKNOWN'
         elif target.disabled:
@@ -177,15 +182,14 @@ class MMTFacility(BaseRoboticObservationFacility):
         return {'state': status, 'scheduled_start': None, 'scheduled_end': None}
 
     def submit_observation(self, observation_payload):
-        finder_chart = observation_payload.pop('finder_chart')
-        target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)
+        target = mmtapi.Target(token=observation_payload['program'], payload=observation_payload)
         target.post()
-        target.upload_finder(finder_chart)
+        target.upload_finder(observation_payload['finder_chart'])
         return [target.id]
 
     def validate_observation(self, observation_payload):
         # Target.validate is automatically called by Target.__init__
-        target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload=observation_payload)
+        target = mmtapi.Target(token=observation_payload['program'], payload=observation_payload)
         return target.message['Errors']
 
     def get_terminal_observing_states(self):
@@ -195,12 +199,14 @@ class MMTFacility(BaseRoboticObservationFacility):
         return self.SITES
 
     def cancel_observation(self, observation_id):
-        target = mmtapi.Target(token=MMT_SETTINGS['api_key'], payload={'targetid': observation_id})
+        token = ObservationRecord.objects.get(observation_id=observation_id).parameters.get('program')
+        target = mmtapi.Target(token=token, payload={'targetid': observation_id})
         target.delete()
 
     def get_observation_url(self, observation_id):
+        token = ObservationRecord.objects.get(observation_id=observation_id).parameters.get('program')
         # javascript is required to get to the observation_id level, but this is close enough
-        return f"https://scheduler.mmto.arizona.edu/catalog.php?token={MMT_SETTINGS['api_key']}"
+        return f"https://scheduler.mmto.arizona.edu/catalog.php?token={token}"
 
     def get_facility_status(self):
         queues = mmtapi.Instruments().get_instruments()
