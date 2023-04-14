@@ -225,7 +225,7 @@ FACILITIES = {
         },
     },
     'MMT': {
-        'api_key': os.getenv('MMT_API_TOKEN', MMT_API_KEY),
+        'programs': MMT_PROGRAMS,
     }
 }
 
