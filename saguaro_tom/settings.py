@@ -367,10 +367,10 @@ ALERT_STREAMS = [
                 # 'enable.auto.commit': False
             },
             'TOPIC_HANDLERS': {
-                'gcn.classic.text.LVC_INITIAL': 'tom_alertstreams.alertstreams.alertstream.alert_logger',
-                'gcn.classic.text.LVC_PRELIMINARY': 'tom_alertstreams.alertstreams.alertstream.alert_logger',
-                'gcn.classic.text.LVC_RETRACTION': 'tom_alertstreams.alertstreams.alertstream.alert_logger',
-                'gcn.classic.text.LVC_TEST': 'tom_alertstreams.alertstreams.alertstream.alert_logger',
+                'gcn.classic.text.LVC_INITIAL': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
+                'gcn.classic.text.LVC_PRELIMINARY': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
+                'gcn.classic.text.LVC_RETRACTION': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_retraction',
+                'gcn.classic.text.LVC_TEST': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
             },
         },
     }
