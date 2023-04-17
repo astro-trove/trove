@@ -3,7 +3,7 @@ from django.conf import settings
 from guardian.shortcuts import get_objects_for_user
 from plotly import offline
 import plotly.graph_objs as go
-from plotly.express import colors
+from plotly import colors
 from tom_dataproducts.models import ReducedDatum
 import numpy as np
 
