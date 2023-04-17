@@ -1,7 +1,7 @@
 django
 django_extensions
 guardian
-tomtoolkit~=2.12.0
+tomtoolkit~=2.13.0
 psycopg2-binary
 whitenoise
 kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
