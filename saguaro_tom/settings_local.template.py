@@ -6,6 +6,7 @@ GCN_CLIENT_ID = ''      # client ID for GCN Classic over Kafka
 GCN_CLIENT_SECRET = ''  # secret key for GCN Classic over Kafka
 GEM_N_API_KEY = ''      # API key for Gemini Observatory North
 GEM_S_API_KEY = ''      # API key for Gemini Observatory South
+HOPSKOTCH_GROUP_ID = '' # make up a unique ID for your Hopskotch alert consumer
 LCO_API_KEY = ''        # API key for Las Cumbres Observatory
 MMT_PROGRAMS = []       # list of (API key, human-readable name) for MMT Observatory
 POSTGRES_DB = ''        # name of the Postgres database

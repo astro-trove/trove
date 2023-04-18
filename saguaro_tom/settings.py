@@ -343,12 +343,14 @@ ALERT_STREAMS = [
         'NAME': 'tom_alertstreams.alertstreams.hopskotch.HopskotchAlertStream',
         'OPTIONS': {
             'URL': 'kafka://kafka.scimma.org/',
+            'GROUP_ID': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME)
+                        + '-' + os.getenv('HOPSKOTCH_GROUP_ID', HOPSKOTCH_GROUP_ID),
             'USERNAME': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME),
             'PASSWORD': os.getenv('SCIMMA_AUTH_PASSWORD', SCIMMA_AUTH_PASSWORD),
             'TOPIC_HANDLERS': {
                 # 'sys.heartbeat': 'tom_alertstreams.alertstreams.hopskotch.heartbeat_handler',
-                # 'tomtoolkit.test': 'tom_alertstreams.alertstreams.alertstream.alert_logger',
-                'hermes.test': 'tom_alertstreams.alertstreams.alertstream.alert_logger',
+                # 'tomtoolkit.test': 'tom_alertstreams.alertstreams.hopskotch.alert_logger',
+                'hermes.test': 'tom_alertstreams.alertstreams.hopskotch.alert_logger',
             },
         },
     },
@@ -370,7 +372,6 @@ ALERT_STREAMS = [
                 'gcn.classic.text.LVC_INITIAL': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
                 'gcn.classic.text.LVC_PRELIMINARY': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
                 'gcn.classic.text.LVC_RETRACTION': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_retraction',
-                'gcn.classic.text.LVC_TEST': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
             },
         },
     }
