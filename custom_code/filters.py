@@ -25,15 +25,19 @@ class CandidateFilter(django_filters.FilterSet):
     snr_min = django_filters.NumberFilter('snr', 'gte', label='Min. S/N')
     mag_range = django_filters.NumericRangeFilter('mag', label='Magnitude')
     obsdate_range = django_filters.DateTimeFromToRangeFilter('obsdate', label='Obs. Date')
-    mlscore_min = django_filters.NumberFilter('mlscore', 'gte', label='Min. ML Score')
+    mlscore_min = django_filters.NumberFilter('mlscore', 'gte', label='Min. ML Old')
+    mlscore_real_min = django_filters.NumberFilter('mlscore_real', 'gte', label='Min. ML Real')
+    mlscore_bogus_max = django_filters.NumberFilter('mlscore_bogus', 'lte', label='Max. ML Bogus')
 
     order = django_filters.OrderingFilter(
-        fields=['obsdate', 'ra', 'dec', 'snr', 'mag', 'mlscore'],
+        fields=['obsdate', 'ra', 'dec', 'snr', 'mag', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
         field_labels={
             'snr': 'S/N',
             'mag': 'Magnitude',
             'obsdate': 'Obs. Date',
-            'mlscore': 'ML Score',
+            'mlscore': 'ML Old',
+            'mlscore_real': 'ML Real',
+            'mlscore_bogus': 'ML Bogus',
             'ra': 'R.A.',
             'dec': 'Dec.'
         }

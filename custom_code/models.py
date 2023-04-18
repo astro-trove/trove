@@ -128,6 +128,8 @@ class Candidate(models.Model):
     target = models.ForeignKey(Target, null=True, on_delete=models.SET_NULL, db_column='targetid')
     mjdmid = models.FloatField(null=True)
     mlscore = models.FloatField(null=True)
+    mlscore_real = models.FloatField(null=True)
+    mlscore_bogus = models.FloatField(null=True)
     ncombine = models.IntegerField(null=True)
     gladeid = models.IntegerField(null=True)
     exclude = models.IntegerField(null=True)

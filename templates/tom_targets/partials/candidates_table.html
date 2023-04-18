@@ -5,9 +5,11 @@
     <tr>
       <th>Obs. Date</th>
       <th>Mag.</th>
-      <th>FWHM</th>
+      <th>FW HM</th>
       <th>S/N</th>
-      <th>ML Score</th>
+      <th>ML Old</th>
+      <th>ML Real</th>
+      <th>ML Bog.</th>
       <th>Image</th>
       <th>Reference</th>
       <th>Difference</th>
@@ -21,6 +23,8 @@
       <td>{{ candidate.fwhm|floatformat:"1" }}</td>
       <td>{{ candidate.snr|floatformat:"1" }}</td>
       <td>{{ candidate.mlscore|floatformat:"2" }}</td>
+      <td>{{ candidate.mlscore_real|floatformat:"2" }}</td>
+      <td>{{ candidate.mlscore_bogus|floatformat:"2" }}</td>
       <td><img alt="new image" src="{{ candidate|thumbnail_url:'img' }}" height="80"></td>
       <td><img alt="reference image" src="{{ candidate|thumbnail_url:'ref' }}" height="80"></td>
       <td><img alt="difference image" src="{{ candidate|thumbnail_url:'diff' }}" height="80"></td>
