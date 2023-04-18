@@ -9,13 +9,14 @@
     <table class="table table-hover">
       <thead>
         <tr>
-          <th><input type="checkbox" id="selectPage" onClick="select_page(this, {{ target_count }})" /></th>
           <th>Target</th>
           <th>Obs. Date</th>
           <th>Mag.</th>
-          <th>FWHM</th>
+          <th>FW HM</th>
           <th>S/N</th>
-          <th>ML Score</th>
+          <th>ML Old</th>
+          <th>ML Real</th>
+          <th>ML Bog.</th>
           <th>Image</th>
           <th>Reference</th>
           <th>Difference</th>
@@ -24,7 +25,6 @@
       <tbody>
         {% for candidate in object_list %}
         <tr>
-          <td><input type="checkbox" name="selected-target" value="{{ target.id }}" onClick="single_select()"/></td>
           <td>
             {% if candidate.target is not None %}
               <a href="{% url 'targets:detail' candidate.target.id %}" title="{{ candidate.target.name }}">{{ candidate.target.name }}</a>
@@ -32,11 +32,13 @@
               None
             {% endif %}
           </td>
-          <td>{{ candidate.obsdate|date:"Y-m-d" }}</td>
+          <td>{{ candidate.obsdate|date:"m-d" }}</td>
           <td>{{ candidate.mag|floatformat:"1" }}</td>
           <td>{{ candidate.fwhm|floatformat:"1" }}</td>
           <td>{{ candidate.snr|floatformat:"1" }}</td>
           <td>{{ candidate.mlscore|floatformat:"2" }}</td>
+          <td>{{ candidate.mlscore_real|floatformat:"2" }}</td>
+          <td>{{ candidate.mlscore_bogus|floatformat:"2" }}</td>
           <td><img alt="new image" src="{{ candidate|thumbnail_url:'img' }}" height="80"></td>
           <td><img alt="reference image" src="{{ candidate|thumbnail_url:'ref' }}" height="80"></td>
           <td><img alt="difference image" src="{{ candidate|thumbnail_url:'diff' }}" height="80"></td>
