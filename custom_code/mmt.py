@@ -64,6 +64,7 @@ class MMTImagingForm(MMTBaseObservationForm):
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
+            'program': self.cleaned_data['program'],
         }
         return payload
 
