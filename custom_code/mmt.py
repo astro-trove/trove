@@ -65,6 +65,7 @@ class MMTImagingForm(MMTBaseObservationForm):
             'exposuretime': self.cleaned_data['exposure_time'],
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
+            'program': self.cleaned_data['program'],
 	    'note': self.cleaned_data['Notes'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
         }
@@ -101,6 +102,7 @@ class MMTMMIRSImagingForm(MMTBaseObservationForm):
             'exposuretime': self.cleaned_data['exposure_time'],
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
+            'program': self.cleaned_data['program'],
 	    'gain': self.cleaned_data['gain'],
 	    'ReadTab': self.cleaned_data['ReadTab'],
 	    'DitherSize': self.cleaned_data['DitherSize'],
