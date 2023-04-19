@@ -25,9 +25,9 @@ class CandidateFilter(django_filters.FilterSet):
     snr_min = django_filters.NumberFilter('snr', 'gte', label='Min. S/N')
     mag_range = django_filters.NumericRangeFilter('mag', label='Magnitude')
     obsdate_range = django_filters.DateTimeFromToRangeFilter('obsdate', label='Obs. Date')
-    mlscore_min = django_filters.NumberFilter('mlscore', 'gte', label='Min. ML Old')
-    mlscore_real_min = django_filters.NumberFilter('mlscore_real', 'gte', label='Min. ML Real')
-    mlscore_bogus_max = django_filters.NumberFilter('mlscore_bogus', 'lte', label='Max. ML Bogus')
+    mlscore_range = django_filters.NumericRangeFilter('mlscore', 'gte', label='ML Old')
+    mlscore_real_range = django_filters.NumericRangeFilter('mlscore_real', label='ML Real')
+    mlscore_bogus_range = django_filters.NumericRangeFilter('mlscore_bogus', label='ML Bogus')
 
     order = django_filters.OrderingFilter(
         fields=['obsdate', 'ra', 'dec', 'snr', 'mag', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
@@ -45,4 +45,5 @@ class CandidateFilter(django_filters.FilterSet):
 
     class Meta:
         model = Candidate
-        fields = ['cone_search', 'snr_min', 'mag_range', 'obsdate_range', 'field', 'classification', 'mlscore_min']
+        fields = ['cone_search', 'snr_min', 'mag_range', 'obsdate_range', 'field', 'classification',
+                  'mlscore_range', 'mlscore_real_range', 'mlscore_bogus_range']
