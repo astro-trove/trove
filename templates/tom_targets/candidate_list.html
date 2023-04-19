@@ -27,7 +27,7 @@
         <tr>
           <td>
             {% if candidate.target is not None %}
-              <a href="{% url 'targets:detail' candidate.target.id %}" title="{{ candidate.target.name }}">{{ candidate.target.name }}</a>
+              <a href="{% url 'targets:detail' candidate.target.id %}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name }}</a>
             {% else %}
               None
             {% endif %}
