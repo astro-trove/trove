@@ -50,6 +50,7 @@ class MMTImagingForm(MMTBaseObservationForm):
         target = Target.objects.get(pk=self.cleaned_data['target_id'])
         ra, dec = SkyCoord(target.ra, target.dec, unit='deg').to_string('hmsdms', sep=':', precision=1).split()
         payload = {
+            'instrumentid': 16,
             'observationtype': 'imaging',
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
@@ -104,6 +105,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'Longslit5': 121,
         }.get(self.cleaned_data['slit_width'])
         payload = {
+            'instrumentid': 16,
             'observationtype': 'longslit',
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
