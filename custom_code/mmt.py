@@ -17,6 +17,7 @@ class MMTBaseObservationForm(BaseRoboticObservationForm):
     visits = forms.IntegerField(initial=1, min_value=1)
     exposure_time = forms.IntegerField(min_value=1)
     number_of_exposures = forms.IntegerField(initial=2, min_value=1)
+    Notes = forms.CharField(label="Notes", max_length=100)
     priority = forms.ChoiceField(choices=[
         (3, 'low'),
         (2, 'medium'),
@@ -37,12 +38,13 @@ class MMTBaseObservationForm(BaseRoboticObservationForm):
 
 class MMTImagingForm(MMTBaseObservationForm):
     filter = forms.ChoiceField(choices=[('g', 'g'), ('r', 'r'), ('i', 'i'), ('z', 'z')])
+    Notes = forms.CharField(label="Notes", max_length=100)
 
     def layout(self):
         return Layout(
             Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('program')),
+            Row(Column('program'),Column('Notes')),
             Row(Column('target_of_opportunity')),
         )
 
@@ -50,12 +52,12 @@ class MMTImagingForm(MMTBaseObservationForm):
         target = Target.objects.get(pk=self.cleaned_data['target_id'])
         ra, dec = SkyCoord(target.ra, target.dec, unit='deg').to_string('hmsdms', sep=':', precision=1).split()
         payload = {
-            'instrumentid': 16,
             'observationtype': 'imaging',
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
             'dec': dec,
             'epoch': 2000,
+	    'instrumentid':16,
             'magnitude': self.cleaned_data['magnitude'],
             'maskid': 110,
             'filter': self.cleaned_data['filter'],
@@ -63,10 +65,49 @@ class MMTImagingForm(MMTBaseObservationForm):
             'exposuretime': self.cleaned_data['exposure_time'],
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
+	    'note': self.cleaned_data['Notes'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
-            'program': self.cleaned_data['program'],
         }
         return payload
+
+class MMTMMIRSImagingForm(MMTBaseObservationForm):
+    filter = forms.ChoiceField(choices=[('J', 'J'), ('H', 'H'), ('K', 'K'), ('Ks', 'Ks')])
+    gain = forms.ChoiceField(choices=[('Low noise (0.95)', 'Low noise (0.95)'), ('High Dynamic Range (2.68)', 'High Dynamic Range (2.68)')]) 
+    ReadTab = forms.ChoiceField(choices=[('ramp_1.475', 'ramp_1.475'), ('ramp_4.426', 'ramp_4.426'), ('fowler', 'fowler')])
+    DitherSize = forms.FloatField()
+    def layout(self):
+        return Layout(
+            Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
+            Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
+            Row(Column('gain'),Column('ReadTab'),Column('DitherSize')),
+            Row(Column('program'),Column('Notes')),
+	    Row(Column('target_of_opportunity')),
+        )
+
+    def observation_payload(self):
+        target = Target.objects.get(pk=self.cleaned_data['target_id'])
+        ra, dec = SkyCoord(target.ra, target.dec, unit='deg').to_string('hmsdms', sep=':', precision=1).split()
+        payload = {
+            'observationtype': 'imaging',
+            'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
+            'ra': ra,
+            'dec': dec,
+            'epoch': 2000,
+	    'instrumentid':15,
+            'magnitude': self.cleaned_data['magnitude'],
+            'maskid': 110,
+            'filter': self.cleaned_data['filter'],
+            'visits': self.cleaned_data['visits'],
+            'exposuretime': self.cleaned_data['exposure_time'],
+            'numberexposures': self.cleaned_data['number_of_exposures'],
+            'priority': self.cleaned_data['priority'],
+	    'gain': self.cleaned_data['gain'],
+	    'ReadTab': self.cleaned_data['ReadTab'],
+	    'DitherSize': self.cleaned_data['DitherSize'],
+            'targetofopportunity': self.cleaned_data['target_of_opportunity'],
+        }
+        return payload
+
 
 
 class MMTSpectroscopyForm(MMTBaseObservationForm):
@@ -91,7 +132,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
                 Column(AppendedText('slit_width', 'arcsec'))
             ),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('program')),
+            Row(Column('program'),Column('Notes')),
             Row(Column('target_of_opportunity'), Column('finder_chart')),
         )
 
@@ -106,12 +147,12 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'Longslit5': 121,
         }.get(self.cleaned_data['slit_width'])
         payload = {
-            'instrumentid': 16,
             'observationtype': 'longslit',
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
             'dec': dec,
             'epoch': 2000,
+	    'instrumentid':16,
             'magnitude': self.cleaned_data['magnitude'],
             'grating': self.cleaned_data['grating'],
             'centralwavelength': self.cleaned_data['central_wavelength'],
@@ -133,12 +174,77 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
         parameters['finder_chart'] = parameters['finder_chart'].name
         return parameters
 
+class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
+    filter = forms.ChoiceField(choices=[('zJ', 'zJ'), ('HK', 'HK')])
+    grism = forms.ChoiceField(choices=[('J', 'J'), ('HK', 'HK'), ('HK3', 'HK3')])
+    gain = forms.ChoiceField(choices=[('Low noise (0.95)', 'Low noise (0.95)'), ('High Dynamic Range (2.68)', 'High Dynamic Range (2.68)')])
+    ReadTab = forms.ChoiceField(choices=[('ramp_1.475', 'ramp_1.475'), ('ramp_4.426', 'ramp_4.426'), ('fowler', 'fowler')])
+    DitherSize = forms.FloatField()
+    slit_width = forms.ChoiceField(choices=[
+        ('0.2 (1pix)', '1pixel'),
+        ('0.4 (2pix)', '2pixel'),
+        ('0.6 (3pix)', '3pixel'),
+        ('0.8 (4pix)', '4pixel'),
+        ('1.0 (5pix)', '5pixel'),
+        ('1.2 (6pix)', '6pixel'),
+        ('2.4 (12pix)', '12pixel'),
+    ])
+    finder_chart = forms.FileField()
+    def layout(self):
+        return Layout(
+            Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
+            Row(Column('slit_width')),
+            Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
+	    Row(Column('gain'),Column('ReadTab'),Column('DitherSize')),
+            Row(Column('program'),Column('Notes')),
+            Row(Column('target_of_opportunity'), Column('finder_chart')),
+        )
+
+    def observation_payload(self):
+        target = Target.objects.get(pk=self.cleaned_data['target_id'])
+        ra, dec = SkyCoord(target.ra, target.dec, unit='deg').to_string('hmsdms', sep=':', precision=1).split()
+        maskid = {
+            'Longslit0_75': 113,
+            'Longslit1': 111,
+            'Longslit1_25': 131,
+            'Longslit1_5': 114,
+            'Longslit5': 121,
+        }.get(self.cleaned_data['slit_width'])
+        payload = {
+            'observationtype': 'longslit',
+            'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
+            'ra': ra,
+            'dec': dec,
+            'epoch': 2000,
+	    'instrumentid':15,
+            'magnitude': self.cleaned_data['magnitude'],
+            'gain': self.cleaned_data['gain'],
+            'ReadTab': self.cleaned_data['ReadTab'],
+            'DitherSize': self.cleaned_data['DitherSize'],  
+            'slitwidth': self.cleaned_data['slit_width'],
+            'maskid': maskid,
+            'filter': self.cleaned_data['filter'],
+            'visits': self.cleaned_data['visits'],
+            'exposuretime': self.cleaned_data['exposure_time'],
+            'numberexposures': self.cleaned_data['number_of_exposures'],
+            'priority': self.cleaned_data['priority'],
+            'targetofopportunity': self.cleaned_data['target_of_opportunity'],
+            'finder_chart': self.cleaned_data['finder_chart'],
+            'program': self.cleaned_data['program'],
+        } 
+        return payload
+    def serialize_parameters(self) -> dict:
+        parameters = super().serialize_parameters()
+        parameters['finder_chart'] = parameters['finder_chart'].name
+        return parameters
 
 class MMTFacility(BaseRoboticObservationFacility):
     name = 'MMT'
     observation_forms = {
         'IMAGING': MMTImagingForm,
+	'MMIRSIMAGING': MMTMMIRSImagingForm,
         'SPECTROSCOPY': MMTSpectroscopyForm,
+	'MMIRSSPECTROSCOPY': MMTMMIRSSpectroscopyForm,
     }
     SITES = {
         'F. L. Whipple': {
