@@ -44,7 +44,7 @@ class MMTImagingForm(MMTBaseObservationForm):
         return Layout(
             Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('program'),Column('Notes')),
+            Row(Column('program'), Column('Notes')),
             Row(Column('target_of_opportunity')),
         )
 
@@ -57,7 +57,7 @@ class MMTImagingForm(MMTBaseObservationForm):
             'ra': ra,
             'dec': dec,
             'epoch': 2000,
-	    'instrumentid':16,
+            'instrumentid': 16,
             'magnitude': self.cleaned_data['magnitude'],
             'maskid': 110,
             'filter': self.cleaned_data['filter'],
@@ -66,23 +66,32 @@ class MMTImagingForm(MMTBaseObservationForm):
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
             'program': self.cleaned_data['program'],
-	    'note': self.cleaned_data['Notes'],
+            'note': self.cleaned_data['Notes'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
         }
         return payload
 
+
 class MMTMMIRSImagingForm(MMTBaseObservationForm):
     filter = forms.ChoiceField(choices=[('J', 'J'), ('H', 'H'), ('K', 'K'), ('Ks', 'Ks')])
-    gain = forms.ChoiceField(choices=[('Low noise (0.95)', 'Low noise (0.95)'), ('High Dynamic Range (2.68)', 'High Dynamic Range (2.68)')]) 
-    ReadTab = forms.ChoiceField(choices=[('ramp_1.475', 'ramp_1.475'), ('ramp_4.426', 'ramp_4.426'), ('fowler', 'fowler')])
+    gain = forms.ChoiceField(choices=[
+        ('Low noise (0.95)', 'Low noise (0.95)'),
+        ('High Dynamic Range (2.68)', 'High Dynamic Range (2.68)')
+    ])
+    ReadTab = forms.ChoiceField(choices=[
+        ('ramp_1.475', 'ramp_1.475'),
+        ('ramp_4.426', 'ramp_4.426'),
+        ('fowler', 'fowler')
+    ])
     DitherSize = forms.FloatField()
+
     def layout(self):
         return Layout(
             Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('gain'),Column('ReadTab'),Column('DitherSize')),
-            Row(Column('program'),Column('Notes')),
-	    Row(Column('target_of_opportunity')),
+            Row(Column('gain'), Column('ReadTab'), Column('DitherSize')),
+            Row(Column('program'), Column('Notes')),
+            Row(Column('target_of_opportunity')),
         )
 
     def observation_payload(self):
@@ -94,7 +103,7 @@ class MMTMMIRSImagingForm(MMTBaseObservationForm):
             'ra': ra,
             'dec': dec,
             'epoch': 2000,
-	    'instrumentid':15,
+            'instrumentid': 15,
             'magnitude': self.cleaned_data['magnitude'],
             'maskid': 110,
             'filter': self.cleaned_data['filter'],
@@ -103,13 +112,12 @@ class MMTMMIRSImagingForm(MMTBaseObservationForm):
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
             'program': self.cleaned_data['program'],
-	    'gain': self.cleaned_data['gain'],
-	    'ReadTab': self.cleaned_data['ReadTab'],
-	    'DitherSize': self.cleaned_data['DitherSize'],
+            'gain': self.cleaned_data['gain'],
+            'ReadTab': self.cleaned_data['ReadTab'],
+            'DitherSize': self.cleaned_data['DitherSize'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
         }
         return payload
-
 
 
 class MMTSpectroscopyForm(MMTBaseObservationForm):
@@ -134,7 +142,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
                 Column(AppendedText('slit_width', 'arcsec'))
             ),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('program'),Column('Notes')),
+            Row(Column('program'), Column('Notes')),
             Row(Column('target_of_opportunity'), Column('finder_chart')),
         )
 
@@ -154,7 +162,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'ra': ra,
             'dec': dec,
             'epoch': 2000,
-	    'instrumentid':16,
+            'instrumentid': 16,
             'magnitude': self.cleaned_data['magnitude'],
             'grating': self.cleaned_data['grating'],
             'centralwavelength': self.cleaned_data['central_wavelength'],
@@ -176,11 +184,19 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
         parameters['finder_chart'] = parameters['finder_chart'].name
         return parameters
 
+
 class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
     filter = forms.ChoiceField(choices=[('zJ', 'zJ'), ('HK', 'HK')])
     grism = forms.ChoiceField(choices=[('J', 'J'), ('HK', 'HK'), ('HK3', 'HK3')])
-    gain = forms.ChoiceField(choices=[('Low noise (0.95)', 'Low noise (0.95)'), ('High Dynamic Range (2.68)', 'High Dynamic Range (2.68)')])
-    ReadTab = forms.ChoiceField(choices=[('ramp_1.475', 'ramp_1.475'), ('ramp_4.426', 'ramp_4.426'), ('fowler', 'fowler')])
+    gain = forms.ChoiceField(choices=[
+        ('Low noise (0.95)', 'Low noise (0.95)'),
+        ('High Dynamic Range (2.68)', 'High Dynamic Range (2.68)')
+    ])
+    ReadTab = forms.ChoiceField(choices=[
+        ('ramp_1.475', 'ramp_1.475'),
+        ('ramp_4.426', 'ramp_4.426'),
+        ('fowler', 'fowler')
+    ])
     DitherSize = forms.FloatField()
     slit_width = forms.ChoiceField(choices=[
         ('0.2 (1pix)', '1pixel'),
@@ -192,13 +208,14 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
         ('2.4 (12pix)', '12pixel'),
     ])
     finder_chart = forms.FileField()
+
     def layout(self):
         return Layout(
             Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
             Row(Column('slit_width')),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-	    Row(Column('gain'),Column('ReadTab'),Column('DitherSize')),
-            Row(Column('program'),Column('Notes')),
+            Row(Column('gain'), Column('ReadTab'), Column('DitherSize')),
+            Row(Column('program'), Column('Notes')),
             Row(Column('target_of_opportunity'), Column('finder_chart')),
         )
 
@@ -218,11 +235,11 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
             'ra': ra,
             'dec': dec,
             'epoch': 2000,
-	    'instrumentid':15,
+            'instrumentid': 15,
             'magnitude': self.cleaned_data['magnitude'],
             'gain': self.cleaned_data['gain'],
             'ReadTab': self.cleaned_data['ReadTab'],
-            'DitherSize': self.cleaned_data['DitherSize'],  
+            'DitherSize': self.cleaned_data['DitherSize'],
             'slitwidth': self.cleaned_data['slit_width'],
             'maskid': maskid,
             'filter': self.cleaned_data['filter'],
@@ -233,20 +250,22 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
             'finder_chart': self.cleaned_data['finder_chart'],
             'program': self.cleaned_data['program'],
-        } 
+        }
         return payload
+
     def serialize_parameters(self) -> dict:
         parameters = super().serialize_parameters()
         parameters['finder_chart'] = parameters['finder_chart'].name
         return parameters
 
+
 class MMTFacility(BaseRoboticObservationFacility):
     name = 'MMT'
     observation_forms = {
         'IMAGING': MMTImagingForm,
-	'MMIRSIMAGING': MMTMMIRSImagingForm,
+        'MMIRSIMAGING': MMTMMIRSImagingForm,
         'SPECTROSCOPY': MMTSpectroscopyForm,
-	'MMIRSSPECTROSCOPY': MMTMMIRSSpectroscopyForm,
+        'MMIRSSPECTROSCOPY': MMTMMIRSSpectroscopyForm,
     }
     SITES = {
         'F. L. Whipple': {
