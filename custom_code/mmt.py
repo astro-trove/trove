@@ -83,13 +83,13 @@ class MMTMMIRSImagingForm(MMTBaseObservationForm):
         ('ramp_4.426', 'ramp_4.426'),
         ('fowler', 'fowler')
     ])
-    dither_size = forms.FloatField()
+    dither_size = forms.FloatField(min_value=20, initial=30)
 
     def layout(self):
         return Layout(
             Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
+            Row(Column('gain'), Column('read_tab'), Column(AppendedText('dither_size', 'arcsec'))),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('gain'), Column('read_tab'), Column('dither_size')),
             Row(Column('program')),
             Row(Column('target_of_opportunity')),
             Row(Column('notes')),
@@ -116,7 +116,7 @@ class MMTMMIRSImagingForm(MMTBaseObservationForm):
             'gain': self.cleaned_data['gain'],
             'ReadTab': self.cleaned_data['read_tab'],
             'DitherSize': self.cleaned_data['dither_size'],
-	    'notes': self.cleaned_data['notes'],
+            'notes': self.cleaned_data['notes'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
         }
         return payload
@@ -173,7 +173,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'maskid': maskid,
             'filter': self.cleaned_data['filter'],
             'visits': self.cleaned_data['visits'],
- 	    'notes': self.cleaned_data['notes'],
+            'notes': self.cleaned_data['notes'],
             'exposuretime': self.cleaned_data['exposure_time'],
             'numberexposures': self.cleaned_data['number_of_exposures'],
             'priority': self.cleaned_data['priority'],
@@ -201,17 +201,24 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
         ('ramp_4.426', 'ramp_4.426'),
         ('fowler', 'fowler')
     ])
-    dither_size = forms.FloatField()
-    slit_width = forms.ChoiceField(choices=[('1pixel','0.2 (1pixel)'),('2pixel','0.4 (2pixel)'),('3pixel','0.6 (3pixel)'),('4pixel','0.8 (4pixel)'),('5pixel','1.0 (5pixel)'),('6pixel','1.2 (6pixel)'),('12pixel','2.4 (12pixel)')])
-
+    dither_size = forms.FloatField(initial=30)
+    slit_width = forms.ChoiceField(choices=[
+        ('1pixel', '0.2'),
+        ('2pixel', '0.4'),
+        ('3pixel', '0.6'),
+        ('4pixel', '0.8'),
+        ('5pixel', '1.0'),
+        ('6pixel', '1.2'),
+        ('12pixel', '2.4')
+    ])
     finder_chart = forms.FileField()
 
     def layout(self):
         return Layout(
             Row(Column('magnitude'), Column(AppendedText('exposure_time', 's')), Column('filter')),
-            Row(Column(AppendedText('slit_width','arcsec')),Column('grism')),
+            Row(Column('grism'), Column(), Column(AppendedText('slit_width', 'arcsec'))),
+            Row(Column('gain'), Column('read_tab'), Column(AppendedText('dither_size', 'arcsec'))),
             Row(Column('visits'), Column('number_of_exposures'), Column('priority')),
-            Row(Column('gain'), Column('read_tab'), Column('dither_size')),
             Row(Column('program')),
             Row(Column('target_of_opportunity'), Column('finder_chart')),
             Row(Column('notes')),
@@ -220,8 +227,7 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
     def observation_payload(self):
         target = Target.objects.get(pk=self.cleaned_data['target_id'])
         ra, dec = SkyCoord(target.ra, target.dec, unit='deg').to_string('hmsdms', sep=':', precision=1).split()
-        
-        
+
         payload = {
             'observationtype': 'longslit',
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
@@ -230,11 +236,11 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
             'epoch': 'J2000',
             'instrumentid': 15,
             'magnitude': self.cleaned_data['magnitude'],
-	    'notes': self.cleaned_data['notes'],
+            'notes': self.cleaned_data['notes'],
             'gain': self.cleaned_data['gain'],
             'ReadTab': self.cleaned_data['read_tab'],
             'DitherSize': self.cleaned_data['dither_size'],
-	    'grism': self.cleaned_data['grism'],
+            'grism': self.cleaned_data['grism'],
             'slitwidth': self.cleaned_data['slit_width'],
             'maskid': 111,
             'filter': self.cleaned_data['filter'],
@@ -244,7 +250,7 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
             'priority': self.cleaned_data['priority'],
             'targetofopportunity': self.cleaned_data['target_of_opportunity'],
             'finder_chart': self.cleaned_data['finder_chart'],
-	    'slitwidthproperty':'long', 
+            'slitwidthproperty': 'long',
             'program': self.cleaned_data['program'],
         }
         return payload
