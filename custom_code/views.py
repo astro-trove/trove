@@ -96,7 +96,7 @@ class CandidateListView(FilterView):
     View for listing candidates in the TOM.
     """
     template_name = 'tom_targets/candidate_list.html'
-    paginate_by = 25
+    paginate_by = 100
     strict = False
     model = Candidate
     filterset_class = CandidateFilter
