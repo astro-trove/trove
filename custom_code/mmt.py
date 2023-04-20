@@ -56,7 +56,7 @@ class MMTImagingForm(MMTBaseObservationForm):
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
             'dec': dec,
-            'epoch': 2000,
+            'epoch': 'J2000',
             'instrumentid': 16,
             'magnitude': self.cleaned_data['magnitude'],
             'maskid': 110,
@@ -103,7 +103,7 @@ class MMTMMIRSImagingForm(MMTBaseObservationForm):
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
             'dec': dec,
-            'epoch': J2000,
+            'epoch': 'J2000',
             'instrumentid': 15,
             'magnitude': self.cleaned_data['magnitude'],
             'maskid': 110,
@@ -164,7 +164,7 @@ class MMTSpectroscopyForm(MMTBaseObservationForm):
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
             'dec': dec,
-            'epoch': 2000,
+            'epoch': 'J2000',
             'instrumentid': 16,
             'magnitude': self.cleaned_data['magnitude'],
             'grating': self.cleaned_data['grating'],
@@ -227,7 +227,7 @@ class MMTMMIRSSpectroscopyForm(MMTBaseObservationForm):
             'objectid': re.sub('[^a-zA-Z0-9]', '', target.name),  # only alphanumeric characters allowed
             'ra': ra,
             'dec': dec,
-            'epoch': J2000,
+            'epoch': 'J2000',
             'instrumentid': 15,
             'magnitude': self.cleaned_data['magnitude'],
 	    'notes': self.cleaned_data['notes'],
