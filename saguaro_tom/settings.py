@@ -54,6 +54,9 @@ INSTALLED_APPS = [
     'tom_catalogs',
     'tom_observations',
     'tom_dataproducts',
+    'tom_alertstreams',
+    'tom_nonlocalizedevents',
+    'webpack_loader',
     'custom_code',
 ]
 
@@ -222,7 +225,7 @@ FACILITIES = {
         },
     },
     'MMT': {
-        'api_key': os.getenv('MMT_API_TOKEN', MMT_API_KEY),
+        'programs': MMT_PROGRAMS,
     }
 }
 
@@ -333,3 +336,58 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
     'PAGE_SIZE': 100
 }
+
+ALERT_STREAMS = [
+    {
+        'ACTIVE': True,
+        'NAME': 'tom_alertstreams.alertstreams.hopskotch.HopskotchAlertStream',
+        'OPTIONS': {
+            'URL': 'kafka://kafka.scimma.org/',
+            'GROUP_ID': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME)
+                        + '-' + os.getenv('HOPSKOTCH_GROUP_ID', HOPSKOTCH_GROUP_ID),
+            'USERNAME': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME),
+            'PASSWORD': os.getenv('SCIMMA_AUTH_PASSWORD', SCIMMA_AUTH_PASSWORD),
+            'TOPIC_HANDLERS': {
+                # 'sys.heartbeat': 'tom_alertstreams.alertstreams.hopskotch.heartbeat_handler',
+                # 'tomtoolkit.test': 'tom_alertstreams.alertstreams.hopskotch.alert_logger',
+                'hermes.test': 'tom_alertstreams.alertstreams.hopskotch.alert_logger',
+            },
+        },
+    },
+    {
+        'ACTIVE': True,
+        'NAME': 'tom_alertstreams.alertstreams.gcn.GCNClassicAlertStream',
+        # The keys of the OPTIONS dictionary become (lower-case) properties of the AlertStream instance.
+        'OPTIONS': {
+            # see https://github.com/nasa-gcn/gcn-kafka-python#to-use for configuration details.
+            'GCN_CLASSIC_CLIENT_ID': os.getenv('GCN_CLASSIC_CLIENT_ID', GCN_CLIENT_ID),
+            'GCN_CLASSIC_CLIENT_SECRET': os.getenv('GCN_CLASSIC_CLIENT_SECRET', GCN_CLIENT_SECRET),
+            'DOMAIN': 'gcn.nasa.gov',  # optional, defaults to 'gcn.nasa.gov'
+            'CONFIG': {  # optional
+                # 'group.id': 'tom_alertstreams - llindstrom@lco.global',
+                # 'auto.offset.reset': 'earliest',
+                # 'enable.auto.commit': False
+            },
+            'TOPIC_HANDLERS': {
+                'gcn.classic.text.LVC_INITIAL': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
+                'gcn.classic.text.LVC_PRELIMINARY': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_message',
+                'gcn.classic.text.LVC_RETRACTION': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_retraction',
+            },
+        },
+    }
+]
+
+VUE_FRONTEND_DIR_TOM_NONLOCAL = os.path.join(STATIC_ROOT, 'tom_nonlocalizedevents/vue')
+WEBPACK_LOADER = {
+    'TOM_NONLOCALIZEDEVENTS': {
+        'CACHE': not DEBUG,
+        'BUNDLE_DIR_NAME': 'tom_nonlocalizedevents/vue/',  # must end with slash
+        'STATS_FILE': os.path.join(VUE_FRONTEND_DIR_TOM_NONLOCAL, 'webpack-stats.json'),
+        'POLL_INTERVAL': 0.1,
+        'TIMEOUT': None,
+        'IGNORE': [r'.+\.hot-update.js', r'.+\.map']
+    }
+}
+TOM_API_URL = os.getenv('TOM_API_URL', os.path.join(ALLOWED_HOST, FORCE_SCRIPT_NAME))
+HERMES_API_URL = os.getenv('HERMES_API_URL', 'https://hermes.lco.global')
+CREDIBLE_REGION_PROBABILITIES = '[0.25, 0.5, 0.75, 0.9, 0.95]'

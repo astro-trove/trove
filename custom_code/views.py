@@ -13,34 +13,32 @@ from guardian.mixins import PermissionListMixin
 from guardian.shortcuts import get_objects_for_user, assign_perm
 
 from tom_common.hooks import run_hook
-from tom_targets.models import Target, TargetList, TargetExtra
+from tom_targets.models import Target, TargetList
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from tom_dataproducts.models import DataProduct, ReducedDatum
 from tom_dataproducts.views import DataProductUploadView as OldDataProductUploadView
-from custom_code.models import Candidate
-from custom_code.filters import CandidateFilter
+from .models import Candidate
+from .filters import CandidateFilter
 from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
+from .hooks import target_post_save, update_or_create_target_extra
 
 import json
 import requests
 import time
 
-from kne_cand_vetting.catalogs import static_cats_query
-from kne_cand_vetting.galaxy_matching import galaxy_search
-from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot
+from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot, query_ZTFpubphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
-from saguaro_tom.settings import BROKERS, DATABASES, ATLAS_API_KEY
 
-DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**DATABASES['default'])
+DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 
 # from tom_catalogs.harvesters.tns import TNS_URL
 TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
-TNS = BROKERS['TNS']  # includes the API credentials
+TNS = settings.BROKERS['TNS']  # includes the API credentials
 TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
@@ -98,7 +96,7 @@ class CandidateListView(FilterView):
     View for listing candidates in the TOM.
     """
     template_name = 'tom_targets/candidate_list.html'
-    paginate_by = 25
+    paginate_by = 100
     strict = False
     model = Candidate
     filterset_class = CandidateFilter
@@ -300,16 +298,6 @@ class ObservationCreateView(OldObservationCreateView):
         return initial
 
 
-def update_or_create_target_extra(target, key, value):
-    """
-    Check if a ``TargetExtra`` with the given key exists for a given target. If it exists, update the value. If it does
-    not exist, create it with the input value.
-    """
-    te, created = TargetExtra.objects.get_or_create(target=target, key=key)
-    te.value = value
-    te.save()
-
-
 class TargetVettingView(LoginRequiredMixin, RedirectView):
     """
     View that runs or reruns the kilonova candidate vetting code and stores the results
@@ -319,22 +307,9 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset = static_cats_query([target.ra], [target.dec],
-                                                                                  db_connect=DB_CONNECT)
-
-        update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
-        if qso[0] != 'None':
-            update_or_create_target_extra(target=target, key='QSO Prob.', value=qprob[0])
-            update_or_create_target_extra(target=target, key='QSO Offset', value=qoffset[0])
-
-        update_or_create_target_extra(target=target, key='ASASSN Match', value=asassn[0])
-        if asassn[0] != 'None':
-            update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
-            update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
-
-        matches, hostdict = galaxy_search([target.ra], [target.dec], db_connect=DB_CONNECT)
-        update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
-
+        banners = target_post_save(target, created=True)
+        for banner in banners:
+            messages.success(request, banner)
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):
@@ -358,7 +333,7 @@ class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
         Converts micro-Jansky values to AB magnitude and separates detections and non-detections.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=ATLAS_API_KEY)
+        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=settings.ATLAS_API_KEY)
 
         if len(atlasphot)>1:
             for candidate in atlasphot:
@@ -415,9 +390,10 @@ class TargetTNSPhotometry(LoginRequiredMixin, RedirectView):
                 value = {'filter': candidate['F']}
                 if candidate['mag']:  # detection
                     value['magnitude'] = candidate['mag']
-                    value['error'] = candidate['magerr']
                 else:
                     value['limit'] = candidate['limflux']
+                if candidate['magerr']:  # not empty or zero
+                    value['error'] = candidate['magerr']
                 rd, _ = ReducedDatum.objects.get_or_create(
                     timestamp=jd.to_datetime(timezone=TimezoneInfo()),
                     value=value,

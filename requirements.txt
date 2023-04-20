@@ -1,12 +1,12 @@
 django
 django_extensions
 guardian
-flask_sqlalchemy
-fastavro
-tomtoolkit @ git+https://github.com/griffin-h/tom_base  # use my fork until PRs are merged
+tomtoolkit~=2.13.0
+tom-alertstreams
+tom-nonlocalizedevents
 psycopg2-binary
 whitenoise
 kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
-mmtapi @ git+https://github.com/swyatt7/mmtapi  # the latest version is not on PyPI
+mmtapi
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt

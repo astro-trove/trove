@@ -3,7 +3,7 @@ from django.conf import settings
 from guardian.shortcuts import get_objects_for_user
 from plotly import offline
 import plotly.graph_objs as go
-from plotly.express import colors
+from plotly import colors
 from tom_dataproducts.models import ReducedDatum
 import numpy as np
 
@@ -102,7 +102,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
             filter_data = detections[datum.source_name][datum.value['filter']]
             filter_data.setdefault('time', []).append(datum.timestamp)
             filter_data.setdefault('magnitude', []).append(datum.value['magnitude'])
-            filter_data.setdefault('error', []).append(datum.value.get('error'))
+            filter_data.setdefault('error', []).append(datum.value.get('error', 0.))
         elif 'limit' in datum.value:
             limits.setdefault(datum.source_name, {})
             limits[datum.source_name].setdefault(datum.value['filter'], {})
@@ -139,8 +139,11 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                 )
             )
             plot_data.append(series)
-            all_ydata.append(np.array(filter_values['magnitude']) + np.array(filter_values['error']))
-            all_ydata.append(np.array(filter_values['magnitude']) - np.array(filter_values['error']))
+            mags = np.array(filter_values['magnitude'], float)  # converts None --> nan (as well as any strings)
+            errs = np.array(filter_values['error'], float)
+            errs[np.isnan(errs)] = 0.  # missing errors treated as zero
+            all_ydata.append(mags + errs)
+            all_ydata.append(mags - errs)
     for source_name, source_values in limits.items():
         for filter_name, filter_values in source_values.items():
             # get unique color for this data series
@@ -159,13 +162,13 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                 name=f'{source_name} {filter_name} limits',
             )
             plot_data.append(series)
-            all_ydata.append(filter_values['limit'])
+            all_ydata.append(np.array(filter_values['limit'], float))
 
     # scale the y-axis manually so that we know the range ahead of time and can scale the secondary y-axis to match
     if all_ydata:
         all_ydata = np.concatenate(all_ydata)
-        ymin = np.min(all_ydata)
-        ymax = np.max(all_ydata)
+        ymin = np.nanmin(all_ydata)
+        ymax = np.nanmax(all_ydata)
         yrange = ymax - ymin
         ymin_view = ymin - 0.05 * yrange
         ymax_view = ymax + 0.05 * yrange
@@ -180,6 +183,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
         'showline': True,
         'linecolor': label_color,
         'mirror': True,
+        'zeroline': False,
     }
     if target.distance is not None:
         dm = 5. * (np.log10(target.distance) + 5.)
@@ -189,6 +193,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
             'showgrid': False,
             'overlaying': 'y',
             'side': 'right',
+            'zeroline': False,
         }
         plot_data.append(go.Scatter(x=[], y=[], yaxis='y2'))  # dummy data set for abs mag axis
     else:

@@ -7,14 +7,14 @@ For customization instructions, see tom_common/base.html
 <li class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
     <a class="nav-link" href="{% url 'home' %}">Home <span class="sr-only">(current)</span></a>
 </li>
-<li class="nav-item {% if request.resolver_match.url_name == 'targetgrouping' %}active{% endif %}">
-    <a class="nav-link" href="{% url 'custom_code:targetgrouping' %}">GW Events</a>
+<li class="nav-item {% if request.resolver_match.namespace == 'nonlocalizedevents' %}active{% endif %}">
+    <a class="nav-link" href="{% url 'nonlocalizedevents:index' %}">GW Events</a>
 </li>
 <li class="nav-item {% if request.resolver_match.namespace == 'targets' and request.resolver_match.url_name == 'list' %}active{% endif %}">
     <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
 </li>
 <li class="nav-item {% if request.resolver_match.url_name == 'candidates' %}active{% endif %}">
-    <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&order=-mlscore">Candidates</a>
+    <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&order=-mlscore_real">Candidates</a>
 </li>
 <li class="nav-item {% if request.resolver_match.namespace == 'alerts' %}active{% endif %}">
     <a class="nav-link" href="{% url 'alerts:list' %}">Alerts</a>
