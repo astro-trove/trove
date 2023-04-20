@@ -2,6 +2,8 @@ django
 django_extensions
 guardian
 tomtoolkit~=2.13.0
+tom-alertstreams
+tom-nonlocalizedevents
 psycopg2-binary
 whitenoise
 kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
