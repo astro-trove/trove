@@ -32,7 +32,7 @@ def target_post_save(target, created):
 
     messages = []
     if created:
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset, tns_results = \
+        qprob, qso, qoffset, asassnprob, asassn, asassnoffset, tns_results, gaiaprob, gaias, gaiaoffset, gaiaclass = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
 
         if tns_results[0] is not None:
@@ -57,6 +57,12 @@ def target_post_save(target, created):
         if asassn[0] != 'None':
             update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
             update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
+
+        update_or_create_target_extra(target=target, key='Gaia Match', value=asassn[0])
+        if asassn[0] != 'None':
+            update_or_create_target_extra(target=target, key='Gaia VS Prob.', value=gaiaprob[0])
+            update_or_create_target_extra(target=target, key='Gaia VS Offset', value=gaiaoffset[0])
+            update_or_create_target_extra(target=target, key='Gaia VS Class', value=gaiaclass[0])
 
         matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
