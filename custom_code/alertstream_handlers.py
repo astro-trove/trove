@@ -59,8 +59,9 @@ def send_email(subject, body):
 def format_si_prefix(qty, d=1):
     log1000 = math.log10(qty) / 3.
     if 0. < log1000 <= 9.:
-        prefix = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'][int(log1000)]
-        return f'{qty * 1000. ** -log1000:.{d}f} {prefix}'
+        i = int(log1000)
+        prefix = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'][i]
+        return f'{qty * 1000. ** -i:.{d}f} {prefix}'
     else:
         return f'{qty:.{d}e}'
 
