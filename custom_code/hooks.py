@@ -8,6 +8,7 @@ import json
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
+from astropy.coordinates import SkyCoord
 from django.conf import settings
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
@@ -32,6 +33,11 @@ def target_post_save(target, created):
 
     messages = []
     if created:
+        coord = SkyCoord(target.ra, target.dec, unit='deg')
+        target.galactic_lng = coord.galactic.l.deg
+        target.galactic_lat = coord.galactic.b.deg
+        target.save()
+
         qprob, qso, qoffset, asassnprob, asassn, asassnoffset, tns_results, gaiaprob, gaias, gaiaoffset, gaiaclass = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
 

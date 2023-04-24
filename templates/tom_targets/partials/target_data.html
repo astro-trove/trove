@@ -18,6 +18,9 @@
   <dt class="col-sm-3">&nbsp;</dt>
   <dd class="col-sm-4">{{ target.ra|floatformat:6 }}</dd>
   <dd class="col-sm-5">{{ target.dec|floatformat:6 }}</dd>
+  <dt class="col-sm-3">Galactic</dt>
+  <dd class="col-sm-4">{{ target.galactic_lng|floatformat:6 }}</dd>
+  <dd class="col-sm-5">{{ target.galactic_lat|floatformat:6 }}</dd>
 </dl>
 <dl class="row">
 {% for key, value in extras.items %}
