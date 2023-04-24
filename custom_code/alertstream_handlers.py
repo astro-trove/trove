@@ -1,5 +1,6 @@
 from tom_nonlocalizedevents.alertstream_handlers.gw_event_handler import handle_message, extract_fields
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from django.contrib.auth.models import Group
 from django.conf import settings
 from twilio.rest import Client
 from email.mime.text import MIMEText
@@ -43,7 +44,11 @@ def send_email(subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = settings.ALERT_EMAIL_FROM
-    msg['To'] = ",".join(settings.ALERT_EMAIL_TO)
+    if body.startswith('Test'):
+        group = Group.objects.get(name='Test Email Alerts')
+    else:
+        group = Group.objects.get(name='Email Alerts')
+    msg['To'] = ','.join([u.email.split(',')[0] for u in group.user_set.all()])
     email_text = msg.as_string()
 
     try:

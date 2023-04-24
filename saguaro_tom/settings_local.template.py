@@ -1,5 +1,4 @@
 ALERT_EMAIL_FROM = ''   # email address from which the alerts are sent
-ALERT_EMAIL_TO = []   # list of email addresses from which the alerts are sent
 ALERT_SMS_FROM = ''     # phone number from which the text message alerts are sent
 ALERT_SMS_TO = []     # list of phone numbers to which text message alerts are sent
 ALLOWED_HOST = ''       # hostname or IP address of the web server (leave blank for development)
