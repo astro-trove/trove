@@ -37,7 +37,8 @@ def send_slack(body):
     payload = {'text': body}
     json_data = json.dumps(payload)
     headers = {'Content-Type': 'application/json'}
-    requests.post(settings.SLACK_URL, data=json_data.encode('ascii'), headers=headers)
+    for url in settings.SLACK_URLS:
+        requests.post(url, data=json_data.encode('ascii'), headers=headers)
 
 
 def send_email(subject, body):
