@@ -29,7 +29,12 @@ https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{TOM_ID}/"""
 
 
 def send_text(body):
-    for number in settings.ALERT_SMS_TO:
+    if body.startswith('Test'):
+        group = Group.objects.get(name='Test SMS Alerts')
+    else:
+        group = Group.objects.get(name='SMS Alerts')
+    for user in group.user_set.all():
+        number = settings.ALERT_SMS_TO[user.username]
         twilio_client.messages.create(body=body, from_=settings.ALERT_SMS_FROM, to=number)
 
 
