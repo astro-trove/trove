@@ -29,7 +29,7 @@ https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{TOM_ID}/"""
 
 
 def send_text(body):
-    if body.startswith('Test'):
+    if body.startswith('TEST'):
         group = Group.objects.get(name='Test SMS Alerts')
     else:
         group = Group.objects.get(name='SMS Alerts')
@@ -50,7 +50,7 @@ def send_email(subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = settings.ALERT_EMAIL_FROM
-    if body.startswith('Test'):
+    if body.startswith('TEST'):
         group = Group.objects.get(name='Test Email Alerts')
     else:
         group = Group.objects.get(name='Email Alerts')
