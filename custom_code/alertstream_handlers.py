@@ -55,6 +55,8 @@ def send_email(subject, body):
     else:
         group = Group.objects.get(name='Email Alerts')
     msg['To'] = ','.join([u.email.split(',')[0] for u in group.user_set.all()])
+    if not msg['To']:
+        logger.info(f'Email "{subject}" not sent. No one is subscribed.')
     email_text = msg.as_string()
 
     try:
