@@ -34,8 +34,11 @@ def send_text(body):
     else:
         group = Group.objects.get(name='SMS Alerts')
     for user in group.user_set.all():
-        number = settings.ALERT_SMS_TO[user.username]
-        twilio_client.messages.create(body=body, from_=settings.ALERT_SMS_FROM, to=number)
+        if user.username in settings.ALERT_SMS_TO:
+            number = settings.ALERT_SMS_TO[user.username]
+            twilio_client.messages.create(body=body, from_=settings.ALERT_SMS_FROM, to=number)
+        else:
+            logger.error(f'User {user.username} did not provide their phone number')
 
 
 def send_slack(body):
