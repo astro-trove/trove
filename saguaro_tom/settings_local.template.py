@@ -1,3 +1,6 @@
+ALERT_EMAIL_FROM = ''   # email address from which the alerts are sent
+ALERT_SMS_FROM = ''     # phone number from which the text message alerts are sent
+ALERT_SMS_TO = {}       # dictionary of user name: phone numbers to which text message alerts are sent
 ALLOWED_HOST = ''       # hostname or IP address of the web server (leave blank for development)
 ATLAS_API_KEY = ''      # API key for the ATLAS forced photometry server
 DEBUG = False           # set to True to display error tracebacks in browser, leave False in production
@@ -17,4 +20,7 @@ POSTGRES_USER = ''      # username for the Postgres database
 SCIMMA_AUTH_USERNAME = '' # username for SCIMMA authentication
 SCIMMA_AUTH_PASSWORD = '' # password for SCIMMA authentication
 SECRET_KEY = ''         # see https://docs.djangoproject.com/en/4.1/ref/settings/#secret-key
+SLACK_URLS = []         # Slack URLs for incoming webhooks
 TNS_API_KEY = ''        # API key for the Transient Name Server
+TWILIO_ACCOUNT_SID = '' # account ID for Twilio text message alerts
+TWILIO_AUTH_TOKEN = ''  # authorization token for Twilio text message alerts
