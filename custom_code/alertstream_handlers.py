@@ -16,7 +16,7 @@ twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
 ALERT_TEXT = """{NOTICE_TYPE} v{SEQUENCE_NUM}
 {TRIGGER_NUM}
-{DATE:%F %T}
+{DATE}
 1/FAR = {INV_FAR}yr
 Dist = {DISTMEAN:.0f} ± {DISTSTD:.0f} Mpc
 Has NS = {PROB_NS}
@@ -101,7 +101,7 @@ def handle_message_and_send_alerts(message):
             alert['DISTMEAN'] = math.nan
             alert['DISTSTD'] = math.nan
         else:
-            alert['DATE'] = seq.localization.date
+            alert['DATE'] = seq.localization.date.strftime('%F %T')
             alert['DISTMEAN'] = seq.localization.distance_mean
             alert['DISTSTD'] = seq.localization.distance_std
         email_subject = alert['TRIGGER_NUM']
