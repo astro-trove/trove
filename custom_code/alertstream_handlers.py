@@ -60,6 +60,7 @@ def send_email(subject, body):
     msg['To'] = ','.join([u.email.split(',')[0] for u in group.user_set.all()])
     if not msg['To']:
         logger.info(f'Email "{subject}" not sent. No one is subscribed.')
+        return
     email_text = msg.as_string()
 
     try:
