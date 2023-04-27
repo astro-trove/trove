@@ -42,6 +42,8 @@ def send_text(body):
 
 
 def send_slack(body):
+    if body.startswith('TEST'):
+        return
     payload = {'text': body}
     json_data = json.dumps(payload)
     headers = {'Content-Type': 'application/json'}
