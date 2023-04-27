@@ -3,7 +3,7 @@ from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import query_ZTFpubphot
 from tom_targets.models import TargetExtra
-from tom_alerts.brokers.mars import MARSBroker
+from tom_dataproducts.models import ReducedDatum
 import json
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
@@ -15,6 +15,34 @@ DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".form
 COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
 
 logger = logging.getLogger(__name__)
+
+
+def process_reduced_ztf_data(target, candidates):
+    """Ingest data from the ZTF JSON format into ``ReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
+    for candidate in candidates:
+        if all([key in candidate['candidate'] for key in ['jd', 'magpsf', 'fid', 'sigmapsf']]):
+            nondetection = False
+        elif all(key in candidate['candidate'] for key in ['jd', 'diffmaglim', 'fid']):
+            nondetection = True
+        else:
+            continue
+        jd = Time(candidate['candidate']['jd'], format='jd', scale='utc')
+        jd.to_datetime(timezone=TimezoneInfo())
+        value = {
+            'filter': {1: 'g', 2: 'r', 3: 'i'}[candidate['candidate']['fid']]
+        }
+        if nondetection:
+            value['limit'] = candidate['candidate']['diffmaglim']
+        else:
+            value['magnitude'] = candidate['candidate']['magpsf']
+            value['error'] = candidate['candidate']['sigmapsf']
+        rd, _ = ReducedDatum.objects.get_or_create(
+            timestamp=jd.to_datetime(timezone=TimezoneInfo()),
+            value=value,
+            source_name='ZTF',
+            source_location=alert['zid'],
+            data_type='photometry',
+            target=target)
 
 
 def update_or_create_target_extra(target, key, value):
@@ -92,18 +120,7 @@ def target_post_save(target, created):
                 if newdatetime not in olddatetimes:
                     logger.info('New ZTF point at {0}.'.format(newdatetime))
                     newztfphot.append(candidate)
-
-        if newztfphot:
-            # emulate the MARS alert format
-            alert = ztfphot[0]
-            alert['lco_id'] = alert.pop('zid')
-            if len(ztfphot) > 1:
-                alert['prv_candidate'] = ztfphot[1:]
-
-            # process using the built-in MARS broker interface
-            mars = MARSBroker()
-            mars.name = 'ZTF'
-            mars.process_reduced_data(target, alert)
+        process_reduced_ztf_data(target, newztfphot)
 
     redshift = target.targetextra_set.filter(key='Redshift')
     if redshift.exists() and redshift.first().float_value >= 0.02 and target.distance is None:
