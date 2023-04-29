@@ -337,6 +337,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 100
 }
 
+SAVE_TEST_ALERTS = os.getenv('SAVE_TEST_ALERTS', DEBUG)
 ALERT_STREAMS = [
     {
         'ACTIVE': True,
@@ -348,14 +349,12 @@ ALERT_STREAMS = [
             'USERNAME': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME),
             'PASSWORD': os.getenv('SCIMMA_AUTH_PASSWORD', SCIMMA_AUTH_PASSWORD),
             'TOPIC_HANDLERS': {
-                # 'sys.heartbeat': 'tom_alertstreams.alertstreams.hopskotch.heartbeat_handler',
-                # 'tomtoolkit.test': 'tom_alertstreams.alertstreams.hopskotch.alert_logger',
-                'hermes.test': 'tom_alertstreams.alertstreams.hopskotch.alert_logger',
+                'igwn.gwalert': 'custom_code.alertstream_handlers.handle_message_and_send_alerts'
             },
         },
     },
     {
-        'ACTIVE': True,
+        'ACTIVE': False,
         'NAME': 'tom_alertstreams.alertstreams.gcn.GCNClassicAlertStream',
         # The keys of the OPTIONS dictionary become (lower-case) properties of the AlertStream instance.
         'OPTIONS': {
@@ -369,9 +368,9 @@ ALERT_STREAMS = [
                 # 'enable.auto.commit': False
             },
             'TOPIC_HANDLERS': {
-                'gcn.classic.text.LVC_PRELIMINARY': 'custom_code.alertstream_handlers.handle_message_and_send_alerts',
-                'gcn.classic.text.LVC_INITIAL': 'custom_code.alertstream_handlers.handle_message_and_send_alerts',
-                'gcn.classic.text.LVC_RETRACTION': 'tom_nonlocalizedevents.alertstream_handlers.gw_event_handler.handle_retraction',
+                'gcn.classic.text.LVC_PRELIMINARY': 'tom_nonlocalizedevents.alertstream_handlers.gcn_event_handler.handle_message',
+                'gcn.classic.text.LVC_INITIAL': 'tom_nonlocalizedevents.alertstream_handlers.gcn_event_handler.handle_message',
+                'gcn.classic.text.LVC_RETRACTION': 'tom_nonlocalizedevents.alertstream_handlers.gcn_event_handler.handle_retraction',
             },
         },
     }

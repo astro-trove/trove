@@ -1,4 +1,4 @@
-from tom_nonlocalizedevents.alertstream_handlers.gw_event_handler import handle_message, extract_fields
+from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from django.contrib.auth.models import Group
 from django.conf import settings
@@ -14,22 +14,25 @@ logger = logging.getLogger(__name__)
 
 twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-ALERT_TEXT = """{NOTICE_TYPE} v{SEQUENCE_NUM}
-{TRIGGER_NUM}
-{DATE}
-1/FAR = {INV_FAR}yr
-Dist = {DISTMEAN:.0f} ± {DISTSTD:.0f} Mpc
-Has NS = {PROB_NS}
-Has Remnant = {PROB_REMNANT}
-BNS = {PROB_BNS}
-NSBH = {PROB_NSBH}
-BBH = {PROB_BBH}
-Terrestrial = {PROB_TERRES}
-https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{TOM_ID}/"""
+ALERT_TEXT = """{search} {seq.event_subtype} v{seq.sequence_id}
+{nle.event_id} ({significance})
+{time}
+1/FAR = {inv_far}yr
+Dist = {seq.localization.distance_mean:.0f} ± {seq.localization.distance_std:.0f} Mpc
+50% Area = {seq.localization.area_50:.0f}°
+90% Area = {seq.localization.area_90:.0f}°
+Has NS = {HasNS:.0%}
+Has Mass Gap = {HasMassGap:.0%}
+Has Remnant = {HasRemnant:.0%}
+BNS = {BNS:.0%}
+NSBH = {NSBH:.0%}
+BBH = {BBH:.0%}
+Terrestrial = {Terrestrial:.0%}
+https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.id}/"""
 
 
 def send_text(body):
-    if body.startswith('TEST'):
+    if body.startswith('MDC'):
         group = Group.objects.get(name='Test SMS Alerts')
     else:
         group = Group.objects.get(name='SMS Alerts')
@@ -42,7 +45,7 @@ def send_text(body):
 
 
 def send_slack(body):
-    if body.startswith('TEST'):
+    if body.startswith('MDC'):
         return
     payload = {'text': body}
     json_data = json.dumps(payload)
@@ -55,7 +58,7 @@ def send_email(subject, body):
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = settings.ALERT_EMAIL_FROM
-    if body.startswith('TEST'):
+    if body.startswith('MDC'):
         group = Group.objects.get(name='Test Email Alerts')
     else:
         group = Group.objects.get(name='Email Alerts')
@@ -85,35 +88,15 @@ def format_si_prefix(qty, d=1):
         return f'{qty:.{d}e}'
 
 
-def handle_message_and_send_alerts(message):
-    handle_message(message)
+def handle_message_and_send_alerts(message, metadata):
+    nle, seq = handle_igwn_message(message, metadata)
 
     try:
-        if not isinstance(message, bytes):
-            bytes_message = message.value()
-        else:
-            bytes_message = message
-        fields = ['NOTICE_TYPE', 'TRIGGER_NUM', 'SEQUENCE_NUM', 'FAR',
-                  'PROB_BBH', 'PROB_BNS', 'PROB_NSBH', 'PROB_TERRES', 'PROB_NS', 'PROB_REMNANT', 'PROB_MassGap']
-        alert = extract_fields(bytes_message.decode('utf-8'), fields)
-        for field in fields:
-            if field == 'FAR' or field.startswith('PROB'):
-                alert[field] = float(alert[field].split(' ')[0])
-        alert['INV_FAR'] = format_si_prefix(3.168808781402895e-08 / alert['FAR'])  # 1/Hz to yr
-
-        nle = NonLocalizedEvent.objects.get(event_id=alert['TRIGGER_NUM'])
-        seq = nle.sequences.get(sequence_id=alert['SEQUENCE_NUM'])
-        alert['TOM_ID'] = nle.id
-        if seq.localization is None:
-            alert['DATE'] = "Couldn't parse sky map"
-            alert['DISTMEAN'] = math.nan
-            alert['DISTSTD'] = math.nan
-        else:
-            alert['DATE'] = seq.localization.date.strftime('%F %T')
-            alert['DISTMEAN'] = seq.localization.distance_mean
-            alert['DISTSTD'] = seq.localization.distance_std
-        email_subject = alert['TRIGGER_NUM']
-        body = ALERT_TEXT.format(**alert)
+        significance = 'significant' if seq.details['significant'] else 'subthreshold'
+        inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
+        email_subject = nle.event_id
+        body = ALERT_TEXT.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
+                                 **seq.details, **seq.details['properties'], **seq.details['classification'])
         logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
