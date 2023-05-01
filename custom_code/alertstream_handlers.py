@@ -88,22 +88,29 @@ def format_si_prefix(qty, d=1):
 
 
 def handle_message_and_send_alerts(message, metadata):
-    event_objects = handle_igwn_message(message, metadata)
-    if event_objects is not None:
-        nle, seq = event_objects
+    nle, seq = handle_igwn_message(message, metadata)
 
+    if nle is None:  # test event and SAVE_TEST_ALERTS = False
+        logger.info('Test alert not saved')
+        return
+
+    email_subject = nle.event_id
     try:
-        significance = 'significant' if seq.details['significant'] else 'subthreshold'
-        inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
-        email_subject = nle.event_id
-        body = ALERT_TEXT.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
-                                 **seq.details, **seq.details['properties'], **seq.details['classification'])
-        logger.info(f'Sending GW alert: {body}')
+        if seq is None:  # retraction
+            seq = nle.sequences.last()
+            search = seq.details.get('search', '') if seq is not None else ''  # figure out if it was a test event
+            body = f'{search} {nle.event_id} {nle.state}'
+            logger.info(f'Sending GW retraction: {body}')
+        else:
+            significance = 'significant' if seq.details['significant'] else 'subthreshold'
+            inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
+            body = ALERT_TEXT.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
+                                     **seq.details, **seq.details['properties'], **seq.details['classification'])
+            logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
-        email_subject = 'Unknown GW Alert'
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
-        body += 'https://gracedb.ligo.org/latest/?query=MDC&query_type=S'
+        body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
     send_text(body)
     send_slack(body)
     send_email(email_subject, body)
