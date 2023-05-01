@@ -18,8 +18,8 @@ ALERT_TEXT = """{search} {seq.event_subtype} v{seq.sequence_id}
 {time}
 1/FAR = {inv_far}yr
 Distance = {seq.localization.distance_mean:.0f} ± {seq.localization.distance_std:.0f} Mpc
-50% Area = {seq.localization.area_50:.0f}°
-90% Area = {seq.localization.area_90:.0f}°
+50% Area = {seq.localization.area_50:.0f} deg²
+90% Area = {seq.localization.area_90:.0f} deg²
 Has NS = {HasNS:.0%}
 Has Mass Gap = {HasMassGap:.0%}
 Has Remnant = {HasRemnant:.0%}
