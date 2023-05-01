@@ -17,7 +17,7 @@ ALERT_TEXT = """{search} {seq.event_subtype} v{seq.sequence_id}
 {nle.event_id} ({significance})
 {time}
 1/FAR = {inv_far}yr
-Dist = {seq.localization.distance_mean:.0f} ± {seq.localization.distance_std:.0f} Mpc
+Distance = {seq.localization.distance_mean:.0f} ± {seq.localization.distance_std:.0f} Mpc
 50% Area = {seq.localization.area_50:.0f}°
 90% Area = {seq.localization.area_90:.0f}°
 Has NS = {HasNS:.0%}
