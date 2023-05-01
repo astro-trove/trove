@@ -1,5 +1,4 @@
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
-from tom_nonlocalizedevents.models import NonLocalizedEvent
 from django.contrib.auth.models import Group
 from django.conf import settings
 from twilio.rest import Client
@@ -89,7 +88,9 @@ def format_si_prefix(qty, d=1):
 
 
 def handle_message_and_send_alerts(message, metadata):
-    nle, seq = handle_igwn_message(message, metadata)
+    event_objects = handle_igwn_message(message, metadata)
+    if event_objects is not None:
+        nle, seq = event_objects
 
     try:
         significance = 'significant' if seq.details['significant'] else 'subthreshold'
