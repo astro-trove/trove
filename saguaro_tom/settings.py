@@ -248,7 +248,7 @@ TOM_FACILITY_CLASSES = [
     'tom_observations.facilities.gemini.GEMFacility',
     'tom_observations.facilities.soar.SOARFacility',
     'tom_observations.facilities.lt.LTFacility',
-    'tom_mmt.mmt.MMTFacility',
+    'custom_code.facilities.CustomMMTFacility',
 ]
 
 TOM_ALERT_CLASSES = [
