@@ -29,6 +29,8 @@ BBH = {BBH:.0%}
 Terrestrial = {Terrestrial:.0%}
 https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.id}/"""
 
+ALERT_TEXT_NO_LOCALIZATION = ALERT_TEXT[:107] + 'Sky map not ingested\n' + ALERT_TEXT[291:]
+
 
 def send_text(body):
     if body.startswith('MDC'):
@@ -104,7 +106,8 @@ def handle_message_and_send_alerts(message, metadata):
         else:
             significance = 'significant' if seq.details['significant'] else 'subthreshold'
             inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
-            body = ALERT_TEXT.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
+            alert_text = ALERT_TEXT_NO_LOCALIZATION if seq.localization is None else ALERT_TEXT
+            body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
             logger.info(f'Sending GW alert: {body}')
     except Exception as e:
