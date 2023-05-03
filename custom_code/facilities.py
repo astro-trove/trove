@@ -46,8 +46,8 @@ class CustomMMIRSSpectroscopyForm(CustomMMIRSObservationForm, MMTMMIRSSpectrosco
 
 class CustomMMTFacility(MMTFacility):
     observation_forms = {
-        'BINOSPEC_IMAGING': CustomBinospecImagingForm,
-        'MMIRS_IMAGING': CustomMMIRSImagingForm,
-        'BINOSPEC_SPECTROSCOPY': CustomBinospecSpectroscopyForm,
-        'MMIRS_SPECTROSCOPY': CustomMMIRSSpectroscopyForm,
+        'Binospec_Imaging': CustomBinospecImagingForm,
+        'Binospec_Spectroscopy': CustomBinospecSpectroscopyForm,
+        'MMIRS_Imaging': CustomMMIRSImagingForm,
+        'MMIRS_Spectroscopy': CustomMMIRSSpectroscopyForm,
     }
