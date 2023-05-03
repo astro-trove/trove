@@ -285,6 +285,8 @@ class ObservationCreateView(OldObservationCreateView):
     """
     Modify the built-in ObservationCreateView to populate any "magnitude" field with the latest observed magnitude
     """
+    template_name = 'tom_observations/observation_form.html'
+
     def get_initial(self):
         initial = super().get_initial()
         target = self.get_target()
@@ -295,6 +297,7 @@ class ObservationCreateView(OldObservationCreateView):
                 initial['magnitude'] = latest_photometry['magnitude']
             elif 'limit' in latest_photometry:
                 initial['magnitude'] = latest_photometry['limit']
+        initial['user'] = self.request.user
         return initial
 
 
