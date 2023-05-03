@@ -297,7 +297,6 @@ class ObservationCreateView(OldObservationCreateView):
                 initial['magnitude'] = latest_photometry['magnitude']
             elif 'limit' in latest_photometry:
                 initial['magnitude'] = latest_photometry['limit']
-        initial['user'] = self.request.user
         return initial
 
 

@@ -1,14 +1,14 @@
 from tom_mmt.mmt import MMTBaseObservationForm, MMTImagingForm, MMTMMIRSImagingForm, MMTSpectroscopyForm, \
                         MMTMMIRSSpectroscopyForm, MMTFacility
 from crispy_forms.layout import Layout, HTML
+from django.conf import settings
 
 
 class CustomMMTObservationForm(MMTBaseObservationForm):
     def __init__(self, *args, **kwargs):
-        user = kwargs['initial']['user']
         kwargs['initial']['notes'] = f'This is a rapid ToO for GW follow-up. ' \
-                                     f'For questions please reach out to {user.get_full_name()} at {user.email}.\n\n' \
-                                     f'{kwargs["initial"].get("notes", "")}'
+                                     f'For questions please reach out to the SAGUARO team at {settings.CONTACT_EMAIL}.'\
+                                     f'\n\n{kwargs["initial"].get("notes", "")}'
         super().__init__(*args, **kwargs)
 
 
