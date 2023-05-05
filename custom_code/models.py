@@ -107,6 +107,17 @@ class TargetListExtra(models.Model):
         return self.value
 
 
+class CSSField(models.Model):
+    name = models.CharField(max_length=6, primary_key=True)
+    ra = models.FloatField()
+    dec = models.FloatField()
+    ecliptic_lng = models.FloatField()
+    ecliptic_lat = models.FloatField()
+    galactic_lng = models.FloatField()
+    galactic_lat = models.FloatField()
+    healpix = models.BigIntegerField()
+
+
 class Candidate(models.Model):
     candidatenumber = models.IntegerField(null=True)
     filename = models.CharField(max_length=128, null=True)
@@ -119,7 +130,7 @@ class Candidate(models.Model):
     magerr = models.FloatField(null=True)
     rawfilename = models.CharField(max_length=128, null=True)
     obsdate = models.DateTimeField(null=False, default=datetime.now)
-    field = models.CharField(max_length=32, null=True)
+    field = models.ForeignKey(CSSField, null=True, on_delete=models.SET_NULL)
     classification = models.IntegerField(null=True)
     cx = models.FloatField(null=True)
     cy = models.FloatField(null=True)
