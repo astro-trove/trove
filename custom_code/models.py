@@ -130,7 +130,7 @@ class Candidate(models.Model):
     magerr = models.FloatField(null=True)
     rawfilename = models.CharField(max_length=128, null=True)
     obsdate = models.DateTimeField(null=False, default=datetime.now)
-    field = models.ForeignKey(CSSField, null=True, on_delete=models.SET_NULL)
+    field = models.ForeignKey(CSSField, null=True, on_delete=models.SET_NULL, db_column='field')
     classification = models.IntegerField(null=True)
     cx = models.FloatField(null=True)
     cy = models.FloatField(null=True)
