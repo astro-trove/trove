@@ -12,7 +12,7 @@ def thumbnail_url(candidate, suffix):
     url = f'http://beast.as.arizona.edu:5013/api/png/{candidate.obsdate.strftime("%Y/%m/%d")}/'
     url += f'{candidate.field}/{candidate.candidatenumber}_{visit}_{suffix}.png'
     try:
-        response = requests.get(url, timeout=0.1)
+        response = requests.get(url, timeout=0.2)
         return 'data:image/png;base64,' + base64.b64encode(response.content).decode() if response.ok else ''
     except requests.exceptions.ConnectTimeout:
         return ''
