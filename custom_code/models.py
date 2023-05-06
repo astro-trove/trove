@@ -1,9 +1,9 @@
 from datetime import datetime
 from dateutil.parser import parse
 
-from django.conf import settings
 from django.db import models
 from tom_targets.models import Target, TargetList
+from tom_nonlocalizedevents.models import EventLocalization
 
 
 def _target_list_save(self, *args, **kwargs):
@@ -117,6 +117,12 @@ class CSSField(models.Model):
     galactic_lat = models.FloatField()
     healpix = models.BigIntegerField()
 
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
 
 class Candidate(models.Model):
     candidatenumber = models.IntegerField(null=True)
@@ -148,3 +154,18 @@ class Candidate(models.Model):
     class Meta:
         db_table = 'candidates'
         ordering = ['-obsdate', '-candidatenumber']
+
+
+class CSSFieldCredibleRegion(models.Model):
+    localization = models.ForeignKey(EventLocalization, related_name='css_field_credible_regions', on_delete=models.CASCADE)
+    css_field = models.ForeignKey(CSSField, related_name='css_field_credible_regions', on_delete=models.CASCADE)
+
+    smallest_percent = models.IntegerField(
+        default=100,
+        help_text='Smallest percent credible region this field falls into for this localization.'
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['localization', 'css_field'], name='unique_localization_css_field')
+        ]
