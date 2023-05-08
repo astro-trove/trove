@@ -8,6 +8,7 @@ import smtplib
 import logging
 import json
 import math
+from .healpix_utils import update_all_credible_region_percents_for_css_fields
 
 logger = logging.getLogger(__name__)
 
@@ -120,3 +121,6 @@ def handle_message_and_send_alerts(message, metadata):
     send_text(body)
     send_slack(body)
     send_email(email_subject, body)
+
+    if seq.localization is not None:
+        update_all_credible_region_percents_for_css_fields(seq.localization)
