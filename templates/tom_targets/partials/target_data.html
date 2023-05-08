@@ -1,4 +1,4 @@
-{% load tom_common_extras targets_extras %}
+{% load tom_common_extras targets_extras target_extras %}  {# targets_extras is built in; target_extras is custom #}
 <dl class="row">
   {% for target_name in target.names %}
     {% if forloop.first %}
@@ -21,6 +21,9 @@
   <dt class="col-sm-3">Galactic</dt>
   <dd class="col-sm-4">{{ target.galactic_lng|floatformat:6 }}</dd>
   <dd class="col-sm-5">{{ target.galactic_lat|floatformat:6 }}</dd>
+  <dt class="col-sm-3">Ecliptic</dt>
+  <dd class="col-sm-4">{{ target|ecliptic_lng|floatformat:6 }}</dd>
+  <dd class="col-sm-5">{{ target|ecliptic_lat|floatformat:6 }}</dd>
 </dl>
 <dl class="row">
 {% for key, value in extras.items %}
