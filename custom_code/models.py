@@ -116,6 +116,7 @@ class CSSField(models.Model):
     galactic_lng = models.FloatField()
     galactic_lat = models.FloatField()
     healpix = models.BigIntegerField()
+    adjacent = models.ManyToManyField('self')
 
     def __str__(self):
         return self.name
