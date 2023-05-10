@@ -45,6 +45,7 @@
       <a href="{% url 'custom_code:css-fields' pk=view.kwargs.pk %}" class="btn btn-secondary" title="Reset">Reset</a>
       {% endbuttons %}
     </form>
+    <a href="{% url 'custom_code:css-fields-export' pk=view.kwargs.pk %}" class="btn btn-info" title="Export">Export</a>
   </div>
 </div>
 {% endblock %}

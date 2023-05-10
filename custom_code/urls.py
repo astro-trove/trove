@@ -4,6 +4,7 @@ from tom_targets.views import TargetGroupingView, TargetGroupingDeleteView
 from .views import TargetGroupingCreateView, CandidateListView, TargetReportView, TargetClassifyView, TargetVettingView
 from .views import ObservationCreateView, TargetNameSearchView, TargetListView, TargetATLASForcedPhot
 from .views import TargetTNSPhotometry, DataProductUploadView, CSSFieldListView, NonLocalizedEventListView
+from .views import CSSFieldExportView
 
 from tom_common.api_router import SharedAPIRootRouter
 
@@ -27,4 +28,5 @@ urlpatterns = [
     path('dataproducts/data/upload/', DataProductUploadView.as_view(), name='upload'),
     path('nonlocalizedevents/', NonLocalizedEventListView.as_view(), name='nonlocalizedevents'),
     path('nonlocalizedevents/<int:pk>/cssfields/', CSSFieldListView.as_view(), name='css-fields'),
+    path('nonlocalizedevents/<int:pk>/cssfields/export/', CSSFieldExportView.as_view(), name='css-fields-export'),
 ]

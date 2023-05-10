@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, StreamingHttpResponse
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView
 from django_filters.views import FilterView
@@ -31,6 +31,7 @@ from .hooks import target_post_save, update_or_create_target_extra
 import json
 import requests
 import time
+from io import StringIO
 
 from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot, query_ZTFpubphot
 import numpy as np
@@ -516,6 +517,35 @@ class CSSFieldListView(FilterView):
         context = super().get_context_data(object_list=object_list, **kwargs)
         context['nonlocalizedevent'] = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
         return context
+
+
+class CSSFieldExportView(CSSFieldListView):
+    """
+    View that handles the export of CSS Fields to .prog file(s).
+    """
+    def render_to_response(self, context, **response_kwargs):
+        """
+        Returns a response containing the exported .prog file(s) of selected fields.
+
+        :param context: Context object for this view
+        :type context: dict
+
+        :returns: response class with ASCII
+        :rtype: StreamingHttpResponse
+        """
+        groups = list(context['filter'].qs.filter(group__isnull=False).values_list('group', flat=True).distinct())
+        text = ''
+        for g in groups:
+            group = context['filter'].qs.filter(group=g).order_by('rank_in_group')
+            names = [cr.css_field.name for cr in group]
+            text += ','.join(names) + '\n'
+        file_buffer = StringIO(text)
+        file_buffer.seek(0)  # goto the beginning of the buffer
+        response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
+        filename = "{nonlocalizedevent}.prog".format(**context)
+        response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
+        return response
+
 
 
 class NonLocalizedEventListView(OldNonLocalizedEventListView):
