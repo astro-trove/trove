@@ -1,6 +1,6 @@
 {% extends 'tom_common/index.html' %}
 {% block content %}
-<!-- block content -->
+{% block title %}GW Events{% endblock %}
 <h1>Non-Localized Event Index</h1>
 {% if object_list %}
   <table class="table">
@@ -22,22 +22,22 @@
       <tr>
         <td>{{ event.event_type }}</td>
         <td scope="row">
-            <a href="{% url 'nonlocalizedevents:detail'  event.id %}"><b>{{ event.event_id }}</b> Details</a>
+            <a href="{% url 'nonlocalizedevents:detail'  event.id %}" target="_blank"><b>{{ event.event_id }}</b> Details</a>
         </td>
         <td scope="row">
-            <a href="{% url 'custom_code:css-fields' event.id %}?grouping_ngroups=3&grouping_nfields=12">{{ event.event_id }}</a>
+            <a href="{% url 'custom_code:css-fields' event.id %}?grouping_ngroups=3&grouping_nfields=12" target="_blank">{{ event.event_id }}</a>
         </td>
         <td>{{event.state }}</td>
         <td>{{event.modified | timesince }}</td>
         <td>{{event.created | timesince }}</td>
         <td>
-          <a href="{{ event.hermes_url }}">{{ event.event_id }}</a>
+          <a href="{{ event.hermes_url }}" target="_blank">{{ event.event_id }}</a>
         </td>
         <td>
-          <a href="{{ event.gracedb_url }}">{{ event.event_id }}</a>
+          <a href="{{ event.gracedb_url }}" target="_blank">{{ event.event_id }}</a>
         </td>
         <td>
-            <a href="{{ event.treasuremap_url }}">{{ event.event_id }}</a>
+            <a href="{{ event.treasuremap_url }}" target="_blank">{{ event.event_id }}</a>
         </td>
       </tr>
       {% endfor %}
