@@ -1,0 +1,50 @@
+{% extends 'tom_common/base.html' %}
+{% load bootstrap4 %}
+{% block title %}CSS Fields{% endblock %}
+{% block content %}
+<h1>CSS Fields</h1>
+<div class="row">
+  <div class="col-md-10">
+  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <table class="table table-hover">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>RA</th>
+          <th>Dec.</th>
+          <th>Prob.</th>
+          <th>Group</th>
+          <th>Rank</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for link in object_list %}
+        <tr>
+          <td>{{ link.css_field.name }}</td>
+          <td>{{ link.css_field.ra|floatformat:"6" }}</td>
+          <td>{{ link.css_field.dec|floatformat:"6" }}</td>
+          <td>{{ link.probability_contained|floatformat:"6" }}</td>
+          <td>{{ link.group }}</td>
+          <td>{{ link.rank_in_group }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10">No fields match those filters.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  </div>
+  {{ filter.fields }}
+  <div class="col-md-2">
+    <form action="" method="get" class="form">
+      {% bootstrap_form filter.form %}
+      {% buttons %}
+      <button type="submit" class="btn btn-primary">Filter</button>
+      <a href="{% url 'custom_code:css-fields' pk=view.kwargs.pk %}" class="btn btn-secondary" title="Reset">Reset</a>
+      {% endbuttons %}
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -9,6 +9,11 @@ import logging
 import json
 import math
 from .healpix_utils import update_all_credible_region_percents_for_css_fields
+from .cssfield_selection import get_prob_radec, CSS_FOOTPRINT
+from ligo.skymap import bayestar
+from astropy.table import Table
+from io import BytesIO
+import healpy
 
 logger = logging.getLogger(__name__)
 
@@ -94,12 +99,23 @@ def format_si_prefix(qty, d=1):
 
 
 def handle_message_and_send_alerts(message, metadata):
+    # get skymap table out for later
+    try:
+        alert = message.content[0]
+        skymap_bytes = alert['event']['skymap']
+        skymap = Table.read(BytesIO(skymap_bytes))
+    except Exception as e:  # no matter what, do not crash the listener before ingesting the alert
+        logger.error(f'Could not extract skymap from alert: {e}')
+        skymap = None
+
+    # ingest NonLocalizedEvent into the TOM database
     nle, seq = handle_igwn_message(message, metadata)
 
     if nle is None:  # test event and SAVE_TEST_ALERTS = False
         logger.info('Test alert not saved')
         return
 
+    # send SMS, Slack, and email alerts
     email_subject = nle.event_id
     try:
         if seq is None:  # retraction
@@ -123,4 +139,11 @@ def handle_message_and_send_alerts(message, metadata):
     send_email(email_subject, body)
 
     if seq.localization is not None:
+        # store credible regions for CSS fields (for associating candidates)
         update_all_credible_region_percents_for_css_fields(seq.localization)
+
+        # get the total probability in each CSS field footprint
+        flat = bayestar.rasterize(skymap)
+        probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
+        nside = healpy.npix2nside(len(probs))
+        get_prob_radec(probs, nside, CSS_FOOTPRINT, seq.localization.css_field_credible_regions.all())

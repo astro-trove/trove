@@ -19,8 +19,9 @@ from tom_observations.views import ObservationCreateView as OldObservationCreate
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from tom_dataproducts.models import DataProduct, ReducedDatum
 from tom_dataproducts.views import DataProductUploadView as OldDataProductUploadView
-from .models import Candidate
-from .filters import CandidateFilter
+from tom_nonlocalizedevents.models import NonLocalizedEvent
+from .models import Candidate, CSSFieldCredibleRegion
+from .filters import CandidateFilter, CSSFieldCredibleRegionFilter
 from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
@@ -489,3 +490,23 @@ class DataProductUploadView(OldDataProductUploadView):
             )
 
         return redirect(form.cleaned_data.get('referrer', '/'))
+
+
+class CSSFieldListView(FilterView):
+    """
+    View for listing candidates in the TOM.
+    """
+    template_name = 'tom_nonlocalizedevents/cssfield_list.html'
+    paginate_by = 100
+    strict = False
+    model = CSSFieldCredibleRegion
+    filterset_class = CSSFieldCredibleRegionFilter
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        seq = nle.sequences.last()
+        if seq is None:
+            return queryset.none()
+        else:
+            return queryset.filter(localization=seq.localization)
