@@ -16,3 +16,37 @@ class Migration(migrations.Migration):
             field=models.FloatField(null=True),
         ),
     ]
+
+# After running this migration, populate the column using the following code:
+#
+# from tom_nonlocalizedevents.models import NonLocalizedEvent
+# from astropy.table import Table
+# from custom_code.cssfield_selection import get_prob_radec, CSS_FOOTPRINT
+# from healpix_alchemy.constants import LEVEL
+# from ligo.skymap import bayestar
+# import astropy_healpix
+# import numpy as np
+# import healpy
+#
+#
+# def bigintrange_to_uniq(tiles):
+#     """Converts SkymapTile.tile values back to healpix UNIQ values"""
+#     a = np.array([bigintrange.lower for bigintrange in tiles])
+#     b = np.array([bigintrange.upper for bigintrange in tiles])
+#     ipix = a // (b - a)
+#     shift = np.log2(b - a).astype(np.int64)
+#     level = LEVEL - shift // 2
+#     return astropy_healpix.level_ipix_to_uniq(level, ipix)
+#
+#
+# for nle in NonLocalizedEvent.objects.filter(event_id__startswith='MS2305'):
+#     seq = nle.sequences.last()
+#     if seq is not None and seq.localization is not None:
+#         skymap = Table(list(seq.localization.tiles.values('tile', 'probdensity')))
+#         skymap.add_column(bigintrange_to_uniq(skymap['tile']), 0, 'UNIQ')
+#         skymap.rename_column('probdensity', 'PROBDENSITY')
+#         flat = bayestar.rasterize(skymap)
+#         probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
+#         nside = healpy.npix2nside(len(probs))
+#         get_prob_radec(probs, nside, CSS_FOOTPRINT, seq.localization.css_field_credible_regions.all())
+#         print(nle.event_id)
