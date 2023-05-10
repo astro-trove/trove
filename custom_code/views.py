@@ -20,6 +20,7 @@ from tom_dataproducts.exceptions import InvalidFileFormatException
 from tom_dataproducts.models import DataProduct, ReducedDatum
 from tom_dataproducts.views import DataProductUploadView as OldDataProductUploadView
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from tom_nonlocalizedevents.views import NonLocalizedEventListView as OldNonLocalizedEventListView
 from .models import Candidate, CSSFieldCredibleRegion
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter
 from .data_processor import run_data_processor
@@ -510,3 +511,16 @@ class CSSFieldListView(FilterView):
             return queryset.none()
         else:
             return queryset.filter(localization=seq.localization)
+
+
+class NonLocalizedEventListView(OldNonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    model = NonLocalizedEvent
+    template_name = 'tom_nonlocalizedevents/nonlocalizedevent_list.html'
+
+    def get_queryset(self):
+        # '-created' is most recent first
+        qs = NonLocalizedEvent.objects.order_by('-created')
+        return qs
