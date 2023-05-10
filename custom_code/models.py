@@ -165,6 +165,9 @@ class CSSFieldCredibleRegion(models.Model):
         default=100,
         help_text='Smallest percent credible region this field falls into for this localization.'
     )
+    probability_contained = models.FloatField(null=True)
+    group = models.IntegerField(null=True)
+    rank_in_group = models.IntegerField(null=True)
 
     class Meta:
         constraints = [
