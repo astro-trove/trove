@@ -10,3 +10,4 @@ kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
 twilio
+paramiko

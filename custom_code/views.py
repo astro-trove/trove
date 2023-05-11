@@ -36,6 +36,8 @@ from io import StringIO
 from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot, query_ZTFpubphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
+import paramiko
+import os
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 
@@ -523,6 +525,22 @@ class CSSFieldExportView(CSSFieldListView):
     """
     View that handles the export of CSS Fields to .prog file(s).
     """
+    def generate_prog_file(self):
+        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        seq = nle.sequences.last()
+        queryset = seq.localization.css_field_credible_regions.filter(group__isnull=False)
+        groups = list(queryset.values_list('group', flat=True).distinct())
+        text = ''
+        for g in groups:
+            group = queryset.filter(group=g).order_by('rank_in_group')
+            names = [cr.css_field.name for cr in group]
+            text += ','.join(names) + '\n'
+        return text
+
+    def prog_file_name(self):
+        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        return f"{nle.event_id}.prog"
+
     def render_to_response(self, context, **response_kwargs):
         """
         Returns a response containing the exported .prog file(s) of selected fields.
@@ -533,19 +551,49 @@ class CSSFieldExportView(CSSFieldListView):
         :returns: response class with ASCII
         :rtype: StreamingHttpResponse
         """
-        groups = list(context['filter'].qs.filter(group__isnull=False).values_list('group', flat=True).distinct())
-        text = ''
-        for g in groups:
-            group = context['filter'].qs.filter(group=g).order_by('rank_in_group')
-            names = [cr.css_field.name for cr in group]
-            text += ','.join(names) + '\n'
-        file_buffer = StringIO(text)
+        file_buffer = StringIO(self.generate_prog_file())
         file_buffer.seek(0)  # goto the beginning of the buffer
         response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
-        filename = "{nonlocalizedevent}.prog".format(**context)
+        filename = self.prog_file_name()
         response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
         return response
 
+
+class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
+    """
+    View that handles the submission of CSS Fields to CSS.
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view. Calls the function to get photometry from TNS.
+        Separates detections and non-detections.
+        """
+        text = self.generate_prog_file()
+        filename = self.prog_file_name()
+        try:
+            with paramiko.SSHClient() as ssh:
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(settings.CSS_HOSTNAME, username=settings.CSS_USERNAME)
+                sftp = ssh.open_sftp()
+                with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
+                    f.write(text)
+            banner = f'{filename} submitted to CSS'
+            logger.info(banner)
+            messages.success(request, banner)
+        except Exception as e:
+            logger.error(str(e))
+            messages.error(request, str(e))
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer
 
 
 class NonLocalizedEventListView(OldNonLocalizedEventListView):
