@@ -1,7 +1,7 @@
 django
 django_extensions
 guardian
-tomtoolkit~=2.14.0
+tomtoolkit~=2.14.1
 tom-alertstreams
 tom-nonlocalizedevents
 psycopg2-binary
