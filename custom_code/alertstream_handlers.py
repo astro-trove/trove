@@ -141,9 +141,11 @@ def handle_message_and_send_alerts(message, metadata):
     if seq.localization is not None:
         # store credible regions for CSS fields (for associating candidates)
         update_all_credible_region_percents_for_css_fields(seq.localization)
+        logger.info('Updated credible regions for CSS fields')
 
         # get the total probability in each CSS field footprint
         flat = bayestar.rasterize(skymap)
         probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
         nside = healpy.npix2nside(len(probs))
         get_prob_radec(probs, nside, CSS_FOOTPRINT, seq.localization.css_field_credible_regions.all())
+        logger.info('Updated probabilities for CSS fields')
