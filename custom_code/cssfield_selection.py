@@ -1,7 +1,9 @@
-import astropy
 import numpy as np
 import healpy
-from astropy.coordinates import SkyCoord
+from astroplan import moon_illumination
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_moon, get_sun, spherical_to_cartesian
+from astropy.time import Time
+from astropy import units as u
 import logging
 
 logger = logging.getLogger(__name__)
@@ -97,13 +99,34 @@ def get_prob_radec(probs, nside, fp, css_field_credible_regions):
         pointing_footprint = project_footprint(fp, cr.css_field.ra, cr.css_field.dec)
         ras_poly = [x[0] for x in pointing_footprint][:-1]
         decs_poly = [x[1] for x in pointing_footprint][:-1]
-        xyzpoly = astropy.coordinates.spherical_to_cartesian(1, np.deg2rad(decs_poly), np.deg2rad(ras_poly))
+        xyzpoly = spherical_to_cartesian(1, np.deg2rad(decs_poly), np.deg2rad(ras_poly))
         qp = healpy.query_polygon(nside, np.array(xyzpoly).T)
         prob = 0
         for ind in qp:
             prob += probs[ind]
         cr.probability_contained = prob
         cr.save()
+
+
+CSS_LOCATION = EarthLocation(lat=32.4433333333 * u.deg, lon=-110.788888889 * u.deg, height=2790 * u.m)
+
+
+def observable_tonight(target):
+    radec = SkyCoord(target.ra, target.dec, unit=u.deg)
+    time = Time.now() + np.linspace(0., 1 * u.day, 48)
+    frame = AltAz(obstime=time, location=CSS_LOCATION)
+
+    altaz = radec.transform_to(frame)
+    target_up = (altaz.secz <= 2.5) & (altaz.secz >= 1.)
+
+    sun_altaz = get_sun(time).transform_to(altaz)
+    sun_down = sun_altaz.alt <= -12. * u.deg
+
+    moon_altaz = get_moon(time).transform_to(frame)
+    moon_down = moon_altaz.alt <= 0.
+    moon_far = moon_altaz.separation(altaz) > (3. + 42. * moon_illumination(time)) * u.deg
+
+    return np.any(sun_down & target_up & (moon_far | moon_down))
 
 
 def rank_css_fields(queryset, n_select=12, n_groups=3):
@@ -115,10 +138,11 @@ def rank_css_fields(queryset, n_select=12, n_groups=3):
             for i, cr in enumerate(fields_remaining):
                 if cr in adjacent_remaining:
                     cr = fields_remaining.pop(i)
-                    cr.group = g + 1
-                    cr.rank_in_group = r + 1
-                    cr.save()
-                    break
+                    if observable_tonight(cr.css_field):
+                        cr.group = g + 1
+                        cr.rank_in_group = r + 1
+                        cr.save()
+                        break
             else:
                 logger.warning('No adjacent fields to select')
                 break
