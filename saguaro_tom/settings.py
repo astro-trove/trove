@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django_comments',
     'bootstrap4',
     'crispy_forms',
+    'crispy_bootstrap4',
     'rest_framework',
     'rest_framework.authtoken',
     'django_filters',
@@ -94,6 +95,7 @@ TEMPLATES = [
     },
 ]
 
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
@@ -255,9 +257,8 @@ TOM_ALERT_CLASSES = [
     'tom_alerts.brokers.alerce.ALeRCEBroker',
     'tom_alerts.brokers.antares.ANTARESBroker',
     'tom_alerts.brokers.gaia.GaiaBroker',
+    'tom_alerts.brokers.hermes.HermesBroker',
     'tom_alerts.brokers.lasair.LasairBroker',
-    'tom_alerts.brokers.mars.MARSBroker',
-    'tom_alerts.brokers.scimma.SCIMMABroker',
     'tom_alerts.brokers.scout.ScoutBroker',
     'tom_alerts.brokers.tns.TNSBroker',
     'tom_alerts.brokers.fink.FinkBroker',
@@ -311,6 +312,8 @@ TARGET_PERMISSIONS_ONLY = True
 # URLs that should be allowed access even with AUTH_STRATEGY = LOCKED
 # for example: OPEN_URLS = ['/', '/about']
 OPEN_URLS = []
+
+MATCH_MANAGERS = {'Target': 'custom_code.managers.StrictTargetMatchManager'}
 
 HOOKS = {
     'target_post_save': 'custom_code.hooks.target_post_save',
