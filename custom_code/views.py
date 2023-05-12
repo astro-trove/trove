@@ -537,10 +537,6 @@ class CSSFieldExportView(CSSFieldListView):
             text += ','.join(names) + '\n'
         return text
 
-    def prog_file_name(self):
-        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
-        return f"{nle.event_id}.prog"
-
     def render_to_response(self, context, **response_kwargs):
         """
         Returns a response containing the exported .prog file(s) of selected fields.
@@ -554,7 +550,8 @@ class CSSFieldExportView(CSSFieldListView):
         file_buffer = StringIO(self.generate_prog_file())
         file_buffer.seek(0)  # goto the beginning of the buffer
         response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
-        filename = self.prog_file_name()
+        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        filename = f"Saguaro_{nle.event_id}.prog"
         response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
         return response
 
@@ -569,17 +566,19 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
         Separates detections and non-detections.
         """
         text = self.generate_prog_file()
-        filename = self.prog_file_name()
+        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
         try:
             with paramiko.SSHClient() as ssh:
                 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
                 ssh.connect(settings.CSS_HOSTNAME, username=settings.CSS_USERNAME)
                 sftp = ssh.open_sftp()
-                with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
-                    f.write(text)
-            banner = f'{filename} submitted to CSS'
-            logger.info(banner)
-            messages.success(request, banner)
+                for i, line in enumerate(text.splitlines()):
+                    filename = f'Saguaro_{nle.event_id}_{i+1:d}.prog'
+                    with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
+                            f.write(line + '\n')
+                    banner = f'{filename} submitted to CSS'
+                    logger.info(banner)
+                    messages.success(request, banner)
         except Exception as e:
             logger.error(str(e))
             messages.error(request, str(e))
