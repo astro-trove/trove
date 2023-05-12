@@ -40,7 +40,7 @@ def process_reduced_ztf_data(target, candidates):
             timestamp=jd.to_datetime(timezone=TimezoneInfo()),
             value=value,
             source_name='ZTF',
-            source_location=alert['zid'],
+            source_location=candidate['zid'],
             data_type='photometry',
             target=target)
 
