@@ -117,16 +117,19 @@ def observable_tonight(target):
     frame = AltAz(obstime=time, location=CSS_LOCATION)
 
     altaz = radec.transform_to(frame)
-    target_up = (altaz.secz <= 2.5) & (altaz.secz >= 1.)
+    target_up = (altaz.secz <= 1.75) & (altaz.secz >= 1.)
 
-    sun_altaz = get_sun(time).transform_to(altaz)
+    sun_altaz = get_sun(time).transform_to(frame)
     sun_down = sun_altaz.alt <= -12. * u.deg
+    now_or_sunset = np.flatnonzero(sun_down).min()
+    sunrise = np.flatnonzero(~sun_down[now_or_sunset:]).min() + now_or_sunset
 
     moon_altaz = get_moon(time).transform_to(frame)
     moon_down = moon_altaz.alt <= 0.
     moon_far = moon_altaz.separation(altaz) > (3. + 42. * moon_illumination(time)) * u.deg
 
-    return np.any(sun_down & target_up & (moon_far | moon_down))
+    observable = target_up & (moon_far | moon_down)
+    return observable[now_or_sunset:sunrise].any()
 
 
 def rank_css_fields(queryset, n_select=12, n_groups=3):
