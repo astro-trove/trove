@@ -8,10 +8,10 @@
       <tr>
         <th scope="col">Event Type</th>
         <th scope="col">Detail Page</th>
-        <th scope="col">CSS Fields</th>
         <th scope="col">State</th>
-        <th scope="col">Updated (in TOM)</th>
         <th scope="col">Created (in TOM)</th>
+        <th scope="col">Candidates</th>
+        <th scope="col">CSS Fields</th>
         <th scope="col">Hermes</th>
         <th scope="col">GraceDB</th>
         <th scope="col">Treasure Map</th>
@@ -21,23 +21,25 @@
       {% for event in object_list %}
       <tr>
         <td>{{ event.event_type }}</td>
-        <td scope="row">
-            <a href="{% url 'nonlocalizedevents:detail'  event.id %}" target="_blank"><b>{{ event.event_id }}</b> Details</a>
-        </td>
-        <td scope="row">
-            <a href="{% url 'custom_code:css-fields' event.id %}?grouping_ngroups=3&grouping_nfields=12" target="_blank">{{ event.event_id }}</a>
+        <td>
+            <a href="{% url 'nonlocalizedevents:detail'  event.id %}" target="_blank"><b>{{ event.event_id }}</b></a>
         </td>
         <td>{{event.state }}</td>
-        <td>{{event.modified | timesince }}</td>
         <td>{{event.created | timesince }}</td>
         <td>
-          <a href="{{ event.hermes_url }}" target="_blank">{{ event.event_id }}</a>
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Candidates</a>
         </td>
         <td>
-          <a href="{{ event.gracedb_url }}" target="_blank">{{ event.event_id }}</a>
+            <a href="{% url 'custom_code:css-fields' event.id %}?grouping_ngroups=3&grouping_nfields=12" target="_blank">CSS Fields</a>
         </td>
         <td>
-            <a href="{{ event.treasuremap_url }}" target="_blank">{{ event.event_id }}</a>
+          <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
+        </td>
+        <td>
+          <a href="{{ event.gracedb_url }}" target="_blank">GraceDB</a>
+        </td>
+        <td>
+            <a href="{{ event.treasuremap_url }}" target="_blank">Treasure Map</a>
         </td>
       </tr>
       {% endfor %}
