@@ -14,5 +14,5 @@ def thumbnail_url(candidate, suffix):
     try:
         response = requests.get(url, timeout=0.2)
         return 'data:image/png;base64,' + base64.b64encode(response.content).decode() if response.ok else ''
-    except requests.exceptions.ConnectTimeout:
+    except requests.exceptions.ConnectionError:
         return ''
