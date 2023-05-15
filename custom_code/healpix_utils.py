@@ -23,45 +23,45 @@ def update_all_credible_region_percents_for_css_fields(eventlocalization):
     This function creates a credible region linkage with probability prob for each of the event candidate
     ids supplied if they fall within that prob for the event location specified.
     """
-    session = Session(sa_engine)
+    with Session(sa_engine) as session:
 
-    cum_prob = sa.func.sum(
-        SaSkymapTile.probdensity * SaSkymapTile.tile.area
-    ).over(
-        order_by=SaSkymapTile.probdensity.desc()
-    ).label(
-        'cum_prob'
-    )
-
-    subquery = sa.select(
-        SaSkymapTile.probdensity,
-        cum_prob
-    ).filter(
-        SaSkymapTile.localization_id == eventlocalization.id
-    ).subquery()
-
-    for prob in CREDIBLE_REGION_PROBABILITIES:
-        min_probdensity = sa.select(
-            sa.func.min(subquery.columns.probdensity)
-        ).filter(
-            subquery.columns.cum_prob <= prob
-        ).scalar_subquery()
-
-        query = sa.select(
-            SaCSSField.name
-        ).filter(
-            SaSkymapTile.localization_id == eventlocalization.id,
-            SaSkymapTile.tile.contains(SaCSSField.healpix),
-            SaSkymapTile.probdensity >= min_probdensity
+        cum_prob = sa.func.sum(
+            SaSkymapTile.probdensity * SaSkymapTile.tile.area
+        ).over(
+            order_by=SaSkymapTile.probdensity.desc()
+        ).label(
+            'cum_prob'
         )
 
-        results = session.execute(query)
+        subquery = sa.select(
+            SaSkymapTile.probdensity,
+            cum_prob
+        ).filter(
+            SaSkymapTile.localization_id == eventlocalization.id
+        ).subquery()
 
-        for sa_css_field in results:
-            CSSFieldCredibleRegion.objects.update_or_create(
-                css_field=CSSField.objects.get(name=sa_css_field[0]),
-                localization=eventlocalization,
-                defaults={
-                    'smallest_percent': int(prob * 100.0)
-                }
+        for prob in CREDIBLE_REGION_PROBABILITIES:
+            min_probdensity = sa.select(
+                sa.func.min(subquery.columns.probdensity)
+            ).filter(
+                subquery.columns.cum_prob <= prob
+            ).scalar_subquery()
+
+            query = sa.select(
+                SaCSSField.name
+            ).filter(
+                SaSkymapTile.localization_id == eventlocalization.id,
+                SaSkymapTile.tile.contains(SaCSSField.healpix),
+                SaSkymapTile.probdensity >= min_probdensity
             )
+
+            results = session.execute(query)
+
+            for sa_css_field in results:
+                CSSFieldCredibleRegion.objects.update_or_create(
+                    css_field=CSSField.objects.get(name=sa_css_field[0]),
+                    localization=eventlocalization,
+                    defaults={
+                        'smallest_percent': int(prob * 100.0)
+                    }
+                )
