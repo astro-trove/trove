@@ -47,7 +47,7 @@
     </form>
     <p><a href="{% url 'custom_code:css-fields-export' pk=view.kwargs.pk %}" class="btn btn-info" title="Export">Export</a></p>
     <p><a href="{% url 'custom_code:css-fields-submit' pk=view.kwargs.pk %}" class="btn btn-warning" title="Submit">Submit</a></p>
-    <p>CSS only observes fields requested on the same UT date. This page loaded at {% now "H:i" %} UT.</p>
+    <p>CSS only observes fields requested on the same UT date. This page loaded at {% now "M d H:i" %} UT.</p>
   </div>
 </div>
 {% endblock %}
