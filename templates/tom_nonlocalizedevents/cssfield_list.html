@@ -42,11 +42,11 @@
       {% bootstrap_form filter.form %}
       {% buttons %}
       <button type="submit" class="btn btn-primary">Filter</button>
-      <a href="{% url 'custom_code:css-fields' pk=view.kwargs.pk %}" class="btn btn-secondary" title="Reset">Reset</a>
+      <a href="{% url 'custom_code:css-fields' view.kwargs.event_id %}" class="btn btn-secondary" title="Reset">Reset</a>
       {% endbuttons %}
     </form>
-    <p><a href="{% url 'custom_code:css-fields-export' pk=view.kwargs.pk %}" class="btn btn-info" title="Export">Export</a></p>
-    <p><a href="{% url 'custom_code:css-fields-submit' pk=view.kwargs.pk %}" class="btn btn-warning" title="Submit">Submit</a></p>
+    <p><a href="{% url 'custom_code:css-fields-export' view.kwargs.event_id %}" class="btn btn-info" title="Export">Export</a></p>
+    <p><a href="{% url 'custom_code:css-fields-submit' view.kwargs.event_id %}" class="btn btn-warning" title="Submit">Submit</a></p>
     <p>CSS only observes fields requested on the same UT date. This page loaded at {% now "M d H:i" %} UT.</p>
   </div>
 </div>

@@ -27,7 +27,7 @@ urlpatterns = [
     path('observations/<str:facility>/create/', ObservationCreateView.as_view(), name='create'),
     path('dataproducts/data/upload/', DataProductUploadView.as_view(), name='upload'),
     path('nonlocalizedevents/', NonLocalizedEventListView.as_view(), name='nonlocalizedevents'),
-    path('nonlocalizedevents/<int:pk>/cssfields/', CSSFieldListView.as_view(), name='css-fields'),
-    path('nonlocalizedevents/<int:pk>/cssfields/export/', CSSFieldExportView.as_view(), name='css-fields-export'),
-    path('nonlocalizedevents/<int:pk>/cssfields/submit/', CSSFieldSubmitView.as_view(), name='css-fields-submit'),
+    path('nonlocalizedevents/<str:event_id>/cssfields/', CSSFieldListView.as_view(), name='css-fields'),
+    path('nonlocalizedevents/<str:event_id>/cssfields/export/', CSSFieldExportView.as_view(), name='css-fields-export'),
+    path('nonlocalizedevents/<str:event_id>/cssfields/submit/', CSSFieldSubmitView.as_view(), name='css-fields-submit'),
 ]

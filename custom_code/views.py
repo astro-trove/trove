@@ -508,7 +508,7 @@ class CSSFieldListView(FilterView):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         seq = nle.sequences.last()
         if seq is None:
             return queryset.none()
@@ -517,7 +517,7 @@ class CSSFieldListView(FilterView):
 
     def get_context_data(self, *, object_list=None, **kwargs):
         context = super().get_context_data(object_list=object_list, **kwargs)
-        context['nonlocalizedevent'] = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        context['nonlocalizedevent'] = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         return context
 
 
@@ -526,7 +526,7 @@ class CSSFieldExportView(CSSFieldListView):
     View that handles the export of CSS Fields to .prog file(s).
     """
     def generate_prog_file(self):
-        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         seq = nle.sequences.last()
         queryset = seq.localization.css_field_credible_regions.filter(group__isnull=False)
         groups = list(queryset.values_list('group', flat=True).distinct())
@@ -550,7 +550,7 @@ class CSSFieldExportView(CSSFieldListView):
         file_buffer = StringIO(self.generate_prog_file())
         file_buffer.seek(0)  # goto the beginning of the buffer
         response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
-        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         filename = f"Saguaro_{nle.event_id}.prog"
         response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
         return response
@@ -566,7 +566,7 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
         Separates detections and non-detections.
         """
         text = self.generate_prog_file()
-        nle = NonLocalizedEvent.objects.get(pk=self.kwargs['pk'])
+        nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         try:
             with paramiko.SSHClient() as ssh:
                 ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
