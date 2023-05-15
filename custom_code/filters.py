@@ -46,7 +46,7 @@ class LocalizationFilter(django_filters.Filter):
     field_class = LocalizationField
 
     def filter(self, queryset, value):
-        if value and value[1]:
+        if value and value[0]:
             nle, prob, dt = value
             seq = nle.sequences.last()
             if seq is None or seq.details is None:
