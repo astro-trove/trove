@@ -173,3 +173,4 @@ class CSSFieldCredibleRegion(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['localization', 'css_field'], name='unique_localization_css_field')
         ]
+        ordering = ['-probability_contained']

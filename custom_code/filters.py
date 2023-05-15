@@ -114,7 +114,7 @@ class CSSFieldWidget(django.forms.widgets.MultiWidget):
         super().__init__(widgets, **kwargs)
 
     def decompress(self, value):
-        return value
+        return value or (None, None)
 
 
 class CSSFieldField(django.forms.MultiValueField):
@@ -141,6 +141,6 @@ class CSSFieldFilter(django_filters.Filter):
 
 
 class CSSFieldCredibleRegionFilter(django_filters.FilterSet):
-    grouping = CSSFieldFilter(label='Grouping', initial={'n_groups': 3})
+    grouping = CSSFieldFilter(label='Grouping')
     order = django_filters.OrderingFilter(fields=['name', 'ra', 'dec', 'probability_contained',
                                                   'group', 'rank_in_group'])
