@@ -18,6 +18,7 @@ POSTGRES_HOST = ''      # hostname or IP address of the Postgres database server
 POSTGRES_PASSWORD = ''  # password for the Postgres database
 POSTGRES_PORT = 5432    # port number for the Postgres database
 POSTGRES_USER = ''      # username for the Postgres database
+SAVE_TEST_ALERTS = False # save test gravitational-wave alerts
 SCIMMA_AUTH_USERNAME = '' # username for SCIMMA authentication
 SCIMMA_AUTH_PASSWORD = '' # password for SCIMMA authentication
 SECRET_KEY = ''         # see https://docs.djangoproject.com/en/4.1/ref/settings/#secret-key
