@@ -4,7 +4,7 @@
     var aladin;
 A.init.then(() => {
     aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
-    var json = {{ credible_region }};
+    var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
     aladin.addMOC(moc);
 });
