@@ -174,3 +174,9 @@ class CSSFieldCredibleRegion(models.Model):
             models.UniqueConstraint(fields=['localization', 'css_field'], name='unique_localization_css_field')
         ]
         ordering = ['-probability_contained']
+
+
+class CredibleRegionContour(models.Model):
+    localization = models.ForeignKey(EventLocalization, on_delete=models.CASCADE)
+    probability = models.FloatField()
+    pixels = models.JSONField()

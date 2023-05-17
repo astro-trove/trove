@@ -1,8 +1,9 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 %}
+{% load bootstrap4 skymap_extras %}
 {% block title %}CSS Fields{% endblock %}
 {% block content %}
 <h1>CSS Fields for {{ nonlocalizedevent.event_id }}</h1>
+<div class="row"><div class="col-md-12">{% skymap view.kwargs.event_id %}</div></div>
 <div class="row">
   <div class="col-md-10">
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}

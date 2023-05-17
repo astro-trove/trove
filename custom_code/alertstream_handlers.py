@@ -10,10 +10,13 @@ import json
 import math
 from .healpix_utils import update_all_credible_region_percents_for_css_fields
 from .cssfield_selection import get_prob_radec, CSS_FOOTPRINT
+from .models import CredibleRegionContour
 from ligo.skymap import bayestar
 from astropy.table import Table
 from io import BytesIO
 import healpy
+import astropy_healpix as ah
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +101,30 @@ def format_si_prefix(qty, d=1):
         return f'{qty:.{d}e}'
 
 
+def calculate_credible_region(skymap, localization, probability=0.9):
+    # Sort the pixels of the sky map by descending probability density
+    skymap.sort('PROBDENSITY', reverse=True)
+    # Find the area of each pixel
+    skymap['level'], skymap['ipix'] = ah.uniq_to_level_ipix(skymap['UNIQ'])
+    pixel_area = ah.nside_to_pixel_area(ah.level_to_nside(skymap['level']))
+    # Calculate the probability within each pixel: the pixel area times the probability density
+    prob = pixel_area * skymap['PROBDENSITY']
+    # Calculate the cumulative sum of the probability
+    cumprob = np.cumsum(prob)
+    # Find the pixel for which the probability sums to 0.9
+    index_90 = cumprob.searchsorted(probability)
+    # Find the pixels included in this sum
+    skymap90 = skymap[:index_90].group_by('level')
+    credible_region_90 = {group['level'][0]: list(group['ipix']) for group in skymap90.groups}
+    credible_region_90.set_default(skymap.meta['MOCORDER'], [])  # must include the highest order
+    # Create the CredibleRegionContour object
+    CredibleRegionContour.update_or_create(
+        localization=localization,
+        probability=probability,
+        pixels=credible_region_90
+    )
+
+
 def handle_message_and_send_alerts(message, metadata):
     # get skymap table out for later
     try:
@@ -139,6 +166,9 @@ def handle_message_and_send_alerts(message, metadata):
     send_email(email_subject, body)
 
     if seq.localization is not None:
+        # store the credible region contour for skymap plotting
+        calculate_credible_region(skymap, seq.localization)
+
         # store credible regions for CSS fields (for associating candidates)
         update_all_credible_region_percents_for_css_fields(seq.localization)
         logger.info('Updated credible regions for CSS fields')
