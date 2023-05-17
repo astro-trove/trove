@@ -1,0 +1,11 @@
+<div id='aladin-lite-div' style='aspect-ratio: 2'></div>
+<script src='https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js' charset='utf-8'></script>
+<script type="text/javascript">
+    var aladin;
+A.init.then(() => {
+    aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+    var json = {{ credible_region }};
+    var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
+    aladin.addMOC(moc);
+});
+</script>
