@@ -4,6 +4,29 @@
     var aladin;
 A.init.then(() => {
     aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+    var sun_ra = {{ current_sun_ra }};
+    var sun_dec = {{ current_sun_dec }};
+    var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun'});
+    aladin.addOverlay(sun_overlay);
+    sun_overlay.add(A.circle(sun_ra, sun_dec, 15));
+    var moon_ra = {{ current_moon_ra }};
+    var moon_dec = {{ current_moon_dec }};
+    var moon_excl = {{ current_moon_exclusion }};
+    var moon_overlay = A.graphicOverlay({color: '#d3d3d3', name: 'Moon'});
+    aladin.addOverlay(moon_overlay);
+    moon_overlay.add(A.circle(moon_ra, moon_dec, moon_excl));
+    var css_fields = {{ css_fields }};
+    var css_field_colors = ['#f00', '#0f0', '#00f']
+    for (let g in css_fields) {
+        var color = css_field_colors[g];
+        var group = css_fields[g];
+        g++;
+        var fields_overlay = A.graphicOverlay({color: color, name: 'CSS Fields ' + g});
+        aladin.addOverlay(fields_overlay);
+        for (let i in group) {
+            fields_overlay.add(A.polyline(group[i]));
+        }
+    }
     var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
     aladin.addMOC(moc);
