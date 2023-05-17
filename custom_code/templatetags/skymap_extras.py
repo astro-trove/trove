@@ -34,9 +34,11 @@ def skymap(event_id):
         fields = seq.localization.css_field_credible_regions.filter(group__isnull=False)
         if fields.exists():
             groups = list(fields.order_by('group').values_list('group', flat=True).distinct())
-            centers = np.array([fields.filter(group=g).values_list('css_field__ra', 'css_field__dec') for g in groups])
-            vertices = centers[:, :, np.newaxis] + CSS_FOOTPRINT
-            extras['css_fields'] = vertices.tolist()
+            vertices = []
+            for g in groups:
+                centers = np.array(fields.filter(group=g).values_list('css_field__ra', 'css_field__dec'))
+                vertices.append((centers[:, np.newaxis] + CSS_FOOTPRINT).tolist())
+            extras['css_fields'] = vertices
         else:
             extras['css_fields'] = []
 
