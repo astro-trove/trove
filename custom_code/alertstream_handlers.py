@@ -118,7 +118,7 @@ def calculate_credible_region(skymap, localization, probability=0.9):
     credible_region_90 = {group['level'][0]: list(group['ipix']) for group in skymap90.groups}
     credible_region_90.setdefault(skymap.meta['MOCORDER'], [])  # must include the highest order
     # Create the CredibleRegionContour object
-    return CredibleRegionContour(localization=localization, probability=probability, pixels=credible_region_90)
+    CredibleRegionContour(localization=localization, probability=probability, pixels=credible_region_90).save()
 
 
 def handle_message_and_send_alerts(message, metadata):
