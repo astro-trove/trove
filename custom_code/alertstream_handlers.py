@@ -28,7 +28,7 @@ BNS = {BNS:.0%}
 NSBH = {NSBH:.0%}
 BBH = {BBH:.0%}
 Terrestrial = {Terrestrial:.0%}
-https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.id}/"""
+https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/"""
 
 ALERT_TEXT_NO_LOCALIZATION = ALERT_TEXT[:107] + 'Sky map not ingested\n' + ALERT_TEXT[291:]
 
