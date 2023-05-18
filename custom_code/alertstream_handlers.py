@@ -140,7 +140,7 @@ def handle_message_and_send_alerts(message, metadata):
     # get skymap bytes out for later
     try:
         alert = message.content[0]
-        skymap_bytes = alert['event'].get('skymap')
+        skymap_bytes = alert.get('event', {}).get('skymap')
     except Exception as e:  # no matter what, do not crash the listener before ingesting the alert
         logger.error(f'Could not extract skymap from alert: {e}')
         skymap_bytes = None
