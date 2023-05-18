@@ -53,7 +53,8 @@ def send_slack(body):
     lines.insert(0, '<!here>' if 'RETRACTED' in body else '<!channel>')
     headers = {'Content-Type': 'application/json'}
     for url, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        lines[-1] = link
+        if lines[-1].startswith('http'):
+            lines[-1] = link
         json_data = json.dumps({'text': '\n'.join(lines)})
         requests.post(url, data=json_data.encode('ascii'), headers=headers)
 
