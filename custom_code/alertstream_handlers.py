@@ -46,15 +46,15 @@ def send_text(body):
             logger.error(f'User {user.username} did not provide their phone number')
 
 
-def send_slack(body):
+def send_slack(body, nle):
     if body.startswith('MDC'):
         return
     lines = body.splitlines()
     lines.insert(0, '<!here>' if 'RETRACTED' in body else '<!channel>')
     headers = {'Content-Type': 'application/json'}
     for url, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        if lines[-1].startswith('http'):
-            lines[-1] = link
+        if 'http' in lines[-1]:
+            lines[-1] = link.format(nle=nle)
         json_data = json.dumps({'text': '\n'.join(lines)})
         requests.post(url, data=json_data.encode('ascii'), headers=headers)
 
@@ -119,7 +119,7 @@ def handle_message_and_send_alerts(message, metadata):
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
         body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
     send_text(body)
-    send_slack(body)
+    send_slack(body, nle)
     send_email(email_subject, body)
 
     if seq.localization is not None:
