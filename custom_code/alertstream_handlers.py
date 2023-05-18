@@ -122,14 +122,13 @@ def calculate_credible_region(skymap, localization, probability=0.9):
 
 
 def handle_message_and_send_alerts(message, metadata):
-    # get skymap table out for later
+    # get skymap bytes out for later
     try:
         alert = message.content[0]
-        skymap_bytes = alert['event']['skymap']
-        skymap = Table.read(BytesIO(skymap_bytes))
+        skymap_bytes = alert['event'].get('skymap')
     except Exception as e:  # no matter what, do not crash the listener before ingesting the alert
         logger.error(f'Could not extract skymap from alert: {e}')
-        skymap = None
+        skymap_bytes = None
 
     # ingest NonLocalizedEvent into the TOM database
     nle, seq = handle_igwn_message(message, metadata)
@@ -142,18 +141,21 @@ def handle_message_and_send_alerts(message, metadata):
     email_subject = nle.event_id
     try:
         if seq is None:  # retraction
+            localization = None
             seq = nle.sequences.last()
             search = seq.details.get('search', '') if seq is not None else ''  # figure out if it was a test event
             body = f'{search} {nle.event_id} {nle.state}'
             logger.info(f'Sending GW retraction: {body}')
         else:
+            localization = seq.localization
             significance = 'significant' if seq.details['significant'] else 'subthreshold'
             inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
-            alert_text = ALERT_TEXT_NO_LOCALIZATION if seq.localization is None else ALERT_TEXT
+            alert_text = ALERT_TEXT_NO_LOCALIZATION if localization is None else ALERT_TEXT
             body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
             logger.info(f'Sending GW alert: {body}')
     except Exception as e:
+        localization = None
         logger.error(f'Could not parse GW alert: {e}')
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
         body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
@@ -161,17 +163,20 @@ def handle_message_and_send_alerts(message, metadata):
     send_slack(body, nle)
     send_email(email_subject, body)
 
-    if seq.localization is not None:
+    if skymap_bytes is not None and localization is not None:
+        skymap = Table.read(BytesIO(skymap_bytes))
+
         # store the credible region contour for skymap plotting
-        calculate_credible_region(skymap, seq.localization)
+        calculate_credible_region(skymap, localization)
+        logger.info('Calculated skymap contours')
 
         # store credible regions for CSS fields (for associating candidates)
-        update_all_credible_region_percents_for_css_fields(seq.localization)
+        update_all_credible_region_percents_for_css_fields(localization)
         logger.info('Updated credible regions for CSS fields')
 
         # get the total probability in each CSS field footprint
         flat = bayestar.rasterize(skymap)
         probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
         nside = healpy.npix2nside(len(probs))
-        get_prob_radec(probs, nside, CSS_FOOTPRINT, seq.localization.css_field_credible_regions.all())
+        get_prob_radec(probs, nside, CSS_FOOTPRINT, localization.css_field_credible_regions.all())
         logger.info('Updated probabilities for CSS fields')
