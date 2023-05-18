@@ -163,20 +163,25 @@ def handle_message_and_send_alerts(message, metadata):
     send_slack(body, nle)
     send_email(email_subject, body)
 
-    if skymap_bytes is not None and localization is not None:
-        skymap = Table.read(BytesIO(skymap_bytes))
-
-        # store the credible region contour for skymap plotting
-        calculate_credible_region(skymap, localization)
-        logger.info('Calculated skymap contours')
-
+    if localization is None:
+        logger.info('No localization')
+    elif CredibleRegionContour.objects.filter(localization=localization).exists():
+        logger.info('Localization already exists')
+    else:
         # store credible regions for CSS fields (for associating candidates)
         update_all_credible_region_percents_for_css_fields(localization)
         logger.info('Updated credible regions for CSS fields')
 
-        # get the total probability in each CSS field footprint
-        flat = bayestar.rasterize(skymap)
-        probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
-        nside = healpy.npix2nside(len(probs))
-        get_prob_radec(probs, nside, CSS_FOOTPRINT, localization.css_field_credible_regions.all())
-        logger.info('Updated probabilities for CSS fields')
+        if skymap_bytes is not None:
+            skymap = Table.read(BytesIO(skymap_bytes))
+
+            # store the credible region contour for skymap plotting
+            calculate_credible_region(skymap, localization)
+            logger.info('Calculated skymap contours')
+
+            # get the total probability in each CSS field footprint
+            flat = bayestar.rasterize(skymap)
+            probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
+            nside = healpy.npix2nside(len(probs))
+            get_prob_radec(probs, nside, CSS_FOOTPRINT, localization.css_field_credible_regions.all())
+            logger.info('Updated probabilities for CSS fields')
