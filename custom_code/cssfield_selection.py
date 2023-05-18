@@ -1,3 +1,5 @@
+import pdb
+
 import numpy as np
 import healpy
 from astroplan import moon_illumination
@@ -139,9 +141,9 @@ def rank_css_fields(queryset, n_select=12, n_groups=3):
     for g in range(n_groups):
         adjacent = set()
         for r in range(n_select):
-            for i, cr in enumerate(fields_remaining):
+            for cr in fields_remaining.copy():
                 if r == 0 or cr in adjacent:
-                    cr = fields_remaining.pop(i)
+                    fields_remaining.remove(cr)
                     if observable_tonight(cr.css_field):
                         cr.group = g + 1
                         cr.rank_in_group = r + 1
