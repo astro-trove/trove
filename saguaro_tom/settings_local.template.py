@@ -21,6 +21,7 @@ POSTGRES_USER = ''      # username for the Postgres database
 SCIMMA_AUTH_USERNAME = '' # username for SCIMMA authentication
 SCIMMA_AUTH_PASSWORD = '' # password for SCIMMA authentication
 SECRET_KEY = ''         # see https://docs.djangoproject.com/en/4.1/ref/settings/#secret-key
+SLACK_LINKS = []         # links to TOMS for Slack alerts (same order as SLACK_URLS)
 SLACK_URLS = []         # Slack URLs for incoming webhooks
 TNS_API_KEY = ''        # API key for the Transient Name Server
 TWILIO_ACCOUNT_SID = '' # account ID for Twilio text message alerts
