@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
 #
 # from tom_nonlocalizedevents.models import NonLocalizedEvent
 # from astropy.table import Table
-# from custom_code.cssfield_selection import get_prob_radec, CSS_FOOTPRINT
+# from custom_code.cssfield_selection import calculate_footprint_probabilities, CSS_FOOTPRINT
 # from healpix_alchemy.constants import LEVEL
 # from ligo.skymap import bayestar
 # import astropy_healpix
@@ -45,8 +45,5 @@ class Migration(migrations.Migration):
 #         skymap = Table(list(seq.localization.tiles.values('tile', 'probdensity')))
 #         skymap.add_column(bigintrange_to_uniq(skymap['tile']), 0, 'UNIQ')
 #         skymap.rename_column('probdensity', 'PROBDENSITY')
-#         flat = bayestar.rasterize(skymap)
-#         probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
-#         nside = healpy.npix2nside(len(probs))
-#         get_prob_radec(probs, nside, CSS_FOOTPRINT, seq.localization.css_field_credible_regions.all())
+#         calculate_footprint_probabilities(skymap, seq.localization)
 #         print(nle.event_id)

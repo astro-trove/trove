@@ -2,6 +2,7 @@ import pdb
 
 import numpy as np
 import healpy
+from ligo.skymap import bayestar
 from astroplan import moon_illumination
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_moon, get_sun, spherical_to_cartesian
 from astropy.time import Time
@@ -96,9 +97,13 @@ def z_rot(theta_deg):
     ])
 
 
-def get_prob_radec(probs, nside, fp, css_field_credible_regions):
-    for cr in css_field_credible_regions:
-        pointing_footprint = project_footprint(fp, cr.css_field.ra, cr.css_field.dec)
+def calculate_footprint_probabilities(skymap, localization):
+    """get the total probability in each CSS field footprint"""
+    flat = bayestar.rasterize(skymap)
+    probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
+    nside = healpy.npix2nside(len(probs))
+    for cr in localization.css_field_credible_regions.all():
+        pointing_footprint = project_footprint(CSS_FOOTPRINT, cr.css_field.ra, cr.css_field.dec)
         ras_poly = [x[0] for x in pointing_footprint][:-1]
         decs_poly = [x[1] for x in pointing_footprint][:-1]
         xyzpoly = spherical_to_cartesian(1, np.deg2rad(decs_poly), np.deg2rad(ras_poly))
@@ -108,6 +113,7 @@ def get_prob_radec(probs, nside, fp, css_field_credible_regions):
             prob += probs[ind]
         cr.probability_contained = prob
         cr.save()
+    logger.info('Updated probabilities for CSS fields')
 
 
 CSS_LOCATION = EarthLocation(lat=32.4433333333 * u.deg, lon=-110.788888889 * u.deg, height=2790 * u.m)

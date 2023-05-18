@@ -5,7 +5,9 @@ from sqlalchemy.orm import declarative_base, Session
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile
 from .models import CSSField, CSSFieldCredibleRegion
 import json
+import logging
 
+logger = logging.getLogger(__name__)
 
 CREDIBLE_REGION_PROBABILITIES = sorted(json.loads(settings.CREDIBLE_REGION_PROBABILITIES), reverse=True)
 
@@ -20,8 +22,7 @@ class SaCSSField(Base):
 
 def update_all_credible_region_percents_for_css_fields(eventlocalization):
     """
-    This function creates a credible region linkage with probability prob for each of the event candidate
-    ids supplied if they fall within that prob for the event location specified.
+    This function creates a credible region linkage for each of the CSS fields in the event localization specified
     """
     with Session(sa_engine) as session:
 
@@ -65,3 +66,4 @@ def update_all_credible_region_percents_for_css_fields(eventlocalization):
                         'smallest_percent': int(prob * 100.0)
                     }
                 )
+    logger.info('Updated credible regions for CSS fields')
