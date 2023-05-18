@@ -2,8 +2,17 @@
 {% load bootstrap4 skymap_extras targets_extras %}
 {% block title %}CSS Fields{% endblock %}
 {% block content %}
-<h1>CSS Fields for {{ nonlocalizedevent.event_id }}</h1>
-<div class="row"><div class="col-md-12">{% skymap view.kwargs.event_id %}</div></div>
+<h1>
+    CSS Fields for {{ nonlocalizedevent.event_id }}
+    {% if eventlocalization.external_coincidences.exists %}
+        {{ eventlocalization.external_coincidences.last.sequences.last.event_subtype.title }}
+        {{ eventlocalization.external_coincidences.last.sequences.last.sequence_id }} Combined
+    {% else %}
+        {{ eventlocalization.sequences.last.event_subtype.title }}
+        {{ eventlocalization.sequences.last.sequence_id }}
+    {% endif %}
+</h1>
+<div class="row"><div class="col-md-12">{% skymap eventlocalization %}</div></div>
 <div class="row">
   <div class="col-md-10">
   {% select_target_js %}
@@ -12,8 +21,8 @@
       <input type="hidden" value="False" id="isSelectAll" name="isSelectAll">
       {% csrf_token %}
       {% buttons %}
-      <button type="submit" class="btn btn-info" formaction="{% url 'custom_code:css-fields-export' view.kwargs.event_id %}">Export</button>
-      <button type="submit" class="btn btn-warning" formaction="{% url 'custom_code:css-fields-submit' view.kwargs.event_id %}">Submit</button>
+      <button type="submit" class="btn btn-info" formaction="{% url 'custom_code:css-fields-export' eventlocalization.id %}">Export</button>
+      <button type="submit" class="btn btn-warning" formaction="{% url 'custom_code:css-fields-submit' eventlocalization.id %}">Submit</button>
       CSS only observes fields requested on the same UT date. This page loaded at {% now "M d H:i" %} UT.
       {% endbuttons %}
       <table class="table table-hover">
@@ -55,7 +64,7 @@
       {% bootstrap_form filter.form %}
       {% buttons %}
       <button type="submit" class="btn btn-primary">Filter</button>
-      <a href="{% url 'custom_code:css-fields' view.kwargs.event_id %}" class="btn btn-secondary" title="Reset">Reset</a>
+      <a href="{% url 'custom_code:css-fields' eventlocalization.id %}" class="btn btn-secondary" title="Reset">Reset</a>
       {% endbuttons %}
     </form>
   </div>

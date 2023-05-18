@@ -12,7 +12,7 @@ CSS_FOOTPRINT = np.array([[-w, -h], [-w, h], [w, h], [w, -h], [-w, -h]])
 
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html')
-def skymap(event_id):
+def skymap(localization):
 
     # sun and moon
     now = Time.now()
@@ -27,28 +27,25 @@ def skymap(event_id):
         'current_moon_exclusion': current_moon_exclusion,
     }
 
-    nle = NonLocalizedEvent.objects.get(event_id=event_id)
-    seq = nle.sequences.last()
-    if seq and seq.localization:
-        # CSS fields
-        fields = seq.localization.css_field_credible_regions.filter(group__isnull=False)
-        if fields.exists():
-            groups = list(fields.order_by('group').values_list('group', flat=True).distinct())
-            vertices = []
-            for g in groups:
-                centers = np.array(fields.filter(group=g).values_list('css_field__ra', 'css_field__dec'))
-                cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
-                cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
-                vertices.append((centers[:, np.newaxis] + CSS_FOOTPRINT / cos_dec[:, np.newaxis]).tolist())
-            extras['css_fields'] = vertices
-        else:
-            extras['css_fields'] = []
+    # CSS fields
+    fields = localization.css_field_credible_regions.filter(group__isnull=False)
+    if fields.exists():
+        groups = list(fields.order_by('group').values_list('group', flat=True).distinct())
+        vertices = []
+        for g in groups:
+            centers = np.array(fields.filter(group=g).values_list('css_field__ra', 'css_field__dec'))
+            cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
+            cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
+            vertices.append((centers[:, np.newaxis] + CSS_FOOTPRINT / cos_dec[:, np.newaxis]).tolist())
+        extras['css_fields'] = vertices
+    else:
+        extras['css_fields'] = []
 
-        # GW skymap
-        contour = seq.localization.credible_region_contours.filter(probability=0.9)
-        if contour.exists():
-            extras['credible_region'] = contour.last().pixels
-        else:
-            extras['credible_region'] = []
+    # GW skymap
+    contour = localization.credible_region_contours.filter(probability=0.9)
+    if contour.exists():
+        extras['credible_region'] = contour.last().pixels
+    else:
+        extras['credible_region'] = []
 
     return extras
