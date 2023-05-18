@@ -37,7 +37,9 @@ def skymap(event_id):
             vertices = []
             for g in groups:
                 centers = np.array(fields.filter(group=g).values_list('css_field__ra', 'css_field__dec'))
-                vertices.append((centers[:, np.newaxis] + CSS_FOOTPRINT).tolist())
+                cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
+                cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
+                vertices.append((centers[:, np.newaxis] + CSS_FOOTPRINT / cos_dec[:, np.newaxis]).tolist())
             extras['css_fields'] = vertices
         else:
             extras['css_fields'] = []
