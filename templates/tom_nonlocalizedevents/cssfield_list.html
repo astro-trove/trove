@@ -1,15 +1,25 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 skymap_extras %}
+{% load bootstrap4 skymap_extras targets_extras %}
 {% block title %}CSS Fields{% endblock %}
 {% block content %}
 <h1>CSS Fields for {{ nonlocalizedevent.event_id }}</h1>
 <div class="row"><div class="col-md-12">{% skymap view.kwargs.event_id %}</div></div>
 <div class="row">
   <div class="col-md-10">
+  {% select_target_js %}
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
-    <table class="table table-hover">
+    <form method="POST">
+      <input type="hidden" value="False" id="isSelectAll" name="isSelectAll">
+      {% csrf_token %}
+      {% buttons %}
+      <button type="submit" class="btn btn-info" formaction="{% url 'custom_code:css-fields-export' view.kwargs.event_id %}">Export</button>
+      <button type="submit" class="btn btn-warning" formaction="{% url 'custom_code:css-fields-submit' view.kwargs.event_id %}">Submit</button>
+      CSS only observes fields requested on the same UT date. This page loaded at {% now "M d H:i" %} UT.
+      {% endbuttons %}
+      <table class="table table-hover">
       <thead>
         <tr>
+          <th><input type="checkbox" id="selectPage" onClick="select_page(this, {{ object_list|length }})" /></th>
           <th>Name</th>
           <th>RA</th>
           <th>Dec.</th>
@@ -21,6 +31,7 @@
       <tbody>
         {% for link in object_list %}
         <tr>
+          <td><input type="checkbox" name="selected-target" value="{{ link.id }}" onClick="single_select()" checked /></td>
           <td>{{ link.css_field.name }}</td>
           <td>{{ link.css_field.ra|floatformat:"6" }}</td>
           <td>{{ link.css_field.dec|floatformat:"6" }}</td>
@@ -34,7 +45,8 @@
         </tr>
         {% endfor %}
       </tbody>
-    </table>
+      </table>
+    </form>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
   </div>
   {{ filter.fields }}
@@ -46,9 +58,6 @@
       <a href="{% url 'custom_code:css-fields' view.kwargs.event_id %}" class="btn btn-secondary" title="Reset">Reset</a>
       {% endbuttons %}
     </form>
-    <p><a href="{% url 'custom_code:css-fields-export' view.kwargs.event_id %}" class="btn btn-info" title="Export">Export</a></p>
-    <p><a href="{% url 'custom_code:css-fields-submit' view.kwargs.event_id %}" class="btn btn-warning" title="Submit">Submit</a></p>
-    <p>CSS only observes fields requested on the same UT date. This page loaded at {% now "M d H:i" %} UT.</p>
   </div>
 </div>
 {% endblock %}

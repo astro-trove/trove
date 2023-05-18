@@ -525,11 +525,18 @@ class CSSFieldExportView(CSSFieldListView):
     """
     View that handles the export of CSS Fields to .prog file(s).
     """
-    def generate_prog_file(self):
+    def post(self, request, *args, **kwargs):
+        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
+        text = self.generate_prog_file(target_ids)
+        return self.render_to_response(text)
+
+    def generate_prog_file(self, target_ids):
         nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         seq = nle.sequences.last()
         queryset = seq.localization.css_field_credible_regions.filter(group__isnull=False)
-        groups = list(queryset.values_list('group', flat=True).distinct())
+        if target_ids is not None:
+            queryset = queryset.filter(id__in=target_ids)
+        groups = list(queryset.order_by('group').values_list('group', flat=True).distinct())
         text = ''
         for g in groups:
             group = queryset.filter(group=g).order_by('rank_in_group')
@@ -537,17 +544,14 @@ class CSSFieldExportView(CSSFieldListView):
             text += ','.join(names) + '\n'
         return text
 
-    def render_to_response(self, context, **response_kwargs):
+    def render_to_response(self, text, **response_kwargs):
         """
         Returns a response containing the exported .prog file(s) of selected fields.
-
-        :param context: Context object for this view
-        :type context: dict
 
         :returns: response class with ASCII
         :rtype: StreamingHttpResponse
         """
-        file_buffer = StringIO(self.generate_prog_file())
+        file_buffer = StringIO(text)
         file_buffer.seek(0)  # goto the beginning of the buffer
         response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
         nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
@@ -560,12 +564,12 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
     """
     View that handles the submission of CSS Fields to CSS.
     """
-    def get(self, request, *args, **kwargs):
+    def post(self, request, *args, **kwargs):
         """
-        Method that handles the GET requests for this view. Calls the function to get photometry from TNS.
-        Separates detections and non-detections.
+        Method that handles the POST requests for this view.
         """
-        text = self.generate_prog_file()
+        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
+        text = self.generate_prog_file(target_ids)
         nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         try:
             with paramiko.SSHClient() as ssh:
