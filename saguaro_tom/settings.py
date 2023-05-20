@@ -340,7 +340,6 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 100
 }
 
-SAVE_TEST_ALERTS = os.getenv('SAVE_TEST_ALERTS', DEBUG)
 ALERT_STREAMS = [
     {
         'ACTIVE': True,

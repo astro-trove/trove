@@ -1,0 +1,48 @@
+<div id='aladin-lite-div' style='aspect-ratio: 2'></div>
+<script src='https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js' charset='utf-8'></script>
+<script type="text/javascript">
+    var aladin;
+A.init.then(() => {
+    aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+    var candidates = A.catalog({name: 'Candidates'});
+    aladin.addCatalog(candidates);
+    {% for candidate in candidates %}
+        var cat_ra = {{ candidate.target.ra }};
+        var cat_dec = {{ candidate.target.dec }};
+        var cat_name = '{{ candidate.target.name }}'
+        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+    {% endfor %}
+    var sun_ra = {{ current_sun_ra }};
+    var sun_dec = {{ current_sun_dec }};
+    var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun Exclusion'});
+    aladin.addOverlay(sun_overlay);
+    sun_overlay.add(A.circle(sun_ra, sun_dec, 15));
+    var sun_cat = A.catalog({color: '#ffd700', name: 'Sun'});
+    aladin.addCatalog(sun_cat);
+    sun_cat.addSources([A.marker(sun_ra, sun_dec, {popupTitle: "Sun's Current Position"})]);
+    var moon_ra = {{ current_moon_ra }};
+    var moon_dec = {{ current_moon_dec }};
+    var moon_excl = {{ current_moon_exclusion }};
+    var moon_overlay = A.graphicOverlay({color: '#d3d3d3', name: 'Moon Exclusion'});
+    aladin.addOverlay(moon_overlay);
+    moon_overlay.add(A.circle(moon_ra, moon_dec, moon_excl));
+    var moon_cat = A.catalog({color: '#d3d3d3', name: 'Moon'});
+    aladin.addCatalog(moon_cat);
+    moon_cat.addSources([A.marker(moon_ra, moon_dec, {popupTitle: "Moon's Current Position"})]);
+    var css_fields = {{ css_fields }};
+    var css_field_colors = ['#f00', '#0f0', '#00f']
+    for (let g in css_fields) {
+        var color = css_field_colors[g];
+        var group = css_fields[g];
+        g++;
+        var fields_overlay = A.graphicOverlay({color: color, name: 'CSS Fields ' + g});
+        aladin.addOverlay(fields_overlay);
+        for (let i in group) {
+            fields_overlay.add(A.polyline(group[i]));
+        }
+    }
+    var json = {{ credible_region|safe }};
+    var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
+    aladin.addMOC(moc);
+});
+</script>

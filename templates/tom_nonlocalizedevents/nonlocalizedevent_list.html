@@ -1,0 +1,62 @@
+{% extends 'tom_common/index.html' %}
+{% block title %}GW Events{% endblock %}
+{% block content %}
+<h1>Non-Localized Event Index</h1>
+{% if object_list %}
+  <table class="table">
+      <thead>
+      <tr>
+        <th scope="col">Event Type</th>
+        <th scope="col">Detail Page</th>
+        <th scope="col">State</th>
+        <th scope="col">Created (in TOM)</th>
+        <th scope="col">CSS Fields</th>
+        <th scope="col">Candidates</th>
+        <th scope="col">Hermes</th>
+        <th scope="col">GraceDB</th>
+        <th scope="col">Treasure Map</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for event in object_list %}
+      <tr>
+        <td>{{ event.event_type }}</td>
+        <td>
+            <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank"><b>{{ event.event_id }}</b></a>
+        </td>
+        <td>{{event.state }}</td>
+        <td>{{event.created | timesince }}</td>
+        <td>
+        {% for localization in event.localizations.all|dictsort:"id" %}
+            <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12" target="_blank">
+                {% if localization.external_coincidences.exists %}
+                    {{ localization.external_coincidences.last.sequences.last.sequence_id }}c
+                {% else %}
+                    {{ localization.sequences.last.sequence_id }}
+                {% endif %}
+            </a>
+        {% endfor %}
+        </td>
+        <td>
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Candidates</a>
+        </td>
+        <td>
+          <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
+        </td>
+        <td>
+          <a href="{{ event.gracedb_url }}" target="_blank">GraceDB</a>
+        </td>
+        <td>
+            <a href="{{ event.treasuremap_url }}" target="_blank">Treasure Map</a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+  </table>
+{% else %}
+    <p>No events have been created. Create Superevents via the admin interface, the REST API,
+        or the readstreams management command.</p>
+    <p>Coming soon: event creation from the <a href="{% url 'tom_alerts:list' %}">HERMES Alert Broker</a>.</p>
+{% endif %}
+
+{% endblock content %}

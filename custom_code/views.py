@@ -4,7 +4,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, StreamingHttpResponse
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView
 from django_filters.views import FilterView
@@ -19,8 +19,10 @@ from tom_observations.views import ObservationCreateView as OldObservationCreate
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from tom_dataproducts.models import DataProduct, ReducedDatum
 from tom_dataproducts.views import DataProductUploadView as OldDataProductUploadView
-from .models import Candidate
-from .filters import CandidateFilter
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
+from tom_nonlocalizedevents.views import NonLocalizedEventListView as OldNonLocalizedEventListView
+from .models import Candidate, CSSFieldCredibleRegion
+from .filters import CandidateFilter, CSSFieldCredibleRegionFilter
 from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
@@ -29,10 +31,13 @@ from .hooks import target_post_save, update_or_create_target_extra
 import json
 import requests
 import time
+from io import StringIO
 
 from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot, query_ZTFpubphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
+import paramiko
+import os
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 
@@ -489,3 +494,136 @@ class DataProductUploadView(OldDataProductUploadView):
             )
 
         return redirect(form.cleaned_data.get('referrer', '/'))
+
+
+class CSSFieldListView(FilterView):
+    """
+    View for listing candidates in the TOM.
+    """
+    template_name = 'tom_nonlocalizedevents/cssfield_list.html'
+    paginate_by = 100
+    strict = False
+    model = CSSFieldCredibleRegion
+    filterset_class = CSSFieldCredibleRegionFilter
+
+    def get_eventlocalization(self):
+        if 'localization_id' in self.kwargs:
+            return EventLocalization.objects.get(id=self.kwargs['localization_id'])
+        elif 'event_id' in self.kwargs:
+            nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
+            seq = nle.sequences.last()
+            if seq is not None:
+                return seq.localization
+
+    def get_nonlocalizedevent(self):
+        if 'localization_id' in self.kwargs:
+            localization = EventLocalization.objects.get(id=self.kwargs['localization_id'])
+            return localization.nonlocalizedevent
+        elif 'event_id' in self.kwargs:
+            return NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        localization = self.get_eventlocalization()
+        if localization is None:
+            return queryset.none()
+        else:
+            return queryset.filter(localization=localization)
+
+    def get_context_data(self, *, object_list=None, **kwargs):
+        context = super().get_context_data(object_list=object_list, **kwargs)
+        context['nonlocalizedevent'] = self.get_nonlocalizedevent()
+        context['eventlocalization'] = self.get_eventlocalization()
+        return context
+
+
+class CSSFieldExportView(CSSFieldListView):
+    """
+    View that handles the export of CSS Fields to .prog file(s).
+    """
+    def post(self, request, *args, **kwargs):
+        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
+        text = self.generate_prog_file(target_ids)
+        return self.render_to_response(text)
+
+    def generate_prog_file(self, target_ids):
+        localization = self.get_eventlocalization()
+        queryset = localization.css_field_credible_regions.filter(group__isnull=False)
+        if target_ids is not None:
+            queryset = queryset.filter(id__in=target_ids)
+        groups = list(queryset.order_by('group').values_list('group', flat=True).distinct())
+        text = ''
+        for g in groups:
+            group = queryset.filter(group=g).order_by('rank_in_group')
+            names = [cr.css_field.name for cr in group]
+            text += ','.join(names) + '\n'
+        return text
+
+    def render_to_response(self, text, **response_kwargs):
+        """
+        Returns a response containing the exported .prog file(s) of selected fields.
+
+        :returns: response class with ASCII
+        :rtype: StreamingHttpResponse
+        """
+        file_buffer = StringIO(text)
+        file_buffer.seek(0)  # goto the beginning of the buffer
+        response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
+        nle = self.get_nonlocalizedevent()
+        filename = f"Saguaro_{nle.event_id}.prog"
+        response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
+        return response
+
+
+class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
+    """
+    View that handles the submission of CSS Fields to CSS.
+    """
+    def post(self, request, *args, **kwargs):
+        """
+        Method that handles the POST requests for this view.
+        """
+        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
+        text = self.generate_prog_file(target_ids)
+        nle = self.get_nonlocalizedevent()
+        try:
+            with paramiko.SSHClient() as ssh:
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                ssh.connect(settings.CSS_HOSTNAME, username=settings.CSS_USERNAME,
+                            disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+                # See https://www.paramiko.org/changelog.html#2.9.0 for why disabled_algorithms is required
+                sftp = ssh.open_sftp()
+                for i, line in enumerate(text.splitlines()):
+                    filename = f'Saguaro_{nle.event_id}_{i+1:d}.prog'
+                    with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
+                            f.write(line + '\n')
+                    banner = f'{filename} submitted to CSS'
+                    logger.info(banner)
+                    messages.success(request, banner)
+        except Exception as e:
+            logger.error(str(e))
+            messages.error(request, str(e))
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer
+
+
+class NonLocalizedEventListView(OldNonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    model = NonLocalizedEvent
+    template_name = 'tom_nonlocalizedevents/nonlocalizedevent_list.html'
+
+    def get_queryset(self):
+        # '-created' is most recent first
+        qs = NonLocalizedEvent.objects.order_by('-created')
+        return qs

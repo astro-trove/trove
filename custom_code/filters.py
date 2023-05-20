@@ -6,6 +6,7 @@ from django.conf import settings
 from datetime import datetime, timedelta
 from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from .cssfield_selection import rank_css_fields
 
 CREDIBLE_REGION_PROBABILITIES = json.loads(settings.CREDIBLE_REGION_PROBABILITIES)
 CREDIBLE_REGION_CHOICES = [(int(100. * p), f'{p:.0%}') for p in CREDIBLE_REGION_PROBABILITIES]
@@ -103,3 +104,43 @@ class CandidateFilter(django_filters.FilterSet):
         }
     )
 
+
+class CSSFieldWidget(django.forms.widgets.MultiWidget):
+    def __init__(self, **kwargs):
+        widgets = {
+            'ngroups': django.forms.NumberInput(attrs={'placeholder': '# groups'}),
+            'nfields': django.forms.NumberInput(attrs={'placeholder': '# fields'}),
+        }
+        super().__init__(widgets, **kwargs)
+
+    def decompress(self, value):
+        return value or (None, None)
+
+
+class CSSFieldField(django.forms.MultiValueField):
+    def __init__(self, **kwargs):
+        fields = (
+            django.forms.IntegerField(min_value=0, initial=3),
+            django.forms.IntegerField(min_value=0, initial=12)
+        )
+        super().__init__(fields, widget=CSSFieldWidget, **kwargs)
+
+    def compress(self, data_list):
+        return data_list
+
+
+class CSSFieldFilter(django_filters.Filter):
+    field_class = CSSFieldField
+
+    def filter(self, queryset, value):
+        if value:
+            rank_css_fields(queryset, n_groups=value[0], n_select=value[1])
+            return queryset.filter(group__isnull=False, rank_in_group__isnull=False).order_by('group', 'rank_in_group')
+        else:
+            return queryset.order_by('group', 'rank_in_group')
+
+
+class CSSFieldCredibleRegionFilter(django_filters.FilterSet):
+    grouping = CSSFieldFilter(label='Grouping')
+    order = django_filters.OrderingFilter(fields=['name', 'ra', 'dec', 'probability_contained',
+                                                  'group', 'rank_in_group'])

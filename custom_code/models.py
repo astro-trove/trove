@@ -116,6 +116,7 @@ class CSSField(models.Model):
     galactic_lng = models.FloatField()
     galactic_lat = models.FloatField()
     healpix = models.BigIntegerField()
+    adjacent = models.ManyToManyField('self')
 
     def __str__(self):
         return self.name
@@ -164,8 +165,23 @@ class CSSFieldCredibleRegion(models.Model):
         default=100,
         help_text='Smallest percent credible region this field falls into for this localization.'
     )
+    probability_contained = models.FloatField(null=True)
+    group = models.IntegerField(null=True)
+    rank_in_group = models.IntegerField(null=True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['localization', 'css_field'], name='unique_localization_css_field')
+        ]
+        ordering = ['-probability_contained']
+
+
+class CredibleRegionContour(models.Model):
+    localization = models.ForeignKey(EventLocalization, related_name='credible_region_contours', on_delete=models.CASCADE)
+    probability = models.FloatField()
+    pixels = models.JSONField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['localization', 'probability'], name='unique_localization_probability')
         ]
