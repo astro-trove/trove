@@ -139,8 +139,8 @@ def calculate_credible_region(skymap, localization, probability=0.9):
 def handle_message_and_send_alerts(message, metadata):
     # get skymap bytes out for later
     try:
-        alert = message.content[0]
-        skymap_bytes = alert.get('event', {}).get('skymap')
+        event = message.content[0]['event']
+        skymap_bytes = None if event is None else event.get('skymap')
     except Exception as e:  # no matter what, do not crash the listener before ingesting the alert
         logger.error(f'Could not extract skymap from alert: {e}')
         skymap_bytes = None
