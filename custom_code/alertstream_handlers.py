@@ -72,10 +72,10 @@ def send_text(body):
 def send_slack(body, nle):
     if body.startswith('MDC'):
         return
-    body_slack = '<!here>\n' if 'RETRACTED' in body else '<!channel>\n' + body
+    body = '<!here>\n' if 'RETRACTED' in body else '<!channel>\n' + body
     headers = {'Content-Type': 'application/json'}
     for url, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        body_slack.replace(ALERT_TEXT_URL.format(nle=nle), link.format(nle=nle))
+        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), link.format(nle=nle))
         json_data = json.dumps({'text': body_slack})
         requests.post(url, data=json_data.encode('ascii'), headers=headers)
 
