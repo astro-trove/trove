@@ -13,8 +13,7 @@ CSS_FOOTPRINT = np.array([[-w, -h], [-w, h], [w, h], [w, -h], [-w, -h]])
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html')
 def skymap(localization):
-
-    # sun and moon
+    # sun, moon, and candidates
     now = Time.now()
     current_sun_pos = get_sun(now)
     current_moon_pos = get_moon(now)
@@ -25,6 +24,7 @@ def skymap(localization):
         'current_moon_ra': current_moon_pos.ra.deg,
         'current_moon_dec': current_moon_pos.dec.deg,
         'current_moon_exclusion': current_moon_exclusion,
+        'candidates': localization.nonlocalizedevent.candidates.all(),
     }
 
     # CSS fields

@@ -4,6 +4,14 @@
     var aladin;
 A.init.then(() => {
     aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+    var candidates = A.catalog({name: 'Candidates'});
+    aladin.addCatalog(candidates);
+    {% for candidate in candidates %}
+        var cat_ra = {{ candidate.target.ra }};
+        var cat_dec = {{ candidate.target.dec }};
+        var cat_name = '{{ candidate.target.name }}'
+        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+    {% endfor %}
     var sun_ra = {{ current_sun_ra }};
     var sun_dec = {{ current_sun_dec }};
     var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun Exclusion'});
