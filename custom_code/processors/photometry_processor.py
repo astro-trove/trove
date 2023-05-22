@@ -3,6 +3,7 @@ import mimetypes
 from astropy import units
 from astropy.io import ascii
 from astropy.time import Time, TimezoneInfo
+import numpy as np
 
 from tom_dataproducts.processors.photometry_processor import PhotometryProcessor as OldPhotometryProcessor
 from tom_dataproducts.exceptions import InvalidFileFormatException
@@ -55,11 +56,10 @@ class PhotometryProcessor(OldPhotometryProcessor):
             time.format = 'datetime'
             value = {
                 'timestamp': time.to_datetime(timezone=utc),
-                'magnitude': datum['magnitude'],
-                'filter': datum['filter'],
-                'error': datum['error'],
-                'source': datum['source'] if 'source' in data.colnames else ''
             }
+            for column_name in datum.colnames:
+                if not np.ma.is_masked(datum[column_name]):
+                    value[column_name] = datum[column_name]
             photometry.append(value)
 
         return photometry
