@@ -107,12 +107,12 @@ def send_email(subject, body):
 
 def format_si_prefix(qty, d=1):
     log1000 = math.log10(qty) / 3.
-    if -1. < log1000 < 11.:
+    if -0.4 < log1000 < 11.:  # switch to scientific notation if it rounds to 0.0 or is above the largest prefix
         i = int(log1000)
         prefix = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q'][i]
         return f'{qty * 1000. ** -i:.{d}f} {prefix}'
     else:
-        return f'{qty:.{d}e}'
+        return f'{qty:.{d}e} '
 
 
 def calculate_credible_region(skymap, localization, probability=0.9):
