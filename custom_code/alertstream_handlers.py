@@ -61,10 +61,11 @@ def send_text(body):
         group = Group.objects.get(name='Test SMS Alerts')
     else:
         group = Group.objects.get(name='SMS Alerts')
+    body_ascii = body.replace('±', '+/-').replace('²', '2')
     for user in group.user_set.all():
         if user.username in settings.ALERT_SMS_TO:
             number = settings.ALERT_SMS_TO[user.username]
-            twilio_client.messages.create(body=body, from_=settings.ALERT_SMS_FROM, to=number)
+            twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=number)
         else:
             logger.error(f'User {user.username} did not provide their phone number')
 
