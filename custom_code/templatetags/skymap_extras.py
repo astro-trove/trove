@@ -12,7 +12,7 @@ CSS_FOOTPRINT = np.array([[-w, -h], [-w, h], [w, h], [w, -h], [-w, -h]])
 
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html')
-def skymap(localization):
+def skymap(localization, saguaro_candidates=None):
     # sun, moon, and candidates
     now = Time.now()
     current_sun_pos = get_sun(now)
@@ -25,6 +25,7 @@ def skymap(localization):
         'current_moon_dec': current_moon_pos.dec.deg,
         'current_moon_exclusion': current_moon_exclusion,
         'candidates': localization.nonlocalizedevent.candidates.all(),
+        'saguaro_candidates': saguaro_candidates,
     }
 
     # CSS fields
@@ -41,6 +42,16 @@ def skymap(localization):
     else:
         extras['css_fields'] = []
 
+    # observed CSS fields
+    if saguaro_candidates is not None and saguaro_candidates.exists():
+        centers = np.unique(saguaro_candidates.values_list('field__ra', 'field__dec'), axis=0)
+        cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
+        cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
+        vertices = (centers[:, np.newaxis] + CSS_FOOTPRINT / cos_dec[:, np.newaxis]).tolist()
+        extras['observed_css_fields'] = vertices
+    else:
+        extras['observed_css_fields'] = []
+
     # GW skymap
     contour = localization.credible_region_contours.filter(probability=0.9)
     if contour.exists():
@@ -49,3 +60,13 @@ def skymap(localization):
         extras['credible_region'] = []
 
     return extras
+
+
+@register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html', takes_context=True)
+def skymap_event_id(context, saguaro_candidates):
+    event_id = context['request'].GET.get('localization_event')
+    if event_id is None:
+        return
+    nle = NonLocalizedEvent.objects.get(event_id=event_id)
+    seq = nle.sequences.last()
+    return skymap(seq.localization, saguaro_candidates)
