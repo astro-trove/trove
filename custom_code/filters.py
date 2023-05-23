@@ -144,3 +144,10 @@ class CSSFieldCredibleRegionFilter(django_filters.FilterSet):
     grouping = CSSFieldFilter(label='Grouping')
     order = django_filters.OrderingFilter(fields=['name', 'ra', 'dec', 'probability_contained',
                                                   'group', 'rank_in_group'])
+
+
+class NonLocalizedEventFilter(django_filters.FilterSet):
+    def test_alert_filter(self, queryset, name, hide_test_alerts):
+        return queryset.exclude(event_id__startswith='M') if hide_test_alerts else queryset
+    hide_test_alerts = django_filters.BooleanFilter(label='Exclude test alerts?', method='test_alert_filter',
+                                                       widget=django.forms.CheckboxInput)

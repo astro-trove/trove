@@ -22,7 +22,7 @@ from tom_dataproducts.views import DataProductUploadView as OldDataProductUpload
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
 from tom_nonlocalizedevents.views import NonLocalizedEventListView as OldNonLocalizedEventListView
 from .models import Candidate, CSSFieldCredibleRegion
-from .filters import CandidateFilter, CSSFieldCredibleRegionFilter
+from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
 from .data_processor import run_data_processor
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
@@ -616,12 +616,13 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
         return referer
 
 
-class NonLocalizedEventListView(OldNonLocalizedEventListView):
+class NonLocalizedEventListView(FilterView):
     """
     Unadorned Django ListView subclass for NonLocalizedEvent model.
     """
     model = NonLocalizedEvent
     template_name = 'tom_nonlocalizedevents/nonlocalizedevent_list.html'
+    filterset_class = NonLocalizedEventFilter
 
     def get_queryset(self):
         # '-created' is most recent first
