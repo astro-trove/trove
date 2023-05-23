@@ -32,6 +32,7 @@
           <th>Name</th>
           <th>RA</th>
           <th>Dec.</th>
+          <th>Ref?</th>
           <th>Prob.</th>
           <th>Group</th>
           <th>Rank</th>
@@ -44,6 +45,7 @@
           <td>{{ link.css_field.name }}</td>
           <td>{{ link.css_field.ra|floatformat:"6" }}</td>
           <td>{{ link.css_field.dec|floatformat:"6" }}</td>
+          <td>{{ link.css_field.has_reference }}</td>
           <td>{{ link.probability_contained|floatformat:"6" }}</td>
           <td>{{ link.group }}</td>
           <td>{{ link.rank_in_group }}</td>

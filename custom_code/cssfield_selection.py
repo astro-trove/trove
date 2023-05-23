@@ -142,7 +142,7 @@ def observable_tonight(target):
 
 def rank_css_fields(queryset, n_select=12, n_groups=3):
     queryset.update(group=None, rank_in_group=None)  # erase any previous ranking
-    queryset = queryset.order_by('-probability_contained')
+    queryset = queryset.filter(css_field__has_reference=True).order_by('-probability_contained')
     fields_remaining = list(queryset)
     for g in range(n_groups):
         adjacent = set()
