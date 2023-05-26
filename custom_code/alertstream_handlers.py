@@ -56,11 +56,8 @@ ALERT_TEXT = [  # index = number of localizations available
 ]
 
 
-def send_text(body):
-    if body.startswith('MDC'):
-        group = Group.objects.get(name='Test SMS Alerts')
-    else:
-        group = Group.objects.get(name='SMS Alerts')
+def send_text(body, is_test_alert=False):
+    group = Group.objects.get(name='Test SMS Alerts') if is_test_alert else Group.objects.get(name='SMS Alerts')
     body_ascii = body.replace('±', '+/-').replace('²', '2')
     for user in group.user_set.all():
         if user.username in settings.ALERT_SMS_TO:
@@ -70,10 +67,10 @@ def send_text(body):
             logger.error(f'User {user.username} did not provide their phone number')
 
 
-def send_slack(body, nle):
-    if body.startswith('MDC'):
+def send_slack(body, nle, is_test_alert=False):
+    if is_test_alert:
         return
-    body = '<!here>\n' if 'RETRACTED' in body else '<!channel>\n' + body
+    body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
     for url, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
         body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), link.format(nle=nle))
@@ -81,14 +78,11 @@ def send_slack(body, nle):
         requests.post(url, data=json_data.encode('ascii'), headers=headers)
 
 
-def send_email(subject, body):
+def send_email(subject, body, is_test_alert=False):
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = settings.ALERT_EMAIL_FROM
-    if body.startswith('MDC'):
-        group = Group.objects.get(name='Test Email Alerts')
-    else:
-        group = Group.objects.get(name='Email Alerts')
+    group = Group.objects.get(name='Test Email Alerts') if is_test_alert else Group.objects.get(name='Email Alerts')
     msg['To'] = ','.join([u.email.split(',')[0] for u in group.user_set.all()])
     if not msg['To']:
         logger.info(f'Email "{subject}" not sent. No one is subscribed.')
@@ -177,9 +171,10 @@ def handle_message_and_send_alerts(message, metadata):
         logger.error(f'Could not parse GW alert: {e}')
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
         body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
-    send_text(body)
-    send_slack(body, nle)
-    send_email(email_subject, body)
+    is_test_alert = nle.event_id.startswith('M')
+    send_text(body, is_test_alert=is_test_alert)
+    send_slack(body, nle, is_test_alert=is_test_alert)
+    send_email(email_subject, body, is_test_alert=is_test_alert)
 
     for localization in localizations:
         if CredibleRegionContour.objects.filter(localization=localization).exists():
