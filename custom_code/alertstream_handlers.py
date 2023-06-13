@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-ALERT_TEXT_INTRO = """{search} {seq.event_subtype} v{seq.sequence_id}
+ALERT_TEXT_INTRO = """{group} {seq.event_subtype} v{seq.sequence_id}
 {nle.event_id} ({significance})
 {time}
 1/FAR = {inv_far}yr
@@ -46,6 +46,12 @@ BBH = {BBH:.0%}
 Terrestrial = {Terrestrial:.0%}
 """
 
+ALERT_TEXT_BURST = """50% Area = {seq.localization.area_50:.0f} deg²
+90% Area = {seq.localization.area_90:.0f} deg²
+Duration = {duration:.1e} s
+Frequency = {central_frequency:.0f} Hz
+"""
+
 ALERT_TEXT_URL = "https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/"
 
 ALERT_TEXT = [  # index = number of localizations available
@@ -53,6 +59,7 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_EXTERNAL_COINCIDENCE + ALERT_TEXT_CLASSIFICATION +
     ALERT_TEXT_URL,
+    ALERT_TEXT_INTRO + ALERT_TEXT_BURST + ALERT_TEXT_URL,
 ]
 
 
@@ -163,7 +170,7 @@ def handle_message_and_send_alerts(message, metadata):
                 localizations.append(seq.external_coincidence.localization)
             significance = 'significant' if seq.details['significant'] else 'subthreshold'
             inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
-            alert_text = ALERT_TEXT[len(localizations)]
+            alert_text = ALERT_TEXT[len(localizations)] if seq.details['group'] == 'CBC' else ALERT_TEXT[-1]
             body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
             logger.info(f'Sending GW alert: {body}')
