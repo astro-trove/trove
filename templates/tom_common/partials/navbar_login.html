@@ -1,0 +1,26 @@
+{% if user.is_authenticated %}
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" data-toggle="dropdown">
+        {% if user.first_name or user.last_name %}
+            {{ user.first_name }} {{ user.last_name }} ({{ user.username }})
+        {% else %}
+            {{ user.username }}
+        {% endif %}
+    </a>
+    <ul class="dropdown-menu">
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'user-update' user.id %}" style="color:black">Update User</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'custom_code:profile-update' user.profile.id %}" style="color:black">SMS Subscriptions</a>
+        </li>
+    </ul>
+</li>
+<li>
+    <a class="btn btn-outline-success" title="logout" href="{% url 'logout' %}">Logout</a>
+</li>
+{% else %}
+<li class="nav-item">
+    <a class="btn btn-outline-success" title="logout" href="{% url 'login' %}">Login</a>
+</li>
+{% endif %}

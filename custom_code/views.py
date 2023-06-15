@@ -3,16 +3,19 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
+from django.contrib.auth.models import User
+from django.urls import reverse, reverse_lazy
 from django.http import HttpResponseRedirect, StreamingHttpResponse
-from django.views.generic.base import RedirectView
-from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView
+from django.views.generic.base import RedirectView, TemplateView, TemplateResponse, View
+from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView, UpdateView
+from django.forms.models import model_to_dict
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 from guardian.shortcuts import get_objects_for_user, assign_perm
 
 from tom_common.hooks import run_hook
+from tom_common.forms import CustomUserCreationForm
 from tom_targets.models import Target, TargetList
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
@@ -20,11 +23,10 @@ from tom_dataproducts.exceptions import InvalidFileFormatException
 from tom_dataproducts.models import DataProduct, ReducedDatum
 from tom_dataproducts.views import DataProductUploadView as OldDataProductUploadView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
-from tom_nonlocalizedevents.views import NonLocalizedEventListView as OldNonLocalizedEventListView
-from .models import Candidate, CSSFieldCredibleRegion
+from .models import Candidate, CSSFieldCredibleRegion, Profile
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
 from .data_processor import run_data_processor
-from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
+from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm, ProfileUpdateForm
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
 
@@ -628,3 +630,19 @@ class NonLocalizedEventListView(FilterView):
         # '-created' is most recent first
         qs = NonLocalizedEvent.objects.order_by('-created')
         return qs
+
+
+class ProfileUpdateView(LoginRequiredMixin, UpdateView):
+    model = Profile
+    template_name = 'tom_common/update_user_profile.html'
+    form_class = ProfileUpdateForm
+
+    def get_success_url(self):
+        """
+        Returns the redirect URL for a successful update. If the current user is a superuser, returns the URL for the
+        user list. Otherwise, returns the URL for updating the current user.
+
+        :returns: URL for user list or update user
+        :rtype: str
+        """
+        return reverse_lazy('custom_code:profile-update', kwargs={'pk': self.get_object().id})

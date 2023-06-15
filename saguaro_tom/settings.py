@@ -59,6 +59,7 @@ INSTALLED_APPS = [
     'tom_nonlocalizedevents',
     'webpack_loader',
     'custom_code',
+    'phonenumber_field',
 ]
 
 SITE_ID = 1
