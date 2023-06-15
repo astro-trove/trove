@@ -1,5 +1,4 @@
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
-from django.contrib.auth.models import Group
 from django.conf import settings
 from twilio.rest import Client
 from email.mime.text import MIMEText
@@ -9,8 +8,8 @@ import logging
 import json
 import math
 from .healpix_utils import update_all_credible_region_percents_for_css_fields
-from .cssfield_selection import calculate_footprint_probabilities, CSS_FOOTPRINT
-from .models import CredibleRegionContour
+from .cssfield_selection import calculate_footprint_probabilities
+from .models import CredibleRegionContour, Profile
 from astropy.table import Table
 from io import BytesIO
 import astropy_healpix as ah
@@ -56,21 +55,18 @@ ALERT_TEXT = [  # index = number of localizations available
 ]
 
 
-def send_text(body, is_test_alert=False, is_significant=True):
-    group = Group.objects.get(name='Test SMS Alerts') if is_test_alert else Group.objects.get(name='SMS Alerts')
+def send_text(body, is_test_alert=False, is_significant=True, has_ns=True):
     body_ascii = body.replace('±', '+/-').replace('²', '2')
-    for user in group.user_set.all():
-        if user.username in settings.ALERT_SMS_TO:
-            number = settings.ALERT_SMS_TO[user.username]
-            twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=number)
-        else:
-            logger.error(f'User {user.username} did not provide their phone number')
+    for user in Profile.objects.all():
+        if ((not is_test_alert or user.test_alerts) and (is_significant or user.subthreshold_alerts)
+                and (has_ns or user.bbh_alerts) and (not has_ns or user.ns_alerts)) and user.phone_number:
+            twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
-def send_slack(body, nle, is_test_alert=False, is_significant=True):
+def send_slack(body, nle, is_test_alert=False, is_significant=True, has_ns=True):
     if is_test_alert:
         return
-    if is_significant:
+    if is_significant and has_ns:
         body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
     for url, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
@@ -169,15 +165,17 @@ def handle_message_and_send_alerts(message, metadata):
             alert_text = ALERT_TEXT[len(localizations)]
             body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
+            has_ns = seq.details['classification']['HasNS'] >= 0.01
             logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
         body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
         is_significant = False
+        has_ns = False
     is_test_alert = nle.event_id.startswith('M')
-    send_text(body, is_test_alert=is_test_alert, is_significant=is_significant)
-    send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant)
+    send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, has_ns=has_ns)
+    send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant, has_ns=has_ns)
     send_email(email_subject, body, is_test_alert=is_test_alert)
 
     for localization in localizations:
