@@ -4,6 +4,14 @@
     var aladin;
 A.init.then(() => {
     aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+    var saguaro_candidates = A.catalog({name: 'SAGUARO Candidates'});
+    aladin.addCatalog(saguaro_candidates);
+    {% for candidate in saguaro_candidates|slice:":100" %}
+        var cat_ra = {{ candidate.target.ra }};
+        var cat_dec = {{ candidate.target.dec }};
+        var cat_name = '{{ candidate.target.name }}'
+        saguaro_candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+    {% endfor %}
     var candidates = A.catalog({name: 'Candidates'});
     aladin.addCatalog(candidates);
     {% for candidate in candidates %}
@@ -40,6 +48,12 @@ A.init.then(() => {
         for (let i in group) {
             fields_overlay.add(A.polyline(group[i]));
         }
+    }
+    var observed_css_fields = {{ observed_css_fields }};
+    var observed_fields_overlay = A.graphicOverlay({color: '#0ff', name: 'Observed CSS Fields'});
+    aladin.addOverlay(observed_fields_overlay);
+    for (let i in observed_css_fields) {
+        observed_fields_overlay.add(A.polyline(observed_css_fields[i]));
     }
     var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});

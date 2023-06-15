@@ -48,7 +48,7 @@
         {% endfor %}
         </td>
         <td>
-            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Candidates</a>
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&order=-mlscore_real" target="_blank">Candidates</a>
         </td>
         <td>
           <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
