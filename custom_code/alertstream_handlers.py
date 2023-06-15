@@ -1,4 +1,5 @@
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
+from django.contrib.auth.models import Group
 from django.conf import settings
 from twilio.rest import Client
 from email.mime.text import MIMEText
@@ -58,8 +59,15 @@ ALERT_TEXT = [  # index = number of localizations available
 def send_text(body, is_test_alert=False, is_significant=True, has_ns=True):
     body_ascii = body.replace('±', '+/-').replace('²', '2')
     for user in Profile.objects.all():
-        if ((not is_test_alert or user.test_alerts) and (is_significant or user.subthreshold_alerts)
-                and (has_ns or user.bbh_alerts) and (not has_ns or user.ns_alerts)) and user.phone_number:
+        if is_test_alert:
+            subscribed = user.test_alerts
+        elif not is_significant:
+            subscribed = user.subthreshold_alerts
+        elif has_ns:
+            subscribed = user.ns_alerts
+        else:
+            subscribed = user.bbh_alerts
+        if subscribed and user.phone_number is not None:
             twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
@@ -165,7 +173,7 @@ def handle_message_and_send_alerts(message, metadata):
             alert_text = ALERT_TEXT[len(localizations)]
             body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
-            has_ns = seq.details['classification']['HasNS'] >= 0.01
+            has_ns = seq.details['properties']['HasNS'] >= 0.01
             logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
