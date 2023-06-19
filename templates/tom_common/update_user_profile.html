@@ -1,0 +1,12 @@
+{% extends 'tom_common/base.html' %}
+{% load bootstrap4 %}
+{% block title %}Update Profile{% endblock %}
+{% block content %}
+<form action="{% url 'custom_code:profile-update' object.id %}" method="POST">
+{% csrf_token %}
+{% bootstrap_form form %}
+{% buttons %}
+<button type="submit" class="btn btn-primary">Update</button>
+{% endbuttons %}
+</form>
+{% endblock %}

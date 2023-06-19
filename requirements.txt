@@ -11,3 +11,4 @@ lightcurve-fitting
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
 twilio
 paramiko
+django-phonenumber-field[phonenumberslite]
