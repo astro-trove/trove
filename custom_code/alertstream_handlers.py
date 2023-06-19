@@ -9,8 +9,8 @@ import logging
 import json
 import math
 from .healpix_utils import update_all_credible_region_percents_for_css_fields
-from .cssfield_selection import calculate_footprint_probabilities, CSS_FOOTPRINT
-from .models import CredibleRegionContour
+from .cssfield_selection import calculate_footprint_probabilities
+from .models import CredibleRegionContour, Profile
 from astropy.table import Table
 from io import BytesIO
 import astropy_healpix as ah
@@ -63,21 +63,26 @@ ALERT_TEXT = [  # index = number of localizations available
 ]
 
 
-def send_text(body, is_test_alert=False):
-    group = Group.objects.get(name='Test SMS Alerts') if is_test_alert else Group.objects.get(name='SMS Alerts')
+def send_text(body, is_test_alert=False, is_significant=True, has_ns=True):
     body_ascii = body.replace('±', '+/-').replace('²', '2')
-    for user in group.user_set.all():
-        if user.username in settings.ALERT_SMS_TO:
-            number = settings.ALERT_SMS_TO[user.username]
-            twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=number)
+    for user in Profile.objects.all():
+        if is_test_alert:
+            subscribed = user.test_alerts
+        elif not is_significant:
+            subscribed = user.subthreshold_alerts
+        elif has_ns:
+            subscribed = user.ns_alerts
         else:
-            logger.error(f'User {user.username} did not provide their phone number')
+            subscribed = user.bbh_alerts
+        if subscribed and user.phone_number is not None:
+            twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
-def send_slack(body, nle, is_test_alert=False):
+def send_slack(body, nle, is_test_alert=False, is_significant=True, has_ns=True):
     if is_test_alert:
         return
-    body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
+    if is_significant and has_ns:
+        body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
     for url, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
         body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), link.format(nle=nle))
@@ -162,25 +167,30 @@ def handle_message_and_send_alerts(message, metadata):
             seq = nle.sequences.last()
             search = seq.details.get('search', '') if seq is not None else ''  # figure out if it was a test event
             body = f'{search} {nle.event_id} {nle.state}'
+            is_significant = seq.details['significant']
             logger.info(f'Sending GW retraction: {body}')
         else:
             if seq.localization is not None:
                 localizations.append(seq.localization)
             if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
                 localizations.append(seq.external_coincidence.localization)
-            significance = 'significant' if seq.details['significant'] else 'subthreshold'
+            is_significant = seq.details['significant']
+            significance = 'significant' if is_significant else 'subthreshold'
             inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
             alert_text = ALERT_TEXT[len(localizations)] if seq.details['group'] == 'CBC' else ALERT_TEXT[-1]
             body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
+            has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01  # burst alerts do not have NSs
             logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
         body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
+        is_significant = False
+        has_ns = False
     is_test_alert = nle.event_id.startswith('M')
-    send_text(body, is_test_alert=is_test_alert)
-    send_slack(body, nle, is_test_alert=is_test_alert)
+    send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, has_ns=has_ns)
+    send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant, has_ns=has_ns)
     send_email(email_subject, body, is_test_alert=is_test_alert)
 
     for localization in localizations:
