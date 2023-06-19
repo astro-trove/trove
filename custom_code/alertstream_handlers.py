@@ -173,7 +173,7 @@ def handle_message_and_send_alerts(message, metadata):
             alert_text = ALERT_TEXT[len(localizations)]
             body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
-            has_ns = seq.details['properties']['HasNS'] >= 0.01
+            has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01  # burst alerts do not have NSs
             logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
