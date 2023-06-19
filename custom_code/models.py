@@ -197,6 +197,7 @@ class Profile(models.Model):
     phone_number = PhoneNumberField(null=True, region='US')
     test_alerts = models.BooleanField(default=False)
     subthreshold_alerts = models.BooleanField(default=False)
+    burst_alerts = models.BooleanField(default=False)
     bbh_alerts = models.BooleanField(default=False)
     ns_alerts = models.BooleanField(default=False)
 
