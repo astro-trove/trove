@@ -39,9 +39,9 @@
         <td>
             <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank">{{ event.event_id }}</a>
             {% if event.state == "RETRACTED" %}
-                &#x274c; {# red X emoji #}
+                <span title="retracted">&#x274c;</span> {# red X emoji #}
             {% elif event.sequences.last.event_subtype != "PRELIMINARY" %}
-                &#x2714; {# heavy check mark emoji #}
+                <span title="confirmed">&#x2714;</span> {# heavy check mark emoji #}
             {% endif %}
         </td>
         <td>{{ event.sequences.last.details.far|format_inverse_far }}</td>
