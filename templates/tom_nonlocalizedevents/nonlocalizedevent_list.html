@@ -3,7 +3,7 @@
 {% block title %}GW Events{% endblock %}
 {% block content %}
 <div class="row">
-    <div class="col-md-6"><h1>Non-Localized Event Index</h1></div>
+    <div class="col-md-6"><h1>GW Event Index</h1></div>
     <div class="col-md-6 d-flex justify-content-end align-items-baseline">
     {% if request.GET.hide_test_alerts %}
         <a href="{% url 'custom_code:nonlocalizedevents' %}" class="btn btn-secondary" title="Show">Show Test Alerts</a>
@@ -16,10 +16,11 @@
   <table class="table">
       <thead>
       <tr>
-        <th scope="col">Event Type</th>
         <th scope="col">Detail Page</th>
-        <th scope="col">State</th>
-        <th scope="col">Created (in TOM)</th>
+        <th scope="col">Significance</th>
+        <th scope="col">Group</th>
+        <th scope="col">HasNS</th>
+        <th scope="col">HasRemnant</th>
         <th scope="col">CSS Fields</th>
         <th scope="col">Candidates</th>
         <th scope="col">Hermes</th>
@@ -30,12 +31,19 @@
       <tbody>
       {% for event in object_list %}
       <tr>
-        <td>{{ event.event_type }}</td>
         <td>
             <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank"><b>{{ event.event_id }}</b></a>
         </td>
-        <td>{{event.state }}</td>
-        <td>{{event.created | timesince }}</td>
+        <td>
+            {% if event.sequences.last.details.significant %}
+            Significant
+            {% else %}
+            Subthreshold
+            {% endif %}
+        </td>
+        <td>{{ event.sequences.last.details.group }}</td>
+        <td>{{ event.sequences.last.details.properties.HasNS | floatformat:"2" }}</td>
+        <td>{{ event.sequences.last.details.properties.HasRemnant | floatformat:"2" }}</td>
         <td>
         {% for localization in event.localizations.all|dictsort:"id" %}
             <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12" target="_blank">

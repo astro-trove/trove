@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-ALERT_TEXT_INTRO = """{search} {seq.event_subtype} v{seq.sequence_id}
+ALERT_TEXT_INTRO = """{group} {seq.event_subtype} v{seq.sequence_id}
 {nle.event_id} ({significance})
 {time}
 1/FAR = {inv_far}yr
@@ -46,6 +46,12 @@ BBH = {BBH:.0%}
 Terrestrial = {Terrestrial:.0%}
 """
 
+ALERT_TEXT_BURST = """50% Area = {seq.localization.area_50:.0f} deg²
+90% Area = {seq.localization.area_90:.0f} deg²
+Duration = {duration:.1e} s
+Frequency = {central_frequency:.0f} Hz
+"""
+
 ALERT_TEXT_URL = "https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/"
 
 ALERT_TEXT = [  # index = number of localizations available
@@ -53,16 +59,19 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_EXTERNAL_COINCIDENCE + ALERT_TEXT_CLASSIFICATION +
     ALERT_TEXT_URL,
+    ALERT_TEXT_INTRO + ALERT_TEXT_BURST + ALERT_TEXT_URL,
 ]
 
 
-def send_text(body, is_test_alert=False, is_significant=True, has_ns=True):
+def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
     body_ascii = body.replace('±', '+/-').replace('²', '2')
     for user in Profile.objects.all():
         if is_test_alert:
             subscribed = user.test_alerts
         elif not is_significant:
             subscribed = user.subthreshold_alerts
+        elif is_burst:
+            subscribed = user.burst_alerts
         elif has_ns:
             subscribed = user.ns_alerts
         else:
@@ -161,6 +170,7 @@ def handle_message_and_send_alerts(message, metadata):
             search = seq.details.get('search', '') if seq is not None else ''  # figure out if it was a test event
             body = f'{search} {nle.event_id} {nle.state}'
             is_significant = seq.details['significant']
+            is_burst = seq.details['group'] == 'Burst'
             logger.info(f'Sending GW retraction: {body}')
         else:
             if seq.localization is not None:
@@ -170,19 +180,21 @@ def handle_message_and_send_alerts(message, metadata):
             is_significant = seq.details['significant']
             significance = 'significant' if is_significant else 'subthreshold'
             inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
-            alert_text = ALERT_TEXT[len(localizations)]
+            is_burst = seq.details['group'] == 'Burst'
+            alert_text = ALERT_TEXT[-1] if is_burst else ALERT_TEXT[len(localizations)]
             body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
                                      **seq.details, **seq.details['properties'], **seq.details['classification'])
-            has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01  # burst alerts do not have NSs
             logger.info(f'Sending GW alert: {body}')
+        has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01  # burst alerts do not have NSs
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
         body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
         is_significant = False
+        is_burst = False
         has_ns = False
     is_test_alert = nle.event_id.startswith('M')
-    send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, has_ns=has_ns)
+    send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
     send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant, has_ns=has_ns)
     send_email(email_subject, body, is_test_alert=is_test_alert)
 
