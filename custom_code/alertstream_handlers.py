@@ -176,9 +176,10 @@ def handle_message_and_send_alerts(message, metadata):
             derived_quantities['duration_ms'] = seq.details['duration'] * 1000.
         else:
             alert_text = ALERT_TEXT[len(localizations)]
-            derived_quantities['distance'] = format_distance(seq.localization)
-            if seq.external_coincidence.localization is not None:
-                derived_quantities['distance_external'] = format_distance(seq.external_coincidence.localization)
+            if localizations:
+                derived_quantities['distance'] = format_distance(localizations[0])
+            if len(localizations) > 1:
+                derived_quantities['distance_external'] = format_distance(localizations[1])
         body = alert_text.format(nle=nle, seq=seq, **seq.details, **derived_quantities,
                                  **seq.details['properties'], **seq.details['classification'])
         logger.info(f'Sending GW alert: {body}')
