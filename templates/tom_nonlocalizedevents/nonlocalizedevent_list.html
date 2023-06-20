@@ -19,9 +19,10 @@
         <th scope="col">Detail Page</th>
         <th scope="col">1/FAR</th>
         <th scope="col">Class.</th>
+        <th scope="col">Dist.</th>
         <th scope="col">NS?</th>
         <th scope="col">Bright?</th>
-        <th scope="col">CSS Fields</th>
+        <th scope="col">CSS</th>
         <th scope="col">Candidates</th>
         <th scope="col">Hermes</th>
         <th scope="col">GraceDB</th>
@@ -45,6 +46,7 @@
         </td>
         <td>{{ event.sequences.last.details.far|format_inverse_far }}</td>
         <td>{{ event.sequences.last.details|get_most_likely_class }}</td>
+        <td>{{ event.sequences.last.localization|format_distance }}</td>
         <td>{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
         <td>{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
         <td>

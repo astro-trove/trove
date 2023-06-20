@@ -7,7 +7,7 @@ import requests
 import smtplib
 import logging
 import json
-from .templatetags.nonlocalizedevent_extras import format_inverse_far, get_most_likely_class
+from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, get_most_likely_class
 from .healpix_utils import update_all_credible_region_percents_for_css_fields
 from .cssfield_selection import calculate_footprint_probabilities
 from .models import CredibleRegionContour, Profile
@@ -26,13 +26,12 @@ ALERT_TEXT_INTRO = """{most_likely_class} {seq.event_subtype} v{seq.sequence_id}
 1/FAR = {inverse_far}
 """
 
-ALERT_TEXT_LOCALIZATION = """Distance = {seq.localization.distance_mean:.0f} ± {seq.localization.distance_std:.0f} Mpc
+ALERT_TEXT_LOCALIZATION = """Distance = {distance}
 50% Area = {seq.localization.area_50:.0f} deg²
 90% Area = {seq.localization.area_90:.0f} deg²
 """
 
-ALERT_TEXT_EXTERNAL_COINCIDENCE = "Distance (comb.) = {seq.external_coincidence.localization.distance_mean:.0f} ± " \
-                                  """{seq.external_coincidence.localization.distance_std:.0f} Mpc
+ALERT_TEXT_EXTERNAL_COINCIDENCE = """Distance (comb.) = {distance_external}
 50% Area (comb.) = {seq.external_coincidence.localization.area_50:.0f} deg²
 90% Area (comb.) = {seq.external_coincidence.localization.area_90:.0f} deg²
 """
@@ -177,6 +176,9 @@ def handle_message_and_send_alerts(message, metadata):
             derived_quantities['duration_ms'] = seq.details['duration'] * 1000.
         else:
             alert_text = ALERT_TEXT[len(localizations)]
+            derived_quantities['distance'] = format_distance(seq.localization)
+            if seq.external_coincidence.localization is not None:
+                derived_quantities['distance_external'] = format_distance(seq.external_coincidence.localization)
         body = alert_text.format(nle=nle, seq=seq, **seq.details, **derived_quantities,
                                  **seq.details['properties'], **seq.details['classification'])
         logger.info(f'Sending GW alert: {body}')

@@ -21,6 +21,21 @@ def format_inverse_far(far):
 
 
 @register.filter
+def format_distance(localization):
+    if localization is None or not localization.distance_mean:
+        return ''
+    dist_mean = localization.distance_mean
+    dist_std = localization.distance_std
+    if localization.distance_mean < 1000.:
+        unit = 'Mpc'
+    else:
+        dist_mean /= 1000.
+        dist_std /= 1000.
+        unit = 'Gpc'
+    return f'{dist_mean:.0f} ± {dist_std:.0f} {unit}' if dist_mean > 10. else f'{dist_mean:.1f} ± {dist_std:.1f} {unit}'
+
+
+@register.filter
 def get_most_likely_class(details):
     if details['group'] == 'CBC':
         classification = details['classification']
