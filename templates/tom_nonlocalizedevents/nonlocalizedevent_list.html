@@ -1,5 +1,5 @@
 {% extends 'tom_common/index.html' %}
-{% load bootstrap4 %}
+{% load bootstrap4 nonlocalizedevent_extras %}
 {% block title %}GW Events{% endblock %}
 {% block content %}
 <div class="row">
@@ -17,10 +17,10 @@
       <thead>
       <tr>
         <th scope="col">Detail Page</th>
-        <th scope="col">Significance</th>
-        <th scope="col">Group</th>
-        <th scope="col">HasNS</th>
-        <th scope="col">HasRemnant</th>
+        <th scope="col">1/FAR</th>
+        <th scope="col">Class.</th>
+        <th scope="col">NS?</th>
+        <th scope="col">Bright?</th>
         <th scope="col">CSS Fields</th>
         <th scope="col">Candidates</th>
         <th scope="col">Hermes</th>
@@ -30,20 +30,23 @@
       </thead>
       <tbody>
       {% for event in object_list %}
+      {% if event.sequences.last.details.significant %}
+      <tr style="font-weight: bold">
+      {% else %}
       <tr>
+      {% endif %}
         <td>
-            <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank"><b>{{ event.event_id }}</b></a>
-        </td>
-        <td>
-            {% if event.sequences.last.details.significant %}
-            Significant
-            {% else %}
-            Subthreshold
+            <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank">{{ event.event_id }}</a>
+            {% if event.state == "RETRACTED" %}
+                &#x274c; {# red X emoji #}
+            {% elif event.sequences.last.event_subtype != "PRELIMINARY" %}
+                &#x2714; {# heavy check mark emoji #}
             {% endif %}
         </td>
-        <td>{{ event.sequences.last.details.group }}</td>
-        <td>{{ event.sequences.last.details.properties.HasNS | floatformat:"2" }}</td>
-        <td>{{ event.sequences.last.details.properties.HasRemnant | floatformat:"2" }}</td>
+        <td>{{ event.sequences.last.details.far|format_inverse_far }}</td>
+        <td>{{ event.sequences.last.details|get_most_likely_class }}</td>
+        <td>{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
+        <td>{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
         <td>
         {% for localization in event.localizations.all|dictsort:"id" %}
             <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12" target="_blank">

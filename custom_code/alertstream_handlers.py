@@ -7,7 +7,7 @@ import requests
 import smtplib
 import logging
 import json
-import math
+from .templatetags.nonlocalizedevent_extras import format_inverse_far, get_most_likely_class
 from .healpix_utils import update_all_credible_region_percents_for_css_fields
 from .cssfield_selection import calculate_footprint_probabilities
 from .models import CredibleRegionContour, Profile
@@ -20,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-ALERT_TEXT_INTRO = """{group} {seq.event_subtype} v{seq.sequence_id}
+ALERT_TEXT_INTRO = """{most_likely_class} {seq.event_subtype} v{seq.sequence_id}
 {nle.event_id} ({significance})
 {time}
-1/FAR = {inv_far}yr
+1/FAR = {inverse_far}
 """
 
 ALERT_TEXT_LOCALIZATION = """Distance = {seq.localization.distance_mean:.0f} ± {seq.localization.distance_std:.0f} Mpc
@@ -48,14 +48,16 @@ Terrestrial = {Terrestrial:.0%}
 
 ALERT_TEXT_BURST = """50% Area = {seq.localization.area_50:.0f} deg²
 90% Area = {seq.localization.area_90:.0f} deg²
-Duration = {duration:.1e} s
+Duration = {duration_ms:.0f} ms
 Frequency = {central_frequency:.0f} Hz
 """
 
 ALERT_TEXT_URL = "https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/"
 
+ALERT_TEXT_RETRACTION = "{most_likely_class} {nle.event_id} {nle.state}"
+
 ALERT_TEXT = [  # index = number of localizations available
-    ALERT_TEXT_INTRO + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
+    ALERT_TEXT_RETRACTION,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_EXTERNAL_COINCIDENCE + ALERT_TEXT_CLASSIFICATION +
     ALERT_TEXT_URL,
@@ -113,16 +115,6 @@ def send_email(subject, body, is_test_alert=False):
         logger.error(f'Email "{subject}" failed: {e}')
 
 
-def format_si_prefix(qty, d=1):
-    log1000 = math.log10(qty) / 3.
-    if -0.4 < log1000 < 11.:  # switch to scientific notation if it rounds to 0.0 or is above the largest prefix
-        i = int(log1000)
-        prefix = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q'][i]
-        return f'{qty * 1000. ** -i:.{d}f} {prefix}'
-    else:
-        return f'{qty:.{d}e} '
-
-
 def calculate_credible_region(skymap, localization, probability=0.9):
     """store the credible region contour for skymap plotting"""
     # Sort the pixels of the sky map by descending probability density
@@ -167,25 +159,27 @@ def handle_message_and_send_alerts(message, metadata):
     try:
         if seq is None:  # retraction
             seq = nle.sequences.last()
-            search = seq.details.get('search', '') if seq is not None else ''  # figure out if it was a test event
-            body = f'{search} {nle.event_id} {nle.state}'
-            is_significant = seq.details['significant']
-            is_burst = seq.details['group'] == 'Burst'
-            logger.info(f'Sending GW retraction: {body}')
         else:
             if seq.localization is not None:
                 localizations.append(seq.localization)
             if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
                 localizations.append(seq.external_coincidence.localization)
-            is_significant = seq.details['significant']
-            significance = 'significant' if is_significant else 'subthreshold'
-            inv_far = format_si_prefix(3.168808781402895e-08 / seq.details['far'])  # 1/Hz to yr
-            is_burst = seq.details['group'] == 'Burst'
-            alert_text = ALERT_TEXT[-1] if is_burst else ALERT_TEXT[len(localizations)]
-            body = alert_text.format(significance=significance, inv_far=inv_far, nle=nle, seq=seq,
-                                     **seq.details, **seq.details['properties'], **seq.details['classification'])
-            logger.info(f'Sending GW alert: {body}')
+        is_significant = seq.details['significant']
+        is_burst = seq.details['group'] == 'Burst'
         has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01  # burst alerts do not have NSs
+        derived_quantities = {
+            'most_likely_class': get_most_likely_class(seq.details),
+            'inverse_far': format_inverse_far(seq.details['far']),
+            'significance': 'significant' if is_significant else 'subthreshold',
+        }
+        if is_burst:
+            alert_text = ALERT_TEXT[-1]
+            derived_quantities['duration_ms'] = seq.details['duration'] * 1000.
+        else:
+            alert_text = ALERT_TEXT[len(localizations)]
+        body = alert_text.format(nle=nle, seq=seq, **seq.details, **derived_quantities,
+                                 **seq.details['properties'], **seq.details['classification'])
+        logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
         body = 'Received a GW alert that could not be parsed. Check GraceDB: '
