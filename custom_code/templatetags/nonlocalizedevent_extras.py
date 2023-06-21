@@ -39,9 +39,7 @@ def format_distance(localization):
 def get_most_likely_class(details):
     if details['group'] == 'CBC':
         classification = details['classification']
-        sorted_classes = sorted(classification, key=classification.get)
-        sorted_classes.remove('Terrestrial')
-        return sorted_classes[-1]
+        return max(classification, key=classification.get)
     else:  # burst
         return details['group']
 
