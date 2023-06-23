@@ -1,5 +1,5 @@
 {% extends 'tom_common/index.html' %}
-{% load bootstrap4 %}
+{% load bootstrap4 nonlocalizedevent_extras %}
 {% block title %}GW Events{% endblock %}
 {% block content %}
 <div class="row">
@@ -17,55 +17,65 @@
       <thead>
       <tr>
         <th scope="col">Detail Page</th>
-        <th scope="col">Significance</th>
-        <th scope="col">Group</th>
-        <th scope="col">HasNS</th>
-        <th scope="col">HasRemnant</th>
-        <th scope="col">CSS Fields</th>
-        <th scope="col">Candidates</th>
-        <th scope="col">Hermes</th>
-        <th scope="col">GraceDB</th>
-        <th scope="col">Treasure Map</th>
+        <th scope="col" title="Inverse False Alarm Rate">1/FAR</th>
+        <th scope="col" title="Most Likely Classification">Class.</th>
+        <th scope="col" title="Distance">Distance</th>
+        <th scope="col" title="Has Neutron Star?">NS?</th>
+        <th scope="col" title="Has Remnant?">Bright?</th>
+        <th scope="col" title="CSS Fields">CSS</th>
+        <th scope="col" title="CSS Candidates">Cand.</th>
+        <th scope="col" title="Hermes">Hermes</th>
+        <th scope="col" title="GraceDB">GraceDB</th>
+        <th scope="col" title="Gravitational Wave Treasure Map">GWTM</th>
       </tr>
       </thead>
       <tbody>
       {% for event in object_list %}
+      {% if event.sequences.last.details.significant %}
+      <tr style="font-weight: bold">
+      {% else %}
       <tr>
+      {% endif %}
         <td>
-            <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank"><b>{{ event.event_id }}</b></a>
-        </td>
-        <td>
-            {% if event.sequences.last.details.significant %}
-            Significant
-            {% else %}
-            Subthreshold
+            <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank">{{ event.event_id }}</a>
+            {% if event.state == "RETRACTED" %}
+                <span title="retracted">&#x274c;</span> {# red X emoji #}
+            {% elif event.sequences.last.event_subtype != "PRELIMINARY" %}
+                <span title="confirmed">&#x2714;</span> {# heavy check mark emoji #}
             {% endif %}
         </td>
-        <td>{{ event.sequences.last.details.group }}</td>
-        <td>{{ event.sequences.last.details.properties.HasNS | floatformat:"2" }}</td>
-        <td>{{ event.sequences.last.details.properties.HasRemnant | floatformat:"2" }}</td>
-        <td>
+        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far|format_inverse_far }}</td>
+        <td title="Most Likely Classification">{{ event.sequences.last.details|get_most_likely_class }}</td>
+        <td title="Distance">{{ event.sequences.last.localization|format_distance }}</td>
+        <td title="Has Neutron Star?">{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
+        <td title="Has Remnant?">{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
+        <td title="CSS Fields">
         {% for localization in event.localizations.all|dictsort:"id" %}
-            <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12" target="_blank">
-                {% if localization.external_coincidences.exists %}
-                    {{ localization.external_coincidences.last.sequences.last.sequence_id }}c
-                {% else %}
-                    {{ localization.sequences.last.sequence_id }}
-                {% endif %}
+            {% if localization.external_coincidences.exists %}
+                <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
+                   title="{{ localization.external_coincidences.last.sequences.last.event_subtype }} Combined"
+                   target="_blank">
+                {{ localization.external_coincidences.last.sequences.last.sequence_id }}c
+            {% else %}
+                <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
+                   title="{{ localization.sequences.last.event_subtype }}"
+                   target="_blank">
+                {{ localization.sequences.last.sequence_id }}
+            {% endif %}
             </a>
         {% endfor %}
         </td>
-        <td>
-            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&order=-mlscore_real" target="_blank">Candidates</a>
+        <td title="CSS Candidates">
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&order=-mlscore_real" target="_blank">Cand.</a>
         </td>
-        <td>
+        <td title="Hermes">
           <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
         </td>
-        <td>
+        <td title="GraceDB">
           <a href="{{ event.gracedb_url }}" target="_blank">GraceDB</a>
         </td>
-        <td>
-            <a href="{{ event.treasuremap_url }}" target="_blank">Treasure Map</a>
+        <td title="Gravitational Wave Treasure Map">
+            <a href="{{ event.treasuremap_url }}" target="_blank">GWTM</a>
         </td>
       </tr>
       {% endfor %}
