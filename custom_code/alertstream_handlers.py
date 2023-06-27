@@ -165,7 +165,9 @@ def handle_message_and_send_alerts(message, metadata):
                 localizations.append(seq.external_coincidence.localization)
         is_significant = seq.details['significant']
         is_burst = seq.details['group'] == 'Burst'
-        has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01  # burst alerts do not have NSs
+        has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01 \
+            or seq.details['classification'].get('BNS', 0.) >= 0.01 \
+            or seq.details['classification'].get('NSBH', 0.) >= 0.01
         derived_quantities = {
             'most_likely_class': get_most_likely_class(seq.details),
             'inverse_far': format_inverse_far(seq.details['far']),
