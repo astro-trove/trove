@@ -23,7 +23,7 @@
   </thead>
   {% for galaxy in galaxies %}
     <tr>
-      <td><a href="https://ned.ipac.caltech.edu/conesearch?in_csys=Equatorial&in_equinox=J2000&coordinates={{galaxy.RA}}d,{{galaxy.Dec}}d&radius=0.2&hconst=67.8&omegam=0.308&omegav=0.692&wmap=4&corr_z=1&z_constraint=Unconstrained&z_unit=z&ot_include=ANY&nmp_op=ANY&search_type=Near%20Position%20Search&out_csys=Same%20as%20Input&out_equinox=Same%20as%20Input&obj_sort=Distance%20to%20search%20center" target="_blank">{{ galaxy.ID }}</a></td>
+      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&coordinates={{galaxy.RA}}d,{{galaxy.Dec}}d&radius=0.2" target="_blank">{{ galaxy.ID }}</a></td>
       <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
       {% if galaxy.Dist %}
