@@ -23,7 +23,7 @@
   </thead>
   {% for galaxy in galaxies %}
     <tr>
-      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&coordinates={{galaxy.RA}}d,{{galaxy.Dec}}d&radius=0.2" target="_blank">{{ galaxy.ID }}</a></td>
+      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&coordinates={{galaxy.RA}}d,{{galaxy.Dec}}d&radius=0.02" target="_blank">{{ galaxy.ID }}</a></td>
       <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
       {% if galaxy.Dist %}
