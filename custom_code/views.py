@@ -3,19 +3,15 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.models import User
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect, StreamingHttpResponse
-from django.views.generic.base import RedirectView, TemplateView, TemplateResponse, View
+from django.views.generic.base import RedirectView
 from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView, UpdateView
-from django.forms.models import model_to_dict
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
-from guardian.shortcuts import get_objects_for_user, assign_perm
+from guardian.shortcuts import get_objects_for_user
 
-from tom_common.hooks import run_hook
-from tom_common.forms import CustomUserCreationForm
 from tom_targets.models import Target, TargetList
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
@@ -32,7 +28,7 @@ import requests
 import time
 from io import StringIO
 
-from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot, query_ZTFpubphot
+from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
 import paramiko
