@@ -62,3 +62,20 @@ Then (as root) enable the sites:
     % a2ensite saguaro_tom-ssl.conf
     % service apache2 restart
   ```
+
+## Running the alert listener
+The alert listener is now integrated into the TOM. It should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
+```
+@reboot cd /var/www/saguaro_tom/; python manage.py readstreams > /home/saguaro/alertstreams.log 2>&1
+```
+
+If it does not restart, or you need to restart the listener manually, run the following on `sand`. First, kill any other instances are running:
+```
+sudo pkill -f readstreams
+```
+
+Then run
+```
+cd /var/www/saguaro_tom/
+sudo nohup python manage.py readstreams > /home/saguaro/alertstreams.log 2>&1 &
+```
