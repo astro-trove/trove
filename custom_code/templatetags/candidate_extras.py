@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 def thumbnail_url(candidate, suffix):
     """Returns an image thumbnail as a data URL"""
     visit = candidate.filename.split('_')[4]
-    url = f'http://beast.as.arizona.edu:5013/api/png/{candidate.obsdate.strftime("%Y/%m/%d")}/'
+    url = f'http://sassy.as.arizona.edu/papp/api/{candidate.obsdate.strftime("%Y/%m/%d")}/'
     url += f'{candidate.field}/{candidate.candidatenumber}_{visit}_{suffix}.png'
     try:
         response = requests.get(url, timeout=0.2)
