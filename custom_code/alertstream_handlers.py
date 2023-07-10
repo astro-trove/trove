@@ -64,9 +64,7 @@ ALERT_TEXT = [  # index = number of localizations available
 ]
 
 # links for Slack; replaces ALERT_TEXT_URL
-ALERT_TEXT_LINKS = '{link} <https://hermes.lco.global/nonlocalizedevent/{{nle.event_id}}/|Hermes>' \
-                         ' <https://gracedb.ligo.org/superevents/{{nle.event_id}}/|GraceDB>' \
-                         ' <https://treasuremap.space/alerts?graceids={{nle.event_id}}|Treasure Map>'
+ALERT_LINKS = '{link} <{{nle.hermes_url}}|Hermes> <{{nle.gracedb_url}}|GraceDB> <{{nle.treasuremap_url}}|Treasure Map>'
 
 
 def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
@@ -100,7 +98,7 @@ def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=Fal
         body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
     for url_list, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), ALERT_TEXT_LINKS.format(link=link).format(nle=nle))
+        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), ALERT_LINKS.format(link=link).format(nle=nle))
         json_data = json.dumps({'text': body_slack})
         requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
 
@@ -199,8 +197,7 @@ def handle_message_and_send_alerts(message, metadata):
         logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
-        body = 'Received a GW alert that could not be parsed. Check GraceDB: '
-        body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
+        body = f'Received a GW alert that could not be parsed. Check GraceDB: {nle.gracedb_url}'
         is_significant = False
         is_burst = False
         has_ns = False
