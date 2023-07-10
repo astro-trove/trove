@@ -63,6 +63,11 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_BURST + ALERT_TEXT_URL,
 ]
 
+# links for Slack; replaces ALERT_TEXT_URL
+ALERT_TEXT_LINKS = '{link} <https://hermes.lco.global/nonlocalizedevent/{{nle.event_id}}/|Hermes>' \
+                         ' <https://gracedb.ligo.org/superevents/{{nle.event_id}}/|GraceDB>' \
+                         ' <https://treasuremap.space/alerts?graceids={{nle.event_id}}|Treasure Map>'
+
 
 def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
     body_ascii = body.replace('±', '+/-').replace('²', '2')
@@ -95,7 +100,7 @@ def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=Fal
         body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
     for url_list, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), link.format(nle=nle))
+        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), ALERT_TEXT_LINKS.format(link=link).format(nle=nle))
         json_data = json.dumps({'text': body_slack})
         requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
 
