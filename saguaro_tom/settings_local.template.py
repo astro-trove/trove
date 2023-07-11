@@ -24,8 +24,24 @@ SAVE_TEST_ALERTS = False # save test gravitational-wave alerts
 SCIMMA_AUTH_USERNAME = '' # username for SCIMMA authentication
 SCIMMA_AUTH_PASSWORD = '' # password for SCIMMA authentication
 SECRET_KEY = ''         # see https://docs.djangoproject.com/en/4.1/ref/settings/#secret-key
-SLACK_LINKS = []         # links to TOMS for Slack alerts (same order as SLACK_URLS)
-SLACK_URLS = []         # Slack URLs for incoming webhooks
+SLACK_LINKS = [  # links to TOMs for Slack alerts, {nle.id} is replaced by the event name (e.g., S190425z)
+    '<https://tom0.edu/nonlocalizedevents/{nle.event_id}/|Name of TOM 0>',  # TOM corresponding to Slack workspace 0
+    '<https://tom1.edu/nonlocalizedevents/{nle.event_id}/|Name of TOM 1>',  # TOM corresponding to Slack workspace 1
+]
+SLACK_URLS = [  # list of lists of Slack URLs for incoming webhooks
+    [  # list of URLs for Slack workspace 0
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-subthreshold
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-burst
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-bbh
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-ns
+    ],
+    [  # list of URLs for Slack workspace 1
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-subthreshold
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-burst
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-bbh
+        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-ns
+    ],
+]
 TNS_API_KEY = ''        # API key for the Transient Name Server
 TWILIO_ACCOUNT_SID = '' # account ID for Twilio text message alerts
 TWILIO_AUTH_TOKEN = ''  # authorization token for Twilio text message alerts

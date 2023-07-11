@@ -63,6 +63,9 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_BURST + ALERT_TEXT_URL,
 ]
 
+# links for Slack; replaces ALERT_TEXT_URL
+ALERT_LINKS = '{link} <{{nle.hermes_url}}|Hermes> <{{nle.gracedb_url}}|GraceDB> <{{nle.treasuremap_url}}|Treasure Map>'
+
 
 def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
     body_ascii = body.replace('±', '+/-').replace('²', '2')
@@ -81,16 +84,23 @@ def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, ha
             twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
-def send_slack(body, nle, is_test_alert=False, is_significant=True, has_ns=True):
+def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
     if is_test_alert:
         return
-    if is_significant and has_ns:
+    elif not is_significant:
+        channel = 0
+    elif is_burst:
+        channel = 1
+    elif not has_ns:
+        channel = 2
+    else:
+        channel = 3
         body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
-    for url, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), link.format(nle=nle))
+    for url_list, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
+        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), ALERT_LINKS.format(link=link).format(nle=nle))
         json_data = json.dumps({'text': body_slack})
-        requests.post(url, data=json_data.encode('ascii'), headers=headers)
+        requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
 
 
 def send_email(subject, body, is_test_alert=False):
@@ -187,15 +197,14 @@ def handle_message_and_send_alerts(message, metadata):
         logger.info(f'Sending GW alert: {body}')
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
-        body = 'Received a GW alert that could not be parsed. Check GraceDB: '
-        body += f'https://gracedb.ligo.org/superevents/{nle.event_id}/view/'
+        body = f'Received a GW alert that could not be parsed. Check GraceDB: {nle.gracedb_url}'
         is_significant = False
         is_burst = False
         has_ns = False
     is_test_alert = nle.event_id.startswith('M')
-    send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
-    send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant, has_ns=has_ns)
-    send_email(email_subject, body, is_test_alert=is_test_alert)
+    # send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
+    send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
+    # send_email(email_subject, body, is_test_alert=is_test_alert)
 
     for localization in localizations:
         if CredibleRegionContour.objects.filter(localization=localization).exists():
