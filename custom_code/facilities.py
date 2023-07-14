@@ -3,31 +3,35 @@ from tom_mmt.mmt import MMTBaseObservationForm, MMTImagingForm, MMTMMIRSImagingF
 from crispy_forms.layout import Layout, HTML
 from django.conf import settings
 
+SAGUARO_NOTE = 'This is a rapid ToO for GW follow-up. ' \
+               f'For questions, please contact the SAGUARO team at {settings.CONTACT_EMAIL}.'
+MMIRS_NOTE = 'Please use a random 30" dither pattern (4 exposures per position if K-band). ' \
+             'Please guide for individual exposures. ' \
+             'I have put in a dither size of 30" but this just specifies my estimated box size to not lose guiding ' \
+             '(not the size of the individual dithers). ' \
+             'We do not care about the position angle so adjust as needed for the guide star.'
 
-class CustomMMTObservationForm(MMTBaseObservationForm):
+
+class CustomBinospecObservationForm(MMTBaseObservationForm):
     def __init__(self, *args, **kwargs):
-        kwargs['initial']['notes'] = f'This is a rapid ToO for GW follow-up. ' \
-                                     f'For questions please reach out to the SAGUARO team at {settings.CONTACT_EMAIL}.'\
-                                     f'\n\n{kwargs["initial"].get("notes", "")}'
         super().__init__(*args, **kwargs)
+        if 'notes' not in kwargs['initial']:
+            kwargs['initial']['notes'] = SAGUARO_NOTE
 
 
-class CustomBinospecImagingForm(CustomMMTObservationForm, MMTImagingForm):
+class CustomBinospecImagingForm(CustomBinospecObservationForm, MMTImagingForm):
     pass
 
 
-class CustomBinospecSpectroscopyForm(CustomMMTObservationForm, MMTSpectroscopyForm):
+class CustomBinospecSpectroscopyForm(CustomBinospecObservationForm, MMTSpectroscopyForm):
     pass
 
 
-class CustomMMIRSObservationForm(CustomMMTObservationForm):
+class CustomMMIRSObservationForm(MMTBaseObservationForm):
     def __init__(self, *args, **kwargs):
-        kwargs['initial']['notes'] = 'Please use a random 30" dither pattern (4 exposures per position if K-band). ' \
-                                     'Please guide for individual exposures. I have put in a dither size of 30" but ' \
-                                     'this just specifies my estimated box size to not lose guiding (not the size of ' \
-                                     'the individual dithers). We do not care about the position angle so adjust as ' \
-                                     'needed for the guide star.'
         super().__init__(*args, **kwargs)
+        if 'notes' not in kwargs['initial']:
+            kwargs['initial']['notes'] = f'{SAGUARO_NOTE}\n\n{MMIRS_NOTE}'
 
     def layout(self):
         return Layout(
@@ -43,6 +47,7 @@ class CustomMMIRSImagingForm(CustomMMIRSObservationForm, MMTMMIRSImagingForm):
 
 class CustomMMIRSSpectroscopyForm(CustomMMIRSObservationForm, MMTMMIRSSpectroscopyForm):
     pass
+
 
 class CustomMMTFacility(MMTFacility):
     observation_forms = {
