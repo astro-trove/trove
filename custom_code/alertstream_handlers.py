@@ -183,7 +183,7 @@ def handle_message_and_send_alerts(message, metadata):
             'inverse_far': format_inverse_far(seq.details['far']),
             'significance': 'significant' if is_significant else 'subthreshold',
         }
-        if is_burst:
+        if is_burst and nle.state == 'ACTIVE':  # not a retraction
             alert_text = ALERT_TEXT[-1]
             derived_quantities['duration_ms'] = seq.details['duration'] * 1000.
         else:
