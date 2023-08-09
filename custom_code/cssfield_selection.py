@@ -1,5 +1,3 @@
-import pdb
-
 import numpy as np
 import healpy
 from ligo.skymap import bayestar

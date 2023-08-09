@@ -1,14 +1,26 @@
+astroplan
+astropy
 django
-django_extensions
-guardian
+django-crispy-forms
+django-extensions
+django-filter
+django-guardian
+django-phonenumber-field[phonenumberslite]
+healpy
+kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
+lightcurve-fitting
+ligo.skymap
+numpy
 tomtoolkit~=2.14.4
 tom-alertstreams
-tom-nonlocalizedevents~=0.7.7
-psycopg2-binary
-whitenoise
-kne_cand_vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
-lightcurve-fitting
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
+tom-nonlocalizedevents~=0.7.7
 twilio
 paramiko
-django-phonenumber-field[phonenumberslite]
+plotly
+psycopg2-binary
+python-dateutil
+requests
+specutils
+SQLAlchemy
+whitenoise
