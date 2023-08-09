@@ -173,6 +173,8 @@ class CSSFieldCredibleRegion(models.Model):
     probability_contained = models.FloatField(null=True)
     group = models.IntegerField(null=True)
     rank_in_group = models.IntegerField(null=True)
+    first_observable = models.DateTimeField(null=True)
+    treasuremap_id = models.IntegerField(null=True)
 
     class Meta:
         constraints = [

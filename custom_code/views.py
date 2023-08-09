@@ -44,6 +44,8 @@ TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
 TNS_CLASSIFICATION_IDS = {name: cid for cid, name in TNS_CLASSIFICATION_CHOICES}
 
+TREASUREMAP_POINTINGS_URL = 'https://treasuremap.space/api/v1/pointings'
+
 logger = logging.getLogger(__name__)
 
 
@@ -478,27 +480,97 @@ class CSSFieldListView(FilterView):
         return context
 
 
+def generate_prog_file(css_credible_regions):
+    groups = list(css_credible_regions.order_by('group').values_list('group', flat=True).distinct())
+    text = ''
+    for g in groups:
+        group = css_credible_regions.filter(group=g).order_by('rank_in_group')
+        names = [cr.css_field.name for cr in group]
+        text += ','.join(names) + '\n'
+    return text
+
+
+def submit_to_css(text, event_id, request=None):
+    try:
+        with paramiko.SSHClient() as ssh:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(settings.CSS_HOSTNAME, username=settings.CSS_USERNAME,
+                        disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
+            # See https://www.paramiko.org/changelog.html#2.9.0 for why disabled_algorithms is required
+            sftp = ssh.open_sftp()
+            for i, line in enumerate(text.splitlines()):
+                filename = f'Saguaro_{event_id}_{i + 1:d}.prog'
+                with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
+                    f.write(line + '\n')
+                banner = f'{filename} submitted to CSS'
+                logger.info(banner)
+                if request is not None:
+                    messages.success(request, banner)
+    except Exception as e:
+        logger.error(str(e))
+        if request is not None:
+            messages.error(request, str(e))
+
+
+def report_to_treasure_map(css_credible_regions, event_id, status='planned', instrument_id=11, request=None):
+    json_data = {
+        'api_token': settings.TREASUREMAP_API_KEY,
+        'graceid': event_id,
+        'pointings': [
+            {
+                'ra': cr.css_field.ra,
+                'dec': cr.css_field.dec,
+                'pos_angle': 0.,  # CSS fields have a fixed position angle
+                'instrumentid': instrument_id,  # 11 = MLS10KCCD-CSS
+                'time': cr.first_observable.strftime('%Y-%m-%dT%H:%M:%S'),
+                'status': status,
+                'depth': 21.5,
+                'depth_unit': 'ab_mag',
+                'band': 'open',
+            } for cr in css_credible_regions
+        ]
+    }
+    response = requests.post(url=TREASUREMAP_POINTINGS_URL, json=json_data)
+    if response.ok:
+        response_json = response.json()
+        submitted_pointings = response_json['pointing_ids']
+        for cr, treasuremap_id in zip(css_credible_regions, submitted_pointings):
+            cr.treasuremap_id = treasuremap_id
+            cr.save()
+        banner = f'Submitted {len(submitted_pointings):d} {status} pointings for {event_id} to the Treasure Map'
+        logger.info(banner)
+        if request:
+            messages.success(request, banner)
+        for error in response_json['ERRORS']:
+            logger.error(error)
+            if request:
+                messages.error(request, error)
+        for warning in response_json['WARNINGS']:
+            logger.warning(warning)
+            if request:
+                messages.warning(request, warning)
+    else:
+        logger.error(response.text)
+        if request:
+            messages.error(request, response.text)
+
+
 class CSSFieldExportView(CSSFieldListView):
     """
     View that handles the export of CSS Fields to .prog file(s).
     """
     def post(self, request, *args, **kwargs):
-        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
-        text = self.generate_prog_file(target_ids)
+        css_credible_regions = self.get_selected_fields(request)
+        text = generate_prog_file(css_credible_regions)
         return self.render_to_response(text)
 
-    def generate_prog_file(self, target_ids):
+    def get_selected_fields(self, request):
+        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
         localization = self.get_eventlocalization()
-        queryset = localization.css_field_credible_regions.filter(group__isnull=False)
+        css_credible_regions = localization.css_field_credible_regions.filter(group__isnull=False)
         if target_ids is not None:
-            queryset = queryset.filter(id__in=target_ids)
-        groups = list(queryset.order_by('group').values_list('group', flat=True).distinct())
-        text = ''
-        for g in groups:
-            group = queryset.filter(group=g).order_by('rank_in_group')
-            names = [cr.css_field.name for cr in group]
-            text += ','.join(names) + '\n'
-        return text
+            css_credible_regions = css_credible_regions.filter(id__in=target_ids)
+        return css_credible_regions
 
     def render_to_response(self, text, **response_kwargs):
         """
@@ -518,32 +590,17 @@ class CSSFieldExportView(CSSFieldListView):
 
 class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
     """
-    View that handles the submission of CSS Fields to CSS.
+    View that handles the submission of CSS Fields to CSS and reporting to the GW Treasure Map.
     """
     def post(self, request, *args, **kwargs):
         """
         Method that handles the POST requests for this view.
         """
-        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
-        text = self.generate_prog_file(target_ids)
+        css_credible_regions = self.get_selected_fields(request)
+        text = generate_prog_file(css_credible_regions)
         nle = self.get_nonlocalizedevent()
-        try:
-            with paramiko.SSHClient() as ssh:
-                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                ssh.connect(settings.CSS_HOSTNAME, username=settings.CSS_USERNAME,
-                            disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
-                # See https://www.paramiko.org/changelog.html#2.9.0 for why disabled_algorithms is required
-                sftp = ssh.open_sftp()
-                for i, line in enumerate(text.splitlines()):
-                    filename = f'Saguaro_{nle.event_id}_{i+1:d}.prog'
-                    with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
-                            f.write(line + '\n')
-                    banner = f'{filename} submitted to CSS'
-                    logger.info(banner)
-                    messages.success(request, banner)
-        except Exception as e:
-            logger.error(str(e))
-            messages.error(request, str(e))
+        submit_to_css(text, nle.event_id, request=request)
+        report_to_treasure_map(css_credible_regions, nle.event_id, request=request)
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):

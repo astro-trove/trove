@@ -36,6 +36,8 @@
           <th>Prob.</th>
           <th>Group</th>
           <th>Rank</th>
+          <th>Observable</th>
+          <th>TM Pointing</th>
         </tr>
       </thead>
       <tbody>
@@ -49,6 +51,8 @@
           <td>{{ link.probability_contained|floatformat:"6" }}</td>
           <td>{{ link.group }}</td>
           <td>{{ link.rank_in_group }}</td>
+          <td>{{ link.first_observable|date:"M d H:i" }}</td>
+          <td>{{ link.treasuremap_id }}</td>
         </tr>
         {% empty %}
         <tr>
