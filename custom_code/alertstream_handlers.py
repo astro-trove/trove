@@ -45,22 +45,21 @@ BBH = {BBH:.0%}
 Terrestrial = {Terrestrial:.0%}
 """
 
-ALERT_TEXT_BURST = """50% Area = {seq.localization.area_50:.0f} deg²
-90% Area = {seq.localization.area_90:.0f} deg²
-Duration = {duration_ms:.0f} ms
-Frequency = {central_frequency:.0f} Hz
-"""
-
 ALERT_TEXT_URL = "https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/"
 
 ALERT_TEXT_RETRACTION = "{most_likely_class} {nle.event_id} {nle.state}"
 
+ALERT_TEXT_BURST = ALERT_TEXT_INTRO + """50% Area = {seq.localization.area_50:.0f} deg²
+90% Area = {seq.localization.area_90:.0f} deg²
+Duration = {duration_ms:.0f} ms
+Frequency = {central_frequency:.0f} Hz
+""" + ALERT_TEXT_URL
+
 ALERT_TEXT = [  # index = number of localizations available
-    ALERT_TEXT_RETRACTION,
+    ALERT_TEXT_INTRO + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_EXTERNAL_COINCIDENCE + ALERT_TEXT_CLASSIFICATION +
     ALERT_TEXT_URL,
-    ALERT_TEXT_INTRO + ALERT_TEXT_BURST + ALERT_TEXT_URL,
 ]
 
 # links for Slack; replaces ALERT_TEXT_URL
@@ -183,8 +182,10 @@ def handle_message_and_send_alerts(message, metadata):
             'inverse_far': format_inverse_far(seq.details['far']),
             'significance': 'significant' if is_significant else 'subthreshold',
         }
-        if is_burst and nle.state == 'ACTIVE':  # not a retraction
-            alert_text = ALERT_TEXT[-1]
+        if nle.state == 'RETRACTED':
+            alert_text = ALERT_TEXT_RETRACTION
+        elif is_burst:
+            alert_text = ALERT_TEXT_BURST
             derived_quantities['duration_ms'] = seq.details['duration'] * 1000.
         else:
             alert_text = ALERT_TEXT[len(localizations)]
