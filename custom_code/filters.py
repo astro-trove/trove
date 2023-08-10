@@ -1,6 +1,6 @@
 import django.forms
 import django_filters
-from .models import CSSField
+from tom_surveys.models import SurveyField
 import json
 from django.conf import settings
 from datetime import datetime, timedelta
@@ -80,7 +80,7 @@ class CandidateFilter(django_filters.FilterSet):
 
         return cone_search_filter(queryset, ra, dec, radius)
 
-    field = django_filters.ModelChoiceFilter(queryset=CSSField.objects)
+    field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects)
     classification = django_filters.ChoiceFilter(choices=[(0, 'Transient'), (1, 'Moving Object')])
     snr_min = django_filters.NumberFilter('snr', 'gte', label='Min. S/N')
     mag_range = django_filters.NumericRangeFilter('mag', label='Magnitude')

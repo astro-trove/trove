@@ -3,7 +3,8 @@ from healpix_alchemy.types import Point
 import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base, Session
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile
-from .models import CSSField, CSSFieldCredibleRegion
+from tom_surveys.models import SurveyField
+from .models import CSSFieldCredibleRegion
 import json
 import logging
 
@@ -60,7 +61,7 @@ def update_all_credible_region_percents_for_css_fields(eventlocalization):
 
             for sa_css_field in results:
                 CSSFieldCredibleRegion.objects.update_or_create(
-                    css_field=CSSField.objects.get(name=sa_css_field[0]),
+                    css_field=SurveyField.objects.get(name=sa_css_field[0]),
                     localization=eventlocalization,
                     defaults={
                         'smallest_percent': int(prob * 100.0)

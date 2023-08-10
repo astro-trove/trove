@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from phonenumber_field.modelfields import PhoneNumberField
 from tom_targets.models import Target, TargetList
 from tom_nonlocalizedevents.models import EventLocalization
+from tom_surveys.models import SurveyField, SurveyObservationRecord
 
 
 def _target_list_save(self, *args, **kwargs):
@@ -111,25 +112,6 @@ class TargetListExtra(models.Model):
         return self.value
 
 
-class CSSField(models.Model):
-    name = models.CharField(max_length=6, primary_key=True)
-    ra = models.FloatField()
-    dec = models.FloatField()
-    ecliptic_lng = models.FloatField()
-    ecliptic_lat = models.FloatField()
-    galactic_lng = models.FloatField()
-    galactic_lat = models.FloatField()
-    healpix = models.BigIntegerField()
-    adjacent = models.ManyToManyField('self')
-    has_reference = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        ordering = ['name']
-
-
 class Candidate(models.Model):
     candidatenumber = models.IntegerField(null=True)
     filename = models.CharField(max_length=128, null=True)
@@ -142,7 +124,7 @@ class Candidate(models.Model):
     magerr = models.FloatField(null=True)
     rawfilename = models.CharField(max_length=128, null=True)
     obsdate = models.DateTimeField(null=False, default=datetime.now)
-    field = models.ForeignKey(CSSField, null=True, on_delete=models.SET_NULL, db_column='field')
+    field = models.ForeignKey(SurveyField, null=True, on_delete=models.SET_NULL, db_column='field')
     classification = models.IntegerField(null=True)
     cx = models.FloatField(null=True)
     cy = models.FloatField(null=True)
@@ -164,7 +146,8 @@ class Candidate(models.Model):
 
 class CSSFieldCredibleRegion(models.Model):
     localization = models.ForeignKey(EventLocalization, related_name='css_field_credible_regions', on_delete=models.CASCADE)
-    css_field = models.ForeignKey(CSSField, related_name='css_field_credible_regions', on_delete=models.CASCADE)
+    css_field = models.ForeignKey(SurveyField, related_name='css_field_credible_regions', on_delete=models.CASCADE)
+    observation_record = models.ForeignKey(SurveyObservationRecord, null=True, on_delete=models.SET_NULL)
 
     smallest_percent = models.IntegerField(
         default=100,
