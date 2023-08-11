@@ -114,7 +114,6 @@ class TargetListExtra(models.Model):
 
 class Candidate(models.Model):
     candidatenumber = models.IntegerField(null=True)
-    filename = models.CharField(max_length=128, null=True)
     elongation = models.FloatField(null=True)
     ra = models.FloatField(null=True)
     dec = models.FloatField(null=True)

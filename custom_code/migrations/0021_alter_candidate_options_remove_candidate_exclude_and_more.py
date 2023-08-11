@@ -58,3 +58,21 @@ class Migration(migrations.Migration):
             ),
         ),
     ]
+
+# After running this migration, populate the observation records and link candidates to them using the following code:
+# from tom_surveys.models import SurveyObservationRecord
+# from custom_code.models import Candidate
+# from astropy.time import Time, TimezoneInfo
+# distinct_candidates = Candidate.objects.order_by('filename').distinct('filename')
+# for c in distinct_candidates:
+#     date_obs = Time(c.mjdmid, format='mjd').to_datetime(timezone=TimezoneInfo()) if c.mjdmid != -1. else c.obsdate
+#     sor = SurveyObservationRecord.objects.create(
+#         survey_field=c.field,
+#         facility='CSS',
+#         parameters={'ncombine': c.ncombine},
+#         observation_id=c.filename,
+#         status='COMPLETED',
+#         scheduled_start=date_obs,
+#     )
+#     candidates = Candidate.objects.filter(filename=c.filename)
+#     candidates.update(observation_record=sor)
