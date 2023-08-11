@@ -74,5 +74,6 @@ class Migration(migrations.Migration):
 #         status='COMPLETED',
 #         scheduled_start=date_obs,
 #     )
-#     candidates = Candidate.objects.filter(filename=c.filename)
+# for sor in SurveyObservationRecord.objects.all():
+#     candidates = Candidate.objects.filter(filename=sor.observation_id)
 #     candidates.update(observation_record=sor)

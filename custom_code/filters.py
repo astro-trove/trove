@@ -80,22 +80,22 @@ class CandidateFilter(django_filters.FilterSet):
 
         return cone_search_filter(queryset, ra, dec, radius)
 
-    field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects)
+    observation_record__survey_field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects, label='Survey Field')
     classification = django_filters.ChoiceFilter(choices=[(0, 'Transient'), (1, 'Moving Object')])
     snr_min = django_filters.NumberFilter('snr', 'gte', label='Min. S/N')
     mag_range = django_filters.NumericRangeFilter('mag', label='Magnitude')
-    obsdate_range = django_filters.DateTimeFromToRangeFilter('obsdate', label='Obs. Date')
+    obsdate_range = django_filters.DateTimeFromToRangeFilter('observation_record__scheduled_start', label='Obs. Date')
     mlscore_range = django_filters.NumericRangeFilter('mlscore', 'gte', label='ML Old')
     mlscore_real_range = django_filters.NumericRangeFilter('mlscore_real', label='ML Real')
     mlscore_bogus_range = django_filters.NumericRangeFilter('mlscore_bogus', label='ML Bogus')
     localization = LocalizationFilter(label='Localization')
 
     order = django_filters.OrderingFilter(
-        fields=['obsdate', 'ra', 'dec', 'snr', 'mag', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
+        fields=['observation_record__scheduled_start', 'ra', 'dec', 'snr', 'mag', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
         field_labels={
             'snr': 'S/N',
             'mag': 'Magnitude',
-            'obsdate': 'Obs. Date',
+            'observation_record__scheduled_start': 'Obs. Date',
             'mlscore': 'ML Old',
             'mlscore_real': 'ML Real',
             'mlscore_bogus': 'ML Bogus',

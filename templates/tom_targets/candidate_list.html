@@ -37,7 +37,7 @@
               None
             {% endif %}
           </td>
-          <td>{{ candidate.obsdate|date:"m-d" }}</td>
+          <td>{{ candidate.observation_record.scheduled_start|date:"m-d" }}</td>
           <td>{{ candidate.mag|floatformat:"1" }}</td>
           <td>{{ candidate.fwhm|floatformat:"1" }}</td>
           <td>{{ candidate.snr|floatformat:"1" }}</td>
