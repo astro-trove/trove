@@ -14,7 +14,7 @@ class SurveyField(models.Model):
     galactic_lng = models.FloatField()
     galactic_lat = models.FloatField()
     healpix = models.BigIntegerField()
-    adjacent = models.ManyToManyField('self', db_column='cssfield')
+    adjacent = models.ManyToManyField('self')
     has_reference = models.BooleanField(default=False)
 
     def __str__(self):
