@@ -73,7 +73,7 @@ class SurveyObservationRecord(models.Model):
     modified = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ('-created',)
+        ordering = ('-scheduled_start',)
         models.UniqueConstraint(fields=['facility', 'observation_id'], name='unique_facility_observation_id')
 
     def save(self, *args, **kwargs):
