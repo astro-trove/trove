@@ -17,6 +17,7 @@ from django.urls import path, include
 
 urlpatterns = [
     path('', include('custom_code.urls')),
+    path('surveys/', include('tom_surveys.urls')),
     path('', include('tom_common.urls')),
     path('nonlocalizedevents/', include('tom_nonlocalizedevents.urls', namespace='nonlocalizedevents')),
 ]

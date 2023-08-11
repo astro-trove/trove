@@ -1,0 +1,50 @@
+{% extends 'tom_common/base.html' %}
+{% load bootstrap4 %}
+{% block title %}Survey Observations{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-md-10">
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Facility</th>
+          <th>Field</th>
+          <th>Time</th>
+          <th>Status</th>
+          <th>Candidates</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for observation in object_list %}
+        <tr>
+          <td>{{ observation.facility }}</td>
+          <td>{{ observation.survey_field.name }}</td>
+          <td>{{ observation.scheduled_start }}</td>
+          <td>{{ observation.status }}</td>
+          <td>{{ observation.candidate_set.count }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10">
+            No observations match those filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  </div>
+  <div class="col-md-2">
+    <form action="" method="get" class="form">
+      {% bootstrap_form filter.form %}
+      {% buttons %}
+        <button type="submit" class="btn btn-primary">
+          Filter
+        </button>
+        <a href="{% url 'surveys:observations' %}" class="btn btn-secondary" title="Reset">Reset</a>
+      {% endbuttons %}
+    </form>
+  </div>
+</div>
+{% endblock %}
