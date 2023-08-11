@@ -74,6 +74,7 @@ class SurveyObservationRecord(models.Model):
 
     class Meta:
         ordering = ('-created',)
+        models.UniqueConstraint(fields=['facility', 'observation_id'], name='unique_facility_observation_id')
 
     def save(self, *args, **kwargs):
         if self.id:

@@ -122,26 +122,18 @@ class Candidate(models.Model):
     snr = models.FloatField(null=True)
     mag = models.FloatField(null=True)
     magerr = models.FloatField(null=True)
-    rawfilename = models.CharField(max_length=128, null=True)
-    obsdate = models.DateTimeField(null=False, default=datetime.now)
-    field = models.ForeignKey(SurveyField, null=True, on_delete=models.SET_NULL, db_column='field')
     classification = models.IntegerField(null=True)
     cx = models.FloatField(null=True)
     cy = models.FloatField(null=True)
     cz = models.FloatField(null=True)
-    htm16id = models.BigIntegerField(null=True)
     target = models.ForeignKey(Target, null=True, on_delete=models.SET_NULL, db_column='targetid')
-    mjdmid = models.FloatField(null=True)
     mlscore = models.FloatField(null=True)
     mlscore_real = models.FloatField(null=True)
     mlscore_bogus = models.FloatField(null=True)
-    ncombine = models.IntegerField(null=True)
-    gladeid = models.IntegerField(null=True)
-    exclude = models.IntegerField(null=True)
+    observation_record = models.ForeignKey(SurveyObservationRecord, null=True, on_delete=models.DO_NOTHING)
 
     class Meta:
         db_table = 'candidates'
-        ordering = ['-obsdate', '-candidatenumber']
 
 
 class CSSFieldCredibleRegion(models.Model):
