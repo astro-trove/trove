@@ -15,8 +15,8 @@ CREDIBLE_REGION_PROBABILITIES = sorted(json.loads(settings.CREDIBLE_REGION_PROBA
 Base = declarative_base()
 
 
-class SaCSSField(Base):
-    __tablename__ = 'custom_code_cssfield'
+class SaSurveyField(Base):
+    __tablename__ = 'tom_surveys_surveyfield'
     name = sa.Column(sa.String, primary_key=True)
     healpix = sa.Column(Point)
 
@@ -50,10 +50,10 @@ def update_all_credible_region_percents_for_css_fields(eventlocalization):
             ).scalar_subquery()
 
             query = sa.select(
-                SaCSSField.name
+                SaSurveyField.name
             ).filter(
                 SaSkymapTile.localization_id == eventlocalization.id,
-                SaSkymapTile.tile.contains(SaCSSField.healpix),
+                SaSkymapTile.tile.contains(SaSurveyField.healpix),
                 SaSkymapTile.probdensity >= min_probdensity
             )
 
