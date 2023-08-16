@@ -57,7 +57,8 @@ class LocalizationFilter(django_filters.Filter):
             return queryset.filter(
                 observation_record__survey_field__css_field_credible_regions__localization=seq.localization,
                 observation_record__survey_field__css_field_credible_regions__smallest_percent__lte=prob,
-                obsdate__gte=tmin, obsdate__lte=tmax
+                observation_record__scheduled_start__gte=tmin,
+                observation_record__scheduled_start__lte=tmax
             )
         else:
             return queryset
