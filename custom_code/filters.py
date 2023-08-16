@@ -54,9 +54,11 @@ class LocalizationFilter(django_filters.Filter):
                 return queryset.none()
             tmin = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
             tmax = datetime.now(tmin.tzinfo) if dt is None else tmin + timedelta(days=dt)
-            return queryset.filter(field__css_field_credible_regions__localization=seq.localization,
-                                   field__css_field_credible_regions__smallest_percent__lte=prob,
-                                   obsdate__gte=tmin, obsdate__lte=tmax)
+            return queryset.filter(
+                observation_record__survey_field__css_field_credible_regions__localization=seq.localization,
+                observation_record__survey_field__css_field_credible_regions__smallest_percent__lte=prob,
+                obsdate__gte=tmin, obsdate__lte=tmax
+            )
         else:
             return queryset
 
