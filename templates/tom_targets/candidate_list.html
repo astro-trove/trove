@@ -4,7 +4,7 @@
 {% block content %}
 {% if request.GET.localization_event %}
 <h1>Candidates for {{request.GET.localization_event}}</h1>
-<div class="row"><div class="col-md-12">{% skymap_event_id filter.qs %}</div></div>
+<div class="row"><div class="col-md-12">{% skymap_event_id survey_candidates=filter.qs %}</div></div>
 {% else %}
 <h1>Candidates</h1>
 {% endif %}

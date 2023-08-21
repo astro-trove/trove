@@ -6,6 +6,7 @@ from django.conf import settings
 from datetime import datetime, timedelta
 from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from .models import Candidate
 from .cssfield_selection import rank_css_fields
 
 CREDIBLE_REGION_PROBABILITIES = json.loads(settings.CREDIBLE_REGION_PROBABILITIES)
@@ -26,7 +27,7 @@ class LocalizationWidget(django.forms.widgets.MultiWidget):
         super().__init__(widgets, **kwargs)
 
     def decompress(self, value):
-        return value
+        return value or (None, None, None)
 
 
 class LocalizationField(django.forms.MultiValueField):
@@ -54,12 +55,21 @@ class LocalizationFilter(django_filters.Filter):
                 return queryset.none()
             tmin = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
             tmax = datetime.now(tmin.tzinfo) if dt is None else tmin + timedelta(days=dt)
-            return queryset.filter(
-                observation_record__survey_field__css_field_credible_regions__localization=seq.localization,
-                observation_record__survey_field__css_field_credible_regions__smallest_percent__lte=prob,
-                observation_record__scheduled_start__gte=tmin,
-                observation_record__scheduled_start__lte=tmax
-            )
+            if queryset.model == Candidate:
+                filter_kwargs = {
+                    'observation_record__survey_field__css_field_credible_regions__localization': seq.localization,
+                    'observation_record__survey_field__css_field_credible_regions__smallest_percent__lte': prob,
+                    'observation_record__scheduled_start__gte': tmin,
+                    'observation_record__scheduled_start__lte': tmax,
+                }
+            else:  # assume the model is SurveyObservationRecord itself
+                filter_kwargs = {
+                    'survey_field__css_field_credible_regions__localization': seq.localization,
+                    'survey_field__css_field_credible_regions__smallest_percent__lte': prob,
+                    'scheduled_start__gte': tmin,
+                    'scheduled_start__lte': tmax,
+                }
+            return queryset.filter(**filter_kwargs)
         else:
             return queryset
 
