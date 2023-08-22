@@ -1,5 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Row, Column, Submit, HTML
 from tom_targets.models import TargetList
 from .models import TargetListExtra, Profile
 from datetime import datetime
@@ -288,3 +290,20 @@ class ProfileUpdateForm(forms.ModelForm):
             'bbh_alerts': 'BBH alerts (HasNS < 1%)',
             'ns_alerts': 'NS alerts (HasNS > 1%)',
         }
+
+
+class NonLocalizedEventFormHelper(FormHelper):
+    layout = Layout(
+            Row(
+                Column('prefix'),
+                Column('state'),
+                Column('inv_far_min'),
+                Column('classification'),
+                Column('has_ns_min'),
+                Column('has_remnant_min'),
+            ),
+            Row(
+                Submit('submit', 'Filter'),
+                HTML('<a href="{% url \'custom_code:nonlocalizedevents\' %}" class="btn btn-secondary" title="Reset">Reset</a>'),
+            )
+        )

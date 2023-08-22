@@ -21,7 +21,7 @@ from tom_surveys.models import SurveyObservationRecord
 from .models import Candidate, CSSFieldCredibleRegion, Profile
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm, ProfileUpdateForm
-from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
+from .forms import NonLocalizedEventFormHelper, TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
 
 import json
@@ -639,6 +639,14 @@ class NonLocalizedEventListView(FilterView):
     model = NonLocalizedEvent
     template_name = 'tom_nonlocalizedevents/nonlocalizedevent_list.html'
     filterset_class = NonLocalizedEventFilter
+    paginate_by = 100
+    formhelper_class = NonLocalizedEventFormHelper
+
+    def get_filterset(self, filterset_class):
+        kwargs = self.get_filterset_kwargs(filterset_class)
+        filterset = filterset_class(**kwargs)
+        filterset.form.helper = self.formhelper_class()
+        return filterset
 
     def get_queryset(self):
         # '-created' is most recent first

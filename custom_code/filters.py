@@ -160,7 +160,29 @@ class CSSFieldCredibleRegionFilter(django_filters.FilterSet):
 
 
 class NonLocalizedEventFilter(django_filters.FilterSet):
-    def test_alert_filter(self, queryset, name, hide_test_alerts):
-        return queryset.exclude(event_id__startswith='M') if hide_test_alerts else queryset
-    hide_test_alerts = django_filters.BooleanFilter(label='Exclude test alerts?', method='test_alert_filter',
-                                                       widget=django.forms.CheckboxInput)
+    prefix = django_filters.ChoiceFilter(choices=(('S', 'Real'), ('MS', 'Test')), label='Alert Type',
+                                         field_name='event_id', lookup_expr='startswith')
+    state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')))
+
+    @staticmethod
+    def inv_far_filter(queryset, name, min_inv_far):
+        print(name, min_inv_far, type(min_inv_far))
+        max_far = 3.168808781402895e-08 / float(min_inv_far)  # yr to 1/Hz
+        return queryset.filter(sequences__details__far__lte=max_far).distinct()  # TODO: only look at latest update
+    inv_far_min = django_filters.NumberFilter(label='Min. 1/FAR (yr)', method='inv_far_filter', min_value=0.,
+                                              help_text='Significant CBC alerts have 1/FAR > 0.5 yr')
+
+    classification = django_filters.MultipleChoiceFilter(
+        choices=(
+            ('BNS', 'BNS'),
+            ('NSBH', 'NSBH'),
+            ('BBH', 'BBH'),
+            ('Burst', 'Burst'),
+            ('Terrestrial', 'Terrestrial'),
+        ),
+        label='Classification(s)',
+    )
+    has_ns_min = django_filters.NumberFilter('sequences__details__properties__hasns',
+                                             label='Min. HasNS', min_value=0., max_value=1.)
+    has_remnant_min = django_filters.NumberFilter('sequences__details__properties__hasremnant',
+                                                  label='Min. HasRemnant', min_value=0., max_value=1.)
