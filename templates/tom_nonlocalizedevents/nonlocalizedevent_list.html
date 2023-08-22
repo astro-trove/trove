@@ -2,7 +2,7 @@
 {% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras %}
 {% block title %}GW Events{% endblock %}
 {% block content %}
-<h1>GW Event Index</h1>
+<h1>GW Events</h1>
 <div class="row">
     <div class="col-md-12">
     <form action="" method="get" class="form">
@@ -23,8 +23,9 @@
         <th scope="col" title="Distance">Distance</th>
         <th scope="col" title="Has Neutron Star?">NS?</th>
         <th scope="col" title="Has Remnant?">Bright?</th>
-        <th scope="col" title="CSS Fields">CSS</th>
-        <th scope="col" title="CSS Candidates">Cand.</th>
+        <th scope="col" title="Survey Plans">Plans</th>
+        <th scope="col" title="Survey Observations">Obs.</th>
+        <th scope="col" title="Survey Candidates">Cand.</th>
         <th scope="col" title="Hermes">Hermes</th>
         <th scope="col" title="GraceDB">GraceDB</th>
         <th scope="col" title="Gravitational Wave Treasure Map">GWTM</th>
@@ -45,12 +46,12 @@
                 <span title="confirmed">&#x2714;</span> {# heavy check mark emoji #}
             {% endif %}
         </td>
-        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far|format_inverse_far }}</td>
-        <td title="Most Likely Classification">{{ event.sequences.last.details|get_most_likely_class }}</td>
-        <td title="Distance">{{ event.sequences.last.localization|format_distance }}</td>
+        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far | format_inverse_far }}</td>
+        <td title="Most Likely Classification">{{ event.sequences.last.details | get_most_likely_class | truncate }}</td>
+        <td title="Distance">{{ event.sequences.last.localization | format_distance }}</td>
         <td title="Has Neutron Star?">{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
         <td title="Has Remnant?">{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
-        <td title="CSS Fields">
+        <td title="Survey Plans">
         {% for localization in event.localizations.all|dictsort:"id" %}
             {% if localization.external_coincidences.exists %}
                 <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
@@ -66,7 +67,10 @@
             </a>
         {% endfor %}
         </td>
-        <td title="CSS Candidates">
+        <td title="Survey Observations">
+            <a href="{% url 'surveys:observations' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Obs.</a>
+        </td>
+        <td title="Survey Candidates">
             <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&order=-mlscore_real" target="_blank">Cand.</a>
         </td>
         <td title="Hermes">
