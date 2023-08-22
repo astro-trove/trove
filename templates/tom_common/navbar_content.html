@@ -8,7 +8,7 @@ For customization instructions, see tom_common/base.html
     <a class="nav-link" href="{% url 'home' %}">Home <span class="sr-only">(current)</span></a>
 </li>
 <li class="nav-item {% if request.resolver_match.url_name == 'nonlocalizedevents' %}active{% endif %}">
-    <a class="nav-link" href="{% url 'nonlocalizedevents:index' %}?inv_far_min=0.5&state=ACTIVE&prefix=S">GW Events</a>
+    <a class="nav-link" href="{% url 'nonlocalizedevents:index' %}?prefix=S&state=ACTIVE&inv_far_min=0.5">GW Events</a>
 </li>
 <li class="nav-item {% if request.resolver_match.namespace == 'targets' and request.resolver_match.url_name == 'list' %}active{% endif %}">
     <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
