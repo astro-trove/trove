@@ -169,28 +169,31 @@ class NonLocalizedEventFilter(django_filters.FilterSet):
         max_far = 3.168808781402895e-08 / float(min_inv_far)  # yr to 1/Hz
         return queryset.filter(**{name + '__lte': max_far}).distinct()  # TODO: only look at latest update
     inv_far_min = django_filters.NumberFilter('sequences__details__far',
-                                              method='inv_far_filter', label='Min. 1/FAR (yr)', min_value=0.,
+                                              method='inv_far_filter', label='1/FAR', min_value=0.,
                                               help_text='Significant CBC alerts have 1/FAR > 0.5 yr')
 
-    classification = django_filters.MultipleChoiceFilter(
-        choices=(
-            ('BNS', 'BNS'),
-            ('NSBH', 'NSBH'),
-            ('BBH', 'BBH'),
-            ('Burst', 'Burst'),
-            ('Terrestrial', 'Terrestrial'),
-        ),
-        label='Classification(s)',
-        help_text="Doesn't currently work",
-    )
+    # classification = django_filters.MultipleChoiceFilter(
+    #     choices=(
+    #         ('BNS', 'BNS'),
+    #         ('NSBH', 'NSBH'),
+    #         ('BBH', 'BBH'),
+    #         ('Burst', 'Burst'),
+    #         ('Terrestrial', 'Terrestrial'),
+    #     ),
+    #     label='Classification(s)',
+    #     help_text="Doesn't currently work",
+    # )
+    distance_max = django_filters.NumberFilter('sequences__localization__distance_mean',
+                                               lookup_expr='lte', label='Distance', min_value=0.,
+                                               distinct=True)  # TODO: only look at latest update
 
     @staticmethod
-    def float_gte_decimal(queryset, name, value):
+    def percent_gte_decimal(queryset, name, value):
         """Compare a float to a Django Decimal in a JSON-serializable way"""
-        return queryset.filter(**{name + '__gte': float(value)})
+        return queryset.filter(**{name + '__gte': 0.01 * float(value)}).distinct()  # TODO: only look at latest update
     has_ns_min = django_filters.NumberFilter('sequences__details__properties__HasNS',
-                                             method='float_gte_decimal', label='Min. HasNS',
-                                             min_value=0., max_value=1., help_text='Very slow')
+                                             method='percent_gte_decimal', label='HasNS',
+                                             min_value=0., max_value=100., help_text='Very slow')
     has_remnant_min = django_filters.NumberFilter('sequences__details__properties__HasRemnant',
-                                                  method='float_gte_decimal', label='Min. HasRemnant',
-                                                  min_value=0., max_value=1., help_text='Very slow')
+                                                  method='percent_gte_decimal', label='HasRemnant',
+                                                  min_value=0., max_value=100., help_text='Very slow')
