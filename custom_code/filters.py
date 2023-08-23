@@ -57,15 +57,15 @@ class LocalizationFilter(django_filters.Filter):
             tmax = datetime.now(tmin.tzinfo) if dt is None else tmin + timedelta(days=dt)
             if queryset.model == Candidate:
                 filter_kwargs = {
-                    'observation_record__survey_field__css_field_credible_regions__localization': seq.localization,
-                    'observation_record__survey_field__css_field_credible_regions__smallest_percent__lte': prob,
+                    'observation_record__survey_field__credibleregions__localization': seq.localization,
+                    'observation_record__survey_field__credibleregions__smallest_percent__lte': prob,
                     'observation_record__scheduled_start__gte': tmin,
                     'observation_record__scheduled_start__lte': tmax,
                 }
             else:  # assume the model is SurveyObservationRecord itself
                 filter_kwargs = {
-                    'survey_field__css_field_credible_regions__localization': seq.localization,
-                    'survey_field__css_field_credible_regions__smallest_percent__lte': prob,
+                    'survey_field__credibleregions__localization': seq.localization,
+                    'survey_field__credibleregions__smallest_percent__lte': prob,
                     'scheduled_start__gte': tmin,
                     'scheduled_start__lte': tmax,
                 }

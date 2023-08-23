@@ -35,7 +35,7 @@ def skymap(localization, survey_candidates=None, survey_observations=None):
     }
 
     # potential survey fields
-    fields = localization.css_field_credible_regions.filter(group__isnull=False)
+    fields = localization.surveyfieldcredibleregions.filter(group__isnull=False)
     if fields.exists():
         groups = list(fields.order_by('group').values_list('group', flat=True).distinct())
         vertices = []

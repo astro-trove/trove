@@ -135,9 +135,9 @@ class Candidate(models.Model):
         db_table = 'candidates'
 
 
-class CSSFieldCredibleRegion(models.Model):
-    localization = models.ForeignKey(EventLocalization, related_name='css_field_credible_regions', on_delete=models.CASCADE)
-    css_field = models.ForeignKey(SurveyField, related_name='css_field_credible_regions', on_delete=models.CASCADE)
+class SurveyFieldCredibleRegion(models.Model):
+    localization = models.ForeignKey(EventLocalization, related_name='surveyfieldcredibleregions', on_delete=models.CASCADE)
+    survey_field = models.ForeignKey(SurveyField, related_name='credibleregions', on_delete=models.CASCADE)
     observation_record = models.ForeignKey(SurveyObservationRecord, null=True, on_delete=models.SET_NULL)
 
     smallest_percent = models.IntegerField(
@@ -147,12 +147,12 @@ class CSSFieldCredibleRegion(models.Model):
     probability_contained = models.FloatField(null=True)
     group = models.IntegerField(null=True)
     rank_in_group = models.IntegerField(null=True)
-    first_observable = models.DateTimeField(null=True)
+    scheduled_start = models.DateTimeField(null=True)
     treasuremap_id = models.IntegerField(null=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['localization', 'css_field'], name='unique_localization_css_field')
+            models.UniqueConstraint(fields=['localization', 'survey_field'], name='unique_localization_survey_field')
         ]
         ordering = ['-probability_contained']
 

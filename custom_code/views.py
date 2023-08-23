@@ -18,7 +18,7 @@ from tom_observations.views import ObservationCreateView as OldObservationCreate
 from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
 from tom_surveys.models import SurveyObservationRecord
-from .models import Candidate, CSSFieldCredibleRegion, Profile
+from .models import Candidate, SurveyFieldCredibleRegion, Profile
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm, ProfileUpdateForm
 from .forms import NonLocalizedEventFormHelper, TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
@@ -447,7 +447,7 @@ class CSSFieldListView(FilterView):
     template_name = 'tom_nonlocalizedevents/cssfield_list.html'
     paginate_by = 100
     strict = False
-    model = CSSFieldCredibleRegion
+    model = SurveyFieldCredibleRegion
     filterset_class = CSSFieldCredibleRegionFilter
 
     def get_eventlocalization(self):
@@ -482,7 +482,7 @@ class CSSFieldListView(FilterView):
 
 
 def generate_prog_file(css_credible_regions):
-    return ','.join([cr.css_field.name for cr in css_credible_regions]) + '\n'
+    return ','.join([cr.survey_field.name for cr in css_credible_regions]) + '\n'
 
 
 def submit_to_css(css_credible_regions, event_id, request=None):
@@ -514,42 +514,42 @@ def create_observation_records(css_credible_regions, observation_id, user=None):
     for group, oid in zip(css_credible_regions, observation_id):
         for cr in group:
             record = SurveyObservationRecord.objects.create(
-                survey_field=cr.css_field,
+                survey_field=cr.survey_field,
                 user=user,
-                facility='CSS',
+                facility=cr.survey_field.facility,
                 parameters={},
                 observation_id=oid,
                 status='PENDING',
-                scheduled_start=cr.first_observable,
+                scheduled_start=cr.scheduled_start,
             )
             cr.observation_record = record
             cr.save()
 
 
-def report_to_treasure_map(css_credible_regions, event_id, status='planned', instrument_id=11, request=None):
-    css_credible_regions = sum(css_credible_regions, [])  # concatenate groups
+def report_to_treasure_map(credible_regions, event_id, status='planned', instrument_id=11, request=None):
+    credible_regions = sum(credible_regions, [])  # concatenate groups
     json_data = {
         'api_token': settings.TREASUREMAP_API_KEY,
         'graceid': event_id,
         'pointings': [
             {
-                'ra': cr.css_field.ra,
-                'dec': cr.css_field.dec,
+                'ra': cr.survey_field.ra,
+                'dec': cr.survey_field.dec,
                 'pos_angle': 0.,  # CSS fields have a fixed position angle
                 'instrumentid': instrument_id,  # 11 = MLS10KCCD-CSS
-                'time': cr.first_observable.strftime('%Y-%m-%dT%H:%M:%S'),
+                'time': cr.scheduled_start.strftime('%Y-%m-%dT%H:%M:%S'),
                 'status': status,
                 'depth': 21.5,
                 'depth_unit': 'ab_mag',
                 'band': 'open',
-            } for cr in css_credible_regions
+            } for cr in credible_regions
         ]
     }
     response = requests.post(url=TREASUREMAP_POINTINGS_URL, json=json_data)
     if response.ok:
         response_json = response.json()
         submitted_pointings = response_json['pointing_ids']
-        for cr, treasuremap_id in zip(css_credible_regions, submitted_pointings):
+        for cr, treasuremap_id in zip(credible_regions, submitted_pointings):
             cr.treasuremap_id = treasuremap_id
             cr.save()
         banner = f'Submitted {len(submitted_pointings):d} {status} pointings for {event_id} to the Treasure Map'
@@ -582,12 +582,12 @@ class CSSFieldExportView(CSSFieldListView):
     def get_selected_fields(self, request):
         target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
         localization = self.get_eventlocalization()
-        css_credible_regions = localization.css_field_credible_regions.filter(group__isnull=False)
+        credible_regions = localization.surveyfieldcredibleregions.filter(group__isnull=False)
         if target_ids is not None:
-            css_credible_regions = css_credible_regions.filter(id__in=target_ids)
-        group_numbers = list(css_credible_regions.order_by('group').values_list('group', flat=True).distinct())
+            credible_regions = credible_regions.filter(id__in=target_ids)
+        group_numbers = list(credible_regions.order_by('group').values_list('group', flat=True).distinct())
         # evaluate this as a list now to maintain the order
-        groups = [list(css_credible_regions.filter(group=g).order_by('rank_in_group')) for g in group_numbers]
+        groups = [list(credible_regions.filter(group=g).order_by('rank_in_group')) for g in group_numbers]
         return groups
 
     def render_to_response(self, text, **response_kwargs):

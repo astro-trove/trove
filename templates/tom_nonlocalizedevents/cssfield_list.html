@@ -44,15 +44,15 @@
         {% for link in object_list %}
         <tr>
           <td><input type="checkbox" name="selected-target" value="{{ link.id }}" onClick="single_select()" checked /></td>
-          <td>{{ link.css_field.name }}</td>
-          <td>{{ link.css_field.ra|floatformat:"6" }}</td>
-          <td>{{ link.css_field.dec|floatformat:"6" }}</td>
-          <td>{{ link.css_field.has_reference }}</td>
-          <td>{{ link.probability_contained|floatformat:"6" }}</td>
+          <td>{{ link.survey_field.name }}</td>
+          <td>{{ link.survey_field.ra | floatformat:"6" }}</td>
+          <td>{{ link.survey_field.dec | floatformat:"6" }}</td>
+          <td>{{ link.survey_field.has_reference }}</td>
+          <td>{{ link.probability_contained | floatformat:"6" }}</td>
           <td>{{ link.group }}:{{ link.rank_in_group }}</td>
           <td>{{ link.treasuremap_id }}</td>
           <td>{{ link.observation_record.created|date:"M d H:i" }}</td>
-          <td>{{ link.first_observable|date:"M d H:i" }}</td>
+          <td>{{ link.scheduled_start | date:"M d H:i" }}</td>
         </tr>
         {% empty %}
         <tr>

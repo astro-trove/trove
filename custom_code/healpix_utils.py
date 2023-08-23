@@ -4,7 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base, Session
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile
 from tom_surveys.models import SurveyField
-from .models import CSSFieldCredibleRegion
+from .models import SurveyFieldCredibleRegion
 import json
 import logging
 
@@ -59,9 +59,9 @@ def update_all_credible_region_percents_for_css_fields(eventlocalization):
 
             results = session.execute(query)
 
-            for sa_css_field in results:
-                CSSFieldCredibleRegion.objects.update_or_create(
-                    css_field=SurveyField.objects.get(name=sa_css_field[0]),
+            for sa_survey_field in results:
+                SurveyFieldCredibleRegion.objects.update_or_create(
+                    survey_field = SurveyField.objects.get(name=sa_survey_field[0]),
                     localization=eventlocalization,
                     defaults={
                         'smallest_percent': int(prob * 100.0)
