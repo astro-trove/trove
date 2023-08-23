@@ -20,7 +20,7 @@ For customization instructions, see tom_common/base.html
             <a class="nav-link" href="{% url 'surveys:observations' %}" style="color:black">Observations</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&order=-mlscore_real" style="color:black">Candidates</a>
+            <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&classification=0&order=-mlscore_real" style="color:black">Candidates</a>
         </li>
     </ul>
 </li>

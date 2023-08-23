@@ -71,7 +71,7 @@
             <a href="{% url 'surveys:observations' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Obs.</a>
         </td>
         <td title="Survey Candidates">
-            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&order=-mlscore_real" target="_blank">Cand.</a>
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">Cand.</a>
         </td>
         <td title="Hermes">
           <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
