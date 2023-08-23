@@ -36,6 +36,12 @@
             {% else %}
               None
             {% endif %}
+            {% for event_candidate in candidate.target.eventcandidate_set.all %}
+                <br />
+                {% if not event_candidate.viable %}<strike>{% endif %}
+                &#x1F517;<a href="{% url 'nonlocalizedevents:event-detail'  event_candidate.nonlocalizedevent.event_id %}" target="_blank">{{ event_candidate.nonlocalizedevent.event_id }}</a>
+                {% if not event_candidate.viable %}</strike>{% endif %}
+            {% endfor %}
           </td>
           <td>{{ candidate.observation_record.scheduled_start|date:"m-d" }}</td>
           <td>{{ candidate.mag|floatformat:"1" }}</td>
