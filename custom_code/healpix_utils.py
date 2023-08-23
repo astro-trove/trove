@@ -21,9 +21,9 @@ class SaSurveyField(Base):
     healpix = sa.Column(Point)
 
 
-def update_all_credible_region_percents_for_css_fields(eventlocalization):
+def update_all_credible_region_percents_for_survey_fields(eventlocalization):
     """
-    This function creates a credible region linkage for each of the CSS fields in the event localization specified
+    This function creates a credible region linkage for each of the survey fields in the event localization specified
     """
     with Session(sa_engine) as session:
 
@@ -67,4 +67,4 @@ def update_all_credible_region_percents_for_css_fields(eventlocalization):
                         'smallest_percent': int(prob * 100.0)
                     }
                 )
-    logger.info('Updated credible regions for CSS fields')
+    logger.info('Updated credible regions for survey fields')
