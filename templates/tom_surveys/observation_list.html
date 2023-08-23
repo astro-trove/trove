@@ -17,6 +17,7 @@
           <th>Facility</th>
           <th>Field</th>
           <th>Time</th>
+          {% if request.GET.localization_event %}<th>&Delta;t</th>{% endif %}
           <th>Status</th>
           <th>Candidates</th>
         </tr>
@@ -27,6 +28,7 @@
           <td>{{ observation.facility }}</td>
           <td>{{ observation.survey_field.name }}</td>
           <td>{{ observation.scheduled_start }}</td>
+          {% if request.GET.localization_event %}<td>{{ observation.scheduled_start | time_after_event:request.GET.localization_event }}</td>{% endif %}
           <td>{{ observation.status }}</td>
           <td>{{ observation.candidate_set.count }}</td>
         </tr>

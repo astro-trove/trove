@@ -1,7 +1,7 @@
 from django import template
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from astropy.coordinates import get_sun, get_moon
-from astropy.time import Time
+from astropy.time import Time, TimezoneInfo
 from astroplan import moon_illumination
 import numpy as np
 
@@ -76,3 +76,11 @@ def skymap_event_id(context, survey_candidates=None, survey_observations=None):
     nle = NonLocalizedEvent.objects.get(event_id=event_id)
     seq = nle.sequences.last()
     return skymap(seq.localization, survey_candidates, survey_observations)
+
+
+@register.filter
+def time_after_event(time, event_id, unit='hour', precision=1):
+    nle = NonLocalizedEvent.objects.get(event_id=event_id)
+    seq = nle.sequences.last()
+    dt = Time(time) - Time(seq.details['time'])
+    return dt.to(unit).to_string(precision=precision)
