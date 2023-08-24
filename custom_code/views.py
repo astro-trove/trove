@@ -16,7 +16,7 @@ from tom_targets.models import Target, TargetList
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_dataproducts.models import ReducedDatum
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
 from tom_surveys.models import SurveyObservationRecord
 from .models import Candidate, SurveyFieldCredibleRegion, Profile
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
@@ -668,3 +668,27 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
         :rtype: str
         """
         return reverse_lazy('custom_code:profile-update', kwargs={'pk': self.get_object().id})
+
+
+class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
+    """
+    View that handles the association of a target with a NonLocalizedEvent on a button press
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view.
+        """
+        nonlocalizedevent = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
+        target = Target.objects.get(id=self.kwargs['target_id'])
+        EventCandidate.objects.create(nonlocalizedevent=nonlocalizedevent, target=target)
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer
