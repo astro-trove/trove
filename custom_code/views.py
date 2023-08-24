@@ -18,6 +18,7 @@ from tom_observations.views import ObservationCreateView as OldObservationCreate
 from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
 from tom_surveys.models import SurveyObservationRecord
+from tom_treasuremap.reporting import report_to_treasure_map
 from .models import Candidate, SurveyFieldCredibleRegion, Profile
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm, ProfileUpdateForm
@@ -44,8 +45,6 @@ TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
 TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
 TNS_CLASSIFICATION_IDS = {name: cid for cid, name in TNS_CLASSIFICATION_CHOICES}
-
-TREASUREMAP_POINTINGS_URL = 'https://treasuremap.space/api/v1/pointings'
 
 logger = logging.getLogger(__name__)
 
@@ -511,6 +510,7 @@ def submit_to_css(css_credible_regions, event_id, request=None):
 
 
 def create_observation_records(css_credible_regions, observation_id, user=None):
+    records = []
     for group, oid in zip(css_credible_regions, observation_id):
         for cr in group:
             record = SurveyObservationRecord.objects.create(
@@ -524,50 +524,8 @@ def create_observation_records(css_credible_regions, observation_id, user=None):
             )
             cr.observation_record = record
             cr.save()
-
-
-def report_to_treasure_map(credible_regions, event_id, status='planned', instrument_id=11, request=None):
-    credible_regions = sum(credible_regions, [])  # concatenate groups
-    json_data = {
-        'api_token': settings.TREASUREMAP_API_KEY,
-        'graceid': event_id,
-        'pointings': [
-            {
-                'ra': cr.survey_field.ra,
-                'dec': cr.survey_field.dec,
-                'pos_angle': 0.,  # CSS fields have a fixed position angle
-                'instrumentid': instrument_id,  # 11 = MLS10KCCD-CSS
-                'time': cr.scheduled_start.strftime('%Y-%m-%dT%H:%M:%S'),
-                'status': status,
-                'depth': 21.5,
-                'depth_unit': 'ab_mag',
-                'band': 'open',
-            } for cr in credible_regions
-        ]
-    }
-    response = requests.post(url=TREASUREMAP_POINTINGS_URL, json=json_data)
-    if response.ok:
-        response_json = response.json()
-        submitted_pointings = response_json['pointing_ids']
-        for cr, treasuremap_id in zip(credible_regions, submitted_pointings):
-            cr.treasuremap_id = treasuremap_id
-            cr.save()
-        banner = f'Submitted {len(submitted_pointings):d} {status} pointings for {event_id} to the Treasure Map'
-        logger.info(banner)
-        if request is not None:
-            messages.success(request, banner)
-        for error in response_json['ERRORS']:
-            logger.error(error)
-            if request is not None:
-                messages.error(request, error)
-        for warning in response_json['WARNINGS']:
-            logger.warning(warning)
-            if request is not None:
-                messages.warning(request, warning)
-    else:
-        logger.error(response.text)
-        if request is not None:
-            messages.error(request, response.text)
+            records.append(record)
+    return records
 
 
 class CSSFieldExportView(CSSFieldListView):
@@ -617,8 +575,14 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
         css_credible_regions = self.get_selected_fields(request)
         nle = self.get_nonlocalizedevent()
         filenames = submit_to_css(css_credible_regions, nle.event_id, request=request)
-        create_observation_records(css_credible_regions, observation_id=filenames, user=request.user)
-        report_to_treasure_map(css_credible_regions, nle.event_id, request=request)
+        records = create_observation_records(css_credible_regions, observation_id=filenames, user=request.user)
+        response = report_to_treasure_map(records, nle)
+        for message in response['SUCCESSES']:
+            messages.success(request, message)
+        for message in response['WARNINGS']:
+            messages.warning(request, message)
+        for message in response['ERRORS']:
+            messages.error(request, message)
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):

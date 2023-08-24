@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'webpack_loader',
     'custom_code',
     'tom_surveys',
+    'tom_treasuremap',
     'phonenumber_field',
 ]
 

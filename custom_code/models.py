@@ -148,7 +148,6 @@ class SurveyFieldCredibleRegion(models.Model):
     group = models.IntegerField(null=True)
     rank_in_group = models.IntegerField(null=True)
     scheduled_start = models.DateTimeField(null=True)
-    treasuremap_id = models.IntegerField(null=True)
 
     class Meta:
         constraints = [
