@@ -680,7 +680,9 @@ class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
         """
         nonlocalizedevent = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         target = Target.objects.get(id=self.kwargs['target_id'])
-        EventCandidate.objects.create(nonlocalizedevent=nonlocalizedevent, target=target)
+        viability_reason = f'added from candidates list by {self.request.user.first_name}'
+        EventCandidate.objects.create(nonlocalizedevent=nonlocalizedevent, target=target,
+                                      viability_reason=viability_reason)
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):
