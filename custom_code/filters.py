@@ -1,11 +1,12 @@
 import django.forms
 import django_filters
-from .models import CSSField
+from tom_surveys.models import SurveyField
 import json
 from django.conf import settings
 from datetime import datetime, timedelta
 from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from .models import Candidate
 from .cssfield_selection import rank_css_fields
 
 CREDIBLE_REGION_PROBABILITIES = json.loads(settings.CREDIBLE_REGION_PROBABILITIES)
@@ -26,7 +27,7 @@ class LocalizationWidget(django.forms.widgets.MultiWidget):
         super().__init__(widgets, **kwargs)
 
     def decompress(self, value):
-        return value
+        return value or (None, None, None)
 
 
 class LocalizationField(django.forms.MultiValueField):
@@ -54,9 +55,21 @@ class LocalizationFilter(django_filters.Filter):
                 return queryset.none()
             tmin = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
             tmax = datetime.now(tmin.tzinfo) if dt is None else tmin + timedelta(days=dt)
-            return queryset.filter(field__css_field_credible_regions__localization=seq.localization,
-                                   field__css_field_credible_regions__smallest_percent__lte=prob,
-                                   obsdate__gte=tmin, obsdate__lte=tmax)
+            if queryset.model == Candidate:
+                filter_kwargs = {
+                    'observation_record__survey_field__credibleregions__localization': seq.localization,
+                    'observation_record__survey_field__credibleregions__smallest_percent__lte': prob,
+                    'observation_record__scheduled_start__gte': tmin,
+                    'observation_record__scheduled_start__lte': tmax,
+                }
+            else:  # assume the model is SurveyObservationRecord itself
+                filter_kwargs = {
+                    'survey_field__credibleregions__localization': seq.localization,
+                    'survey_field__credibleregions__smallest_percent__lte': prob,
+                    'scheduled_start__gte': tmin,
+                    'scheduled_start__lte': tmax,
+                }
+            return queryset.filter(**filter_kwargs)
         else:
             return queryset
 
@@ -80,22 +93,22 @@ class CandidateFilter(django_filters.FilterSet):
 
         return cone_search_filter(queryset, ra, dec, radius)
 
-    field = django_filters.ModelChoiceFilter(queryset=CSSField.objects)
+    observation_record__survey_field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects, label='Survey Field')
     classification = django_filters.ChoiceFilter(choices=[(0, 'Transient'), (1, 'Moving Object')])
     snr_min = django_filters.NumberFilter('snr', 'gte', label='Min. S/N')
     mag_range = django_filters.NumericRangeFilter('mag', label='Magnitude')
-    obsdate_range = django_filters.DateTimeFromToRangeFilter('obsdate', label='Obs. Date')
+    obsdate_range = django_filters.DateTimeFromToRangeFilter('observation_record__scheduled_start', label='Obs. Date')
     mlscore_range = django_filters.NumericRangeFilter('mlscore', 'gte', label='ML Old')
     mlscore_real_range = django_filters.NumericRangeFilter('mlscore_real', label='ML Real')
     mlscore_bogus_range = django_filters.NumericRangeFilter('mlscore_bogus', label='ML Bogus')
     localization = LocalizationFilter(label='Localization')
 
     order = django_filters.OrderingFilter(
-        fields=['obsdate', 'ra', 'dec', 'snr', 'mag', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
+        fields=['observation_record__scheduled_start', 'ra', 'dec', 'snr', 'mag', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
         field_labels={
             'snr': 'S/N',
             'mag': 'Magnitude',
-            'obsdate': 'Obs. Date',
+            'observation_record__scheduled_start': 'Obs. Date',
             'mlscore': 'ML Old',
             'mlscore_real': 'ML Real',
             'mlscore_bogus': 'ML Bogus',
@@ -147,7 +160,40 @@ class CSSFieldCredibleRegionFilter(django_filters.FilterSet):
 
 
 class NonLocalizedEventFilter(django_filters.FilterSet):
-    def test_alert_filter(self, queryset, name, hide_test_alerts):
-        return queryset.exclude(event_id__startswith='M') if hide_test_alerts else queryset
-    hide_test_alerts = django_filters.BooleanFilter(label='Exclude test alerts?', method='test_alert_filter',
-                                                       widget=django.forms.CheckboxInput)
+    prefix = django_filters.ChoiceFilter(choices=(('S', 'Real'), ('MS', 'Test')), label='Alert Type',
+                                         field_name='event_id', lookup_expr='startswith')
+    state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')))
+
+    @staticmethod
+    def inv_far_filter(queryset, name, min_inv_far):
+        max_far = 3.168808781402895e-08 / float(min_inv_far)  # yr to 1/Hz
+        return queryset.filter(**{name + '__lte': max_far}).distinct()  # TODO: only look at latest update
+    inv_far_min = django_filters.NumberFilter('sequences__details__far',
+                                              method='inv_far_filter', label='1/FAR', min_value=0.,
+                                              help_text='Significant CBC alerts have 1/FAR > 0.5 yr')
+
+    # classification = django_filters.MultipleChoiceFilter(
+    #     choices=(
+    #         ('BNS', 'BNS'),
+    #         ('NSBH', 'NSBH'),
+    #         ('BBH', 'BBH'),
+    #         ('Burst', 'Burst'),
+    #         ('Terrestrial', 'Terrestrial'),
+    #     ),
+    #     label='Classification(s)',
+    #     help_text="Doesn't currently work",
+    # )
+    distance_max = django_filters.NumberFilter('sequences__localization__distance_mean',
+                                               lookup_expr='lte', label='Distance', min_value=0.,
+                                               distinct=True)  # TODO: only look at latest update
+
+    @staticmethod
+    def percent_gte_decimal(queryset, name, value):
+        """Compare a float to a Django Decimal in a JSON-serializable way"""
+        return queryset.filter(**{name + '__gte': 0.01 * float(value)}).distinct()  # TODO: only look at latest update
+    has_ns_min = django_filters.NumberFilter('sequences__details__properties__HasNS',
+                                             method='percent_gte_decimal', label='HasNS',
+                                             min_value=0., max_value=100., help_text='Very slow')
+    has_remnant_min = django_filters.NumberFilter('sequences__details__properties__HasRemnant',
+                                                  method='percent_gte_decimal', label='HasRemnant',
+                                                  min_value=0., max_value=100., help_text='Very slow')

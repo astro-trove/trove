@@ -50,3 +50,11 @@ def percentformat(value, d=0):
         return f'{value:.{d}%}'
     except ValueError:
         return value
+
+
+@register.filter
+def truncate(string, length=5):
+    if len(string) > length:
+        return string[:length-1] + '.'
+    else:
+        return string

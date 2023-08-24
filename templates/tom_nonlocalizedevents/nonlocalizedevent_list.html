@@ -1,19 +1,20 @@
 {% extends 'tom_common/index.html' %}
-{% load bootstrap4 nonlocalizedevent_extras %}
+{% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras %}
 {% block title %}GW Events{% endblock %}
 {% block content %}
+<h1>GW Events</h1>
 <div class="row">
-    <div class="col-md-6"><h1>GW Event Index</h1></div>
-    <div class="col-md-6 d-flex justify-content-end align-items-baseline">
-    {% if request.GET.hide_test_alerts %}
-        <a href="{% url 'custom_code:nonlocalizedevents' %}" class="btn btn-secondary" title="Show">Show Test Alerts</a>
-    {% else %}
-        <a href="{% url 'custom_code:nonlocalizedevents' %}?hide_test_alerts=on" class="btn btn-secondary" title="Hide">Hide Test Alerts</a>
-    {% endif %}
+    <div class="col-md-12">
+    <form action="" method="get" class="form">
+      {% crispy filter.form %}
+    </form>
     </div>
 </div>
-{% if object_list %}
-  <table class="table">
+<div class="row">
+    <div class="col-md-12">
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    {% if object_list %}
+    <table class="table">
       <thead>
       <tr>
         <th scope="col">Detail Page</th>
@@ -22,8 +23,9 @@
         <th scope="col" title="Distance">Distance</th>
         <th scope="col" title="Has Neutron Star?">NS?</th>
         <th scope="col" title="Has Remnant?">Bright?</th>
-        <th scope="col" title="CSS Fields">CSS</th>
-        <th scope="col" title="CSS Candidates">Cand.</th>
+        <th scope="col" title="Survey Plans">Plans</th>
+        <th scope="col" title="Survey Observations">Obs.</th>
+        <th scope="col" title="Survey Candidates">Cand.</th>
         <th scope="col" title="Hermes">Hermes</th>
         <th scope="col" title="GraceDB">GraceDB</th>
         <th scope="col" title="Gravitational Wave Treasure Map">GWTM</th>
@@ -44,12 +46,12 @@
                 <span title="confirmed">&#x2714;</span> {# heavy check mark emoji #}
             {% endif %}
         </td>
-        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far|format_inverse_far }}</td>
-        <td title="Most Likely Classification">{{ event.sequences.last.details|get_most_likely_class }}</td>
-        <td title="Distance">{{ event.sequences.last.localization|format_distance }}</td>
+        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far | format_inverse_far }}</td>
+        <td title="Most Likely Classification">{{ event.sequences.last.details | get_most_likely_class | truncate }}</td>
+        <td title="Distance">{{ event.sequences.last.localization | format_distance }}</td>
         <td title="Has Neutron Star?">{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
         <td title="Has Remnant?">{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
-        <td title="CSS Fields">
+        <td title="Survey Plans">
         {% for localization in event.localizations.all|dictsort:"id" %}
             {% if localization.external_coincidences.exists %}
                 <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
@@ -65,8 +67,11 @@
             </a>
         {% endfor %}
         </td>
-        <td title="CSS Candidates">
-            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&order=-mlscore_real" target="_blank">Cand.</a>
+        <td title="Survey Observations">
+            <a href="{% url 'surveys:observations' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Obs.</a>
+        </td>
+        <td title="Survey Candidates">
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">Cand.</a>
         </td>
         <td title="Hermes">
           <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
@@ -80,11 +85,14 @@
       </tr>
       {% endfor %}
       </tbody>
-  </table>
-{% else %}
+    </table>
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    {% else %}
     <p>No events have been created. Create Superevents via the admin interface, the REST API,
         or the readstreams management command.</p>
     <p>Coming soon: event creation from the <a href="{% url 'tom_alerts:list' %}">HERMES Alert Broker</a>.</p>
-{% endif %}
+    {% endif %}
+    </div>
+</div>
 
 {% endblock content %}

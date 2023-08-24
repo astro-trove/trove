@@ -3,7 +3,8 @@ from healpix_alchemy.types import Point
 import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base, Session
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile
-from .models import CSSField, CSSFieldCredibleRegion
+from tom_surveys.models import SurveyField
+from .models import SurveyFieldCredibleRegion
 import json
 import logging
 
@@ -14,15 +15,15 @@ CREDIBLE_REGION_PROBABILITIES = sorted(json.loads(settings.CREDIBLE_REGION_PROBA
 Base = declarative_base()
 
 
-class SaCSSField(Base):
-    __tablename__ = 'custom_code_cssfield'
+class SaSurveyField(Base):
+    __tablename__ = 'tom_surveys_surveyfield'
     name = sa.Column(sa.String, primary_key=True)
     healpix = sa.Column(Point)
 
 
-def update_all_credible_region_percents_for_css_fields(eventlocalization):
+def update_all_credible_region_percents_for_survey_fields(eventlocalization):
     """
-    This function creates a credible region linkage for each of the CSS fields in the event localization specified
+    This function creates a credible region linkage for each of the survey fields in the event localization specified
     """
     with Session(sa_engine) as session:
 
@@ -49,21 +50,21 @@ def update_all_credible_region_percents_for_css_fields(eventlocalization):
             ).scalar_subquery()
 
             query = sa.select(
-                SaCSSField.name
+                SaSurveyField.name
             ).filter(
                 SaSkymapTile.localization_id == eventlocalization.id,
-                SaSkymapTile.tile.contains(SaCSSField.healpix),
+                SaSkymapTile.tile.contains(SaSurveyField.healpix),
                 SaSkymapTile.probdensity >= min_probdensity
             )
 
             results = session.execute(query)
 
-            for sa_css_field in results:
-                CSSFieldCredibleRegion.objects.update_or_create(
-                    css_field=CSSField.objects.get(name=sa_css_field[0]),
+            for sa_survey_field in results:
+                SurveyFieldCredibleRegion.objects.update_or_create(
+                    survey_field = SurveyField.objects.get(name=sa_survey_field[0]),
                     localization=eventlocalization,
                     defaults={
                         'smallest_percent': int(prob * 100.0)
                     }
                 )
-    logger.info('Updated credible regions for CSS fields')
+    logger.info('Updated credible regions for survey fields')

@@ -16,11 +16,12 @@ from tom_targets.models import Target, TargetList
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_dataproducts.models import ReducedDatum
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
-from .models import Candidate, CSSFieldCredibleRegion, Profile
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
+from tom_surveys.models import SurveyObservationRecord
+from .models import Candidate, SurveyFieldCredibleRegion, Profile
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm, ProfileUpdateForm
-from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
+from .forms import NonLocalizedEventFormHelper, TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
 
 import json
@@ -446,7 +447,7 @@ class CSSFieldListView(FilterView):
     template_name = 'tom_nonlocalizedevents/cssfield_list.html'
     paginate_by = 100
     strict = False
-    model = CSSFieldCredibleRegion
+    model = SurveyFieldCredibleRegion
     filterset_class = CSSFieldCredibleRegionFilter
 
     def get_eventlocalization(self):
@@ -481,16 +482,11 @@ class CSSFieldListView(FilterView):
 
 
 def generate_prog_file(css_credible_regions):
-    groups = list(css_credible_regions.order_by('group').values_list('group', flat=True).distinct())
-    text = ''
-    for g in groups:
-        group = css_credible_regions.filter(group=g).order_by('rank_in_group')
-        names = [cr.css_field.name for cr in group]
-        text += ','.join(names) + '\n'
-    return text
+    return ','.join([cr.survey_field.name for cr in css_credible_regions]) + '\n'
 
 
-def submit_to_css(text, event_id, request=None):
+def submit_to_css(css_credible_regions, event_id, request=None):
+    filenames = []
     try:
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -498,11 +494,12 @@ def submit_to_css(text, event_id, request=None):
                         disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
             # See https://www.paramiko.org/changelog.html#2.9.0 for why disabled_algorithms is required
             sftp = ssh.open_sftp()
-            for i, line in enumerate(text.splitlines()):
+            for i, group in enumerate(css_credible_regions):
                 filename = f'Saguaro_{event_id}_{i + 1:d}.prog'
+                filenames.append(filename)
                 with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
-                    f.write(line + '\n')
-                banner = f'{filename} submitted to CSS'
+                    f.write(generate_prog_file(group))
+                banner = f'Submitted {filename} to CSS'
                 logger.info(banner)
                 if request is not None:
                     messages.success(request, banner)
@@ -510,48 +507,66 @@ def submit_to_css(text, event_id, request=None):
         logger.error(str(e))
         if request is not None:
             messages.error(request, str(e))
+    return filenames
 
 
-def report_to_treasure_map(css_credible_regions, event_id, status='planned', instrument_id=11, request=None):
+def create_observation_records(css_credible_regions, observation_id, user=None):
+    for group, oid in zip(css_credible_regions, observation_id):
+        for cr in group:
+            record = SurveyObservationRecord.objects.create(
+                survey_field=cr.survey_field,
+                user=user,
+                facility=cr.survey_field.facility,
+                parameters={},
+                observation_id=oid,
+                status='PENDING',
+                scheduled_start=cr.scheduled_start,
+            )
+            cr.observation_record = record
+            cr.save()
+
+
+def report_to_treasure_map(credible_regions, event_id, status='planned', instrument_id=11, request=None):
+    credible_regions = sum(credible_regions, [])  # concatenate groups
     json_data = {
         'api_token': settings.TREASUREMAP_API_KEY,
         'graceid': event_id,
         'pointings': [
             {
-                'ra': cr.css_field.ra,
-                'dec': cr.css_field.dec,
+                'ra': cr.survey_field.ra,
+                'dec': cr.survey_field.dec,
                 'pos_angle': 0.,  # CSS fields have a fixed position angle
                 'instrumentid': instrument_id,  # 11 = MLS10KCCD-CSS
-                'time': cr.first_observable.strftime('%Y-%m-%dT%H:%M:%S'),
+                'time': cr.scheduled_start.strftime('%Y-%m-%dT%H:%M:%S'),
                 'status': status,
                 'depth': 21.5,
                 'depth_unit': 'ab_mag',
                 'band': 'open',
-            } for cr in css_credible_regions
+            } for cr in credible_regions
         ]
     }
     response = requests.post(url=TREASUREMAP_POINTINGS_URL, json=json_data)
     if response.ok:
         response_json = response.json()
         submitted_pointings = response_json['pointing_ids']
-        for cr, treasuremap_id in zip(css_credible_regions, submitted_pointings):
+        for cr, treasuremap_id in zip(credible_regions, submitted_pointings):
             cr.treasuremap_id = treasuremap_id
             cr.save()
         banner = f'Submitted {len(submitted_pointings):d} {status} pointings for {event_id} to the Treasure Map'
         logger.info(banner)
-        if request:
+        if request is not None:
             messages.success(request, banner)
         for error in response_json['ERRORS']:
             logger.error(error)
-            if request:
+            if request is not None:
                 messages.error(request, error)
         for warning in response_json['WARNINGS']:
             logger.warning(warning)
-            if request:
+            if request is not None:
                 messages.warning(request, warning)
     else:
         logger.error(response.text)
-        if request:
+        if request is not None:
             messages.error(request, response.text)
 
 
@@ -561,16 +576,19 @@ class CSSFieldExportView(CSSFieldListView):
     """
     def post(self, request, *args, **kwargs):
         css_credible_regions = self.get_selected_fields(request)
-        text = generate_prog_file(css_credible_regions)
+        text = ''.join([generate_prog_file(group) for group in css_credible_regions])
         return self.render_to_response(text)
 
     def get_selected_fields(self, request):
         target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
         localization = self.get_eventlocalization()
-        css_credible_regions = localization.css_field_credible_regions.filter(group__isnull=False)
+        credible_regions = localization.surveyfieldcredibleregions.filter(group__isnull=False)
         if target_ids is not None:
-            css_credible_regions = css_credible_regions.filter(id__in=target_ids)
-        return css_credible_regions
+            credible_regions = credible_regions.filter(id__in=target_ids)
+        group_numbers = list(credible_regions.order_by('group').values_list('group', flat=True).distinct())
+        # evaluate this as a list now to maintain the order
+        groups = [list(credible_regions.filter(group=g).order_by('rank_in_group')) for g in group_numbers]
+        return groups
 
     def render_to_response(self, text, **response_kwargs):
         """
@@ -597,9 +615,9 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
         Method that handles the POST requests for this view.
         """
         css_credible_regions = self.get_selected_fields(request)
-        text = generate_prog_file(css_credible_regions)
         nle = self.get_nonlocalizedevent()
-        submit_to_css(text, nle.event_id, request=request)
+        filenames = submit_to_css(css_credible_regions, nle.event_id, request=request)
+        create_observation_records(css_credible_regions, observation_id=filenames, user=request.user)
         report_to_treasure_map(css_credible_regions, nle.event_id, request=request)
         return HttpResponseRedirect(self.get_redirect_url())
 
@@ -621,6 +639,14 @@ class NonLocalizedEventListView(FilterView):
     model = NonLocalizedEvent
     template_name = 'tom_nonlocalizedevents/nonlocalizedevent_list.html'
     filterset_class = NonLocalizedEventFilter
+    paginate_by = 100
+    formhelper_class = NonLocalizedEventFormHelper
+
+    def get_filterset(self, filterset_class):
+        kwargs = self.get_filterset_kwargs(filterset_class)
+        filterset = filterset_class(**kwargs)
+        filterset.form.helper = self.formhelper_class()
+        return filterset
 
     def get_queryset(self):
         # '-created' is most recent first
@@ -642,3 +668,29 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
         :rtype: str
         """
         return reverse_lazy('custom_code:profile-update', kwargs={'pk': self.get_object().id})
+
+
+class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
+    """
+    View that handles the association of a target with a NonLocalizedEvent on a button press
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view.
+        """
+        nonlocalizedevent = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
+        target = Target.objects.get(id=self.kwargs['target_id'])
+        viability_reason = f'added from candidates list by {self.request.user.first_name}'
+        EventCandidate.objects.create(nonlocalizedevent=nonlocalizedevent, target=target,
+                                      viability_reason=viability_reason)
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer

@@ -100,8 +100,8 @@ def calculate_footprint_probabilities(skymap, localization):
     flat = bayestar.rasterize(skymap)
     probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
     nside = healpy.npix2nside(len(probs))
-    for cr in localization.css_field_credible_regions.all():
-        pointing_footprint = project_footprint(CSS_FOOTPRINT, cr.css_field.ra, cr.css_field.dec)
+    for cr in localization.surveyfieldcredibleregions.all():
+        pointing_footprint = project_footprint(CSS_FOOTPRINT, cr.survey_field.ra, cr.survey_field.dec)
         ras_poly = [x[0] for x in pointing_footprint][:-1]
         decs_poly = [x[1] for x in pointing_footprint][:-1]
         xyzpoly = spherical_to_cartesian(1, np.deg2rad(decs_poly), np.deg2rad(ras_poly))
@@ -147,7 +147,7 @@ def observable_tonight(target):
 
 def rank_css_fields(queryset, n_select=12, n_groups=3):
     queryset.update(group=None, rank_in_group=None)  # erase any previous ranking
-    queryset = queryset.filter(css_field__has_reference=True).order_by('-probability_contained')
+    queryset = queryset.filter(survey_field__has_reference=True).order_by('-probability_contained')
     fields_remaining = list(queryset)
     for g in range(n_groups):
         adjacent = set()
@@ -155,13 +155,13 @@ def rank_css_fields(queryset, n_select=12, n_groups=3):
             for cr in fields_remaining.copy():
                 if r == 0 or cr in adjacent:
                     fields_remaining.remove(cr)
-                    first_observable = observable_tonight(cr.css_field)
+                    first_observable = observable_tonight(cr.survey_field)
                     if first_observable:
                         cr.group = g + 1
                         cr.rank_in_group = r + 1
-                        cr.first_observable = first_observable.to_datetime(timezone=TimezoneInfo())
+                        cr.scheduled_start = first_observable.to_datetime(timezone=TimezoneInfo())
                         cr.save()
-                        adjacent |= set(queryset.filter(css_field__in=cr.css_field.adjacent.all()))
+                        adjacent |= set(queryset.filter(survey_field__in=cr.survey_field.adjacent.all()))
                         break
             else:
                 logger.warning('No adjacent fields to select')

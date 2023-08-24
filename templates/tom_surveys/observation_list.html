@@ -1,0 +1,58 @@
+{% extends 'tom_common/base.html' %}
+{% load bootstrap4 skymap_extras %}
+{% block title %}Survey Observations{% endblock %}
+{% block content %}
+{% if request.GET.localization_event %}
+<h1>Survey Observations for {{request.GET.localization_event}}</h1>
+<div class="row"><div class="col-md-12">{% skymap_event_id survey_observations=filter.qs %}</div></div>
+{% else %}
+<h1>Survey Observations</h1>
+{% endif %}
+<div class="row">
+  <div class="col-md-10">
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Facility</th>
+          <th>Field</th>
+          <th>Time</th>
+          {% if request.GET.localization_event %}<th>&Delta;t</th>{% endif %}
+          <th>Status</th>
+          <th>Candidates</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for observation in object_list %}
+        <tr>
+          <td>{{ observation.facility }}</td>
+          <td>{{ observation.survey_field.name }}</td>
+          <td>{{ observation.scheduled_start }}</td>
+          {% if request.GET.localization_event %}<td>{{ observation.scheduled_start | time_after_event:request.GET.localization_event }}</td>{% endif %}
+          <td>{{ observation.status }}</td>
+          <td>{{ observation.candidate_set.count }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10">
+            No observations match those filters.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  </div>
+  <div class="col-md-2">
+    <form action="" method="get" class="form">
+      {% bootstrap_form filter.form %}
+      {% buttons %}
+        <button type="submit" class="btn btn-primary">
+          Filter
+        </button>
+        <a href="{% url 'surveys:observations' %}" class="btn btn-secondary" title="Reset">Reset</a>
+      {% endbuttons %}
+    </form>
+  </div>
+</div>
+{% endblock %}
