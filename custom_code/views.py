@@ -509,14 +509,14 @@ def submit_to_css(css_credible_regions, event_id, request=None):
     return filenames
 
 
-def create_observation_records(css_credible_regions, observation_id, user=None):
+def create_observation_records(credible_regions, observation_id, user, facility):
     records = []
-    for group, oid in zip(css_credible_regions, observation_id):
+    for group, oid in zip(credible_regions, observation_id):
         for cr in group:
             record = SurveyObservationRecord.objects.create(
                 survey_field=cr.survey_field,
                 user=user,
-                facility=cr.survey_field.facility,
+                facility=facility,
                 parameters={},
                 observation_id=oid,
                 status='PENDING',
@@ -575,7 +575,7 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
         css_credible_regions = self.get_selected_fields(request)
         nle = self.get_nonlocalizedevent()
         filenames = submit_to_css(css_credible_regions, nle.event_id, request=request)
-        records = create_observation_records(css_credible_regions, observation_id=filenames, user=request.user)
+        records = create_observation_records(css_credible_regions, filenames, request.user, 'CSS')
         response = report_to_treasure_map(records, nle)
         for message in response['SUCCESSES']:
             messages.success(request, message)
