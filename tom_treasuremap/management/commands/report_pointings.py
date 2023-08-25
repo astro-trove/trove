@@ -42,4 +42,5 @@ class Command(BaseCommand):
         for nle in active_nles:
             matching_observations = loc_filter.filter(recent_obs, (nle, contour_percent, lookback_days_nle))
             logger.info(f'Found {len(matching_observations)} pointings matching {nle.event_id}')
-            report_to_treasure_map(matching_observations, nle)
+            if matching_observations.exists():
+                report_to_treasure_map(matching_observations, nle)
