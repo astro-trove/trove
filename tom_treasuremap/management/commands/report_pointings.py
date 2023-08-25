@@ -22,15 +22,14 @@ class Command(BaseCommand):
                             type=float, default=1.)
         parser.add_argument('--contours-percent', help='Report pointings centered within this localization contour',
                             type=float, default=95.)
-        parser.add_argument('--instrument-id', help='The Treasure Map instrument ID for the survey facility',
-                            type=int, default=11)
+        parser.add_argument('--test', action='store_true', help='Report pointings for test events only')
 
-    def handle(self, lookback_days_nle=3., lookback_days_obs=1., contour_percent=95., instrument_id=11):
+    def handle(self, lookback_days_nle=3., lookback_days_obs=1., contour_percent=95., test=False, **kwargs):
         now = Time.now()
         lookback_window_nle = now - (lookback_days_nle + lookback_days_obs) * u.day
         active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle.isot,
                                                        sequences__details__significant=True,
-                                                       event_id__startswith='S').distinct()
+                                                       event_id__startswith='MS' if test else 'S').distinct()
         if not active_nles.exists():
             logger.info('No active nonlocalized events found')
             return
