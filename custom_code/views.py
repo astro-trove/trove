@@ -509,7 +509,7 @@ def submit_to_css(css_credible_regions, event_id, request=None):
     return filenames
 
 
-def create_observation_records(credible_regions, observation_id, user, facility):
+def create_observation_records(credible_regions, observation_id, user, facility, parameters=None):
     records = []
     for group, oid in zip(credible_regions, observation_id):
         for cr in group:
@@ -517,7 +517,7 @@ def create_observation_records(credible_regions, observation_id, user, facility)
                 survey_field=cr.survey_field,
                 user=user,
                 facility=facility,
-                parameters={},
+                parameters=parameters or {},
                 observation_id=oid,
                 status='PENDING',
                 scheduled_start=cr.scheduled_start,
@@ -575,7 +575,8 @@ class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
         css_credible_regions = self.get_selected_fields(request)
         nle = self.get_nonlocalizedevent()
         filenames = submit_to_css(css_credible_regions, nle.event_id, request=request)
-        records = create_observation_records(css_credible_regions, filenames, request.user, 'CSS')
+        params = {'pos_angle': 0., 'depth': 20.5, 'depth_unit': 'ab_mag', 'band': 'open'}
+        records = create_observation_records(css_credible_regions, filenames, request.user, 'CSS', params)
         response = report_to_treasure_map(records, nle)
         for message in response['SUCCESSES']:
             messages.success(request, message)

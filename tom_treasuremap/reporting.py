@@ -20,13 +20,13 @@ def report_to_treasure_map(observation_records, nle):
         pointing = {
             'ra': sor.survey_field.ra,
             'dec': sor.survey_field.dec,
-            'pos_angle': 0.,  # survey fields have a fixed position angle
+            'pos_angle': sor.parameters.get('pos_angle', 0.),
             'instrumentid': TREASUREMAP_INSTRUMENT_IDS.get(sor.facility),
             'time': sor.scheduled_start.strftime('%Y-%m-%dT%H:%M:%S'),
             'status': 'planned' if sor.status == 'PENDING' else sor.status.lower(),  # convert to TM terminology
-            'depth': 21.5,
-            'depth_unit': 'ab_mag',
-            'band': 'open',
+            'depth': sor.parameters.get('depth', 20.5),
+            'depth_unit': sor.parameters.get('depth_unit', 'ab_mag'),
+            'band': sor.parameters.get('band', 'open'),
         }
         new_observations.append(sor)
         json_pointings.append(pointing)
