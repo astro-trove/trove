@@ -18,3 +18,6 @@ class TreasureMapPointing(models.Model):
                 name='unique_nonlocalizedevent_observation_record',
             )
         ]
+
+    def __str__(self):
+        return str(self.treasuremap_id)
