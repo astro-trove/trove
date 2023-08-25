@@ -57,6 +57,8 @@ def skymap(localization, survey_candidates=None, survey_observations=None):
                                                           'observation_record__survey_field__dec'), axis=0)
         extras['survey_candidates'] = survey_candidates
         extras['survey_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
+    else:
+        extras['survey_observations'] = []
 
     # GW skymap
     contour = localization.credible_region_contours.filter(probability=0.9)

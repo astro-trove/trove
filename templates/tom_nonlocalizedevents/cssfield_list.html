@@ -35,7 +35,6 @@
           <th>Ref?</th>
           <th>Prob.</th>
           <th>Rank</th>
-          <th>TM ID</th>
           <th>Requested</th>
           <th>Observable</th>
         </tr>
@@ -50,7 +49,6 @@
           <td>{{ link.survey_field.has_reference }}</td>
           <td>{{ link.probability_contained | floatformat:"6" }}</td>
           <td>{{ link.group }}:{{ link.rank_in_group }}</td>
-          <td>{{ link.treasuremap_id }}</td>
           <td>{{ link.observation_record.created|date:"M d H:i" }}</td>
           <td>{{ link.scheduled_start | date:"M d H:i" }}</td>
         </tr>
