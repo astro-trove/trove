@@ -230,8 +230,11 @@ FACILITIES = {
         },
     },
     'MMT': {
-        'programs': MMT_PROGRAMS,
-    }
+        'programs': {
+            'Binospec': MMT_BINOSPEC_PROGRAMS,
+            'MMIRS': MMT_MMIRS_PROGRAMS,
+        },
+    },
 }
 
 # Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
