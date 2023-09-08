@@ -1,7 +1,7 @@
 from django import template
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from astropy.coordinates import get_sun, get_moon
-from astropy.time import Time
+from astropy.time import Time, TimezoneInfo
 from astroplan import moon_illumination
 import numpy as np
 
@@ -11,8 +11,15 @@ h = w = 5. ** 0.5 / 2.  # half-height and half-width of a 5 deg2 square
 CSS_FOOTPRINT = np.array([[-w, -h], [-w, h], [w, h], [w, -h], [-w, -h]])
 
 
+def centers_to_vertices(centers, footprint):
+    """Calculate the vertices for a pointing from its center and footprint"""
+    cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
+    cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
+    return (centers[:, np.newaxis] + footprint / cos_dec[:, np.newaxis]).tolist()
+
+
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html')
-def skymap(localization, saguaro_candidates=None):
+def skymap(localization, survey_candidates=None, survey_observations=None):
     # sun, moon, and candidates
     now = Time.now()
     current_sun_pos = get_sun(now)
@@ -25,32 +32,33 @@ def skymap(localization, saguaro_candidates=None):
         'current_moon_dec': current_moon_pos.dec.deg,
         'current_moon_exclusion': current_moon_exclusion,
         'candidates': localization.nonlocalizedevent.candidates.all(),
-        'saguaro_candidates': saguaro_candidates,
     }
 
-    # CSS fields
-    fields = localization.css_field_credible_regions.filter(group__isnull=False)
+    # potential survey fields
+    fields = localization.surveyfieldcredibleregions.filter(group__isnull=False)
     if fields.exists():
         groups = list(fields.order_by('group').values_list('group', flat=True).distinct())
         vertices = []
         for g in groups:
-            centers = np.array(fields.filter(group=g).values_list('css_field__ra', 'css_field__dec'))
+            centers = np.array(fields.filter(group=g).values_list('survey_field__ra', 'survey_field__dec'))
             cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
             cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
             vertices.append((centers[:, np.newaxis] + CSS_FOOTPRINT / cos_dec[:, np.newaxis]).tolist())
-        extras['css_fields'] = vertices
+        extras['survey_fields'] = vertices
     else:
-        extras['css_fields'] = []
+        extras['survey_fields'] = []
 
-    # observed CSS fields
-    if saguaro_candidates is not None and saguaro_candidates.exists():
-        centers = np.unique(saguaro_candidates.values_list('field__ra', 'field__dec'), axis=0)
-        cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
-        cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
-        vertices = (centers[:, np.newaxis] + CSS_FOOTPRINT / cos_dec[:, np.newaxis]).tolist()
-        extras['observed_css_fields'] = vertices
+    # observed survey fields candidates
+    if survey_observations is not None and survey_observations.exists():
+        centers = np.unique(survey_observations.values_list('survey_field__ra', 'survey_field__dec'), axis=0)
+        extras['survey_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
+    elif survey_candidates is not None and survey_candidates.exists():
+        centers = np.unique(survey_candidates.values_list('observation_record__survey_field__ra',
+                                                          'observation_record__survey_field__dec'), axis=0)
+        extras['survey_candidates'] = survey_candidates
+        extras['survey_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
     else:
-        extras['observed_css_fields'] = []
+        extras['survey_observations'] = []
 
     # GW skymap
     contour = localization.credible_region_contours.filter(probability=0.9)
@@ -63,10 +71,18 @@ def skymap(localization, saguaro_candidates=None):
 
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html', takes_context=True)
-def skymap_event_id(context, saguaro_candidates):
+def skymap_event_id(context, survey_candidates=None, survey_observations=None):
     event_id = context['request'].GET.get('localization_event')
     if event_id is None:
         return
     nle = NonLocalizedEvent.objects.get(event_id=event_id)
     seq = nle.sequences.last()
-    return skymap(seq.localization, saguaro_candidates)
+    return skymap(seq.localization, survey_candidates, survey_observations)
+
+
+@register.filter
+def time_after_event(time, event_id, unit='hour', precision=1):
+    nle = NonLocalizedEvent.objects.get(event_id=event_id)
+    seq = nle.sequences.last()
+    dt = Time(time) - Time(seq.details['time'])
+    return dt.to(unit).to_string(precision=precision)

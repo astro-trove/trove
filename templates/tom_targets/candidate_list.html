@@ -4,7 +4,7 @@
 {% block content %}
 {% if request.GET.localization_event %}
 <h1>Candidates for {{request.GET.localization_event}}</h1>
-<div class="row"><div class="col-md-12">{% skymap_event_id filter.qs %}</div></div>
+<div class="row"><div class="col-md-12">{% skymap_event_id survey_candidates=filter.qs %}</div></div>
 {% else %}
 <h1>Candidates</h1>
 {% endif %}
@@ -36,8 +36,21 @@
             {% else %}
               None
             {% endif %}
+            {% for event_candidate in candidate.target.eventcandidate_set.all %}
+                <br />
+                {% if not event_candidate.viable %}<strike>{% endif %}
+                &#x1F517;<a href="{% url 'nonlocalizedevents:event-detail' event_candidate.nonlocalizedevent.event_id %}" target="_blank">{{ event_candidate.nonlocalizedevent.event_id }}</a>
+                {% if not event_candidate.viable %}</strike>{% endif %}
+            {% empty %}
+                {% if request.GET.localization_event %}
+                    <br />
+                    <a href="{% url 'custom_code:create-candidate' event_id=request.GET.localization_event target_id=candidate.target.id %}" class="btn btn-primary">
+                        Link {{ request.GET.localization_event }}
+                    </a>
+                {% endif %}
+            {% endfor %}
           </td>
-          <td>{{ candidate.obsdate|date:"m-d" }}</td>
+          <td>{{ candidate.observation_record.scheduled_start|date:"m-d" }}</td>
           <td>{{ candidate.mag|floatformat:"1" }}</td>
           <td>{{ candidate.fwhm|floatformat:"1" }}</td>
           <td>{{ candidate.snr|floatformat:"1" }}</td>

@@ -44,5 +44,6 @@ SLACK_URLS = [  # list of lists of Slack URLs for incoming webhooks
     ],
 ]
 TNS_API_KEY = ''        # API key for the Transient Name Server
+TREASUREMAP_API_KEY = '' # API key for the Gravitational Wave Treasure Map
 TWILIO_ACCOUNT_SID = '' # account ID for Twilio text message alerts
 TWILIO_AUTH_TOKEN = ''  # authorization token for Twilio text message alerts

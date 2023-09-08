@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from phonenumber_field.modelfields import PhoneNumberField
 from tom_targets.models import Target, TargetList
 from tom_nonlocalizedevents.models import EventLocalization
+from tom_surveys.models import SurveyField, SurveyObservationRecord
 
 
 def _target_list_save(self, *args, **kwargs):
@@ -111,28 +112,8 @@ class TargetListExtra(models.Model):
         return self.value
 
 
-class CSSField(models.Model):
-    name = models.CharField(max_length=6, primary_key=True)
-    ra = models.FloatField()
-    dec = models.FloatField()
-    ecliptic_lng = models.FloatField()
-    ecliptic_lat = models.FloatField()
-    galactic_lng = models.FloatField()
-    galactic_lat = models.FloatField()
-    healpix = models.BigIntegerField()
-    adjacent = models.ManyToManyField('self')
-    has_reference = models.BooleanField(default=False)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        ordering = ['name']
-
-
 class Candidate(models.Model):
     candidatenumber = models.IntegerField(null=True)
-    filename = models.CharField(max_length=128, null=True)
     elongation = models.FloatField(null=True)
     ra = models.FloatField(null=True)
     dec = models.FloatField(null=True)
@@ -140,31 +121,24 @@ class Candidate(models.Model):
     snr = models.FloatField(null=True)
     mag = models.FloatField(null=True)
     magerr = models.FloatField(null=True)
-    rawfilename = models.CharField(max_length=128, null=True)
-    obsdate = models.DateTimeField(null=False, default=datetime.now)
-    field = models.ForeignKey(CSSField, null=True, on_delete=models.SET_NULL, db_column='field')
     classification = models.IntegerField(null=True)
     cx = models.FloatField(null=True)
     cy = models.FloatField(null=True)
     cz = models.FloatField(null=True)
-    htm16id = models.BigIntegerField(null=True)
     target = models.ForeignKey(Target, null=True, on_delete=models.SET_NULL, db_column='targetid')
-    mjdmid = models.FloatField(null=True)
     mlscore = models.FloatField(null=True)
     mlscore_real = models.FloatField(null=True)
     mlscore_bogus = models.FloatField(null=True)
-    ncombine = models.IntegerField(null=True)
-    gladeid = models.IntegerField(null=True)
-    exclude = models.IntegerField(null=True)
+    observation_record = models.ForeignKey(SurveyObservationRecord, null=True, on_delete=models.DO_NOTHING)
 
     class Meta:
         db_table = 'candidates'
-        ordering = ['-obsdate', '-candidatenumber']
 
 
-class CSSFieldCredibleRegion(models.Model):
-    localization = models.ForeignKey(EventLocalization, related_name='css_field_credible_regions', on_delete=models.CASCADE)
-    css_field = models.ForeignKey(CSSField, related_name='css_field_credible_regions', on_delete=models.CASCADE)
+class SurveyFieldCredibleRegion(models.Model):
+    localization = models.ForeignKey(EventLocalization, related_name='surveyfieldcredibleregions', on_delete=models.CASCADE)
+    survey_field = models.ForeignKey(SurveyField, related_name='credibleregions', on_delete=models.CASCADE)
+    observation_record = models.ForeignKey(SurveyObservationRecord, null=True, on_delete=models.SET_NULL)
 
     smallest_percent = models.IntegerField(
         default=100,
@@ -173,10 +147,11 @@ class CSSFieldCredibleRegion(models.Model):
     probability_contained = models.FloatField(null=True)
     group = models.IntegerField(null=True)
     rank_in_group = models.IntegerField(null=True)
+    scheduled_start = models.DateTimeField(null=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['localization', 'css_field'], name='unique_localization_css_field')
+            models.UniqueConstraint(fields=['localization', 'survey_field'], name='unique_localization_survey_field')
         ]
         ordering = ['-probability_contained']
 

@@ -3,7 +3,7 @@ import healpy
 from ligo.skymap import bayestar
 from astroplan import moon_illumination
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_moon, get_sun, spherical_to_cartesian
-from astropy.time import Time
+from astropy.time import Time, TimezoneInfo
 from astropy import units as u
 import logging
 
@@ -100,8 +100,8 @@ def calculate_footprint_probabilities(skymap, localization):
     flat = bayestar.rasterize(skymap)
     probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
     nside = healpy.npix2nside(len(probs))
-    for cr in localization.css_field_credible_regions.all():
-        pointing_footprint = project_footprint(CSS_FOOTPRINT, cr.css_field.ra, cr.css_field.dec)
+    for cr in localization.surveyfieldcredibleregions.all():
+        pointing_footprint = project_footprint(CSS_FOOTPRINT, cr.survey_field.ra, cr.survey_field.dec)
         ras_poly = [x[0] for x in pointing_footprint][:-1]
         decs_poly = [x[1] for x in pointing_footprint][:-1]
         xyzpoly = spherical_to_cartesian(1, np.deg2rad(decs_poly), np.deg2rad(ras_poly))
@@ -118,6 +118,12 @@ CSS_LOCATION = EarthLocation(lat=32.4433333333 * u.deg, lon=-110.788888889 * u.d
 
 
 def observable_tonight(target):
+    """
+    Determine the first time during the ongoing (if run at night) or upcoming (if run during the day) night that the
+    target is above the horizon and outside the moon restriction. If the target is not visible during the ongoing or
+    upcoming night, including if the target has already set during the ongoing night, return False. This function has
+    30-minute resolution.
+    """
     radec = SkyCoord(target.ra, target.dec, unit=u.deg)
     time = Time.now() + np.linspace(0., 1 * u.day, 48)
     frame = AltAz(obstime=time, location=CSS_LOCATION)
@@ -135,12 +141,13 @@ def observable_tonight(target):
     moon_far = moon_altaz.separation(altaz) > (3. + 42. * moon_illumination(time)) * u.deg
 
     observable = target_up & (moon_far | moon_down)
-    return observable[now_or_sunset:sunrise].any()
+    observable = observable[now_or_sunset:sunrise]
+    return observable.any() and time[now_or_sunset + np.flatnonzero(observable).min()]
 
 
 def rank_css_fields(queryset, n_select=12, n_groups=3):
     queryset.update(group=None, rank_in_group=None)  # erase any previous ranking
-    queryset = queryset.filter(css_field__has_reference=True).order_by('-probability_contained')
+    queryset = queryset.filter(survey_field__has_reference=True).order_by('-probability_contained')
     fields_remaining = list(queryset)
     for g in range(n_groups):
         adjacent = set()
@@ -148,11 +155,13 @@ def rank_css_fields(queryset, n_select=12, n_groups=3):
             for cr in fields_remaining.copy():
                 if r == 0 or cr in adjacent:
                     fields_remaining.remove(cr)
-                    if observable_tonight(cr.css_field):
+                    first_observable = observable_tonight(cr.survey_field)
+                    if first_observable:
                         cr.group = g + 1
                         cr.rank_in_group = r + 1
+                        cr.scheduled_start = first_observable.to_datetime(timezone=TimezoneInfo())
                         cr.save()
-                        adjacent |= set(queryset.filter(css_field__in=cr.css_field.adjacent.all()))
+                        adjacent |= set(queryset.filter(survey_field__in=cr.survey_field.adjacent.all()))
                         break
             else:
                 logger.warning('No adjacent fields to select')

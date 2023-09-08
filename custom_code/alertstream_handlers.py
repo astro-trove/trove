@@ -8,7 +8,7 @@ import smtplib
 import logging
 import json
 from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, get_most_likely_class
-from .healpix_utils import update_all_credible_region_percents_for_css_fields
+from .healpix_utils import update_all_credible_region_percents_for_survey_fields
 from .cssfield_selection import calculate_footprint_probabilities
 from .models import CredibleRegionContour, Profile
 from astropy.table import Table
@@ -211,7 +211,7 @@ def handle_message_and_send_alerts(message, metadata):
         if CredibleRegionContour.objects.filter(localization=localization).exists():
             logger.info(f'Localization {localization.id} already exists')
         else:
-            update_all_credible_region_percents_for_css_fields(localization)
+            update_all_credible_region_percents_for_survey_fields(localization)
             if skymap_bytes is not None:
                 skymap = Table.read(BytesIO(skymap_bytes))
                 calculate_credible_region(skymap, localization)

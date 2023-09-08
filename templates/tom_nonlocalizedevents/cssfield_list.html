@@ -1,9 +1,9 @@
 {% extends 'tom_common/base.html' %}
 {% load bootstrap4 skymap_extras targets_extras %}
-{% block title %}CSS Fields{% endblock %}
+{% block title %}Survey Plans{% endblock %}
 {% block content %}
 <h1>
-    CSS Fields for {{ nonlocalizedevent.event_id }}
+    Survey Plans for {{ nonlocalizedevent.event_id }}
     {% if eventlocalization.external_coincidences.exists %}
         {{ eventlocalization.external_coincidences.last.sequences.last.event_subtype.title }}
         {{ eventlocalization.external_coincidences.last.sequences.last.sequence_id }} Combined
@@ -34,21 +34,23 @@
           <th>Dec.</th>
           <th>Ref?</th>
           <th>Prob.</th>
-          <th>Group</th>
           <th>Rank</th>
+          <th>Requested</th>
+          <th>Observable</th>
         </tr>
       </thead>
       <tbody>
         {% for link in object_list %}
         <tr>
           <td><input type="checkbox" name="selected-target" value="{{ link.id }}" onClick="single_select()" checked /></td>
-          <td>{{ link.css_field.name }}</td>
-          <td>{{ link.css_field.ra|floatformat:"6" }}</td>
-          <td>{{ link.css_field.dec|floatformat:"6" }}</td>
-          <td>{{ link.css_field.has_reference }}</td>
-          <td>{{ link.probability_contained|floatformat:"6" }}</td>
-          <td>{{ link.group }}</td>
-          <td>{{ link.rank_in_group }}</td>
+          <td>{{ link.survey_field.name }}</td>
+          <td>{{ link.survey_field.ra | floatformat:"6" }}</td>
+          <td>{{ link.survey_field.dec | floatformat:"6" }}</td>
+          <td>{{ link.survey_field.has_reference }}</td>
+          <td>{{ link.probability_contained | floatformat:"6" }}</td>
+          <td>{{ link.group }}:{{ link.rank_in_group }}</td>
+          <td>{{ link.observation_record.created|date:"M d H:i" }}</td>
+          <td>{{ link.scheduled_start | date:"M d H:i" }}</td>
         </tr>
         {% empty %}
         <tr>
