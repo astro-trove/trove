@@ -27,7 +27,7 @@
         <tr>
           <td>{{ observation.facility }}</td>
           <td>{{ observation.survey_field.name }}</td>
-          <td>{{ observation.scheduled_start }}</td>
+          <td>{{ observation.scheduled_start | date:"Y-m-d H:i:s" }}</td>
           {% if request.GET.localization_event %}<td>{{ observation.scheduled_start | time_after_event:request.GET.localization_event }}</td>{% endif %}
           <td>{{ observation.status }}</td>
           <td>{{ observation.candidate_set.count }}</td>
