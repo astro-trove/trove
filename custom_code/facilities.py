@@ -1,5 +1,5 @@
-from tom_mmt.mmt import MMTBaseObservationForm, MMTImagingForm, MMTMMIRSImagingForm, MMTSpectroscopyForm, \
-                        MMTMMIRSSpectroscopyForm, MMTFacility
+from tom_mmt.mmt import (MMTBinospecObservationForm, MMTBinospecImagingForm, MMTBinospecSpectroscopyForm,
+                         MMTMMIRSObservationForm, MMTMMIRSImagingForm, MMTMMIRSSpectroscopyForm, MMTFacility)
 from crispy_forms.layout import Layout, HTML
 from django.conf import settings
 
@@ -12,22 +12,22 @@ MMIRS_NOTE = 'Please use a random 30" dither pattern (4 exposures per position i
              'We do not care about the position angle so adjust as needed for the guide star.'
 
 
-class CustomBinospecObservationForm(MMTBaseObservationForm):
+class CustomBinospecObservationForm(MMTBinospecObservationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'notes' not in kwargs['initial']:
             kwargs['initial']['notes'] = SAGUARO_NOTE
 
 
-class CustomBinospecImagingForm(CustomBinospecObservationForm, MMTImagingForm):
+class CustomBinospecImagingForm(CustomBinospecObservationForm, MMTBinospecImagingForm):
     pass
 
 
-class CustomBinospecSpectroscopyForm(CustomBinospecObservationForm, MMTSpectroscopyForm):
+class CustomBinospecSpectroscopyForm(CustomBinospecObservationForm, MMTBinospecSpectroscopyForm):
     pass
 
 
-class CustomMMIRSObservationForm(MMTBaseObservationForm):
+class CustomMMIRSObservationForm(MMTMMIRSObservationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'notes' not in kwargs['initial']:
