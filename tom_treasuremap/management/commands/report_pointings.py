@@ -29,6 +29,7 @@ class Command(BaseCommand):
         lookback_window_nle = now - (lookback_days_nle + lookback_days_obs) * u.day
         active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle.isot,
                                                        sequences__details__significant=True,
+                                                       state='ACTIVE',
                                                        event_id__startswith='MS' if test else 'S').distinct()
         if not active_nles.exists():
             logger.info('No active nonlocalized events found')
