@@ -1,5 +1,5 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 candidate_extras skymap_extras %}
+{% load bootstrap4 crispy_forms_tags candidate_extras skymap_extras %}
 {% block title %}Candidates{% endblock %}
 {% block content %}
 {% if request.GET.localization_event %}
@@ -9,7 +9,14 @@
 <h1>Candidates</h1>
 {% endif %}
 <div class="row">
-  <div class="col-md-10">
+    <div class="col-md-12">
+        <form action="" method="get" class="form">
+            {% crispy filter.form %}
+        </form>
+    </div>
+</div>
+<div class="row">
+  <div class="col-md-12">
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     <table class="table table-hover">
       <thead>
@@ -25,6 +32,7 @@
           <th>Image</th>
           <th>Reference</th>
           <th>Difference</th>
+          <th><i>S</i><sub>corr</sub></th>
         </tr>
       </thead>
       <tbody>
@@ -60,6 +68,7 @@
           <td><img alt="new image" src="{{ candidate|thumbnail_url:'img' }}" height="80"></td>
           <td><img alt="reference image" src="{{ candidate|thumbnail_url:'ref' }}" height="80"></td>
           <td><img alt="difference image" src="{{ candidate|thumbnail_url:'diff' }}" height="80"></td>
+          <td><img alt="Scorr image" src="{{ candidate|thumbnail_url:'scorr' }}" height="80"></td>
         </tr>
         {% empty %}
         <tr>
@@ -75,16 +84,6 @@
       </tbody>
     </table>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
-  </div>
-  {{ filter.fields }}
-  <div class="col-md-2">
-    <form action="" method="get" class="form">
-      {% bootstrap_form filter.form %}
-      {% buttons %}
-      <button type="submit" class="btn btn-primary">Filter</button>
-      <a href="{% url 'custom_code:candidates' %}" class="btn btn-secondary" title="Reset">Reset</a>
-      {% endbuttons %}
-    </form>
   </div>
 </div>
 {% endblock %}

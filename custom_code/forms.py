@@ -312,3 +312,30 @@ class NonLocalizedEventFormHelper(FormHelper):
                 )
             )
         )
+
+
+class CandidateFormHelper(FormHelper):
+    layout = Layout(
+        Row(
+            Column('obsdate_range'),
+            Column('mag_range'),
+            Column('snr_range'),
+            Column('mlscore_range'),
+            Column('mlscore_real_range'),
+            Column('mlscore_bogus_range'),
+        ),
+        Row(
+            Column('cone_search'),
+            Column('observation_record__survey_field'),
+            Column('classification'),
+            Column('localization'),
+            Column('order', css_class='col-md-4'),
+        ),
+        Row(
+            Column(
+                Submit('submit', 'Filter'),
+                HTML('<a href="{% url \'custom_code:candidates\' %}" class="btn btn-secondary" title="Reset">Reset</a>'),
+                css_class='text-right',
+            )
+        )
+    )

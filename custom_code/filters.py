@@ -95,7 +95,7 @@ class CandidateFilter(django_filters.FilterSet):
 
     observation_record__survey_field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects, label='Survey Field')
     classification = django_filters.ChoiceFilter(choices=[(0, 'Transient'), (1, 'Moving Object')])
-    snr_min = django_filters.NumberFilter('snr', 'gte', label='Min. S/N')
+    snr_range = django_filters.NumericRangeFilter('snr', label='S/N')
     mag_range = django_filters.NumericRangeFilter('mag', label='Magnitude')
     obsdate_range = django_filters.DateTimeFromToRangeFilter('observation_record__scheduled_start', label='Obs. Date')
     mlscore_range = django_filters.NumericRangeFilter('mlscore', 'gte', label='ML Old')

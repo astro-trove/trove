@@ -36,7 +36,7 @@ def candidates_table(target):
     """
     Displays a table of all the candidates (detections) associated with a given target, including thumbnails
     """
-    candidates = Candidate.objects.filter(target=target).all()
+    candidates = Candidate.objects.filter(target=target).order_by('-observation_record__scheduled_start')
     return {'candidates': candidates}
 
 
