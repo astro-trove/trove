@@ -6,9 +6,6 @@
   </div>
   <div class="col-md-12">
     <a href="{% url 'custom_code:runatlasfp'  pk=target.id %}" class="btn btn-info" title="Run ATLAS forced phot.">Get ATLAS phot.</a>
-    {% if target.name|slice:":2" == "AT" or target.name|slice:":2" == "SN" %}
-      <a href="{% url 'custom_code:runtnsphot'  pk=target.id %}" class="btn btn-info" title="If TNS candidate, get photometry">Get TNS phot.</a>
-    {% endif %}
     <a href="{% url 'dataproducts:update-reduced-data' %}?target_id={{ target.id }}" class="btn btn-primary" title="Update Targets">Check for new data</a>
   </div>
 </div>

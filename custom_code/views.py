@@ -31,7 +31,7 @@ import requests
 import time
 from io import StringIO
 
-from kne_cand_vetting.survey_phot import ATLAS_forcedphot, query_TNSphot
+from kne_cand_vetting.survey_phot import ATLAS_forcedphot
 import numpy as np
 from astropy.time import Time, TimezoneInfo
 import paramiko
@@ -369,47 +369,6 @@ class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
                     timestamp=mjd.to_datetime(timezone=TimezoneInfo()),
                     value=value,
                     source_name='ATLAS',
-                    data_type='photometry',
-                    target=target)
-
-        return HttpResponseRedirect(self.get_redirect_url())
-
-    def get_redirect_url(self):
-        """
-        Returns redirect URL as specified in the HTTP_REFERER field of the request.
-
-        :returns: referer
-        :rtype: str
-        """
-        referer = self.request.META.get('HTTP_REFERER', '/')
-        return referer
-
-class TargetTNSPhotometry(LoginRequiredMixin, RedirectView):
-    """
-    View that pulls photometry from TNS and stores result.
-    """
-    def get(self, request, *args, **kwargs):
-        """
-        Method that handles the GET requests for this view. Calls the function to get photometry from TNS.
-        Separates detections and non-detections.
-        """
-        target = Target.objects.get(pk=kwargs['pk'])
-        if target.name.startswith('AT') or target.name.startswith('SN'):
-            tnsphot = query_TNSphot(target.name[2:], TNS['bot_id'], TNS['bot_name'], TNS['api_key'])
-
-            for candidate in tnsphot:
-                jd = Time(candidate['jd'], format='jd', scale='utc')
-                value = {'filter': candidate['F']}
-                if candidate['mag']:  # detection
-                    value['magnitude'] = candidate['mag']
-                else:
-                    value['limit'] = candidate['limflux']
-                if candidate['magerr']:  # not empty or zero
-                    value['error'] = candidate['magerr']
-                rd, _ = ReducedDatum.objects.get_or_create(
-                    timestamp=jd.to_datetime(timezone=TimezoneInfo()),
-                    value=value,
-                    source_name=candidate['tel']+' (TNS)',
                     data_type='photometry',
                     target=target)
 

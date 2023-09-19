@@ -1,7 +1,7 @@
 import logging
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
-from kne_cand_vetting.survey_phot import query_ZTFpubphot
+from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
 from tom_targets.models import TargetExtra
 from tom_dataproducts.models import ReducedDatum
 import json
@@ -81,6 +81,27 @@ def target_post_save(target, created):
             if redshift is not None and target.extra_fields.get('Redshift') != redshift:
                 update_or_create_target_extra(target, 'Redshift', redshift)
                 messages.append(f"Redshift set to {redshift}")
+
+            tnsphot = query_TNSphot(target.name[2:],  # remove prefix
+                                    settings.BROKERS['TNS']['bot_id'],
+                                    settings.BROKERS['TNS']['bot_name'],
+                                    settings.BROKERS['TNS']['api_key'])
+
+            for candidate in tnsphot:
+                jd = Time(candidate['jd'], format='jd', scale='utc')
+                value = {'filter': candidate['F']}
+                if candidate['mag']:  # detection
+                    value['magnitude'] = candidate['mag']
+                else:
+                    value['limit'] = candidate['limflux']
+                if candidate['magerr']:  # not empty or zero
+                    value['error'] = candidate['magerr']
+                rd, _ = ReducedDatum.objects.get_or_create(
+                    timestamp=jd.to_datetime(timezone=TimezoneInfo()),
+                    value=value,
+                    source_name=candidate['tel']+' (TNS)',
+                    data_type='photometry',
+                    target=target)
 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
         if qso[0] != 'None':
