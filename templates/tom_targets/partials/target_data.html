@@ -12,6 +12,14 @@
       <dd class="col-sm-9">{{ target_name }}</dd>
     {% endif %}
   {% endfor %}
+  {% for event_candidate in target.eventcandidate_set.all %}
+    <dt class="col-sm-3">&nbsp;</dt>
+    <dd class="col-sm-9">
+      {% if not event_candidate.viable %}<strike>{% endif %}
+      &#x1F517;<a href="{% url 'nonlocalizedevents:event-detail' event_candidate.nonlocalizedevent.event_id %}" target="_blank">{{ event_candidate.nonlocalizedevent.event_id }}</a>
+      {% if not event_candidate.viable %}</strike>{% endif %}
+    </dd>
+  {% endfor %}
   <dt class="col-sm-3">Coords.</dt>
   <dd class="col-sm-4">{{ target.ra|deg_to_sexigesimal:"hms" }}</dd>
   <dd class="col-sm-5">{{ target.dec|deg_to_sexigesimal:"dms" }}</dd>
