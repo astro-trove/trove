@@ -6,6 +6,7 @@ import plotly.graph_objs as go
 from plotly import colors
 from tom_dataproducts.models import ReducedDatum
 import numpy as np
+from datetime import datetime
 
 register = template.Library()
 
@@ -223,6 +224,11 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
         }
     )
     fig = go.Figure(data=plot_data, layout=layout)
+
+    for candidate in target.eventcandidate_set.all():
+        t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+        fig.add_vline(t0.timestamp() * 1000., annotation_text=candidate.nonlocalizedevent.event_id)
+
     return {
         'target': target,
         'plot': offline.plot(fig, output_type='div', show_link=False)
