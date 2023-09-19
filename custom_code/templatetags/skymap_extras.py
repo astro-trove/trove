@@ -13,10 +13,12 @@ CSS_FOOTPRINT = np.array([[-w, -h], [-w, h], [w, h], [w, -h], [-w, -h]])
 
 def centers_to_vertices(centers, footprint):
     """Calculate the vertices for a pointing from its center and footprint"""
-    cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
-    cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
-    return (centers[:, np.newaxis] + footprint / cos_dec[:, np.newaxis]).tolist()
-
+    if centers.size:
+        cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
+        cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
+        return (centers[:, np.newaxis] + footprint / cos_dec[:, np.newaxis]).tolist()
+    else:
+        return []
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html')
 def skymap(localization, survey_candidates=None, survey_observations=None):
@@ -50,15 +52,21 @@ def skymap(localization, survey_candidates=None, survey_observations=None):
 
     # observed survey fields candidates
     if survey_observations is not None and survey_observations.exists():
-        centers = np.unique(survey_observations.values_list('survey_field__ra', 'survey_field__dec'), axis=0)
-        extras['survey_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
+        centers = np.unique(survey_observations.filter(status='PENDING')
+                            .values_list('survey_field__ra', 'survey_field__dec'), axis=0)
+        extras['pending_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
+        centers = np.unique(survey_observations.filter(status='COMPLETED')
+                            .values_list('survey_field__ra', 'survey_field__dec'), axis=0)
+        extras['completed_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
     elif survey_candidates is not None and survey_candidates.exists():
         centers = np.unique(survey_candidates.values_list('observation_record__survey_field__ra',
                                                           'observation_record__survey_field__dec'), axis=0)
         extras['survey_candidates'] = survey_candidates
-        extras['survey_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
+        extras['pending_observations'] = []
+        extras['completed_observations'] = centers_to_vertices(centers, CSS_FOOTPRINT)
     else:
-        extras['survey_observations'] = []
+        extras['pending_observations'] = []
+        extras['completed_observations'] = []
 
     # GW skymap
     contour = localization.credible_region_contours.filter(probability=0.9)

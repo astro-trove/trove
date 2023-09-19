@@ -4,43 +4,27 @@
     var aladin;
 A.init.then(() => {
     aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
-    var survey_candidates = A.catalog({name: 'Survey Candidates'});
-    aladin.addCatalog(survey_candidates);
-    {% for candidate in survey_candidates|slice:":100" %}
-        var cat_ra = {{ candidate.target.ra }};
-        var cat_dec = {{ candidate.target.dec }};
-        var cat_name = '{{ candidate.target.name }}'
-        survey_candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
-    {% endfor %}
-    var candidates = A.catalog({name: 'Candidates'});
-    aladin.addCatalog(candidates);
-    {% for candidate in candidates %}
-        var cat_ra = {{ candidate.target.ra }};
-        var cat_dec = {{ candidate.target.dec }};
-        var cat_name = '{{ candidate.target.name }}'
-        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
-    {% endfor %}
-    var sun_ra = {{ current_sun_ra }};
-    var sun_dec = {{ current_sun_dec }};
-    var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun Exclusion'});
-    aladin.addOverlay(sun_overlay);
-    sun_overlay.add(A.circle(sun_ra, sun_dec, 15));
-    var sun_cat = A.catalog({color: '#ffd700', name: 'Sun'});
-    aladin.addCatalog(sun_cat);
-    sun_cat.addSources([A.marker(sun_ra, sun_dec, {popupTitle: "Sun's Current Position"})]);
     var moon_ra = {{ current_moon_ra }};
     var moon_dec = {{ current_moon_dec }};
     var moon_excl = {{ current_moon_exclusion }};
-    var moon_overlay = A.graphicOverlay({color: '#d3d3d3', name: 'Moon Exclusion'});
-    aladin.addOverlay(moon_overlay);
-    moon_overlay.add(A.circle(moon_ra, moon_dec, moon_excl));
     var moon_cat = A.catalog({color: '#d3d3d3', name: 'Moon'});
     aladin.addCatalog(moon_cat);
     moon_cat.addSources([A.marker(moon_ra, moon_dec, {popupTitle: "Moon's Current Position"})]);
+    var moon_overlay = A.graphicOverlay({color: '#d3d3d3', name: 'Moon Exclusion'});
+    aladin.addOverlay(moon_overlay);
+    moon_overlay.add(A.circle(moon_ra, moon_dec, moon_excl));
+    var sun_ra = {{ current_sun_ra }};
+    var sun_dec = {{ current_sun_dec }};
+    var sun_cat = A.catalog({color: '#ffd700', name: 'Sun'});
+    aladin.addCatalog(sun_cat);
+    sun_cat.addSources([A.marker(sun_ra, sun_dec, {popupTitle: "Sun's Current Position"})]);
+    var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun Exclusion'});
+    aladin.addOverlay(sun_overlay);
+    sun_overlay.add(A.circle(sun_ra, sun_dec, 15));
     var survey_fields = {{ survey_fields }};
-    var survey_field_colors = ['#f00', '#0f0', '#00f']
+    var survey_field_colors = ['#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff']
     for (let g in survey_fields) {
-        var color = survey_field_colors[g];
+        var color = survey_field_colors[g % 6];
         var group = survey_fields[g];
         g++;
         var fields_overlay = A.graphicOverlay({color: color, name: 'Survey Fields ' + g});
@@ -49,12 +33,34 @@ A.init.then(() => {
             fields_overlay.add(A.polyline(group[i]));
         }
     }
-    var survey_observations = {{ survey_observations }};
-    var observed_fields_overlay = A.graphicOverlay({color: '#0ff', name: 'Survey Observations'});
-    aladin.addOverlay(observed_fields_overlay);
-    for (let i in survey_observations) {
-        observed_fields_overlay.add(A.polyline(survey_observations[i]));
+    var pending_observations = {{ pending_observations }};
+    var pending_fields_overlay = A.graphicOverlay({color: '#aaa', name: 'Pending Observations'});
+    aladin.addOverlay(pending_fields_overlay);
+    for (let i in pending_observations) {
+        pending_fields_overlay.add(A.polyline(pending_observations[i]));
     }
+    var survey_candidates = A.catalog({color: '#eee', name: 'Survey Candidates'});
+    aladin.addCatalog(survey_candidates);
+    {% for candidate in survey_candidates|slice:":100" %}
+        var cat_ra = {{ candidate.target.ra }};
+        var cat_dec = {{ candidate.target.dec }};
+        var cat_name = '{{ candidate.target.name }}'
+        survey_candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+    {% endfor %}
+    var completed_observations = {{ completed_observations }};
+    var completed_fields_overlay = A.graphicOverlay({color: '#eee', name: 'Completed Observations'});
+    aladin.addOverlay(completed_fields_overlay);
+    for (let i in completed_observations) {
+        completed_fields_overlay.add(A.polyline(completed_observations[i]));
+    }
+    var candidates = A.catalog({color: '#84f', name: 'Linked Candidates'});
+    aladin.addCatalog(candidates);
+    {% for candidate in candidates %}
+        var cat_ra = {{ candidate.target.ra }};
+        var cat_dec = {{ candidate.target.dec }};
+        var cat_name = '{{ candidate.target.name }}'
+        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+    {% endfor %}
     var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
     aladin.addMOC(moc);
