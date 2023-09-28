@@ -1,10 +1,14 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 %}
+{% load bootstrap4 crispy_forms_tags target_extras %}
 {% block title %}Classify on TNS{% endblock %}
 {% block content %}
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <input type="submit" value="Submit Classification">
-</form>
+<h1>Classify {{ target.name }} on the TNS</h1>
+<div class="row">
+    <div class="col-md-12">
+        <form method="post">
+            {% csrf_token %}
+            {% crispy form %}
+        </form>
+    </div>
+</div>
 {% endblock %}

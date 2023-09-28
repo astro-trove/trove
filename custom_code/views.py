@@ -203,6 +203,11 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
     form_class = TargetReportForm
     template_name = 'tom_targets/targetreport_form.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['target'] = Target.objects.get(pk=self.kwargs['pk'])
+        return context
+
     def get_initial(self):
         target = Target.objects.get(pk=self.kwargs['pk'])
         initial = {
@@ -213,15 +218,15 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
         photometry = target.reduceddatum_set.filter(data_type='photometry')
         if photometry.exists():
             reduced_datum = photometry.latest()
-            initial['obsdate'] = reduced_datum.timestamp
+            initial['observation_date'] = reduced_datum.timestamp
             initial['flux'] = reduced_datum.value['magnitude']
             initial['flux_error'] = reduced_datum.value['error']
             filter_name = reduced_datum.value.get('filter')
             if filter_name in TNS_FILTER_IDS:
-                initial['filter_value'] = (TNS_FILTER_IDS[filter_name], filter_name)
+                initial['filter'] = (TNS_FILTER_IDS[filter_name], filter_name)
             instrument_name = reduced_datum.value.get('instrument')
             if instrument_name in TNS_INSTRUMENT_IDS:
-                initial['instrument_value'] = (TNS_INSTRUMENT_IDS[instrument_name], instrument_name)
+                initial['instrument'] = (TNS_INSTRUMENT_IDS[instrument_name], instrument_name)
         return initial
 
     def form_valid(self, form):
@@ -245,6 +250,11 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
     """
     form_class = TargetClassifyForm
     template_name = 'tom_targets/targetclassify_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['target'] = Target.objects.get(pk=self.kwargs['pk'])
+        return context
 
     def get_initial(self):
         target = Target.objects.get(pk=self.kwargs['pk'])
