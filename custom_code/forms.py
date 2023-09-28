@@ -285,13 +285,15 @@ class TargetClassifyForm(forms.Form):
             Row(HTML('<h4>Classification Spectrum</h4>')),
             Row(
                 Column('observation_date'),
-                Column('instrument'),
                 Column('observer'),
                 Column('reducer'),
             ),
             Row(
+                Column('instrument'),
                 Column('exposure_time'),
                 Column('spectrum_type'),
+            ),
+            Row(
                 Column('ascii_file'),
                 Column('fits_file'),
             ),
