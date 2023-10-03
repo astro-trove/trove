@@ -1,11 +1,6 @@
-{% extends 'tom_common/base.html' %}
-{% load comments bootstrap4 tom_common_extras targets_extras observation_extras dataproduct_extras target_list_extras photometry_extras static cache target_extras %}
+{% extends 'tom_targets/partials/base.html' %}
+{% load comments bootstrap4 tom_common_extras targets_extras observation_extras dataproduct_extras target_list_extras photometry_extras cache target_extras %}
 {% block title %}Target {{ object.name }}{% endblock %}
-{% block additional_css %}
-<link rel="stylesheet" href="{% static 'tom_common/css/pink.css' %}">
-<link rel="stylesheet" href="{% static 'tom_common/css/main.css' %}">
-<link rel="stylesheet" href="{% static 'tom_targets/css/main.css' %}">
-{% endblock %}
 {% block content %}
 <script>
 // This script maintains the selected tab upon reload

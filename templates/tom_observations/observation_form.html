@@ -1,13 +1,9 @@
-{% extends 'tom_common/base.html' %}
-{% load bootstrap4 static crispy_forms_tags observation_extras targets_extras obs_extras %} {# obs_extras overrides display_obs_type #}
+{% extends 'tom_targets/partials/base.html' %}
+{% load bootstrap4 crispy_forms_tags observation_extras targets_extras obs_extras %} {# obs_extras overrides display_obs_type #}
 {% block title %}Submit Observation{% endblock %}
-{% block additional_css %}
-<link rel="stylesheet" href="{% static 'tom_common/css/main.css' %}">
-<link rel="stylesheet" href="{% static 'tom_observations/css/main.css' %}">
-{% endblock %}
 {% block content %}
 {{ form|as_crispy_errors }}
-<h3>Submit an observation to {{ form.facility.value }}</h3>
+<h1>Submit an Observation to {{ form.facility.value }}</h1>
 {% if target.type == 'SIDEREAL' %}
 <div class="row">
     <div class="col">
