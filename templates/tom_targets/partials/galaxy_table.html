@@ -1,32 +1,23 @@
 {% load tom_common_extras target_list_extras %}
 
 <table class="table table-hover">
-  <thead>
     <tr>
       <th scope="col">ID</th>
+      <th scope="col">Name</th>
       <th scope="col"><i>P</i><sub>cc</sub></th>
-      <th scope="col">Offset</th>
-      <th scope="col">Dist.</th>
-      <th scope="col">z</th>
-      <th scope="col">Mag.</th>
+      <th scope="col">Off.<br />(")</th>
+      <th scope="col">Dist.<br />(Mpc)</th>
+      <th scope="col">Redshift</th>
+      <th scope="col">Mag.<br />(AB)</th>
       <th scope="col">Source</th>
     </tr>
-    <tr>
-      <td> </td>
-      <td> </td>
-      <td>''</td>
-      <td>Mpc</td>
-      <td> </td>
-      <td>AB</td>
-      <td> </td>
-    </tr>
-  </thead>
   {% for galaxy in galaxies %}
     <tr>
+      <td>{{ forloop.counter }}</td>
       <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&coordinates={{galaxy.RA}}d,{{galaxy.Dec}}d&radius=0.02" target="_blank">{{ galaxy.ID }}</a></td>
       <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
-      {% if galaxy.Dist %}
+      {% if galaxy.Dist and galaxy.Dist|floatformat != 'nan' %}
         <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr|floatformat:1 }} </td>
       {% else %}
         <td> </td>
@@ -36,10 +27,10 @@
       {% else %}
         <td> </td>
       {% endif %}
-      <td>{{ galaxy.Filter }}&nbsp;=&nbsp;{{ galaxy.Mags|floatformat:1 }}</td>
+      <td><i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{{ galaxy.Mags|floatformat:1 }}</td>
       <td>{{ galaxy.Source }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan=8>No host galaxies stored</td></tr>
+    <tr><td colspan=9>No host galaxies stored</td></tr>
   {% endfor %}
 </table>
