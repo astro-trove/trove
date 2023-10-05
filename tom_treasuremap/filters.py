@@ -6,7 +6,7 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent
 class TreasureMapPointingFilter(django_filters.FilterSet):
     id = django_filters.NumericRangeFilter('treasuremap_id', label='ID')
     gw_event = django_filters.ModelChoiceFilter('nonlocalizedevent__event_id', label='GW Event',
-                                                queryset=NonLocalizedEvent.objects.filter(event_id__startswith='S'))
+                                                queryset=NonLocalizedEvent.objects.filter(event_id__startswith='S').order_by('-event_id'))
     facility = django_filters.CharFilter('observation_record__facility', label='Facility')
     field = django_filters.ModelChoiceFilter('observation_record__survey_field', label='Field',
                                              queryset=SurveyField.objects)
