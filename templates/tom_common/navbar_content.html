@@ -13,7 +13,7 @@ For customization instructions, see tom_common/base.html
 <li class="nav-item {% if request.resolver_match.namespace == 'targets' and request.resolver_match.url_name == 'list' %}active{% endif %}">
     <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
 </li>
-<li class="nav-item dropdown {% if request.resolver_match.namespace == 'surveys' or request.resolver_match.url_name == 'candidates'  %}active{% endif %}"">
+<li class="nav-item dropdown {% if request.resolver_match.namespace == 'surveys' or request.resolver_match.url_name == 'candidates' or request.resolver_match.namespace == 'treasuremap' %}active{% endif %}"">
     <a class="nav-link dropdown-toggle" data-toggle="dropdown">Surveys</a>
     <ul class="dropdown-menu">
         <li class="nav-item">
@@ -21,6 +21,9 @@ For customization instructions, see tom_common/base.html
         </li>
         <li class="nav-item">
             <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&classification=0&order=-mlscore_real" style="color:black">Candidates</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'treasuremap:list' %}" style="color:black">Treasure Map</a>
         </li>
     </ul>
 </li>

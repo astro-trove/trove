@@ -18,6 +18,7 @@ class TreasureMapPointing(models.Model):
                 name='unique_nonlocalizedevent_observation_record_status',
             )
         ]
+        ordering = ['-observation_record__scheduled_start']
 
     def __str__(self):
         return str(self.treasuremap_id)
