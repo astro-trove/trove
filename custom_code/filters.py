@@ -95,12 +95,12 @@ class CandidateFilter(django_filters.FilterSet):
 
     observation_record__survey_field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects, label='Survey Field')
     classification = django_filters.ChoiceFilter(choices=[(0, 'Transient'), (1, 'Moving Object')])
-    snr_range = django_filters.NumericRangeFilter('snr', label='S/N')
-    mag_range = django_filters.NumericRangeFilter('mag', label='Magnitude')
+    snr_range = django_filters.RangeFilter('snr', label='S/N')
+    mag_range = django_filters.RangeFilter('mag', label='Magnitude')
     obsdate_range = django_filters.DateTimeFromToRangeFilter('observation_record__scheduled_start', label='Obs. Date')
-    mlscore_range = django_filters.NumericRangeFilter('mlscore', 'gte', label='ML Old')
-    mlscore_real_range = django_filters.NumericRangeFilter('mlscore_real', label='ML Real')
-    mlscore_bogus_range = django_filters.NumericRangeFilter('mlscore_bogus', label='ML Bogus')
+    mlscore_range = django_filters.RangeFilter('mlscore', 'gte', label='ML Old')
+    mlscore_real_range = django_filters.RangeFilter('mlscore_real', label='ML Real')
+    mlscore_bogus_range = django_filters.RangeFilter('mlscore_bogus', label='ML Bogus')
     localization = LocalizationFilter(label='Localization')
 
     order = django_filters.OrderingFilter(
