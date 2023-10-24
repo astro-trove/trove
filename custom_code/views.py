@@ -219,8 +219,8 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
         if photometry.exists():
             reduced_datum = photometry.latest()
             initial['observation_date'] = reduced_datum.timestamp
-            initial['flux'] = reduced_datum.value['magnitude']
-            initial['flux_error'] = reduced_datum.value['error']
+            initial['flux'] = reduced_datum.value.get('magnitude')
+            initial['flux_error'] = reduced_datum.value.get('error')
             filter_name = reduced_datum.value.get('filter')
             if filter_name in TNS_FILTER_IDS:
                 initial['filter'] = (TNS_FILTER_IDS[filter_name], filter_name)
