@@ -1,7 +1,8 @@
 from django import template
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from astropy.coordinates import get_sun, get_moon
-from astropy.time import Time, TimezoneInfo
+from astropy.time import Time
+from datetime import timedelta
 from astroplan import moon_illumination
 import numpy as np
 
@@ -94,3 +95,8 @@ def time_after_event(time, event_id, unit='hour', precision=1):
     seq = nle.sequences.last()
     dt = Time(time) - Time(seq.details['time'])
     return dt.to(unit).to_string(precision=precision)
+
+
+@register.filter
+def secondslater(time, seconds):
+    return time + timedelta(seconds=seconds)

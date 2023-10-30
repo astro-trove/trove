@@ -22,6 +22,7 @@
       <thead>
         <tr>
           <th>Target</th>
+          <th>Field</th>
           <th>Obs. Date</th>
           <th>Mag.</th>
           <th>FW HM</th>
@@ -40,7 +41,7 @@
         <tr>
           <td>
             {% if candidate.target is not None %}
-              <a href="{% url 'targets:detail' candidate.target.id %}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name }}</a>
+              <a href="{% url 'targets:detail' candidate.target.id %}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }} {{ candidate.target.name|slice:"9:" }}</a>
             {% else %}
               None
             {% endif %}
@@ -53,11 +54,12 @@
                 {% if request.GET.localization_event %}
                     <br />
                     <a href="{% url 'custom_code:create-candidate' event_id=request.GET.localization_event target_id=candidate.target.id %}" class="btn btn-primary">
-                        Link {{ request.GET.localization_event }}
+                        &#x1F517;{{ request.GET.localization_event }}
                     </a>
                 {% endif %}
             {% endfor %}
           </td>
+          <td>{{ candidate.observation_record.survey_field.name }}</td>
           <td>{{ candidate.observation_record.scheduled_start|date:"m-d" }}</td>
           <td>{{ candidate.mag|floatformat:"1" }}</td>
           <td>{{ candidate.fwhm|floatformat:"1" }}</td>
