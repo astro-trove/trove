@@ -1,9 +1,10 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 skymap_extras %}
+{% load bootstrap4 nonlocalizedevent_extras skymap_extras %}
 {% block title %}Survey Observations{% endblock %}
 {% block content %}
 {% if request.GET.localization_event %}
-<h1>Survey Observations for {{request.GET.localization_event}}</h1>
+<h1>Survey Observations for <a href="{% url 'nonlocalizedevents:event-detail' request.GET.localization_event %}" target="_blank">{{ request.GET.localization_event }}</a></h1>
+{% nonlocalizedevent_details %}
 <div class="row"><div class="col-md-12">{% skymap_event_id survey_observations=filter.qs %}</div></div>
 {% else %}
 <h1>Survey Observations</h1>

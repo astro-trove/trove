@@ -1,9 +1,10 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 crispy_forms_tags candidate_extras skymap_extras %}
+{% load bootstrap4 crispy_forms_tags candidate_extras nonlocalizedevent_extras skymap_extras %}
 {% block title %}Candidates{% endblock %}
 {% block content %}
 {% if request.GET.localization_event %}
-<h1>Candidates for {{request.GET.localization_event}}</h1>
+<h1>Candidates for <a href="{% url 'nonlocalizedevents:event-detail' request.GET.localization_event %}" target="_blank">{{ request.GET.localization_event }}</a></h1>
+{% nonlocalizedevent_details %}
 <div class="row"><div class="col-md-12">{% skymap_event_id survey_candidates=filter.qs %}</div></div>
 {% else %}
 <h1>Candidates</h1>
