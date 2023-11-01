@@ -1,9 +1,9 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 skymap_extras targets_extras %}
+{% load bootstrap4 nonlocalizedevent_extras skymap_extras targets_extras %}
 {% block title %}Survey Plans{% endblock %}
 {% block content %}
 <h1>
-    Survey Plans for {{ nonlocalizedevent.event_id }}
+    Survey Plans for <a href="{% url 'nonlocalizedevents:event-detail' nonlocalizedevent.event_id %}" target="_blank">{{ nonlocalizedevent.event_id }}</a>
     {% if eventlocalization.external_coincidences.exists %}
         {{ eventlocalization.external_coincidences.last.sequences.last.event_subtype.title }}
         {{ eventlocalization.external_coincidences.last.sequences.last.sequence_id }} Combined
@@ -12,6 +12,7 @@
         {{ eventlocalization.sequences.last.sequence_id }}
     {% endif %}
 </h1>
+{% nonlocalizedevent_details eventlocalization %}
 <div class="row"><div class="col-md-12">{% skymap eventlocalization %}</div></div>
 <div class="row">
   <div class="col-md-10">

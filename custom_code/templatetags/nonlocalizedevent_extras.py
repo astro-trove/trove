@@ -1,4 +1,5 @@
 from django import template
+from tom_nonlocalizedevents.models import NonLocalizedEvent
 import math
 
 register = template.Library()
@@ -53,8 +54,31 @@ def percentformat(value, d=0):
 
 
 @register.filter
+def millisecondformat(value, d=0):
+    try:
+        return f'{value * 1000.:.{d}f} ms'
+    except ValueError:
+        return value
+
+
+@register.filter
 def truncate(string, length=5):
     if len(string) > length:
         return string[:length-1] + '.'
     else:
         return string
+
+
+@register.inclusion_tag('tom_nonlocalizedevents/partials/nonlocalizedevent_details.html', takes_context=True)
+def nonlocalizedevent_details(context, localization=None):
+    if localization is None:
+        event_id = context['request'].GET.get('localization_event')
+        if event_id is None:
+            return
+        nle = NonLocalizedEvent.objects.get(event_id=event_id)
+        sequence = nle.sequences.last()
+    elif localization.external_coincidences.exists():
+        sequence = localization.external_coincidences.last().sequences.last()
+    else:
+        sequence = localization.sequences.last()
+    return {'sequence': sequence}
