@@ -52,6 +52,8 @@ def recent_photometry(context, target, limit=1):
             phot_point = {'timestamp': datum.timestamp, 'magnitude': datum.value['magnitude']}
         elif 'limit' in datum.value.keys():
             phot_point = {'timestamp': datum.timestamp, 'limit': datum.value['limit']}
+        else:
+            continue
 
         if target.distance is not None:
             dm = 5. * (np.log10(target.distance) + 5.)
