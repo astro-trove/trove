@@ -172,7 +172,7 @@ STATIC_URL = FORCE_SCRIPT_NAME + '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, '_static')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 MEDIA_ROOT = os.path.join(BASE_DIR, 'data')
-MEDIA_URL = '/data/'
+MEDIA_URL = FORCE_SCRIPT_NAME + '/data/'
 
 LOGGING = {
     'version': 1,
