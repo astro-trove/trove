@@ -15,6 +15,7 @@ tomtoolkit~=2.15.14
 tom-alertstreams
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
 tom-nonlocalizedevents~=0.7.7
+tom-swift
 twilio
 paramiko
 plotly

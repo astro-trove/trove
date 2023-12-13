@@ -235,6 +235,10 @@ FACILITIES = {
             'MMIRS': MMT_MMIRS_PROGRAMS,
         },
     },
+    'SWIFT': {
+        'SWIFT_USERNAME': SWIFT_USERNAME,
+        'SWIFT_SHARED_SECRET': SWIFT_SHARED_SECRET,
+    },
 }
 
 # Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
@@ -257,6 +261,7 @@ TOM_FACILITY_CLASSES = [
     'tom_observations.facilities.soar.SOARFacility',
     'tom_observations.facilities.lt.LTFacility',
     'custom_code.facilities.CustomMMTFacility',
+    'tom_swift.swift.SwiftFacility',
 ]
 
 TOM_ALERT_CLASSES = [
