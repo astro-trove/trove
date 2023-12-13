@@ -11,7 +11,7 @@ kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
 ligo.skymap
 numpy
-tomtoolkit~=2.14.4
+tomtoolkit~=2.15.14
 tom-alertstreams
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
 tom-nonlocalizedevents~=0.7.7
