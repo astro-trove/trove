@@ -4,6 +4,7 @@ from tom_dataproducts.processors.data_serializers import SpectrumSerializer
 from tom_dataproducts.processors.spectroscopy_processor import SpectroscopyProcessor as OldSpectroscopyProcessor
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from lightcurve_fitting.speccal import readspec
+import numpy as np
 
 
 class SpectroscopyProcessor(OldSpectroscopyProcessor):
@@ -28,7 +29,7 @@ class SpectroscopyProcessor(OldSpectroscopyProcessor):
         else:
             raise InvalidFileFormatException('Unsupported file type')
 
-        serialized_spectrum = SpectrumSerializer().serialize(spectrum)
+        serialized_spectrum = FiniteSpectrumSerializer().serialize(spectrum)
 
         return [(obs_date, serialized_spectrum, '')]  # no support for source_name yet
 
@@ -57,3 +58,25 @@ class SpectroscopyProcessor(OldSpectroscopyProcessor):
         spectrum = Spectrum1D(flux=flux * self.DEFAULT_FLUX_CONSTANT,
                               spectral_axis=wavelength * self.DEFAULT_WAVELENGTH_UNITS)
         return spectrum, date_obs.to_datetime()
+
+
+class FiniteSpectrumSerializer(SpectrumSerializer):
+
+    def serialize(self, spectrum: Spectrum1D) -> dict:
+        """
+        Serializes a Spectrum1D in order to store in a ReducedDatum object. The serialization stores only what's
+        necessary to rebuild the Spectrum1D--namely, flux and wavelength, and their respective units.
+
+        :param spectrum: Spectrum1D to be serialized
+        :type spectrum: specutils.Spectrum1D
+
+        :returns: JSON representation of spectrum
+        :rtype: dict
+        """
+        good = np.isfinite(spectrum.flux)
+        return {
+            'flux': spectrum.flux.value[good].tolist(),
+            'flux_units': spectrum.flux.unit.to_string(),
+            'wavelength': spectrum.wavelength.value[good].tolist(),
+            'wavelength_units': spectrum.wavelength.unit.to_string(),
+        }
