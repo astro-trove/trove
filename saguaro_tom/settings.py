@@ -249,7 +249,7 @@ DATA_PRODUCT_TYPES = {
 DATA_PROCESSORS = {
     'photometry': 'tom_dataproducts.processors.photometry_processor.PhotometryProcessor',
     'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
-    '1D FITS Tar': 'tom_mmt.mmt.MMTDataProcessor',
+    'MMT': 'tom_mmt.mmt.MMTDataProcessor',
 }
 
 TOM_FACILITY_CLASSES = [
