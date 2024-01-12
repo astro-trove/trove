@@ -15,6 +15,7 @@ tomtoolkit~=2.15.14
 tom-alertstreams
 tom-mmt~=0.1.3
 tom-nonlocalizedevents~=0.7.7
+tom-swift~=0.2.0
 twilio
 paramiko
 plotly

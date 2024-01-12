@@ -44,6 +44,8 @@ SLACK_URLS = [  # list of lists of Slack URLs for incoming webhooks
         'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-ns
     ],
 ]
+SWIFT_USERNAME = ''     # username for the Swift ToO API
+SWIFT_SHARED_SECRET = '' # shared secret for the Swift ToO API
 TNS_API_KEY = ''        # API key for the Transient Name Server
 TREASUREMAP_API_KEY = '' # API key for the Gravitational Wave Treasure Map
 TWILIO_ACCOUNT_SID = '' # account ID for Twilio text message alerts
