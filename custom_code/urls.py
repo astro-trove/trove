@@ -3,7 +3,7 @@ from django.urls import path
 from tom_targets.views import TargetGroupingView, TargetGroupingDeleteView
 from .views import TargetGroupingCreateView, CandidateListView, TargetReportView, TargetClassifyView, TargetVettingView
 from .views import ObservationCreateView, TargetNameSearchView, TargetListView, TargetATLASForcedPhot
-from .views import CSSFieldListView, NonLocalizedEventListView, GRBListView, NeutrinoListView
+from .views import CSSFieldListView, GWListView, GRBListView, NeutrinoListView
 from .views import CSSFieldExportView, CSSFieldSubmitView, EventCandidateCreateView, ProfileUpdateView
 
 from tom_common.api_router import SharedAPIRootRouter
@@ -24,7 +24,7 @@ urlpatterns = [
     path('targets/search/', TargetNameSearchView.as_view(), name='search'),
     path('targets/', TargetListView.as_view(), name='list'),
     path('observations/<str:facility>/create/', ObservationCreateView.as_view(), name='create'),
-    path('nonlocalizedevents/', NonLocalizedEventListView.as_view(), name='nonlocalizedevents'),
+    path('nonlocalizedevents/gw/', GWListView.as_view(), name='gw-list'),
     path('nonlocalizedevents/grb/', GRBListView.as_view(), name='grb-list'),
     path('nonlocalizedevents/neutrino/', NeutrinoListView.as_view(), name='neutrino-list'),
     path('nonlocalizedevents/<int:localization_id>/cssfields/', CSSFieldListView.as_view(), name='css-fields'),
