@@ -235,6 +235,10 @@ FACILITIES = {
             'MMIRS': MMT_MMIRS_PROGRAMS,
         },
     },
+    'SWIFT': {
+        'SWIFT_USERNAME': SWIFT_USERNAME,
+        'SWIFT_SHARED_SECRET': SWIFT_SHARED_SECRET,
+    },
 }
 
 # Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
@@ -259,6 +263,7 @@ TOM_FACILITY_CLASSES = [
     'tom_observations.facilities.soar.SOARFacility',
     'tom_observations.facilities.lt.LTFacility',
     'custom_code.facilities.CustomMMTFacility',
+    'tom_swift.swift.SwiftFacility',
 ]
 
 TOM_ALERT_CLASSES = [
@@ -329,6 +334,15 @@ HOOKS = {
     'data_product_post_upload': 'tom_dataproducts.hooks.data_product_post_upload',
     'data_product_post_save': 'tom_dataproducts.hooks.data_product_post_save',
     'multiple_data_products_post_save': 'tom_dataproducts.hooks.multiple_data_products_post_save',
+}
+
+DATA_SHARING = {
+    'tom-demo': {
+        'DISPLAY_NAME': os.getenv('TOM_DEMO_DISPLAY_NAME', 'TOM Demo'),
+        'BASE_URL': os.getenv('TOM_DEMO_BASE_URL', 'https://tom-demo.lco.global/'),
+        'USERNAME': os.getenv('TOM_DEMO_USERNAME', 'guest'),
+        'PASSWORD': os.getenv('TOM_DEMO_PASSWORD', 'guest'),
+    },
 }
 
 AUTO_THUMBNAILS = False
