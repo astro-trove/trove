@@ -5,7 +5,6 @@
     <a href="{% url 'custom_code:report' pk=target.id %}" title="Report target to TNS" class="btn btn-secondary">Report</a>
 {% endif %}
 <a href="{% url 'tom_targets:update' pk=target.id %}" title="Update target details" class="btn btn-primary">Update</a>
-<a href="{% url 'custom_code:vet' pk=target.id %}" title="Run kilonova candidate vetting" class="btn btn-pink">Vet</a>
 {% if sharing %}
     <a href="{% url 'tom_targets:share' pk=target.id %}" title="Share target" class="btn btn-info">Share</a>
 {% endif %}
