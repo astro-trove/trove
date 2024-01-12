@@ -5,7 +5,7 @@
     <h4>Photometry</h4>
   </div>
   <div class="col-md-12">
-    <a href="{% url 'custom_code:runatlasfp'  pk=target.id %}" class="btn btn-info" title="Run ATLAS forced phot.">Get ATLAS phot.</a>
+    <a href="{% url 'custom_code:runatlasfp'  pk=target.id %}" class="btn btn-pink" title="Run ATLAS forced phot.">Get ATLAS phot.</a>
     <a href="{% url 'dataproducts:update-reduced-data' %}?target_id={{ target.id }}" class="btn btn-primary" title="Update Targets">Check for new data</a>
   </div>
 </div>
