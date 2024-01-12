@@ -1,8 +1,8 @@
 {% extends 'tom_common/index.html' %}
 {% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras %}
-{% block title %}Gravitational Waves{% endblock %}
+{% block title %}Neutrinos{% endblock %}
 {% block content %}
-<h1>Gravitational Waves</h1>
+<h1>Neutrinos</h1>
 <div class="row">
     <div class="col-md-12">
     <form action="" method="get" class="form">
@@ -18,17 +18,10 @@
       <thead>
       <tr>
         <th scope="col">Detail Page</th>
-        <th scope="col" title="Inverse False Alarm Rate">1/FAR</th>
-        <th scope="col" title="Most Likely Classification">Class.</th>
-        <th scope="col" title="Distance">Distance</th>
-        <th scope="col" title="Has Neutron Star?">NS?</th>
-        <th scope="col" title="Has Remnant?">Bright?</th>
         <th scope="col" title="Survey Plans">Plans</th>
         <th scope="col" title="Survey Observations">Obs.</th>
         <th scope="col" title="Survey Candidates">Cand.</th>
         <th scope="col" title="Hermes">Hermes</th>
-        <th scope="col" title="GraceDB">GraceDB</th>
-        <th scope="col" title="Gravitational Wave Treasure Map">GWTM</th>
       </tr>
       </thead>
       <tbody>
@@ -38,19 +31,7 @@
       {% else %}
       <tr>
       {% endif %}
-        <td>
-            <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank">{{ event.event_id }}</a>
-            {% if event.state == "RETRACTED" %}
-                <span title="retracted">&#x274c;</span> {# red X emoji #}
-            {% elif event.sequences.last.event_subtype != "PRELIMINARY" %}
-                <span title="confirmed">&#x2714;</span> {# heavy check mark emoji #}
-            {% endif %}
-        </td>
-        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far | format_inverse_far }}</td>
-        <td title="Most Likely Classification">{{ event.sequences.last.details | get_most_likely_class | truncate }}</td>
-        <td title="Distance">{{ event.sequences.last.localization | format_distance }}</td>
-        <td title="Has Neutron Star?">{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
-        <td title="Has Remnant?">{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
+        <td><a href="{% url 'nonlocalizedevents:detail'  event.id %}" target="_blank">{{ event.event_id }}</a></td>
         <td title="Survey Plans">
         {% for localization in event.localizations.all|dictsort:"id" %}
             {% if localization.external_coincidences.exists %}
@@ -75,12 +56,6 @@
         </td>
         <td title="Hermes">
           <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
-        </td>
-        <td title="GraceDB">
-          <a href="{{ event.gracedb_url }}" target="_blank">GraceDB</a>
-        </td>
-        <td title="Gravitational Wave Treasure Map">
-            <a href="{{ event.treasuremap_url }}" target="_blank">GWTM</a>
         </td>
       </tr>
       {% endfor %}
