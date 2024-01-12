@@ -331,6 +331,15 @@ HOOKS = {
     'multiple_data_products_post_save': 'tom_dataproducts.hooks.multiple_data_products_post_save',
 }
 
+DATA_SHARING = {
+    'tom-demo': {
+        'DISPLAY_NAME': os.getenv('TOM_DEMO_DISPLAY_NAME', 'TOM Demo'),
+        'BASE_URL': os.getenv('TOM_DEMO_BASE_URL', 'https://tom-demo.lco.global/'),
+        'USERNAME': os.getenv('TOM_DEMO_USERNAME', 'guest'),
+        'PASSWORD': os.getenv('TOM_DEMO_PASSWORD', 'guest'),
+    },
+}
+
 AUTO_THUMBNAILS = False
 
 THUMBNAIL_MAX_SIZE = (0, 0)
