@@ -40,7 +40,7 @@
 {% endfor %}
 </dl>
 {% if target.tags %}
-<h4>Catalog Crossmatching</h4>
+<h4>Point Source Matches</h4>
 <dl class="row">
 {% for key, value in target.tags.items %}
 {% if key|slice:':4' != 'Host' and key|slice:':4' != 'Best' %}
