@@ -3,6 +3,9 @@ import django_filters
 from tom_surveys.models import SurveyField
 import json
 from django.conf import settings
+from django.db.models import Q
+import functools
+import operator
 from datetime import datetime, timedelta
 from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent
@@ -93,6 +96,16 @@ class CandidateFilter(django_filters.FilterSet):
 
         return cone_search_filter(queryset, ra, dec, radius)
 
+    @staticmethod
+    def multifilter(queryset, name, value):
+        values = [val.strip() for val in value.split(',')]
+        include = [Q(**{name: val}) for val in values if not val.startswith('-')]
+        exclude = [Q(**{name: val[1:]}) for val in values if val.startswith('-')]
+        query = functools.reduce(operator.or_, include, Q()) & ~functools.reduce(operator.or_, exclude, Q())
+        return queryset.filter(query)
+
+    target__name__startswith = django_filters.CharFilter(method='multifilter', label='Name Starts With',
+                                                         help_text='e.g., "SN,AT" (SN or AT), "-J" (not J)')
     observation_record__survey_field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects, label='Survey Field')
     classification = django_filters.ChoiceFilter(choices=[(0, 'Transient'), (1, 'Moving Object')])
     snr_range = django_filters.RangeFilter('snr', label='S/N')

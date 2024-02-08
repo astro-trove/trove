@@ -408,11 +408,12 @@ class CandidateFormHelper(FormHelper):
             Column('mlscore_bogus_range'),
         ),
         Row(
+            Column('target__name__startswith'),
             Column('cone_search'),
             Column('observation_record__survey_field'),
             Column('classification'),
             Column('localization'),
-            Column('order', css_class='col-md-4'),
+            Column('order'),
         ),
         Row(
             Column(

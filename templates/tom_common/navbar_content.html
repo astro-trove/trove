@@ -23,6 +23,9 @@ For customization instructions, see tom_common/base.html
             <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&classification=0&order=-mlscore_real" style="color:black">Candidates</a>
         </li>
         <li class="nav-item">
+            <a class="nav-link" href="{% url 'custom_code:candidates' %}?target__name__startswith=AT,SN&order=-observation_record__scheduled_start" style="color:black">TNS Transients</a>
+        </li>
+        <li class="nav-item">
             <a class="nav-link" href="{% url 'treasuremap:list' %}" style="color:black">Treasure Map</a>
         </li>
     </ul>
