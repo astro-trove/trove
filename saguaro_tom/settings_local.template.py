@@ -30,6 +30,7 @@ SLACK_LINKS = [  # links to TOMs for Slack alerts, {nle.id} is replaced by the e
     '<https://tom0.edu/nonlocalizedevents/{nle.event_id}/|Name of TOM 0>',  # TOM corresponding to Slack workspace 0
     '<https://tom1.edu/nonlocalizedevents/{nle.event_id}/|Name of TOM 1>',  # TOM corresponding to Slack workspace 1
 ]
+SLACK_TNS_URL = 'https://hooks.slack.com/services/.../.../...'  # incoming webhook for TNS transient alerts
 SLACK_URLS = [  # list of lists of Slack URLs for incoming webhooks
     [  # list of URLs for Slack workspace 0
         'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-subthreshold
