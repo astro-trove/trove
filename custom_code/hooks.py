@@ -75,7 +75,7 @@ def target_post_save(target, created):
                 target.name = iau_name
                 target.save()
                 messages.append(f"Found a match in the TNS: {target.name}")
-            if classification is not None and target.extra_fields.get('Classification') != classification:
+            if classification and target.extra_fields.get('Classification') != classification:
                 update_or_create_target_extra(target, 'Classification', classification)
                 messages.append(f"Classification set to {classification}")
             if redshift is not None and np.isfinite(redshift) and target.extra_fields.get('Redshift') != redshift:
