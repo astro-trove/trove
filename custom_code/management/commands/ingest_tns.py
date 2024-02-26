@@ -149,18 +149,18 @@ class Command(BaseCommand):
                                    f'{galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc')
                     break
             else:
-                slack_alert = ''
+                continue
 
-            if slack_alert:  # if there was nearby host galaxy found, check the last nondetection
-                photometry = target.reduceddatum_set.filter(data_type='photometry')
-                first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
-                last_nondet = photometry.filter(value__magnitude__isnull=True,
-                                                timestamp__lt=first_det.timestamp).order_by('timestamp').last()
-                if first_det and last_nondet:
-                    time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
-                    slack_alert += f' and the last nondetection was {time_lnondet:.1f} hours before detection'
-                else:
-                    slack_alert += ' with no known last nondetection'
+            # if there was nearby host galaxy found, check the last nondetection
+            photometry = target.reduceddatum_set.filter(data_type='photometry')
+            first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
+            last_nondet = photometry.filter(value__magnitude__isnull=True,
+                                            timestamp__lt=first_det.timestamp).order_by('timestamp').last()
+            if first_det and last_nondet:
+                time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
+                slack_alert += f' and the last nondetection was {time_lnondet:.1f} hours before detection'
+            else:
+                slack_alert += ' with no known last nondetection'
 
-                json_data = json.dumps({'text': slack_alert}).encode('ascii')
-                requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+            json_data = json.dumps({'text': slack_alert}).encode('ascii')
+            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
