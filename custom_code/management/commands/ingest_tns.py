@@ -138,28 +138,29 @@ class Command(BaseCommand):
 
         for target in updated_targets:
             target_post_save(target, created=True)
-            
-            
+
         for target in new_targets:
-            first_det = target.reduceddatum_set.filter(value__magnitude__isnull = False, data_type='photometry').order_by('timestamp').first()
-            last_nondet = target.reduceddatum_set.filter(value__magnitude__isnull = True, data_type = 'photometry',timestamp__lt = first_det.timestamp).order_by('timestamp').last()
+            target_post_save(target, created=True)
 
-            if last_nondet.timestamp:
-                time_lnondet = np.round((first_det.timestamp - last_nondet.timestamp).total_seconds()/(60*60),3)
-                
-                target_post_save(target, created=True)
-                for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
-                    if galaxy['Dist'] <= 40.:
-                        slack_alert = f'<https://sand.as.arizona.edu/saguaro_tom/targets/{target.id}/|{target.name}> is {galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc and the  last non-detection was {time_lnondet} hours ago'
-                        json_data = json.dumps({'text': slack_alert}).encode('ascii')
-                        requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
-                        break
+            # check if any of the possible host galaxies are within 40 Mpc
+            for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
+                if galaxy['Dist'] <= 40.:
+                    slack_alert = (f'<https://sand.as.arizona.edu/saguaro_tom/targets/{target.id}/|{target.name}> is '
+                                   f'{galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc')
+                    break
             else:
-                target_post_save(target, created=True)
-                for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
-                    if galaxy['Dist'] <= 40.:
-                        slack_alert = f'<https://sand.as.arizona.edu/saguaro_tom/targets/{target.id}/|{target.name}> is {galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc with No known last  non-detection'
-                        json_data = json.dumps({'text': slack_alert}).encode('ascii')
-                        requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
-                        break
+                slack_alert = ''
 
+            if slack_alert:  # if there was nearby host galaxy found, check the last nondetection
+                photometry = target.reduceddatum_set.filter(data_type='photometry')
+                first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
+                last_nondet = photometry.filter(value__magnitude__isnull=True,
+                                                timestamp__lt=first_det.timestamp).order_by('timestamp').last()
+                if first_det and last_nondet:
+                    time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
+                    slack_alert += f' and the last nondetection was {time_lnondet:.1f} hours before detection'
+                else:
+                    slack_alert += ' with no known last nondetection'
+
+                json_data = json.dumps({'text': slack_alert}).encode('ascii')
+                requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
