@@ -144,7 +144,7 @@ class Command(BaseCommand):
 
             # check if any of the possible host galaxies are within 40 Mpc
             for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
-                if galaxy['Dist'] <= 40.:
+                if 1. < galaxy['Dist'] <= 40.:
                     slack_alert = (f'<https://sand.as.arizona.edu/saguaro_tom/targets/{target.id}/|{target.name}> is '
                                    f'{galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc')
                     break
