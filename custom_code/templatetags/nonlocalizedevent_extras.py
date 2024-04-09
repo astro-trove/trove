@@ -12,13 +12,21 @@ def format_inverse_far(far):
     inv_far = 3.168808781402895e-08 / far  # 1/Hz to yr
     if inv_far > 1.:
         log1000 = math.log10(inv_far) / 3.
-        i = min(int(log1000), 10)
-        inv_far *= 1000. ** -i
-        unit = SI_PREFIXES[i] + 'yr'
+        i = int(log1000)
+        if i < 10:
+            inv_far *= 1000. ** -i
+            unit = SI_PREFIXES[i] + 'yr'
+        else:
+            unit = 'yr'
     else:  # convert to days
         inv_far *= 365.25
         unit = 'd'
-    return f'{inv_far:.0f} {unit}' if inv_far > 10. else f'{inv_far:.1f} {unit}'
+    if inv_far >= 1000.:
+        return f'{inv_far:.0e} {unit}'
+    elif inv_far > 10.:
+        return f'{inv_far:.0f} {unit}'
+    else:
+        return f'{inv_far:.1f} {unit}'
 
 
 @register.filter

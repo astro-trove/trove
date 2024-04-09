@@ -390,7 +390,7 @@ class NonLocalizedEventFormHelper(FormHelper):
             Row(
                 Column(
                     Submit('submit', 'Filter'),
-                    HTML('<a href="{% url \'custom_code:nonlocalizedevents\' %}" class="btn btn-secondary" title="Reset">Reset</a>'),
+                    HTML('<a href="{{ request.path }}" class="btn btn-secondary" title="Reset">Reset</a>'),
                     css_class='text-right',
                 )
             )

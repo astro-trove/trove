@@ -579,7 +579,6 @@ class NonLocalizedEventListView(FilterView):
     Unadorned Django ListView subclass for NonLocalizedEvent model.
     """
     model = NonLocalizedEvent
-    template_name = 'tom_nonlocalizedevents/nonlocalizedevent_list.html'
     filterset_class = NonLocalizedEventFilter
     paginate_by = 100
     formhelper_class = NonLocalizedEventFormHelper
@@ -593,6 +592,39 @@ class NonLocalizedEventListView(FilterView):
     def get_queryset(self):
         # '-created' is most recent first
         qs = NonLocalizedEvent.objects.order_by('-created')
+        return qs
+
+
+class GWListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/gw_list.html'
+
+    def get_queryset(self):
+        qs = NonLocalizedEvent.objects.filter(event_type='GW').order_by('-created')
+        return qs
+
+
+class GRBListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/grb_list.html'
+
+    def get_queryset(self):
+        qs = NonLocalizedEvent.objects.filter(event_type='GRB').order_by('-created')
+        return qs
+
+
+class NeutrinoListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/neutrino_list.html'
+
+    def get_queryset(self):
+        qs = NonLocalizedEvent.objects.filter(event_type='NU').order_by('-created')
         return qs
 
 
