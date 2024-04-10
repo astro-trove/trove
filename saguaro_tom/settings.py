@@ -264,7 +264,7 @@ DATA_PROCESSORS = {
     'photometry': 'tom_dataproducts.processors.photometry_processor.PhotometryProcessor',
     'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
     'MMT': 'tom_mmt.mmt.MMTDataProcessor',
-    'atlas_photometry': 'tom_dataproducts.processors.atlas_processor.AtlasProcessor',
+    'atlas_photometry': 'custom_code.processors.atlas_processor.ClippedStackedAtlasProcessor',
 }
 
 TOM_FACILITY_CLASSES = [
