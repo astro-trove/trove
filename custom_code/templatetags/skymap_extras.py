@@ -1,6 +1,6 @@
 from django import template
 from tom_nonlocalizedevents.models import NonLocalizedEvent
-from astropy.coordinates import get_sun, get_moon
+from astropy.coordinates import get_body
 from astropy.time import Time
 from datetime import timedelta
 from astroplan import moon_illumination
@@ -25,8 +25,8 @@ def centers_to_vertices(centers, footprint):
 def skymap(localization, survey_candidates=None, survey_observations=None):
     # sun, moon, and candidates
     now = Time.now()
-    current_sun_pos = get_sun(now)
-    current_moon_pos = get_moon(now)
+    current_sun_pos = get_body('sun', now)
+    current_moon_pos = get_body('moon', now)
     current_moon_exclusion = 3. + 42. * moon_illumination(now)
     extras = {
         'current_sun_ra': current_sun_pos.ra.deg,

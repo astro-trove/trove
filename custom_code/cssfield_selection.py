@@ -2,7 +2,7 @@ import numpy as np
 import healpy
 from ligo.skymap import bayestar
 from astroplan import moon_illumination
-from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_moon, get_sun, spherical_to_cartesian
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body, spherical_to_cartesian
 from astropy.time import Time, TimezoneInfo
 from astropy import units as u
 import logging
@@ -131,12 +131,12 @@ def observable_tonight(target):
     altaz = radec.transform_to(frame)
     target_up = (altaz.secz <= 1.75) & (altaz.secz >= 1.)
 
-    sun_altaz = get_sun(time).transform_to(frame)
+    sun_altaz = get_body('sun', time).transform_to(frame)
     sun_down = sun_altaz.alt <= -12. * u.deg
     now_or_sunset = np.flatnonzero(sun_down).min()
     sunrise = np.flatnonzero(~sun_down[now_or_sunset:]).min() + now_or_sunset
 
-    moon_altaz = get_moon(time).transform_to(frame)
+    moon_altaz = get_body('moon', time).transform_to(frame)
     moon_down = moon_altaz.alt <= 0.
     moon_far = moon_altaz.separation(altaz) > (3. + 42. * moon_illumination(time)) * u.deg
 
