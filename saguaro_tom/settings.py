@@ -241,6 +241,14 @@ FACILITIES = {
     },
 }
 
+FORCED_PHOTOMETRY_SERVICES = {
+    'ATLAS': {
+        'class': 'tom_dataproducts.forced_photometry.atlas.AtlasForcedPhotometryService',
+        'url': "https://fallingstar-data.com/forcedphot",
+        'api_key': os.getenv('ATLAS_FORCED_PHOTOMETRY_API_KEY', ATLAS_API_KEY)
+    },
+}
+
 # Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
 # longer be valid, and may cause issues unless the offending records are modified.
 DATA_PRODUCT_TYPES = {
@@ -249,12 +257,14 @@ DATA_PRODUCT_TYPES = {
     'spectroscopy': ('spectroscopy', 'Spectroscopy'),
     'image_file': ('image_file', 'Image File'),
     'MMT': ('MMT', 'MMT File'),
+    'atlas_photometry': ('atlas_photometry', 'ATLAS Photometry'),
 }
 
 DATA_PROCESSORS = {
     'photometry': 'tom_dataproducts.processors.photometry_processor.PhotometryProcessor',
     'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
     'MMT': 'tom_mmt.mmt.MMTDataProcessor',
+    'atlas_photometry': 'tom_dataproducts.processors.atlas_processor.AtlasProcessor',
 }
 
 TOM_FACILITY_CLASSES = [
