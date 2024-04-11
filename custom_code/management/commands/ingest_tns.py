@@ -140,13 +140,13 @@ class Command(BaseCommand):
             target_post_save(target, created=True)
 
         for target in new_targets:
-            target_post_save(target, created=True)
+            # target_post_save(target, created=True)
 
             # check if any of the possible host galaxies are within 40 Mpc
             for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
-                if 1. < galaxy['Dist'] <= 40.:
+                if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
                     slack_alert = (f'<https://sand.as.arizona.edu/saguaro_tom/targets/{target.id}/|{target.name}> is '
-                                   f'{galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc')
+                                   f'{galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.')
                     break
             else:
                 continue
@@ -158,9 +158,11 @@ class Command(BaseCommand):
                                             timestamp__lt=first_det.timestamp).order_by('timestamp').last()
             if first_det and last_nondet:
                 time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
-                slack_alert += f' and the last nondetection was {time_lnondet:.1f} hours before detection'
+                dmag_lnondet = (last_nondet.value['limit'] - first_det.value['magnitude']) / (time_lnondet / 24.)
+                slack_alert += (f' The last nondetection was {time_lnondet:.1f} hours before detection,'
+                                f' during which time it rose >{dmag_lnondet:.1f} mag/day.')
             else:
-                slack_alert += ' with no known last nondetection'
+                slack_alert += ' No nondetection was reported.'
 
             json_data = json.dumps({'text': slack_alert}).encode('ascii')
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
