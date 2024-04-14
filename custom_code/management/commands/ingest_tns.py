@@ -140,7 +140,7 @@ class Command(BaseCommand):
             target_post_save(target, created=True)
 
         for target in new_targets:
-            # target_post_save(target, created=True)
+            target_post_save(target, created=True)
 
             # check if any of the possible host galaxies are within 40 Mpc
             for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
