@@ -118,8 +118,8 @@ def target_post_save(target, created):
 
         update_or_create_target_extra(target=target, key='PS1 match', value=ps1[0])
         if ps1[0] != 'None' and ps1[0] != 'Multiple matches' and ps1[0] != 'Galaxy match':
-            update_or_create_target_extra(target=target, key='Star Prob. (<0.2)', value=ps1prob[0])
-            update_or_create_target_extra(target=target, key='Star Offset', value=ps1offset[0])
+            update_or_create_target_extra(target=target, key='PS1 Star Prob.', value=ps1prob[0])
+            update_or_create_target_extra(target=target, key='PS1 Offset', value=ps1offset[0])
 
         matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
