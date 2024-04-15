@@ -1,4 +1,4 @@
-{% load tom_common_extras targets_extras target_extras %}  {# targets_extras is built in; target_extras is custom #}
+{% load tom_common_extras targets_extras target_extras nonlocalizedevent_extras %}  {# targets_extras is built in; target_extras is custom #}
 <dl class="row">
   {% for target_name in target.names %}
     {% if forloop.first %}
@@ -45,7 +45,13 @@
 {% for key, value in target.tags.items %}
 {% if key|slice:':4' != 'Host' and key|slice:':4' != 'Best' %}
 <dt class="col-sm-6">{{ key }}</dt>
-<dd class="col-sm-6">{{ value }}</dd>
+    {% if key|slice:'-6:' == 'Offset' %}
+        <dd class="col-sm-6">{{ value|floatformat:1 }}"</dd>
+    {% elif key|slice:'-5:' == 'Prob.' %}
+        <dd class="col-sm-6">{{ value|percentformat:0 }}</dd>
+    {% else %}
+        <dd class="col-sm-6">{{ value }}</dd>
+    {% endif %}
 {% endif %}
 {% endfor %}
 </dl>
