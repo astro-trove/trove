@@ -66,7 +66,7 @@ def target_post_save(target, created):
         target.galactic_lat = coord.galactic.b.deg
         target.save()
 
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset, tns_results, gaiaprob, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
+        qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
 
         if tns_results[0] is not None:
@@ -105,24 +105,21 @@ def target_post_save(target, created):
 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
         if qso[0] != 'None':
-            update_or_create_target_extra(target=target, key='QSO Prob.', value=qprob[0])
             update_or_create_target_extra(target=target, key='QSO Offset', value=qoffset[0])
 
         update_or_create_target_extra(target=target, key='ASASSN Match', value=asassn[0])
         if asassn[0] != 'None':
-            update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
             update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
 
         update_or_create_target_extra(target=target, key='Gaia Match', value=gaia[0])
         if gaia[0] != 'None':
-            update_or_create_target_extra(target=target, key='Gaia VS Prob.', value=gaiaprob[0])
             update_or_create_target_extra(target=target, key='Gaia VS Offset', value=gaiaoffset[0])
             update_or_create_target_extra(target=target, key='Gaia VS Class', value=gaiaclass[0])
 
         update_or_create_target_extra(target=target, key='PS1 match', value=ps1[0])
         if ps1[0] != 'None' and ps1[0] != 'Multiple matches' and ps1[0] != 'Galaxy match':
-            update_or_create_target_extra(target=target, key='Star Prob. (<0.2)', value=ps1prob[0])
-            update_or_create_target_extra(target=target, key='Star Offset', value=ps1offset[0])
+            update_or_create_target_extra(target=target, key='PS1 Star Prob.', value=ps1prob[0])
+            update_or_create_target_extra(target=target, key='PS1 Offset', value=ps1offset[0])
 
         matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
