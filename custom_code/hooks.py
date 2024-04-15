@@ -105,17 +105,14 @@ def target_post_save(target, created):
 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
         if qso[0] != 'None':
-            update_or_create_target_extra(target=target, key='QSO Prob.', value=qprob[0])
             update_or_create_target_extra(target=target, key='QSO Offset', value=qoffset[0])
 
         update_or_create_target_extra(target=target, key='ASASSN Match', value=asassn[0])
         if asassn[0] != 'None':
-            update_or_create_target_extra(target=target, key='ASASSN Prob.', value=asassnprob[0])
             update_or_create_target_extra(target=target, key='ASASSN Offset', value=asassnoffset[0])
 
         update_or_create_target_extra(target=target, key='Gaia Match', value=gaia[0])
         if gaia[0] != 'None':
-            update_or_create_target_extra(target=target, key='Gaia VS Prob.', value=gaiaprob[0])
             update_or_create_target_extra(target=target, key='Gaia VS Offset', value=gaiaoffset[0])
             update_or_create_target_extra(target=target, key='Gaia VS Class', value=gaiaclass[0])
 
