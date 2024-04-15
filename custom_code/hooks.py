@@ -66,7 +66,7 @@ def target_post_save(target, created):
         target.galactic_lat = coord.galactic.b.deg
         target.save()
 
-        qprob, qso, qoffset, asassnprob, asassn, asassnoffset, tns_results, gaiaprob, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
+        qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
 
         if tns_results[0] is not None:
