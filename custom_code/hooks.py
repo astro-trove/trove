@@ -2,7 +2,7 @@ import logging
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
-from tom_targets.models import TargetExtra
+from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
 import json
 import numpy as np
@@ -43,6 +43,9 @@ def process_reduced_ztf_data(target, candidates):
             source_location=candidate['zid'],
             data_type='photometry',
             target=target)
+        tn, created = TargetName.objects.get_or_create(target=target, name=candidate['oid'])
+        if created:
+            logger.info(f'added alias {tn.name} to target {target.name}')
 
 
 def update_or_create_target_extra(target, key, value):
