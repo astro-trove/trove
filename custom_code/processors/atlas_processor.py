@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 class ClippedStackedAtlasProcessor(AtlasProcessor):
     """
     Applies the sigma clipping and stacking recommended by David Young:
-    https://gist.github.com/thespacedoctor/86777fa5a9567b7939e8d84fd8cf6a76#file-plot_atlas_fp-py
+    https://github.com/thespacedoctor/plot-results-from-atlas-force-photometry-service/blob/main/plot_atlas_fp.py
     """
 
     def _process_photometry_from_plaintext(self, data_product):
