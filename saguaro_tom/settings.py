@@ -243,7 +243,7 @@ FACILITIES = {
 
 FORCED_PHOTOMETRY_SERVICES = {
     'ATLAS': {
-        'class': 'tom_dataproducts.forced_photometry.atlas.AtlasForcedPhotometryService',
+        'class': 'custom_code.atlas.CustomAtlasForcedPhotometryService',
         'url': "https://fallingstar-data.com/forcedphot",
         'api_key': os.getenv('ATLAS_FORCED_PHOTOMETRY_API_KEY', ATLAS_API_KEY)
     },
@@ -264,7 +264,7 @@ DATA_PROCESSORS = {
     'photometry': 'tom_dataproducts.processors.photometry_processor.PhotometryProcessor',
     'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
     'MMT': 'tom_mmt.mmt.MMTDataProcessor',
-    'atlas_photometry': 'custom_code.processors.atlas_processor.ClippedStackedAtlasProcessor',
+    'atlas_photometry': 'custom_code.atlas.ClippedStackedAtlasProcessor',
 }
 
 TOM_FACILITY_CLASSES = [

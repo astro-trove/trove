@@ -4,10 +4,33 @@ import numpy as np
 import logging
 
 from tom_dataproducts.exceptions import InvalidFileFormatException
+from tom_dataproducts.forced_photometry.atlas import AtlasForcedPhotometryService, AtlasForcedPhotometryQueryForm
 from tom_dataproducts.processors.atlas_processor import AtlasProcessor
 from kne_cand_vetting.survey_phot import ATLAS_stack
 
 logger = logging.getLogger(__name__)
+
+
+class CustomAtlasForcedPhotometryService(AtlasForcedPhotometryService):
+    name = 'ATLAS'
+
+    def get_form(self):
+        """
+        This method returns the form for querying this service.
+        """
+        return CustomAtlasForcedPhotometryQueryForm
+
+
+class CustomAtlasForcedPhotometryQueryForm(AtlasForcedPhotometryQueryForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # initialize query time range to reasonable values
+        end = Time.now()
+        start = end - 200. * units.d
+        self.fields['min_date'].initial = start.isot
+        self.fields['min_date_mjd'].initial = start.mjd
+        self.fields['max_date'].initial = end.isot
+        self.fields['max_date_mjd'].initial = end.mjd
 
 
 class ClippedStackedAtlasProcessor(AtlasProcessor):
