@@ -56,7 +56,7 @@ def get_most_likely_class(details):
 @register.filter
 def percentformat(value, d=0):
     try:
-        return f'{value:.{d}%}'
+        return f'{float(value):.{d}%}'
     except ValueError:
         return value
 
