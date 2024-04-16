@@ -2,6 +2,7 @@ from astropy import units
 from astropy.time import Time, TimezoneInfo
 import numpy as np
 import logging
+from crispy_forms.layout import Div, HTML
 
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from tom_dataproducts.forced_photometry.atlas import AtlasForcedPhotometryService, AtlasForcedPhotometryQueryForm
@@ -31,6 +32,40 @@ class CustomAtlasForcedPhotometryQueryForm(AtlasForcedPhotometryQueryForm):
         self.fields['min_date_mjd'].initial = start.mjd
         self.fields['max_date'].initial = end.isot
         self.fields['max_date_mjd'].initial = end.mjd
+
+    def layout(self):
+        return Div(
+            Div(
+                Div(
+                    'min_date',
+                    css_class='col-md-5',
+                ),
+                Div(
+                    HTML('OR'),
+                    css_class='col-md-1'
+                ),
+                Div(
+                    'min_date_mjd',
+                    css_class='col-md-5'
+                ),
+                css_class='form-row form-inline mb-2'
+            ),
+            Div(
+                Div(
+                    'max_date',
+                    css_class='col-md-5',
+                ),
+                Div(
+                    HTML('OR'),
+                    css_class='col-md-1'
+                ),
+                Div(
+                    'max_date_mjd',
+                    css_class='col-md-5'
+                ),
+                css_class='form-row form-inline mb-4'
+            ),
+        )
 
 
 class ClippedStackedAtlasProcessor(AtlasProcessor):
