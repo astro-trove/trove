@@ -81,9 +81,10 @@ def target_post_save(target, created):
             if redshift is not None and np.isfinite(redshift) and target.extra_fields.get('Redshift') != redshift:
                 update_or_create_target_extra(target, 'Redshift', redshift)
                 messages.append(f"Redshift set to {redshift}")
-            for internal_name in internal_names.split(', '):
-                if internal_name.strip():
-                    tn, created = TargetName.objects.get_or_create(target=target, name=internal_name.strip())
+            for internal_name in internal_names.split(','):
+                alias = internal_name.strip().replace('SN ', 'SN').replace('AT ', 'AT')
+                if alias and alias != target.name:
+                    tn, created = TargetName.objects.get_or_create(target=target, name=alias)
                     if created:
                         messages.append(f'Added alias {tn.name} from TNS')
 
