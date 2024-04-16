@@ -2,7 +2,7 @@ import logging
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
-from tom_targets.models import TargetExtra
+from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
 import json
 import numpy as np
@@ -70,7 +70,7 @@ def target_post_save(target, created):
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
 
         if tns_results[0] is not None:
-            iau_name, redshift, classification = tns_results[0]
+            iau_name, redshift, classification, internal_names = tns_results[0]
             if target.name != iau_name:
                 target.name = iau_name
                 target.save()
@@ -81,6 +81,11 @@ def target_post_save(target, created):
             if redshift is not None and np.isfinite(redshift) and target.extra_fields.get('Redshift') != redshift:
                 update_or_create_target_extra(target, 'Redshift', redshift)
                 messages.append(f"Redshift set to {redshift}")
+            for internal_name in internal_names.split(', '):
+                if internal_name.strip():
+                    tn, created = TargetName.objects.get_or_create(target=target, name=internal_name.strip())
+                    if created:
+                        messages.append(f'Added alias {tn.name} from TNS')
 
             tnsphot = query_TNSphot(target.name[2:],  # remove prefix
                                     settings.BROKERS['TNS']['bot_id'],
@@ -143,6 +148,9 @@ def target_post_save(target, created):
                 if newdatetime not in olddatetimes:
                     logger.info('New ZTF point at {0}.'.format(newdatetime))
                     newztfphot.append(candidate)
+                tn, created = TargetName.objects.get_or_create(target=target, name=candidate['oid'])
+                if created:
+                    messages.append(f'Added alias {tn.name} from ZTF')
         process_reduced_ztf_data(target, newztfphot)
 
     redshift = target.targetextra_set.filter(key='Redshift')
