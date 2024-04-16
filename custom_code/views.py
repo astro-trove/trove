@@ -15,7 +15,6 @@ from guardian.shortcuts import get_objects_for_user
 from tom_targets.models import Target, TargetList
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
-from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
 from tom_surveys.models import SurveyObservationRecord
 from tom_treasuremap.reporting import report_to_treasure_map
@@ -31,9 +30,6 @@ import requests
 import time
 from io import StringIO
 
-from kne_cand_vetting.survey_phot import ATLAS_forcedphot
-import numpy as np
-from astropy.time import Time, TimezoneInfo
 import paramiko
 import os
 
@@ -332,56 +328,6 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         banners = target_post_save(target, created=True)
         for banner in banners:
             messages.success(request, banner)
-        return HttpResponseRedirect(self.get_redirect_url())
-
-    def get_redirect_url(self):
-        """
-        Returns redirect URL as specified in the HTTP_REFERER field of the request.
-
-        :returns: referer
-        :rtype: str
-        """
-        referer = self.request.META.get('HTTP_REFERER', '/')
-        return referer
-
-
-class TargetATLASForcedPhot(LoginRequiredMixin, RedirectView):
-    """
-    View that runs ATLAS forced photometry over past 200 days and stores result.
-    """
-    def get(self, request, *args, **kwargs):
-        """
-        Method that handles the GET requests for this view. Calls the ATLAS forced photometry function.
-        Converts micro-Jansky values to AB magnitude and separates detections and non-detections.
-        """
-        target = Target.objects.get(pk=kwargs['pk'])
-        atlasphot = ATLAS_forcedphot(target.ra, target.dec, token=settings.ATLAS_API_KEY)
-
-        if len(atlasphot)>1:
-            for candidate in atlasphot:
-                if candidate['uJy'] >= 5*candidate['duJy']:
-                    nondetection = False
-                elif candidate['uJy'] < 5*candidate['duJy']:
-                    nondetection = True
-                else:
-                    continue
-                mjd = Time(candidate['mjd'], format='mjd', scale='utc')
-                mjd.to_datetime(timezone=TimezoneInfo())
-                value = {
-                    'filter': candidate['F']
-                }
-                if nondetection:
-                    value['limit'] = candidate['mag5sig']
-                else:
-                    value['magnitude'] = -2.5*np.log10(candidate['uJy'] * 1e-29) - 48.6
-                    value['error'] = 1.09 * candidate['duJy'] / candidate['uJy']
-                rd, _ = ReducedDatum.objects.get_or_create(
-                    timestamp=mjd.to_datetime(timezone=TimezoneInfo()),
-                    value=value,
-                    source_name='ATLAS',
-                    data_type='photometry',
-                    target=target)
-
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):
