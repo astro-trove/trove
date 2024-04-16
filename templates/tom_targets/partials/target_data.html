@@ -8,14 +8,16 @@
     {% endif %}
     <dd class="col-sm-9">
         {{ target_name }}
-        {% if target_name|slice:":2" == "AT" or target_name|slice:":2" == "SN" %}
+        {% with target_name|slice:":3" as prefix %}
+        {% if prefix == "AT1" or prefix == "AT2" or prefix == "SN1" or prefix == "SN2" %}
             <a href="https://www.wis-tns.org/object/{{ target_name|slice:"2:" }}" target="_blank"><img src="https://www.wis-tns.org/sites/default/files/favicon.png" alt="TNS" title="TNS" style="height: 1em;"></a>
-        {% elif target_name|slice:":3" == 'ZTF' %}
+        {% elif prefix == "ZTF" %}
             <a href="https://alerce.online/object/{{ target_name }}" target="_blank"><img src="https://alerce.online/favicon.ico" alt="ALeRCE" title="ALeRCE" style="height: 1em;"></a>
             <a href="https://antares.noirlab.edu/loci/lookup/{{ target_name }}" target="_blank"><img src="https://antares.noirlab.edu/favicon.ico" alt="ANTARES" title="ANTARES" style="height: 1em;"></a>
             <a href="https://fink-portal.org/{{ target_name }}" target="_blank"><img src="https://fink-portal.org/assets/favicon.ico" alt="Fink" title="Fink" style="height: 1em;"></a>
             <a href="https://lasair-ztf.lsst.ac.uk/objects/{{ target_name }}/" target="_blank"><img src="https://lasair-ztf.lsst.ac.uk/lasair/static/img/favicon/favicon.ico" alt="Lasair" title="Lasair" style="height: 1em;"></a>
         {% endif %}
+        {% endwith %}
     </dd>
   {% endfor %}
   {% for event_candidate in target.eventcandidate_set.all %}
