@@ -27,8 +27,8 @@ SCIMMA_AUTH_USERNAME = '' # username for SCIMMA authentication
 SCIMMA_AUTH_PASSWORD = '' # password for SCIMMA authentication
 SECRET_KEY = ''         # see https://docs.djangoproject.com/en/4.1/ref/settings/#secret-key
 SLACK_LINKS = [  # links to TOMs for Slack alerts, {nle.id} is replaced by the event name (e.g., S190425z)
-    '<https://tom0.edu/nonlocalizedevents/{nle.event_id}/|Name of TOM 0>',  # TOM corresponding to Slack workspace 0
-    '<https://tom1.edu/nonlocalizedevents/{nle.event_id}/|Name of TOM 1>',  # TOM corresponding to Slack workspace 1
+    ('https://tom0.edu/nonlocalizedevents/{nle.event_id}/', 'Name of TOM 0'),  # TOM corresponding to Slack workspace 0
+    ('https://tom1.edu/nonlocalizedevents/{nle.event_id}/', 'Name of TOM 1'),  # TOM corresponding to Slack workspace 1
 ]
 SLACK_TNS_URL = 'https://hooks.slack.com/services/.../.../...'  # incoming webhook for TNS transient alerts
 SLACK_URLS = [  # list of lists of Slack URLs for incoming webhooks

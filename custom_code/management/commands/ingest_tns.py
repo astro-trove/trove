@@ -177,8 +177,7 @@ class Command(BaseCommand):
             seq = nle.sequences.last()
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
             for candidate in candidates:
-                slack_alert = (f'<https://sand.as.arizona.edu/saguaro_tom/targets/{candidate.target.id}/|'
-                               f'{candidate.target.name}> falls in the localization region of '
-                               f'<https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/|'
-                               f'{nle.event_id}>')
-                send_slack(slack_alert, nle, *pick_slack_channel(seq), all_workspaces=False)
+                format_kwargs = {'nle': nle, 'candidate': candidate}
+                slack_alert = ('<https://sand.as.arizona.edu/saguaro_tom/targets/{{candidate.target.id}}/|{{candidate.target.name}}> '
+                               'falls in the localization region of <{link}|{{nle.event_id}}>')
+                send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq), all_workspaces=False)
