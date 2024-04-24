@@ -181,4 +181,4 @@ class Command(BaseCommand):
                                f'{candidate.target.name}> falls in the localization region of '
                                f'<https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/|'
                                f'{nle.event_id}>')
-                send_slack(slack_alert, nle, *pick_slack_channel(seq))
+                send_slack(slack_alert, nle, *pick_slack_channel(seq), all_workspaces=False)

@@ -83,7 +83,7 @@ def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, ha
             twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
-def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
+def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True, all_workspaces=True):
     if is_test_alert:
         return
     elif not is_significant:
@@ -100,6 +100,8 @@ def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=Fal
         body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), ALERT_LINKS.format(link=link).format(nle=nle))
         json_data = json.dumps({'text': body_slack})
         requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
+        if not all_workspaces:
+            break
 
 
 def send_email(subject, body, is_test_alert=False):
