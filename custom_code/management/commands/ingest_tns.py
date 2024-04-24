@@ -172,7 +172,7 @@ class Command(BaseCommand):
 
         # automatically associate with nonlocalized events
         active_nles = get_active_nonlocalizedevents()
-        target_ids = [target.id for target in new_targets + updated_targets]
+        target_ids = [target.id for target in new_targets] + [target.id for target in updated_targets]
         for nle in active_nles:
             seq = nle.sequences.last()
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
