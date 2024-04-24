@@ -100,7 +100,7 @@ def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is
         body_slack = body.format(link=link, service=service).format(**format_kwargs)
         logger.info(f'Sending GW alert: {body_slack}')
         json_data = json.dumps({'text': body_slack})
-        # requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
+        requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
         if not all_workspaces:
             break
 
