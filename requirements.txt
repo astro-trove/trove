@@ -6,6 +6,7 @@ django-extensions
 django-filter
 django-guardian
 django-phonenumber-field[phonenumberslite]
+healpix-alchemy
 healpy
 kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
