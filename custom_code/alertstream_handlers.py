@@ -145,6 +145,16 @@ def calculate_credible_region(skymap, localization, probability=0.9):
     logger.info('Calculated skymap contours')
 
 
+def pick_slack_channel(seq):
+    is_test_alert = seq.nonlocalizedevent.event_id.startswith('M')
+    is_significant = seq.details['significant']
+    is_burst = seq.details['group'] == 'Burst'
+    has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01 \
+             or seq.details['classification'].get('BNS', 0.) >= 0.01 \
+             or seq.details['classification'].get('NSBH', 0.) >= 0.01
+    return is_test_alert, is_significant, is_burst, has_ns
+
+
 def handle_message_and_send_alerts(message, metadata):
     # get skymap bytes out for later
     try:
@@ -172,11 +182,7 @@ def handle_message_and_send_alerts(message, metadata):
                 localizations.append(seq.localization)
             if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
                 localizations.append(seq.external_coincidence.localization)
-        is_significant = seq.details['significant']
-        is_burst = seq.details['group'] == 'Burst'
-        has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01 \
-            or seq.details['classification'].get('BNS', 0.) >= 0.01 \
-            or seq.details['classification'].get('NSBH', 0.) >= 0.01
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         derived_quantities = {
             'most_likely_class': get_most_likely_class(seq.details),
             'inverse_far': format_inverse_far(seq.details['far']),
@@ -202,7 +208,6 @@ def handle_message_and_send_alerts(message, metadata):
         is_significant = False
         is_burst = False
         has_ns = False
-    is_test_alert = nle.event_id.startswith('M')
     # send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
     send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
     # send_email(email_subject, body, is_test_alert=is_test_alert)

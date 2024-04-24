@@ -3,6 +3,9 @@ from django.conf import settings
 from django.db import connection
 from tom_targets.models import Target
 from custom_code.hooks import target_post_save
+from custom_code.healpix_utils import create_candidates_from_targets
+from custom_code.alertstream_handlers import pick_slack_channel, send_slack
+from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
 import requests
 import json
 import logging
@@ -166,3 +169,16 @@ class Command(BaseCommand):
 
             json_data = json.dumps({'text': slack_alert}).encode('ascii')
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+
+        # automatically associate with nonlocalized events
+        active_nles = get_active_nonlocalizedevents()
+        target_ids = [target.id for target in new_targets + updated_targets]
+        for nle in active_nles:
+            seq = nle.sequences.last()
+            candidates = create_candidates_from_targets(seq, target_ids=target_ids)
+            for candidate in candidates:
+                slack_alert = (f'<https://sand.as.arizona.edu/saguaro_tom/targets/{candidate.target.id}/|'
+                               f'{candidate.target.name}> falls in the localization region of '
+                               f'<https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/|'
+                               f'{nle.event_id}>')
+                send_slack(slack_alert, nle, *pick_slack_channel(seq))
