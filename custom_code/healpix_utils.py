@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base, Session
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile
+from tom_nonlocalizedevents.healpix_utils import update_all_credible_region_percents_for_candidates
 from tom_surveys.models import SurveyField
 from tom_targets.models import Target
 from .models import SurveyFieldCredibleRegion
@@ -135,4 +136,9 @@ def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
                 new_candidates.append(ec)
 
         logger.info(f'Linked {len(new_candidates)} new candidates to event {eventsequence.nonlocalizedevent.event_id}')
+
+        localizations = eventsequence.nonlocalizedevent.localizations.all()
+        for localization in localizations:
+            update_all_credible_region_percents_for_candidates(localization, [cand.id for cand in new_candidates])
+
         return new_candidates
