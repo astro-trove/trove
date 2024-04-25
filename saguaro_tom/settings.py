@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'tom_surveys',
     'tom_treasuremap',
     'phonenumber_field',
+    'django_dramatiq',
 ]
 
 SITE_ID = 1
@@ -103,6 +104,19 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
 
+DRAMATIQ_BROKER = {
+    "BROKER": "dramatiq.brokers.redis.RedisBroker",
+    "OPTIONS": {
+        "url": "redis://localhost:6379"
+    },
+    "MIDDLEWARE": [
+        "dramatiq.middleware.AgeLimit",
+        "dramatiq.middleware.TimeLimit",
+        "dramatiq.middleware.Callbacks",
+        "dramatiq.middleware.Retries",
+        "django_dramatiq.middleware.DbConnectionsMiddleware",
+    ]
+}
 
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
