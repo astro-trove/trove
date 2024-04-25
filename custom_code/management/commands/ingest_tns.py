@@ -148,8 +148,8 @@ class Command(BaseCommand):
             # check if any of the possible host galaxies are within 40 Mpc
             for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
                 if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
-                    slack_alert = (f'<https://sand.as.arizona.edu/saguaro_tom/targets/{target.id}/|{target.name}> is '
-                                   f'{galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.')
+                    slack_alert = (f'<{settings.TARGET_LINKS[0][0]}/|{target.name}> is {galaxy["Offset"]:.1f}" from '
+                                   f'galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.').format(target=target)
                     break
             else:
                 continue
@@ -177,7 +177,7 @@ class Command(BaseCommand):
             seq = nle.sequences.last()
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
             for candidate in candidates:
-                format_kwargs = {'nle': nle, 'candidate': candidate}
-                slack_alert = ('<https://sand.as.arizona.edu/saguaro_tom/targets/{{candidate.target.id}}/|{{candidate.target.name}}> '
-                               'falls in the localization region of <{link}|{{nle.event_id}}>')
-                send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq), all_workspaces=False)
+                format_kwargs = {'nle': nle, 'target': candidate.target}
+                slack_alert = ('<{target_link}|{{target.name}}> falls in the '
+                               'localization region of <{nle_link}|{{nle.event_id}}>')
+                send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))

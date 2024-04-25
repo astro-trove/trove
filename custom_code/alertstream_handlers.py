@@ -46,7 +46,7 @@ Terrestrial = {{Terrestrial:.0%}}
 """
 
 # links for Slack
-ALERT_LINKS = ('<{link}|{service}> <{{nle.hermes_url}}|Hermes> '
+ALERT_LINKS = ('<{nle_link}|{service}> <{{nle.hermes_url}}|Hermes> '
                '<{{nle.gracedb_url}}|GraceDB> <{{nle.treasuremap_url}}|Treasure Map>')
 
 ALERT_TEXT_RETRACTION = "{{most_likely_class}} {{nle.event_id}} {{nle.state}}"
@@ -96,8 +96,8 @@ def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is
         channel = 3
         body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
-    for url_list, (link, service) in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        body_slack = body.format(link=link, service=service).format(**format_kwargs)
+    for url_list, (nle_link, service), (target_link, _) in zip(settings.SLACK_URLS, settings.NLE_LINKS, settings.TARGET_LINKS):
+        body_slack = body.format(nle_link=nle_link, service=service, target_link=target_link).format(**format_kwargs)
         logger.info(f'Sending GW alert: {body_slack}')
         json_data = json.dumps({'text': body_slack})
         requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
