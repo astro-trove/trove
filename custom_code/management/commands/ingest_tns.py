@@ -171,7 +171,7 @@ class Command(BaseCommand):
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
         # automatically associate with nonlocalized events
-        active_nles = get_active_nonlocalizedevents()
+        active_nles = get_active_nonlocalizedevents(lookback_days=7.)
         target_ids = [target.id for target in new_targets] + [target.id for target in updated_targets]
         for nle in active_nles:
             seq = nle.sequences.last()
