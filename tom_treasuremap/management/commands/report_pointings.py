@@ -11,6 +11,21 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def get_active_nonlocalizedevents(t0=None, lookback_days=3., test=False):
+    """
+    Returns a queryset containing "active" NonLocalizedEvents, significant events that happened less than
+    `lookback_days` before `t0` and have not been retracted. Use `test=True` to query mock events instead of real ones.
+    """
+    if t0 is None:
+        t0 = Time.now()
+    lookback_window_nle = t0 - lookback_days * u.day
+    active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle.isot,
+                                                   sequences__details__significant=True,
+                                                   state='ACTIVE',
+                                                   event_id__startswith='MS' if test else 'S').distinct()
+    return active_nles
+
+
 class Command(BaseCommand):
 
     help = 'Reports completed survey pointings to the Gravitational Wave Treasure Map (https://treasuremap.space)'
@@ -26,17 +41,13 @@ class Command(BaseCommand):
 
     def handle(self, lookback_days_nle=3., lookback_days_obs=1., contour_percent=95., test=False, **kwargs):
         now = Time.now()
-        lookback_window_nle = now - (lookback_days_nle + lookback_days_obs) * u.day
-        active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle.isot,
-                                                       sequences__details__significant=True,
-                                                       state='ACTIVE',
-                                                       event_id__startswith='MS' if test else 'S').distinct()
+        lookback_window_obs = now - lookback_days_obs * u.day
+        active_nles = get_active_nonlocalizedevents(lookback_window_obs, lookback_days_nle, test=test)
         if not active_nles.exists():
             logger.info('No active nonlocalized events found')
             return
         logger.info(f'Found active nonlocalized events: {", ".join([nle.event_id for nle in active_nles])}')
 
-        lookback_window_obs = now - lookback_days_obs * u.day
         recent_obs = SurveyObservationRecord.objects.filter(created__gt=lookback_window_obs.to_datetime(TimezoneInfo()),
                                                             created__lte=now.to_datetime(TimezoneInfo()))
         loc_filter = LocalizationFilter()

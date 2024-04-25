@@ -20,53 +20,53 @@ logger = logging.getLogger(__name__)
 
 twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
-ALERT_TEXT_INTRO = """{most_likely_class} {seq.event_subtype} v{seq.sequence_id}
-{nle.event_id} ({significance})
-{time}
-1/FAR = {inverse_far}
+ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequence_id}}
+{{nle.event_id}} ({{significance}})
+{{time}}
+1/FAR = {{inverse_far}}
 """
 
-ALERT_TEXT_LOCALIZATION = """Distance = {distance}
-50% Area = {seq.localization.area_50:.0f} deg²
-90% Area = {seq.localization.area_90:.0f} deg²
+ALERT_TEXT_LOCALIZATION = """Distance = {{distance}}
+50% Area = {{seq.localization.area_50:.0f}} deg²
+90% Area = {{seq.localization.area_90:.0f}} deg²
 """
 
-ALERT_TEXT_EXTERNAL_COINCIDENCE = """Distance (comb.) = {distance_external}
-50% Area (comb.) = {seq.external_coincidence.localization.area_50:.0f} deg²
-90% Area (comb.) = {seq.external_coincidence.localization.area_90:.0f} deg²
+ALERT_TEXT_EXTERNAL_COINCIDENCE = """Distance (comb.) = {{distance_external}}
+50% Area (comb.) = {{seq.external_coincidence.localization.area_50:.0f}} deg²
+90% Area (comb.) = {{seq.external_coincidence.localization.area_90:.0f}} deg²
 """
 
-ALERT_TEXT_CLASSIFICATION = """Has NS = {HasNS:.0%}
-Has Mass Gap = {HasMassGap:.0%}
-Has Remnant = {HasRemnant:.0%}
-BNS = {BNS:.0%}
-NSBH = {NSBH:.0%}
-BBH = {BBH:.0%}
-Terrestrial = {Terrestrial:.0%}
+ALERT_TEXT_CLASSIFICATION = """Has NS = {{HasNS:.0%}}
+Has Mass Gap = {{HasMassGap:.0%}}
+Has Remnant = {{HasRemnant:.0%}}
+BNS = {{BNS:.0%}}
+NSBH = {{NSBH:.0%}}
+BBH = {{BBH:.0%}}
+Terrestrial = {{Terrestrial:.0%}}
 """
 
-ALERT_TEXT_URL = "https://sand.as.arizona.edu/saguaro_tom/nonlocalizedevents/{nle.event_id}/"
+# links for Slack
+ALERT_LINKS = ('<{nle_link}|{service}> <{{nle.hermes_url}}|Hermes> '
+               '<{{nle.gracedb_url}}|GraceDB> <{{nle.treasuremap_url}}|Treasure Map>')
 
-ALERT_TEXT_RETRACTION = "{most_likely_class} {nle.event_id} {nle.state}"
+ALERT_TEXT_RETRACTION = "{{most_likely_class}} {{nle.event_id}} {{nle.state}}"
 
-ALERT_TEXT_BURST = ALERT_TEXT_INTRO + """50% Area = {seq.localization.area_50:.0f} deg²
-90% Area = {seq.localization.area_90:.0f} deg²
-Duration = {duration_ms:.0f} ms
-Frequency = {central_frequency:.0f} Hz
-""" + ALERT_TEXT_URL
+ALERT_TEXT_BURST = ALERT_TEXT_INTRO + """50% Area = {{seq.localization.area_50:.0f}} deg²
+90% Area = {{seq.localization.area_90:.0f}} deg²
+Duration = {{duration_ms:.0f}} ms
+Frequency = {{central_frequency:.0f}} Hz
+""" + ALERT_LINKS
 
 ALERT_TEXT = [  # index = number of localizations available
-    ALERT_TEXT_INTRO + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
-    ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_URL,
+    ALERT_TEXT_INTRO + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
+    ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_EXTERNAL_COINCIDENCE + ALERT_TEXT_CLASSIFICATION +
-    ALERT_TEXT_URL,
+    ALERT_LINKS,
 ]
-
-# links for Slack; replaces ALERT_TEXT_URL
-ALERT_LINKS = '{link} <{{nle.hermes_url}}|Hermes> <{{nle.gracedb_url}}|GraceDB> <{{nle.treasuremap_url}}|Treasure Map>'
 
 
 def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
+    """This doesn't currently work"""
     body_ascii = body.replace('±', '+/-').replace('²', '2')
     for user in Profile.objects.all():
         if is_test_alert:
@@ -83,7 +83,7 @@ def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, ha
             twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
-def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
+def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True, all_workspaces=True):
     if is_test_alert:
         return
     elif not is_significant:
@@ -96,13 +96,17 @@ def send_slack(body, nle, is_test_alert=False, is_significant=True, is_burst=Fal
         channel = 3
         body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
     headers = {'Content-Type': 'application/json'}
-    for url_list, link in zip(settings.SLACK_URLS, settings.SLACK_LINKS):
-        body_slack = body.replace(ALERT_TEXT_URL.format(nle=nle), ALERT_LINKS.format(link=link).format(nle=nle))
+    for url_list, (nle_link, service), (target_link, _) in zip(settings.SLACK_URLS, settings.NLE_LINKS, settings.TARGET_LINKS):
+        body_slack = body.format(nle_link=nle_link, service=service, target_link=target_link).format(**format_kwargs)
+        logger.info(f'Sending GW alert: {body_slack}')
         json_data = json.dumps({'text': body_slack})
         requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
+        if not all_workspaces:
+            break
 
 
 def send_email(subject, body, is_test_alert=False):
+    """This doesn't currently work"""
     msg = MIMEText(body)
     msg['Subject'] = subject
     msg['From'] = settings.ALERT_EMAIL_FROM
@@ -145,6 +149,61 @@ def calculate_credible_region(skymap, localization, probability=0.9):
     logger.info('Calculated skymap contours')
 
 
+def pick_slack_channel(seq):
+    is_test_alert = seq.nonlocalizedevent.event_id.startswith('M')
+    is_significant = seq.details['significant']
+    is_burst = seq.details['group'] == 'Burst'
+    has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01 \
+             or seq.details['classification'].get('BNS', 0.) >= 0.01 \
+             or seq.details['classification'].get('NSBH', 0.) >= 0.01
+    return is_test_alert, is_significant, is_burst, has_ns
+
+
+def prepare_and_send_alerts(nle, seq):
+    localizations = []
+    try:
+        if seq is None:  # retraction
+            seq = nle.sequences.last()
+        else:
+            if seq.localization is not None:
+                localizations.append(seq.localization)
+            if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
+                localizations.append(seq.external_coincidence.localization)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        format_kwargs = {
+            'nle': nle,
+            'seq': seq,
+            'most_likely_class': get_most_likely_class(seq.details),
+            'inverse_far': format_inverse_far(seq.details['far']),
+            'significance': 'significant' if is_significant else 'subthreshold',
+        }
+        if nle.state == 'RETRACTED':
+            alert_text = ALERT_TEXT_RETRACTION
+        elif is_burst:
+            alert_text = ALERT_TEXT_BURST
+            format_kwargs['duration_ms'] = seq.details['duration'] * 1000.
+        else:
+            alert_text = ALERT_TEXT[len(localizations)]
+            if localizations:
+                format_kwargs['distance'] = format_distance(localizations[0])
+            if len(localizations) > 1:
+                format_kwargs['distance_external'] = format_distance(localizations[1])
+        format_kwargs.update(seq.details['properties'])
+        format_kwargs.update(seq.details['classification'])
+        format_kwargs.update(seq.details)
+    except Exception as e:
+        logger.error(f'Could not parse GW alert: {e}')
+        alert_text = f'Received a GW alert that could not be parsed. Check GraceDB: {nle.gracedb_url}'
+        format_kwargs = {}
+        is_test_alert = nle.event_id.startswith('M')
+        is_significant = False
+        is_burst = False
+        has_ns = False
+    send_slack(alert_text, format_kwargs,
+               is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
+    return localizations
+
+
 def handle_message_and_send_alerts(message, metadata):
     # get skymap bytes out for later
     try:
@@ -161,51 +220,7 @@ def handle_message_and_send_alerts(message, metadata):
         logger.info('Test alert not saved')
         return
 
-    # send SMS, Slack, and email alerts
-    email_subject = nle.event_id
-    localizations = []
-    try:
-        if seq is None:  # retraction
-            seq = nle.sequences.last()
-        else:
-            if seq.localization is not None:
-                localizations.append(seq.localization)
-            if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
-                localizations.append(seq.external_coincidence.localization)
-        is_significant = seq.details['significant']
-        is_burst = seq.details['group'] == 'Burst'
-        has_ns = seq.details['properties'].get('HasNS', 0.) >= 0.01 \
-            or seq.details['classification'].get('BNS', 0.) >= 0.01 \
-            or seq.details['classification'].get('NSBH', 0.) >= 0.01
-        derived_quantities = {
-            'most_likely_class': get_most_likely_class(seq.details),
-            'inverse_far': format_inverse_far(seq.details['far']),
-            'significance': 'significant' if is_significant else 'subthreshold',
-        }
-        if nle.state == 'RETRACTED':
-            alert_text = ALERT_TEXT_RETRACTION
-        elif is_burst:
-            alert_text = ALERT_TEXT_BURST
-            derived_quantities['duration_ms'] = seq.details['duration'] * 1000.
-        else:
-            alert_text = ALERT_TEXT[len(localizations)]
-            if localizations:
-                derived_quantities['distance'] = format_distance(localizations[0])
-            if len(localizations) > 1:
-                derived_quantities['distance_external'] = format_distance(localizations[1])
-        body = alert_text.format(nle=nle, seq=seq, **seq.details, **derived_quantities,
-                                 **seq.details['properties'], **seq.details['classification'])
-        logger.info(f'Sending GW alert: {body}')
-    except Exception as e:
-        logger.error(f'Could not parse GW alert: {e}')
-        body = f'Received a GW alert that could not be parsed. Check GraceDB: {nle.gracedb_url}'
-        is_significant = False
-        is_burst = False
-        has_ns = False
-    is_test_alert = nle.event_id.startswith('M')
-    # send_text(body, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
-    send_slack(body, nle, is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
-    # send_email(email_subject, body, is_test_alert=is_test_alert)
+    localizations = prepare_and_send_alerts(nle, seq)
 
     for localization in localizations:
         if CredibleRegionContour.objects.filter(localization=localization).exists():

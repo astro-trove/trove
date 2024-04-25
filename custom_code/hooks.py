@@ -9,6 +9,7 @@ import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
+from healpix_alchemy.constants import HPX
 from django.conf import settings
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
@@ -65,6 +66,8 @@ def target_post_save(target, created):
         target.galactic_lng = coord.galactic.l.deg
         target.galactic_lat = coord.galactic.b.deg
         target.save()
+
+        update_or_create_target_extra(target=target, key='healpix', value=HPX.skycoord_to_healpix(coord))
 
         qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)

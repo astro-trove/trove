@@ -3,6 +3,9 @@ from django.conf import settings
 from django.db import connection
 from tom_targets.models import Target
 from custom_code.hooks import target_post_save
+from custom_code.healpix_utils import create_candidates_from_targets
+from custom_code.alertstream_handlers import pick_slack_channel, send_slack
+from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
 import requests
 import json
 import logging
@@ -145,8 +148,8 @@ class Command(BaseCommand):
             # check if any of the possible host galaxies are within 40 Mpc
             for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
                 if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
-                    slack_alert = (f'<https://sand.as.arizona.edu/saguaro_tom/targets/{target.id}/|{target.name}> is '
-                                   f'{galaxy["Offset"]:.1f}" from galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.')
+                    slack_alert = (f'<{settings.TARGET_LINKS[0][0]}/|{target.name}> is {galaxy["Offset"]:.1f}" from '
+                                   f'galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.').format(target=target)
                     break
             else:
                 continue
@@ -166,3 +169,15 @@ class Command(BaseCommand):
 
             json_data = json.dumps({'text': slack_alert}).encode('ascii')
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+
+        # automatically associate with nonlocalized events
+        active_nles = get_active_nonlocalizedevents(lookback_days=7.)
+        target_ids = [target.id for target in new_targets] + [target.id for target in updated_targets]
+        for nle in active_nles:
+            seq = nle.sequences.last()
+            candidates = create_candidates_from_targets(seq, target_ids=target_ids)
+            for candidate in candidates:
+                format_kwargs = {'nle': nle, 'target': candidate.target}
+                slack_alert = ('<{target_link}|{{target.name}}> falls in the '
+                               'localization region of <{nle_link}|{{nle.event_id}}>')
+                send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
