@@ -79,3 +79,41 @@ Then run
 cd /var/www/saguaro_tom/
 sudo nohup python manage.py readstreams > /home/saguaro/alertstreams.log 2>&1 &
 ```
+
+## Allowing for asynchronous tasks
+We use ![redis](https://redis.io) and ![dramatiq](https://dramatiq.io) to run asynchronous tasks (e.g., ATLAS forced photometry queries).
+Redis is installed according to the instructions on its ![readme](https://github.com/redis/redis).
+Dramatiq is configured according to the ![TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/managing_data/forced_photometry.html#configuring-your-tom-to-serve-tasks-asynchronously).
+These should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
+```
+@reboot /usr/local/bin/redis-server > /home/saguaro/redis.log 2>&1
+@reboot cd /var/www/saguaro_tom/; python manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
+```
+
+If either of these does not restart, or you need to restart them manually, run the following on `sand`. First, kill any other instances are running:
+```
+sudo pkill -f redis-server
+sudo pkill -f rundramatiq
+```
+
+Then run
+```
+sudo nohup redis-server > /home/saguaro/redis.log 2>&1
+cd /var/www/saguaro_tom/
+sudo nohup python manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
+```
+
+## Other periodic tasks
+Several other tasks run every hour as cronjobs (as root):
+```
+0 * * * * /var/www/saguaro_tom/manage.py report_pointings > /home/saguaro/report_pointings.log 2>&1
+0 * * * * /var/www/saguaro_tom/manage.py updatestatus > /home/saguaro/observation_status.log 2>&1
+0 * * * * /var/www/saguaro_tom/manage.py verify_listener --max-seconds 10000 > /home/saguaro/verify_listener.log 2>&1
+10 * * * * /var/www/saguaro_tom/manage.py ingest_tns > /home/saguaro/ingest_tns.log 2>&1
+```
+
+Respectively, these:
+- report survey pointings to the ![Treasure Map](https://treasuremap.space)
+- update the statuses of observations scheduled through the TOM (e.g., MMT)
+- verify that the GW alert listener is functioning by checking that we received a test alert in the last 10000 seconds
+- ingest targets from the ![TNS](https://wis-tns.org) (the TNS table is updated on the hour, so we run this 10 minutes after)
