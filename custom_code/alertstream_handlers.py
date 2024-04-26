@@ -237,3 +237,5 @@ def handle_message_and_send_alerts(message, metadata):
                 skymap = Table.read(BytesIO(skymap_bytes))
                 calculate_credible_region(skymap, localization)
                 calculate_footprint_probabilities(skymap, localization)
+
+    logger.info(f'Finished processing alert for {nle.event_id}')
