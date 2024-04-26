@@ -83,7 +83,8 @@ def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, ha
             twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
-def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True, all_workspaces=True):
+def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True,
+               all_workspaces=True, at=None):
     if is_test_alert:
         return
     elif not is_significant:
@@ -94,7 +95,8 @@ def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is
         channel = 2
     else:
         channel = 3
-        body = ('<!here>\n' if 'RETRACTED' in body else '<!channel>\n') + body
+    if at is not None:
+        body = f'<!{at}>\n' + body
     headers = {'Content-Type': 'application/json'}
     for url_list, (nle_link, service), (target_link, _) in zip(settings.SLACK_URLS, settings.NLE_LINKS, settings.TARGET_LINKS):
         body_slack = body.format(nle_link=nle_link, service=service, target_link=target_link).format(**format_kwargs)
@@ -199,8 +201,12 @@ def prepare_and_send_alerts(nle, seq):
         is_significant = False
         is_burst = False
         has_ns = False
+    if is_significant and not is_burst and has_ns:
+        at = 'here' if 'RETRACTED' in alert_text else 'channel'
+    else:
+        at = None
     send_slack(alert_text, format_kwargs,
-               is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns)
+               is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns, at=at)
     return localizations
 
 
