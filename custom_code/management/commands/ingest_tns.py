@@ -19,13 +19,26 @@ class Command(BaseCommand):
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
 
     def handle(self, **kwargs):
-        logger.info('Crossmatching TNS with targets table. This will take several minutes.')
 
+        updated_targets_coords = Target.objects.raw(
+            """
+            --STEP 0: update coordinates of existing targets with TNS names
+            UPDATE tom_targets_target AS tt
+            SET name=CONCAT(tns.name_prefix, tns.name), ra=tns.ra, dec=tns.declination, modified=NOW()
+            FROM tns_q3c as tns
+            WHERE SUBSTRING(tt.name, 3)=tns.name AND q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
+            RETURNING tt.*;
+            """
+        )
+        logger.info(f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS.")
+
+        logger.info('Crossmatching TNS with targets table. This will take several minutes.')
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 --STEP 1: crossmatch TNS transients with existing targets and store in tns_matches table
-                SELECT target.id, target.name, t.tns_name, t.sep, t.ra, t.dec INTO tns_matches
+                CREATE TEMPORARY TABLE tns_matches AS
+                SELECT target.id, target.name, t.tns_name, t.sep, t.ra, t.dec
                 FROM tom_targets_target AS target LEFT JOIN LATERAL (
                     SELECT CONCAT(tns.name_prefix, tns.name) AS tns_name,
                         q3c_dist(target.ra, target.dec, tns.ra, tns.declination) AS sep,
@@ -37,7 +50,8 @@ class Command(BaseCommand):
                 ) AS t ON true
                 WHERE t.tns_name IS NOT NULL;
                 
-                SELECT DISTINCT ON (tns_name) * INTO top_tns_matches
+                CREATE TEMPORARY TABLE top_tns_matches AS
+                SELECT DISTINCT ON (tns_name) *
                 FROM tns_matches
                 ORDER BY tns_name, sep, name; -- if there are duplicates in the TNS, use the earlier one
                 
@@ -64,8 +78,8 @@ class Command(BaseCommand):
             cursor.execute(
                 """
                 --STEP 3: merge any other matches into the new target
+                CREATE TEMPORARY TABLE targets_to_merge AS
                 SELECT tm.id AS old_id, ttm.id  AS new_id, tm.name AS old_name, ttm.name AS new_name
-                INTO targets_to_merge
                 FROM tns_matches as tm
                 JOIN top_tns_matches AS ttm ON ttm.name=tm.tns_name;
                 
@@ -136,8 +150,8 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        with connection.cursor() as cursor:
-            cursor.execute("DROP TABLE tns_matches, top_tns_matches, targets_to_merge; -- cleanup")
+        for target in updated_targets_coords:
+            target_post_save(target, created=True)
 
         for target in updated_targets:
             target_post_save(target, created=True)
