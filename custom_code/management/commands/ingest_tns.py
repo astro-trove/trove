@@ -21,6 +21,18 @@ class Command(BaseCommand):
     def handle(self, **kwargs):
         logger.info('Crossmatching TNS with targets table. This will take several minutes.')
 
+        updated_targets_coords = Target.objects.raw(
+            """
+            --STEP 0: update coordinates of existing targets with TNS names
+            UPDATE tom_targets_target AS tt
+            SET name=CONCAT(tns.name_prefix, tns.name), ra=tns.ra, dec=tns.declination, modified=NOW()
+            FROM tns_q3c as tns
+            WHERE SUBSTRING(tt.name, 3)=tns.name AND q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
+            RETURNING tt.*;
+            """
+        )
+        logger.info(f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS.")
+
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -138,7 +150,7 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        for target in updated_targets:
+        for target in updated_targets.union(updated_targets_coords):
             target_post_save(target, created=True)
 
         for target in new_targets:
