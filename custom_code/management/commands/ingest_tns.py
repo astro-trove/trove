@@ -19,7 +19,6 @@ class Command(BaseCommand):
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
 
     def handle(self, **kwargs):
-        logger.info('Crossmatching TNS with targets table. This will take several minutes.')
 
         updated_targets_coords = Target.objects.raw(
             """
@@ -33,6 +32,7 @@ class Command(BaseCommand):
         )
         logger.info(f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS.")
 
+        logger.info('Crossmatching TNS with targets table. This will take several minutes.')
         with connection.cursor() as cursor:
             cursor.execute(
                 """
