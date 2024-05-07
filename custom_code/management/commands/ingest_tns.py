@@ -150,7 +150,10 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        for target in updated_targets.union(updated_targets_coords):
+        for target in updated_targets_coords:
+            target_post_save(target, created=True)
+
+        for target in updated_targets:
             target_post_save(target, created=True)
 
         for target in new_targets:
