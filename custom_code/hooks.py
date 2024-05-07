@@ -72,8 +72,10 @@ def target_post_save(target, created):
         qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
 
-        if tns_results[0] is not None:
-            iau_name, redshift, classification, internal_names = tns_results[0]
+        if tns_results:
+            for iau_name, redshift, classification, internal_names in tns_results:
+                if target.name[2:] == iau_name[2:]:  # choose the name that already matches, if more than one
+                    break
             if target.name != iau_name:
                 target.name = iau_name
                 target.save()
