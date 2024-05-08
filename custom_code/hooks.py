@@ -135,7 +135,7 @@ def target_post_save(target, created):
         matches, hostdict = galaxy_search(target.ra, target.dec, db_connect=DB_CONNECT)
         update_or_create_target_extra(target=target, key='Host Galaxies', value=json.dumps(hostdict))
 
-        if hostdict:
+        if hostdict and target.distance is None:
             dist = hostdict[0].get('Dist', np.nan)
             if np.isfinite(dist):
                 target.distance = dist
