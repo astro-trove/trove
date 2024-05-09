@@ -235,3 +235,22 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
         'target': target,
         'plot': offline.plot(fig, output_type='div', show_link=False)
     }
+
+
+@register.filter
+def format_mag(datum, d=2):
+    if datum.get('magnitude'):
+        datum['magnitude'] = float(datum['magnitude'])
+        if datum.get('error'):
+            datum['error'] = float(datum['error'])
+            display_str = f'{{magnitude:.{d}f}} ± {{error:.{d}f}}'
+        elif datum.get('limit'):
+            display_str = f'> {{magnitude:.{d}f}}'
+        else:
+            display_str = f'{{magnitude:.{d}f}}'
+        return display_str.format(**datum)
+
+
+@register.filter
+def error_to_snr(error):
+    return 2.5 / np.log(10.) / error
