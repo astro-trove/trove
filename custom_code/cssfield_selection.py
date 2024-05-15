@@ -117,7 +117,7 @@ def calculate_footprint_probabilities(skymap, localization):
 CSS_LOCATION = EarthLocation(lat=32.4433333333 * u.deg, lon=-110.788888889 * u.deg, height=2790 * u.m)
 
 
-def observable_tonight(target):
+def observable_tonight(target, now=None):
     """
     Determine the first time during the ongoing (if run at night) or upcoming (if run during the day) night that the
     target is above the horizon and outside the moon restriction. If the target is not visible during the ongoing or
@@ -125,7 +125,11 @@ def observable_tonight(target):
     30-minute resolution.
     """
     radec = SkyCoord(target.ra, target.dec, unit=u.deg)
-    time = Time.now() + np.linspace(0., 1 * u.day, 48)
+    if now is None:
+        now = Time.now()
+    else:
+        now = Time(now)
+    time = now + np.linspace(0., 1 * u.day, 48)
     frame = AltAz(obstime=time, location=CSS_LOCATION)
 
     altaz = radec.transform_to(frame)
@@ -145,7 +149,7 @@ def observable_tonight(target):
     return observable.any() and time[now_or_sunset + np.flatnonzero(observable).min()]
 
 
-def rank_css_fields(queryset, n_select=12, n_groups=3):
+def rank_css_fields(queryset, n_select=12, n_groups=3, now=None):
     queryset.update(group=None, rank_in_group=None)  # erase any previous ranking
     queryset = queryset.filter(survey_field__has_reference=True).order_by('-probability_contained')
     fields_remaining = list(queryset)
@@ -155,7 +159,7 @@ def rank_css_fields(queryset, n_select=12, n_groups=3):
             for cr in fields_remaining.copy():
                 if r == 0 or cr in adjacent:
                     fields_remaining.remove(cr)
-                    first_observable = observable_tonight(cr.survey_field)
+                    first_observable = observable_tonight(cr.survey_field, now=now)
                     if first_observable:
                         cr.group = g + 1
                         cr.rank_in_group = r + 1
