@@ -111,7 +111,11 @@ class Command(BaseCommand):
                 UPDATE tom_targets_targetextra
                 SET target_id=new_id
                 FROM targets_to_merge
-                WHERE target_id=old_id;
+                WHERE target_id=old_id
+                ON CONFLICT (tom_targets_targetextra_target_id_key_375dc83f_uniq) DO NOTHING;
+
+                DELETE FROM tom_targets_targetextra
+                WHERE target_id IN (SELECT old_id FROM targets_to_merge);
                 
                 UPDATE tom_targets_targetlist_targets
                 SET target_id=new_id
