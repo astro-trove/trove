@@ -112,7 +112,10 @@ class Command(BaseCommand):
                 SET target_id=new_id
                 FROM targets_to_merge
                 WHERE target_id=old_id
-                ON CONFLICT (tom_targets_targetextra_target_id_key_375dc83f_uniq) DO NOTHING;
+                AND NOT EXISTS (
+                    SELECT 1 FROM tom_targets_targetextra
+                    WHERE target_id=new_id AND key=key
+                );
 
                 DELETE FROM tom_targets_targetextra
                 WHERE target_id IN (SELECT old_id FROM targets_to_merge);
