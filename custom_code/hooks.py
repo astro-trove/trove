@@ -88,10 +88,9 @@ def target_post_save(target, created):
                 messages.append(f"Redshift set to {redshift}")
             for internal_name in internal_names.split(','):
                 alias = internal_name.strip().replace('SN ', 'SN').replace('AT ', 'AT')
-                if alias and alias != target.name:
-                    tn, created = TargetName.objects.get_or_create(target=target, name=alias)
-                    if created:
-                        messages.append(f'Added alias {tn.name} from TNS')
+                if alias and alias != target.name and not TargetName.objects.filter(name=alias).exists():
+                    tn = TargetName.objects.create(target=target, name=alias)
+                    messages.append(f'Added alias {tn.name} from TNS')
 
             tnsphot = query_TNSphot(target.name[2:],  # remove prefix
                                     settings.BROKERS['TNS']['bot_id'],
@@ -154,8 +153,8 @@ def target_post_save(target, created):
                 if newdatetime not in olddatetimes:
                     logger.info('New ZTF point at {0}.'.format(newdatetime))
                     newztfphot.append(candidate)
-                tn, created = TargetName.objects.get_or_create(target=target, name=candidate['oid'])
-                if created:
+                if not TargetName.objects.filter(name=candidate['oid']).exists():
+                    tn = TargetName.objects.create(target=target, name=candidate['oid'])
                     messages.append(f'Added alias {tn.name} from ZTF')
         process_reduced_ztf_data(target, newztfphot)
 
