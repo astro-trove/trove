@@ -18,14 +18,23 @@
     {% for candidate in candidates %}
     <tr>
       <td>{{ candidate.observation_record.scheduled_start|date:"Y-m-d" }}</td>
-      <td>{{ candidate.mag|floatformat:"1" }}</td>
-      <td>{{ candidate.mlscore|floatformat:"2" }}</td>
-      <td>{{ candidate.mlscore_real|floatformat:"2" }}</td>
-      <td>{{ candidate.mlscore_bogus|floatformat:"2" }}</td>
-      <td><img alt="new image" src="{{ candidate|thumbnail_url:'img' }}" height="80"></td>
-      <td><img alt="reference image" src="{{ candidate|thumbnail_url:'ref' }}" height="80"></td>
-      <td><img alt="difference image" src="{{ candidate|thumbnail_url:'diff' }}" height="80"></td>
-      <td><img alt="Scorr image" src="{{ candidate|thumbnail_url:'scorr' }}" height="80"></td>
+      {% if candidate.id %}
+        <td>{{ candidate.mag|floatformat:"1" }}</td>
+        <td>{{ candidate.mlscore|floatformat:"2" }}</td>
+        <td>{{ candidate.mlscore_real|floatformat:"2" }}</td>
+        <td>{{ candidate.mlscore_bogus|floatformat:"2" }}</td>
+        <td><img alt="new image" src="{{ candidate|thumbnail_url:'img' }}" height="80"></td>
+        <td><img alt="reference image" src="{{ candidate|thumbnail_url:'ref' }}" height="80"></td>
+        <td><img alt="difference image" src="{{ candidate|thumbnail_url:'diff' }}" height="80"></td>
+        <td><img alt="Scorr image" src="{{ candidate|thumbnail_url:'scorr' }}" height="80"></td>
+      {% else %}
+        {% if candidate.observation_record.parameters.depth %}
+          <td>&gsim;{{ candidate.observation_record.parameters.depth|floatformat:"1" }}</td>
+        {% else %}
+          <td></td>
+        {% endif %}
+      <td colspan=7 style="horiz-align: center;">No source detected.</td>
+      {% endif %}
     </tr>
     {% empty %}
     <tr><td colspan="8">No candidates yet.</td></tr>
