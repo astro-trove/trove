@@ -36,6 +36,7 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
 
   ```bash
     % cd /var/www/saguaro_tom
+    % python3 manage.py collectstatic # only the first time you start the development server
     % python3 manage.py runserver
   ```
 
