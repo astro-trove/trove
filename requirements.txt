@@ -7,18 +7,18 @@ django-extensions
 django-filter
 django-guardian
 django-phonenumber-field[phonenumberslite]
+dramatiq[watch, redis]
 healpix-alchemy
 healpy
 kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
 ligo.skymap
 numpy
-redis
-tomtoolkit~=2.14
-tom-alertstreams>=0.6.2
+tomtoolkit~=2.18.2
+tom-alertstreams
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
-tom-nonlocalizedevents~=0.7.7
-tom-swift~=0.2.0a3
+tom-nonlocalizedevents @ git+https://github.com/griffin-h/tom_nonlocalizedevents.git
+tom-swift~=0.2.0
 twilio
 paramiko
 plotly
