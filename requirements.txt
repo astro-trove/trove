@@ -2,21 +2,23 @@ astroplan
 astropy
 django
 django-crispy-forms
+django-dramatiq
 django-extensions
 django-filter
 django-guardian
 django-phonenumber-field[phonenumberslite]
+dramatiq[watch, redis]
 healpix-alchemy
 healpy
 kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
 ligo.skymap
 numpy
-tomtoolkit~=2.18.2
+tomtoolkit==2.18.2
 tom-alertstreams
-tom-mmt~=0.1.3
-tom-nonlocalizedevents~=0.7.7
-tom-swift~=0.2.0
+tom-mmt @ git+https://github.com/griffin-h/tom_mmt
+tom-nonlocalizedevents==0.8.1
+tom-swift==0.2.0
 twilio
 paramiko
 plotly

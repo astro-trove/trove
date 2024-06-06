@@ -36,6 +36,7 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
 
   ```bash
     % cd /var/www/saguaro_tom
+    % python3 manage.py collectstatic # only the first time you start the development server
     % python3 manage.py runserver
   ```
 
@@ -83,7 +84,7 @@ sudo nohup python manage.py readstreams > /home/saguaro/alertstreams.log 2>&1 &
 ## Allowing for asynchronous tasks
 We use [redis](https://redis.io) and [dramatiq](https://dramatiq.io) to run asynchronous tasks (e.g., ATLAS forced photometry queries).
 Redis is installed according to the instructions on its [readme](https://github.com/redis/redis).
-Dramatiq is configured according to the [TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/managing_data/forced_photometry.html#configuring-your-tom-to-serve-tasks-asynchronously).
+Dramatiq is configured according to the [TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/managing_data/single_target_data_service.html#configuring-your-tom-to-serve-tasks-asynchronously).
 These should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
 @reboot /usr/local/bin/redis-server > /home/saguaro/redis.log 2>&1
