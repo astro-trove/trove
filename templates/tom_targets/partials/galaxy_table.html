@@ -5,10 +5,10 @@
       <th scope="col">ID</th>
       <th scope="col">Name</th>
       <th scope="col"><i>P</i><sub>cc</sub></th>
-      <th scope="col">Off.<br />(")</th>
-      <th scope="col">Dist.<br />(Mpc)</th>
+      <th scope="col">Off.  <br/> (")</th>
+      <th scope="col">Dist. <br/> (Mpc)</th>
       <th scope="col">Redshift</th>
-      <th scope="col">Mag.<br />(AB)</th>
+      <th scope="col">Mag.  <br/> (AB)</th>
       <th scope="col">Source</th>
     </tr>
   {% for galaxy in galaxies %}
@@ -18,12 +18,22 @@
       <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
       {% if galaxy.Dist and galaxy.Dist|floatformat != 'nan' %}
-        <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr|floatformat:1 }} </td>
+        {% if galaxy.DistErr.0 == galaxy.DistErr.1 or galaxy.DistErr.1|floatformat == 'nan' %}
+          <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr.0|floatformat:1 }} </td>
+        {% else %}
+          <td style='min-width:8em;'>
+	    {{ galaxy.Dist|floatformat:1 }}<span class="supsubdist"><sub>-{{ galaxy.DistErr.1|floatformat:1 }}</sub><sup>+{{ galaxy.DistErr.0|floatformat:1 }}</sup></span>
+	  </td>
+      	{% endif %}
       {% else %}
         <td> </td>
       {% endif %}
       {% if galaxy.z %}
-        <td> {{ galaxy.z|floatformat:2 }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr|floatformat:2 }} </td>
+        {% if galaxy.zErr.0 == galaxy.zErr.1 %}
+          <td> {{ galaxy.z|floatformat:2 }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr.0|floatformat:2 }} </td>
+	{% else %}
+          <td> {{ galaxy.z|floatformat:2 }}<span class="supsubz"><sup>+{{ galaxy.zErr.0|floatformat:2 }}</sup><sub>-{{ galaxy.zErr.1|floatformat:2 }}</sub></span> </td>
+        {% endif %}
       {% else %}
         <td> </td>
       {% endif %}
