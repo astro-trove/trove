@@ -22,7 +22,7 @@
           <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr.0|floatformat:1 }} </td>
         {% else %}
           <td style='min-width:8em;'>
-	    {{ galaxy.Dist|floatformat:1 }}<span class="supsubdist"><sub>-{{ galaxy.DistErr.1|floatformat:1 }}</sub><sup>+{{ galaxy.DistErr.0|floatformat:1 }}</sup></span>
+	    {{ galaxy.Dist|floatformat:1 }}<span class="supsubdist"><sub>-{{ galaxy.DistErr.0|floatformat:1 }}</sub><sup>+{{ galaxy.DistErr.1|floatformat:1 }}</sup></span>
 	  </td>
       	{% endif %}
       {% else %}
@@ -32,7 +32,7 @@
         {% if galaxy.zErr.0 == galaxy.zErr.1 %}
           <td> {{ galaxy.z|floatformat:2 }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr.0|floatformat:2 }} </td>
 	{% else %}
-          <td> {{ galaxy.z|floatformat:2 }}<span class="supsubz"><sup>+{{ galaxy.zErr.0|floatformat:2 }}</sup><sub>-{{ galaxy.zErr.1|floatformat:2 }}</sub></span> </td>
+          <td> {{ galaxy.z|floatformat:2 }}<span class="supsubz"><sup>+{{ galaxy.zErr.1|floatformat:2 }}</sup><sub>-{{ galaxy.zErr.0|floatformat:2 }}</sub></span> </td>
         {% endif %}
       {% else %}
         <td> </td>
