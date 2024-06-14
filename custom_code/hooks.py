@@ -59,7 +59,7 @@ def update_or_create_target_extra(target, key, value):
 def target_post_save(target, created):
     """This hook runs following update of a target."""
     logger.info('Target post save hook: %s created: %s', target, created)
-    
+
     messages = []
     if created:
         coord = SkyCoord(target.ra, target.dec, unit='deg')
