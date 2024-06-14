@@ -13,6 +13,7 @@ healpy
 kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
 ligo.skymap
+matplotlib
 numpy
 tomtoolkit==2.18.2
 tom-alertstreams
