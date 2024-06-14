@@ -3,51 +3,6 @@
 {% block title %}Target {{ object.name }}{% endblock %}
 {% block content %}
 
-<style>
-.supsubdist {
-    display: inline-block;
-}
-
-.supsubdist sup,
-.supsubdist sub {
-    position: relative;
-    left: 0.5em;
-    display: block;
-    font-size: 0.75em;
-    line-height: 1.2;
-}
-
-.supsubdist sub {
-    top: 1.75em;
-}
-
-.supsubdist sup {
-    top: -1em;
-}
-
-.supsubz {
-    display: inline-block;
-}
-
-.supsubz sup,
-.supsubz sub {
-    position: relative;
-    left: 0.5em;
-    display: block;
-    font-size: 0.75em;
-    line-height: 1.2;
-}
-
-.supsubz sub {
-    top: 0.5em;
-}
-
-.supsubz sup {
-    top: 0.1em;
-}
-
-</style>
-
 <script>
   // Function to update the URL.
   const updateUrlWithTab = (tabId) => {
