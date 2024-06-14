@@ -139,7 +139,7 @@ def target_post_save(target, created):
             if np.isfinite(dist):
                 target.distance = dist
             disterr = hostdict[0].get('DistErr', np.nan)
-            if np.isfinite(disterr[0]):
+            if np.all(np.isfinite(disterr)):
                 target.distance_err = disterr
             target.save()
 
