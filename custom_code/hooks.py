@@ -140,7 +140,7 @@ def target_post_save(target, created):
                 target.distance = dist
             disterr = hostdict[0].get('DistErr', np.nan)
             if np.all(np.isfinite(disterr)):
-                target.distance_err = disterr
+                target.distance_err = np.mean(disterr)
             target.save()
 
         ztfphot = query_ZTFpubphot(target.ra, target.dec, db_connect=DB_CONNECT)
