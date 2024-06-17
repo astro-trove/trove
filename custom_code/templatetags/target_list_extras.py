@@ -7,6 +7,7 @@ from .skymap_extras import CSS_FOOTPRINT, centers_to_vertices
 import numpy as np
 from matplotlib.path import Path
 import json
+import numpy as np
 
 register = template.Library()
 
@@ -21,7 +22,10 @@ def target_list_extra_field(target_list, name):
     except TargetListExtra.DoesNotExist:
         return None
 
-
+@register.filter
+def islist(value):
+    return isinstance(value, list) or isinstance(value, np.ndarray)
+    
 @register.inclusion_tag('tom_targets/partials/galaxy_table.html')
 def galaxy_table(target):
     """
