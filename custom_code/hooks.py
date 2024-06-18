@@ -37,13 +37,15 @@ def process_reduced_ztf_data(target, candidates):
         else:
             value['magnitude'] = candidate['candidate']['magpsf']
             value['error'] = candidate['candidate']['sigmapsf']
-        rd, _ = ReducedDatum.objects.get_or_create(
+        rd, created = ReducedDatum.objects.get_or_create(
             timestamp=jd.to_datetime(timezone=TimezoneInfo()),
             value=value,
             source_name='ZTF',
-            source_location=candidate['zid'],
             data_type='photometry',
             target=target)
+        if created:  # do this afterward, in case there are duplicate candidates with distinct ZIDs
+            rd.source_location = candidate['zid']
+            rd.save()
 
 
 def update_or_create_target_extra(target, key, value):
