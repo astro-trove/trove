@@ -106,7 +106,7 @@
       </div>
       <div class="tab-pane" id="manage-data">
         {% if user.is_authenticated %}
-          {% query_forced_photometry object %}
+          {% query_single_target_data_service object %}
           <br />
           <br />
         {% endif %}

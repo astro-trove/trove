@@ -255,7 +255,7 @@ FACILITIES = {
     },
 }
 
-FORCED_PHOTOMETRY_SERVICES = {
+SINGLE_TARGET_DATA_SERVICES = {
     'ATLAS': {
         'class': 'custom_code.atlas.CustomAtlasForcedPhotometryService',
         'url': "https://fallingstar-data.com/forcedphot",

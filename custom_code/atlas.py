@@ -6,8 +6,8 @@ from crispy_forms.layout import Row, Column
 from django import forms
 
 from tom_dataproducts.exceptions import InvalidFileFormatException
-from tom_dataproducts.forced_photometry.atlas import AtlasForcedPhotometryService
-from tom_dataproducts.forced_photometry.forced_photometry_service import BaseForcedPhotometryQueryForm
+from tom_dataproducts.single_target_data_service.atlas import AtlasForcedPhotometryService
+from tom_dataproducts.single_target_data_service.single_target_data_service import BaseSingleTargetDataServiceQueryForm
 from tom_dataproducts.processors.atlas_processor import AtlasProcessor
 from kne_cand_vetting.survey_phot import ATLAS_stack
 
@@ -24,7 +24,7 @@ class CustomAtlasForcedPhotometryService(AtlasForcedPhotometryService):
         return CustomAtlasForcedPhotometryQueryForm
 
 
-class CustomAtlasForcedPhotometryQueryForm(BaseForcedPhotometryQueryForm):
+class CustomAtlasForcedPhotometryQueryForm(BaseSingleTargetDataServiceQueryForm):
     min_date = forms.CharField(help_text='Days ago (negative) or MJD or YYYY-MM-DD HH:MM:SS (time optional)')
     max_date = forms.CharField(help_text='Days ago (negative) or MJD or YYYY-MM-DD HH:MM:SS (time optional)')
 
