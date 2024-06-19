@@ -9,6 +9,7 @@ from tom_treasuremap.management.commands.report_pointings import get_active_nonl
 import requests
 import json
 import logging
+import traceback
 
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ def vet_or_post_error(target):
         target_post_save(target, created=True)
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
-        logger.error(slack_alert)
+        logger.error(''.join(traceback.format_exception(e)))
         json_data = json.dumps({'text': slack_alert}).encode('ascii')
         requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
