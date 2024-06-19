@@ -14,6 +14,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def vet_or_post_error(target):
+    try:
+        target_post_save(target, created=True)
+    except Exception as e:
+        slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
+        logger.error(slack_alert)
+        json_data = json.dumps({'text': slack_alert}).encode('ascii')
+        requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+
+
 class Command(BaseCommand):
 
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
@@ -158,16 +168,19 @@ class Command(BaseCommand):
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
         for target in updated_targets_coords:
-            target_post_save(target, created=True)
+            vet_or_post_error(target)
 
         for target in updated_targets:
-            target_post_save(target, created=True)
+            vet_or_post_error(target)
 
         for target in new_targets:
-            target_post_save(target, created=True)
+            vet_or_post_error(target)
 
             # check if any of the possible host galaxies are within 40 Mpc
-            for galaxy in json.loads(target.targetextra_set.get(key='Host Galaxies').value):
+            target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
+            if target_extra is None:
+                continue
+            for galaxy in json.loads(target_extra.value):
                 if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
                     slack_alert = (f'<{settings.TARGET_LINKS[0][0]}/|{target.name}> is {galaxy["Offset"]:.1f}" from '
                                    f'galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.').format(target=target)
