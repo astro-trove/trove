@@ -21,10 +21,15 @@ def centers_to_vertices(centers, footprint):
     else:
         return []
 
-@register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html')
-def skymap(localization, survey_candidates=None, survey_observations=None):
+
+@register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html', takes_context=True)
+def skymap(context, localization, survey_candidates=None, survey_observations=None):
     # sun, moon, and candidates
-    now = Time.now()
+    now = context['request'].GET.get('grouping_now')
+    if now:
+        now = Time(now)
+    else:
+        now = Time.now()
     current_sun_pos = get_body('sun', now)
     current_moon_pos = get_body('moon', now)
     current_moon_exclusion = 3. + 42. * moon_illumination(now)

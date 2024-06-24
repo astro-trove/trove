@@ -136,6 +136,7 @@ class CSSFieldWidget(django.forms.widgets.MultiWidget):
         widgets = {
             'ngroups': django.forms.NumberInput(attrs={'placeholder': '# groups'}),
             'nfields': django.forms.NumberInput(attrs={'placeholder': '# fields'}),
+            'now': django.forms.DateTimeInput(attrs={'placeholder': 'UT night start'}),
         }
         super().__init__(widgets, **kwargs)
 
@@ -147,7 +148,8 @@ class CSSFieldField(django.forms.MultiValueField):
     def __init__(self, **kwargs):
         fields = (
             django.forms.IntegerField(min_value=0, initial=3),
-            django.forms.IntegerField(min_value=0, initial=12)
+            django.forms.IntegerField(min_value=0, initial=12),
+            django.forms.DateTimeField(initial=datetime.utcnow())
         )
         super().__init__(fields, widget=CSSFieldWidget, **kwargs)
 
@@ -160,7 +162,7 @@ class CSSFieldFilter(django_filters.Filter):
 
     def filter(self, queryset, value):
         if value:
-            rank_css_fields(queryset, n_groups=value[0], n_select=value[1])
+            rank_css_fields(queryset, n_groups=value[0], n_select=value[1], now=value[2])
             return queryset.filter(group__isnull=False, rank_in_group__isnull=False).order_by('group', 'rank_in_group')
         else:
             return queryset.order_by('group', 'rank_in_group')
