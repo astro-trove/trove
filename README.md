@@ -109,7 +109,7 @@ Several other tasks run every hour as cronjobs (as root):
 ```
 0 * * * * /var/www/saguaro_tom/manage.py report_pointings > /home/saguaro/report_pointings.log 2>&1
 0 * * * * /var/www/saguaro_tom/manage.py updatestatus > /home/saguaro/observation_status.log 2>&1
-0 * * * * /var/www/saguaro_tom/manage.py verify_listener --max-seconds 10000 > /home/saguaro/verify_listener.log 2>&1
+0 * * * * /var/www/saguaro_tom/manage.py verify_listener > /home/saguaro/verify_listener.log 2>&1
 10 * * * * /var/www/saguaro_tom/manage.py ingest_tns > /home/saguaro/ingest_tns.log 2>&1
 ```
 
