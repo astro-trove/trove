@@ -116,5 +116,5 @@ Several other tasks run every hour as cronjobs (as root):
 Respectively, these:
 - report survey pointings to the [Treasure Map](https://treasuremap.space)
 - update the statuses of observations scheduled through the TOM (e.g., MMT)
-- verify that the GW alert listener is functioning by checking that we received an alert for the latest event in GraceDB
+- verify that the GW alert listener is functioning by checking that we received an alert for the latest event in [GraceDB](https://gracedb.ligo.org/latest/)
 - ingest targets from the [TNS](https://wis-tns.org) (the TNS table is updated on the hour, so we run this 10 minutes after)
