@@ -10,6 +10,7 @@ import requests
 import json
 import logging
 import traceback
+import numpy as np
 
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 def vet_or_post_error(target):
     try:
-        target_post_save(target, created=True)
+        # set the tns query time limit to infinity because we don't care if we
+        # need to wait for this script to run
+        target_post_save(target, created=True, tns_time_limit=np.inf)
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
         logger.error(''.join(traceback.format_exception(e)))
