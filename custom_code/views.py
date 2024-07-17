@@ -325,9 +325,13 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
-        banners = target_post_save(target, created=True)
+        banners, tns_query_status = target_post_save(target, created=True)
         for banner in banners:
             messages.success(request, banner)
+
+        if tns_query_status is not None:
+            messages.add_message(request,99,tns_query_status)
+            
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):
