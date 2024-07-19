@@ -119,7 +119,6 @@ def target_post_save(target, created, tns_time_limit:int=5):
                         target=target)
             else:
                 tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
-                tns_query_status += f' If it is important that you have all of the photometry we encourage you try again in {time_to_wait}s!'
                 logger.info(tns_query_status)
                 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])

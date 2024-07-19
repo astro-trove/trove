@@ -20,14 +20,17 @@ def vet_or_post_error(target):
     try:
         # set the tns query time limit to infinity because we don't care if we
         # need to wait for this script to run
-        target_post_save(target, created=True, tns_time_limit=np.inf)
+        _, tns_query_status = target_post_save(target, created=True, tns_time_limit=np.inf)
+        if tns_query_status is not None:
+            logger.warn(tns_query_status)
+            json_data = json.dumps({'text': tns_query_status}).encode('ascii')
+            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})            
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
         logger.error(''.join(traceback.format_exception(e)))
         json_data = json.dumps({'text': slack_alert}).encode('ascii')
         requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
-
-
+        
 class Command(BaseCommand):
 
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
