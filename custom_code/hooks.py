@@ -2,6 +2,7 @@ import logging
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
+from kne_cand_vetting.mpc import is_minor_planet
 from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
 import json
@@ -76,7 +77,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
 
         if tns_results:
-            for iau_name, redshift, classification, internal_names in tns_results:
+            for iau_name, redshift, classification, internal_names, discoverydate in tns_results:
                 if target.name[2:] == iau_name[2:]:  # choose the name that already matches, if more than one
                     break
             if target.name != iau_name:
@@ -89,12 +90,26 @@ def target_post_save(target, created, tns_time_limit:int=5):
             if redshift is not None and np.isfinite(redshift) and target.extra_fields.get('Redshift') != redshift:
                 update_or_create_target_extra(target, 'Redshift', redshift)
                 messages.append(f"Redshift set to {redshift}")
+            if discoverydate is not None:
+                print(Time(discoverydate.isoformat(), format='isot'))
+                discovery_mjd = Time(discoverydate.isoformat(), format='isot').mjd
+                print(discovery_mjd)
+                
+                print("Checking MPC...")
+                if is_minor_planet(target.ra, target.dec, discovery_mjd):
+                    if classification:
+                        new_class = f'Minor Planet/Asteroid (TNS: {classification})'
+                    else:
+                        new_class = 'Minor Planet/Asteroid'
+                    update_or_create_target_extra(target, 'Classification', new_class)
+                    messages.append("Found this candidate to be a minor planet!")
+                
             for internal_name in internal_names.split(','):
                 alias = internal_name.strip().replace('SN ', 'SN').replace('AT ', 'AT')
                 if alias and alias != target.name and not TargetName.objects.filter(name=alias).exists():
                     tn = TargetName.objects.create(target=target, name=alias)
                     messages.append(f'Added alias {tn.name} from TNS')
-
+                    
             tnsphot, time_to_wait = query_TNSphot(target.name[2:],  # remove prefix
                                     settings.BROKERS['TNS']['bot_id'],
                                     settings.BROKERS['TNS']['bot_name'],
