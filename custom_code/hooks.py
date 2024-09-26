@@ -1,5 +1,5 @@
 import logging
-from kne_cand_vetting.catalogs import static_cats_query
+from kne_cand_vetting.catalogs import static_cats_query, tns_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
 from kne_cand_vetting.mpc import is_minor_planet
@@ -12,6 +12,9 @@ from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
 from healpix_alchemy.constants import HPX
 from django.conf import settings
+from django.contrib import messages
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
@@ -91,18 +94,11 @@ def target_post_save(target, created, tns_time_limit:int=5):
                 update_or_create_target_extra(target, 'Redshift', redshift)
                 messages.append(f"Redshift set to {redshift}")
             if discoverydate is not None:
-                print(Time(discoverydate.isoformat(), format='isot'))
                 discovery_mjd = Time(discoverydate.isoformat(), format='isot').mjd
                 print(discovery_mjd)
-                
-                print("Checking MPC...")
-                if is_minor_planet(target.ra, target.dec, discovery_mjd):
-                    if classification:
-                        new_class = f'Minor Planet/Asteroid (TNS: {classification})'
-                    else:
-                        new_class = 'Minor Planet/Asteroid'
-                    update_or_create_target_extra(target, 'Classification', new_class)
-                    messages.append("Found this candidate to be a minor planet!")
+                if target.extra_fields.get("DiscoveryDate") != discovery_mjd:
+                    update_or_create_target_extra(target, "DiscoveryDate", discovery_mjd)
+                    messages.append(f"DiscoveryDate set to {discovery_mjd} (MJD)")
                 
             for internal_name in internal_names.split(','):
                 alias = internal_name.strip().replace('SN ', 'SN').replace('AT ', 'AT')
@@ -192,3 +188,47 @@ def target_post_save(target, created, tns_time_limit:int=5):
         logger.info(message)
 
     return messages, tns_query_status
+
+def target_run_mpc(target, request, _verbose=False):
+
+    messages.info(request, "Checking MPC...")
+    
+    success_messages = []
+    
+    discovery_mjd = target.extra_fields.get("DiscoveryDate", None)
+    if discovery_mjd is None:
+        messages.info(request, "Querying TNS for the discovery date")
+
+        # try to pull the discovery date from TNS
+        try:
+            engine = create_engine(DB_CONNECT)
+            get_session = sessionmaker(bind=engine)
+            session = get_session()
+        except Exception as _e2:
+            if _verbose:
+                print(f"{_e2}")
+                raise Exception(f"Failed to connect to database")
+
+        coord = tuple(zip([target.ra], [target.dec]))
+        radius = 2 / 3600 # arcseconds to degrees
+        tns_results = tns_query(session, coord, radius)
+        for iau_name, redshift, classification, internal_names, discoverydate in tns_results:
+            if target.name[2:] == iau_name[2:]:  # choose the name that already matches, if more than one
+                break
+        
+        discovery_mjd = Time(discoverydate.isoformat(), format='isot').mjd
+
+    if is_minor_planet(target.ra, target.dec, discovery_mjd):
+        if classification:
+            new_class = f'Minor Planet/Asteroid (TNS: {classification})'
+        else:
+            new_class = 'Minor Planet/Asteroid'
+            update_or_create_target_extra(target, 'Classification', new_class)
+            success_messages.append("Found this candidate to be a minor planet!")
+
+    success_messages.append("MPC Check Complete!")
+    
+    for message in success_messages:
+        logger.info(message)
+        
+    return success_messages
