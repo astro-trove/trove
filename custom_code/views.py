@@ -353,6 +353,7 @@ class TargetMPCView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
         target = Target.objects.get(pk=kwargs['pk'])
+        messages.info(request, "Checking MPC, this takes about a minute...")
         banners = target_run_mpc(target, request)
         for banner in banners:
             messages.success(request, banner)

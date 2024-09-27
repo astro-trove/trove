@@ -12,7 +12,6 @@ from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
 from healpix_alchemy.constants import HPX
 from django.conf import settings
-from django.contrib import messages
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -95,7 +94,6 @@ def target_post_save(target, created, tns_time_limit:int=5):
                 messages.append(f"Redshift set to {redshift}")
             if discoverydate is not None:
                 discovery_mjd = Time(discoverydate.isoformat(), format='isot').mjd
-                print(discovery_mjd)
                 if target.extra_fields.get("DiscoveryDate") != discovery_mjd:
                     update_or_create_target_extra(target, "DiscoveryDate", discovery_mjd)
                     messages.append(f"DiscoveryDate set to {discovery_mjd} (MJD)")
@@ -191,13 +189,11 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
 def target_run_mpc(target, request, _verbose=False):
 
-    messages.info(request, "Checking MPC...")
-    
     success_messages = []
     
     discovery_mjd = target.extra_fields.get("DiscoveryDate", None)
     if discovery_mjd is None:
-        messages.info(request, "Querying TNS for the discovery date")
+        success_messages.append("Querying TNS for the discovery date")
 
         # try to pull the discovery date from TNS
         try:
