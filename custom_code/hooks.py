@@ -94,8 +94,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
                 discovery_mjd = Time(discoverydate.isoformat(), format='isot').mjd
                 if target.extra_fields.get("DiscoveryDate") != discovery_mjd:
                     update_or_create_target_extra(target, "DiscoveryDate", discovery_mjd)
-                    messages.append(f"DiscoveryDate set to {discovery_mjd} (MJD)")
-                
+                    
             for internal_name in internal_names.split(','):
                 alias = internal_name.strip().replace('SN ', 'SN').replace('AT ', 'AT')
                 if alias and alias != target.name and not TargetName.objects.filter(name=alias).exists():
