@@ -23,7 +23,8 @@ from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalized
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm, ProfileUpdateForm
 from .forms import NonLocalizedEventFormHelper, CandidateFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
-from .hooks import target_post_save, update_or_create_target_extra, target_run_mpc
+from .hooks import target_post_save, update_or_create_target_extra
+from .tasks import target_run_mpc
 
 import json
 import requests
@@ -352,12 +353,15 @@ class TargetMPCView(LoginRequiredMixin, RedirectView):
         """
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
-        target = Target.objects.get(pk=kwargs['pk'])
         messages.info(request, "Checking MPC, this takes about a minute...")
-        banners = target_run_mpc(target, request)
-        for banner in banners:
-            messages.success(request, banner)
+        dramatiq_msg = target_run_mpc.send(target_pk=kwargs["pk"])
+        messages.warning(
+            request,
+            "REMEMBER to return in ~1 minute to check for an updated classification!"
+        )
 
+        logger.info(dramatiq_msg)
+        
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):

@@ -354,7 +354,7 @@ MATCH_MANAGERS = {'Target': 'custom_code.managers.StrictTargetMatchManager'}
 
 HOOKS = {
     'target_post_save': 'custom_code.hooks.target_post_save',
-    'target_run_mpc': 'custom_code.hooks.target_run_mpc',
+    'target_run_mpc': 'custom_code.hooks.target_run_mpc.send',
     'observation_change_state': 'tom_common.hooks.observation_change_state',
     'data_product_post_upload': 'tom_dataproducts.hooks.data_product_post_upload',
     'data_product_post_save': 'tom_dataproducts.hooks.data_product_post_save',
