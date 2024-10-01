@@ -91,7 +91,7 @@ def skymap_event_id(context, survey_candidates=None, survey_observations=None):
         return
     nle = NonLocalizedEvent.objects.get(event_id=event_id)
     seq = nle.sequences.last()
-    return skymap(seq.localization, survey_candidates, survey_observations)
+    return skymap(context, seq.localization, survey_candidates, survey_observations)
 
 
 @register.filter
