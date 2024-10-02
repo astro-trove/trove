@@ -1,4 +1,5 @@
 from django import template
+from django.db.models import Max
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 import math
 
@@ -75,6 +76,11 @@ def truncate(string, length=5):
         return string[:length-1] + '.'
     else:
         return string
+
+
+@register.filter
+def sort_localizations(localizations):
+    return localizations.annotate(Max('sequences__sequence_id')).order_by('sequences__sequence_id__max')
 
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/nonlocalizedevent_details.html', takes_context=True)
