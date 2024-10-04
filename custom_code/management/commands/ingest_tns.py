@@ -37,7 +37,7 @@ class Command(BaseCommand):
         updated_targets_coords = Target.objects.raw(
             """
             --STEP 0: update coordinates of existing targets with TNS names
-            UPDATE tom_targets_target AS tt
+            UPDATE tom_targets_basetarget AS tt
             SET name=CONCAT(tns.name_prefix, tns.name), ra=tns.ra, dec=tns.declination, modified=NOW()
             FROM tns_q3c as tns
             WHERE SUBSTRING(tt.name, 3)=tns.name AND q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
@@ -53,7 +53,7 @@ class Command(BaseCommand):
                 --STEP 1: crossmatch TNS transients with existing targets and store in tns_matches table
                 CREATE TEMPORARY TABLE tns_matches AS
                 SELECT target.id, target.name, t.tns_name, t.sep, t.ra, t.dec
-                FROM tom_targets_target AS target LEFT JOIN LATERAL (
+                FROM tom_targets_basetarget AS target LEFT JOIN LATERAL (
                     SELECT CONCAT(tns.name_prefix, tns.name) AS tns_name,
                         q3c_dist(target.ra, target.dec, tns.ra, tns.declination) AS sep,
                         tns.ra,
@@ -79,7 +79,7 @@ class Command(BaseCommand):
         updated_targets = Target.objects.raw(
             """
             --STEP 2: update existing targets (if needed) to match closest TNS transient
-            UPDATE tom_targets_target AS tt
+            UPDATE tom_targets_basetarget AS tt
             SET name=tm.tns_name, ra=tm.ra, dec=tm.dec, modified=NOW()
             FROM top_tns_matches AS tm
             WHERE tt.name=tm.name AND (tm.name != tm.tns_name OR sep > 0)
@@ -148,7 +148,7 @@ class Command(BaseCommand):
 
         deleted_targets = Target.objects.raw(
             """
-            DELETE FROM tom_targets_target
+            DELETE FROM tom_targets_basetarget
             WHERE id IN (
                 SELECT old_id FROM targets_to_merge
             )
@@ -162,7 +162,7 @@ class Command(BaseCommand):
         new_targets = Target.objects.raw(
             """
             --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
-            INSERT INTO tom_targets_target (name, type, created, modified, ra, dec, epoch, scheme)
+            INSERT INTO tom_targets_basetarget (name, type, created, modified, ra, dec, epoch, scheme)
             SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), ra, declination, 2000, ''
             FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate in the TNS
             ON CONFLICT (name) DO NOTHING
