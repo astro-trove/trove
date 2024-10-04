@@ -135,9 +135,9 @@ class Command(BaseCommand):
                 WHERE target_id IN (SELECT old_id FROM targets_to_merge);
                 
                 UPDATE tom_targets_targetlist_targets
-                SET target_id=new_id
+                SET basetarget_id=new_id
                 FROM targets_to_merge
-                WHERE target_id=old_id;
+                WHERE basetarget_id=old_id;
                 
                 UPDATE tom_targets_targetname
                 SET target_id=new_id
