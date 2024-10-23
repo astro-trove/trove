@@ -21,36 +21,47 @@ logger = logging.getLogger(__name__)
 def target_run_mpc(target_pk, _verbose=False):
 
     target = Target.objects.get(pk=target_pk)
+
+    phot = target.reduceddatum_set.filter(data_type="photometry")
+    if not phot.exists():
+        logger.warning("No photometry for this object! Can not check if it is a minor planet!")
+        return
+
+    # we unfortunately have to iterate over all of the photometry points
+    # this is because the phot.earliest() method will include upperlimits
+    # and there is no way to easily filter out upperlimits
+    first_det = None
+    for item in phot.order_by("timestamp").iterator():
+        if "limit" in item.value:
+            continue # this is an upperlimit
+        first_det = item
+        break
     
-    discovery_mjd = target.extra_fields.get("DiscoveryDate", None)
-    if discovery_mjd is None:
-        logger.info("Querying TNS for the discovery date")
+    if first_det is None:
+        logger.warning("All of the photometry was upperlimits! Can not check if it is a minor planet!")
+        return
 
-        # try to pull the discovery date from TNS
-        try:
-            engine = create_engine(DB_CONNECT)
-            get_session = sessionmaker(bind=engine)
-            session = get_session()
-        except Exception as _e2:
-            if _verbose:
-                print(f"{_e2}")
-            raise Exception(f"Failed to connect to database")
-
-        coord = tuple(zip([target.ra], [target.dec]))
-        radius = 2 / 3600 # arcseconds to degrees
-        tns_results = tns_query(session, coord, radius)
-        for iau_name, redshift, classification, internal_names, discoverydate in tns_results:
-            if target.name[2:] == iau_name[2:]:  # choose the name that already matches, if more than one
-                break
+    first_time = first_det.timestamp
+    
+    # then we can select the first detection and correct for times not in UTC
+    utc_offset = first_time.utcoffset()
+    if utc_offset is not None:
+        utc = first_time - utc_offset
+    else:
+        utc = first_time
         
-        discovery_mjd = Time(discoverydate.isoformat(), format='isot').mjd
+    first_mjd = Time(utc, format="datetime")
 
-    if is_minor_planet(target.ra, target.dec, discovery_mjd):
-        if classification:
-            new_class = f'Minor Planet/Asteroid (TNS: {classification})'
+    # then check if it is an asteroid!
+    if is_minor_planet(target.ra, target.dec, first_mjd):
+        new_class_str = "Minor Planet/Asteroid"
+        classification = target.extra_fields.get("Classification", None)
+        if classification and new_class_str not in classification:
+            new_class = f'{new_class_str} (TNS: {classification})'
         else:
-            new_class = 'Minor Planet/Asteroid'
-            update_or_create_target_extra(target, 'Classification', new_class)
+            new_class = new_class_str
+
+        update_or_create_target_extra(target, 'Classification', new_class)
 
         logger.info("Found this candidate to be a minor planet!")
     else:
