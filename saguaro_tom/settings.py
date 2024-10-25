@@ -272,6 +272,7 @@ DATA_PRODUCT_TYPES = {
     'image_file': ('image_file', 'Image File'),
     'MMT': ('MMT', 'MMT File'),
     'atlas_photometry': ('atlas_photometry', 'ATLAS Photometry'),
+    'LCO': ('LCO', 'LCO File'),
 }
 
 DATA_PROCESSORS = {
@@ -279,14 +280,15 @@ DATA_PROCESSORS = {
     'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
     'MMT': 'tom_mmt.mmt.MMTDataProcessor',
     'atlas_photometry': 'custom_code.atlas.ClippedStackedAtlasProcessor',
+    'LCO': 'custom_code.facilities.lco.LCODataProcessor',
 }
 
 TOM_FACILITY_CLASSES = [
-    'tom_observations.facilities.lco.LCOFacility',
+    'custom_code.facilities.lco.CustomLCOFacility',
     'tom_observations.facilities.gemini.GEMFacility',
     'tom_observations.facilities.soar.SOARFacility',
     'tom_observations.facilities.lt.LTFacility',
-    'custom_code.facilities.CustomMMTFacility',
+    'custom_code.facilities.mmt.CustomMMTFacility',
     'tom_swift.swift.SwiftFacility',
 ]
 
