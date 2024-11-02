@@ -1,6 +1,6 @@
 import logging
 from kne_cand_vetting.catalogs import tns_query
-from kne_cand_vetting.mpc import is_minor_planet
+from kne_cand_vetting.mpc import minor_planet_match
 from tom_targets.models import Target
 from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time
@@ -53,16 +53,11 @@ def target_run_mpc(target_pk, _verbose=False):
     first_mjd = Time(utc, format="datetime")
 
     # then check if it is an asteroid!
-    if is_minor_planet(target.ra, target.dec, first_mjd):
-        new_class_str = "Minor Planet/Asteroid"
-        classification = target.extra_fields.get("Classification", None)
-        if classification and new_class_str not in classification:
-            new_class = f'{new_class_str} (TNS: {classification})'
-        else:
-            new_class = new_class_str
-
-        update_or_create_target_extra(target, 'Classification', new_class)
-
+    match = minor_planet_match(target.ra, target.dec, first_mjd)
+    if match is not None:
+        name, sep = match
+        update_or_create_target_extra(target, 'Minor Planet Match', name)
+        update_or_create_target_extra(target, 'Minor Planet Offset', sep)
         logger.info("Found this candidate to be a minor planet!")
     else:
         logger.info("Not a minor planet!")
