@@ -2,8 +2,7 @@ import logging
 from kne_cand_vetting.catalogs import static_cats_query, tns_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
-from kne_cand_vetting.mpc import is_minor_planet
-from tom_targets.models import TargetExtra, TargetName, Target
+from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
 import json
 import numpy as np
