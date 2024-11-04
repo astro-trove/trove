@@ -22,7 +22,8 @@ def vet_or_post_error(target):
         # set the tns query time limit to infinity because we don't care if we
         # need to wait for this script to run
         target_post_save(target, created=True, tns_time_limit=np.inf)
-        target_run_mpc.send(target_pk=target.pk)
+        latest_det = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False).latest()
+        target_run_mpc.send(latest_det.id)
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
         logger.error(''.join(traceback.format_exception(e)))

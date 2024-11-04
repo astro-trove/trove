@@ -13,6 +13,7 @@ from guardian.mixins import PermissionListMixin
 from guardian.shortcuts import get_objects_for_user
 
 from tom_targets.models import Target, TargetList
+from tom_dataproducts.models import ReducedDatum
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
@@ -353,10 +354,16 @@ class TargetMPCView(LoginRequiredMixin, RedirectView):
         """
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
-        messages.info(request, "Running minor planet checker. Refresh after ~1 minute to see matches.")
-        dramatiq_msg = target_run_mpc.send(target_pk=kwargs["pk"])
-        logger.info(dramatiq_msg)
-        
+        # get all detections of the target in question
+        phot = ReducedDatum.objects.filter(target_id=kwargs["pk"], data_type="photometry",
+                                           value__magnitude__isnull=False)
+        if phot.exists():
+            messages.info(request, "Running minor planet checker. Refresh after ~1 minute to see matches.")
+            dramatiq_msg = target_run_mpc.send(phot.latest().id)  # check the latest detection
+            logger.info(dramatiq_msg)
+        else:
+            messages.error(request, "Must have at least one photometric detection to run minor planet checker.")
+
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):

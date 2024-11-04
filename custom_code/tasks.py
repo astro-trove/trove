@@ -1,6 +1,6 @@
 import logging
 from kne_cand_vetting.mpc import minor_planet_match
-from tom_targets.models import Target
+from tom_dataproducts.models import ReducedDatum
 from astropy.time import Time
 import dramatiq
 
@@ -10,29 +10,17 @@ logger = logging.getLogger(__name__)
 
 
 @dramatiq.actor
-def target_run_mpc(target_pk, _verbose=False):
-
-    target = Target.objects.get(pk=target_pk)
-
-    # get the time of the latest detection from the photometry set
-    phot = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
-    if not phot.exists():
-        logger.warning(f"No detections of {target.name}! Can not check if it is a minor planet!")
-        return
-    latest_det = phot.latest().timestamp
-    latest_mjd = Time(latest_det).mjd
-    
-    # then check if it is an asteroid!
-    match = minor_planet_match(target.ra, target.dec, latest_mjd)
+def target_run_mpc(latest_det_id, _verbose=False):
+    """check if a given photometric detection is a minor planet"""
+    latest_det = ReducedDatum.objects.get(id=latest_det_id)
+    match = minor_planet_match(latest_det.target.ra, latest_det.target.dec, Time(latest_det).mjd)
     if match is not None:
         name, sep = match
-        update_or_create_target_extra(target, 'Minor Planet Match', name)
-        update_or_create_target_extra(target, 'Minor Planet Date', latest_det)
-        update_or_create_target_extra(target, 'Minor Planet Offset', sep)
-        logger.info(f'{target.name} is {sep:.1f}" from minor planet {name}')
+        update_or_create_target_extra(latest_det.target, 'Minor Planet Match', name)
+        update_or_create_target_extra(latest_det.target, 'Minor Planet Date', latest_det.timestamp)
+        update_or_create_target_extra(latest_det.target, 'Minor Planet Offset', sep)
+        logger.info(f'{latest_det.target.name} is {sep:.1f}" from minor planet {name}')
     else:
-        update_or_create_target_extra(target, 'Minor Planet Match', 'None')
-        update_or_create_target_extra(target, 'Minor Planet Date', latest_det)
-        logger.info(f"{target.name} is not a minor planet!")
-        
-    logger.info(f"MPC Check for {target.name} Complete!")
+        update_or_create_target_extra(latest_det.target, 'Minor Planet Match', 'None')
+        update_or_create_target_extra(latest_det.target, 'Minor Planet Date', latest_det.timestamp)
+        logger.info(f"{latest_det.target.name} is not a minor planet!")
