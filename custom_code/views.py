@@ -353,13 +353,8 @@ class TargetMPCView(LoginRequiredMixin, RedirectView):
         """
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """
-        messages.info(request, "Checking MPC, this takes about a minute...")
+        messages.info(request, "Running minor planet checker. Refresh after ~1 minute to see matches.")
         dramatiq_msg = target_run_mpc.send(target_pk=kwargs["pk"])
-        messages.warning(
-            request,
-            "REMEMBER to return in ~1 minute to check for an updated classification!"
-        )
-
         logger.info(dramatiq_msg)
         
         return HttpResponseRedirect(self.get_redirect_url())
