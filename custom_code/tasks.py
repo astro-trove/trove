@@ -19,17 +19,20 @@ def target_run_mpc(target_pk, _verbose=False):
     if not phot.exists():
         logger.warning(f"No detections of {target.name}! Can not check if it is a minor planet!")
         return
-    latest_det = Time(phot.latest().timestamp).mjd
+    latest_det = phot.latest().timestamp
+    latest_mjd = Time(latest_det).mjd
     
     # then check if it is an asteroid!
-    match = minor_planet_match(target.ra, target.dec, latest_det)
+    match = minor_planet_match(target.ra, target.dec, latest_mjd)
     if match is not None:
         name, sep = match
         update_or_create_target_extra(target, 'Minor Planet Match', name)
+        update_or_create_target_extra(target, 'Minor Planet Date', latest_det)
         update_or_create_target_extra(target, 'Minor Planet Offset', sep)
         logger.info(f'{target.name} is {sep:.1f}" from minor planet {name}')
     else:
         update_or_create_target_extra(target, 'Minor Planet Match', 'None')
+        update_or_create_target_extra(target, 'Minor Planet Date', latest_det)
         logger.info(f"{target.name} is not a minor planet!")
         
     logger.info(f"MPC Check for {target.name} Complete!")
