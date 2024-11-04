@@ -58,6 +58,8 @@
         <dd class="col-sm-6">{{ value|floatformat:1 }}"</dd>
     {% elif key|slice:'-5:' == 'Prob.' %}
         <dd class="col-sm-6">{{ value|percentformat:0 }}</dd>
+    {% elif key|slice:'-4:' == 'Date' %}
+        <dd class="col-sm-6">{{ value|date:"Y-m-d" }}</dd>
     {% else %}
         <dd class="col-sm-6">{{ value }}</dd>
     {% endif %}
