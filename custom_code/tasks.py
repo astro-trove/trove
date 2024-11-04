@@ -24,7 +24,7 @@ def target_run_mpc(target_pk, _verbose=False):
 
     phot = target.reduceddatum_set.filter(data_type="photometry")
     if not phot.exists():
-        logger.warning("No photometry for this object! Can not check if it is a minor planet!")
+        logger.warning(f"No photometry for {target.name}! Can not check if it is a minor planet!")
         return
 
     # we unfortunately have to iterate over all of the photometry points
@@ -38,7 +38,7 @@ def target_run_mpc(target_pk, _verbose=False):
         break
     
     if first_det is None:
-        logger.warning("All of the photometry was upperlimits! Can not check if it is a minor planet!")
+        logger.warning(f"No detections of {target.name}! Can not check if it is a minor planet!")
         return
 
     first_time = first_det.timestamp
@@ -58,8 +58,9 @@ def target_run_mpc(target_pk, _verbose=False):
         name, sep = match
         update_or_create_target_extra(target, 'Minor Planet Match', name)
         update_or_create_target_extra(target, 'Minor Planet Offset', sep)
-        logger.info("Found this candidate to be a minor planet!")
+        logger.info(f'{target.name} is {sep:.1f}" from minor planet {name}')
     else:
-        logger.info("Not a minor planet!")
+        update_or_create_target_extra(target, 'Minor Planet Match', 'None')
+        logger.info(f"{target.name} is not a minor planet!")
         
     logger.info("MPC Check Complete!")
