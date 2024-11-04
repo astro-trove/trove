@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def target_run_mpc(latest_det_id, _verbose=False):
     """check if a given photometric detection is a minor planet"""
     latest_det = ReducedDatum.objects.get(id=latest_det_id)
-    match = minor_planet_match(latest_det.target.ra, latest_det.target.dec, Time(latest_det).mjd)
+    match = minor_planet_match(latest_det.target.ra, latest_det.target.dec, Time(latest_det.timestamp).mjd)
     if match is not None:
         name, sep = match
         update_or_create_target_extra(latest_det.target, 'Minor Planet Match', name)
