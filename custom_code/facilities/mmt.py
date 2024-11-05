@@ -1,5 +1,5 @@
-from tom_mmt.mmt import (MMTBinospecObservationForm, MMTBinospecImagingForm, MMTBinospecSpectroscopyForm,
-                         MMTMMIRSObservationForm, MMTMMIRSImagingForm, MMTMMIRSSpectroscopyForm, MMTFacility)
+from tom_mmt.mmt import (MMTBinospecObservationForm, MMTBinospecImagingForm, MMTBinospecSpectroscopyForm,MMTCamImagingForm,
+                         MMTCamObservationForm, MMTMMIRSObservationForm, MMTMMIRSImagingForm, MMTMMIRSSpectroscopyForm, MMTFacility)
 from crispy_forms.layout import Layout, HTML
 from django.conf import settings
 
@@ -18,10 +18,19 @@ class CustomBinospecObservationForm(MMTBinospecObservationForm):
         if 'notes' not in kwargs['initial']:
             kwargs['initial']['notes'] = SAGUARO_NOTE
 
+class CustomMMTCamObservationForm(MMTCamObservationForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'notes' not in kwargs['initial']:
+            kwargs['initial']['notes'] = SAGUARO_NOTE
+
+
 
 class CustomBinospecImagingForm(CustomBinospecObservationForm, MMTBinospecImagingForm):
     pass
 
+class CustomMMTCamImagingForm(CustomMMTCamObservationForm, MMTCamImagingForm):
+    pass
 
 class CustomBinospecSpectroscopyForm(CustomBinospecObservationForm, MMTBinospecSpectroscopyForm):
     pass
@@ -51,6 +60,7 @@ class CustomMMIRSSpectroscopyForm(CustomMMIRSObservationForm, MMTMMIRSSpectrosco
 
 class CustomMMTFacility(MMTFacility):
     observation_forms = {
+        'MMTCam_Imaging': CustomMMTCamImagingForm,
         'Binospec_Imaging': CustomBinospecImagingForm,
         'Binospec_Spectroscopy': CustomBinospecSpectroscopyForm,
         'MMIRS_Imaging': CustomMMIRSImagingForm,
