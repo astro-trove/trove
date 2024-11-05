@@ -7,6 +7,8 @@ from custom_code.tasks import target_run_mpc
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.alertstream_handlers import pick_slack_channel, send_slack
 from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
+from datetime import datetime, timedelta
+import itertools
 import requests
 import json
 import logging
@@ -35,7 +37,14 @@ class Command(BaseCommand):
 
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
 
-    def handle(self, **kwargs):
+    def add_arguments(self, parser):
+        parser.add_argument('--lookback-days-nle', help='Nonlocalized events are considered active for this many days',
+                            type=float, default=7.)
+        parser.add_argument('--lookback-days-obs', help='Associate transients whose first detection was within this '
+                                                        'many days of the nonlocalized event',
+                            type=float, default=3.)
+
+    def handle(self, lookback_days_nle=7., lookback_days_obs=3., **kwargs):
 
         updated_targets_coords = Target.objects.raw(
             """
@@ -174,15 +183,12 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        for target in updated_targets_coords:
-            vet_or_post_error(target)
+        new_or_updated_targets = itertools.chain(updated_targets_coords, updated_targets, new_targets)
 
-        for target in updated_targets:
+        for target in new_or_updated_targets:
             vet_or_post_error(target)
 
         for target in new_targets:
-            vet_or_post_error(target)
-
             # check if any of the possible host galaxies are within 40 Mpc
             target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
             if target_extra is None:
@@ -197,9 +203,8 @@ class Command(BaseCommand):
 
             # if there was nearby host galaxy found, check the last nondetection
             photometry = target.reduceddatum_set.filter(data_type='photometry')
-            first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
-            last_nondet = photometry.filter(value__magnitude__isnull=True,
-                                            timestamp__lt=first_det.timestamp).order_by('timestamp').last()
+            first_det = photometry.filter(value__magnitude__isnull=False).earliest()
+            last_nondet = photometry.filter(value__magnitude__isnull=True, timestamp__lt=first_det.timestamp).latest()
             if first_det and last_nondet:
                 time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
                 dmag_lnondet = (last_nondet.value['limit'] - first_det.value['magnitude']) / (time_lnondet / 24.)
@@ -212,10 +217,15 @@ class Command(BaseCommand):
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
         # automatically associate with nonlocalized events
-        active_nles = get_active_nonlocalizedevents(lookback_days=7.)
-        target_ids = [target.id for target in new_targets] + [target.id for target in updated_targets]
-        for nle in active_nles:
+        for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
             seq = nle.sequences.last()
+            nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+            target_ids = []
+            for target in new_or_updated_targets:
+                first_det = target.reduceddatum_set.filter(data_type='photometry',
+                                                           value__magnitude__isnull=False).earliest()
+                if nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
+                    target_ids.append(target.id)
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
             for candidate in candidates:
                 format_kwargs = {'nle': nle, 'target': candidate.target}
