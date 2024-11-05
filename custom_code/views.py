@@ -13,6 +13,7 @@ from guardian.mixins import PermissionListMixin
 from guardian.shortcuts import get_objects_for_user
 
 from tom_targets.models import Target, TargetList
+from tom_dataproducts.models import ReducedDatum
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
@@ -24,6 +25,7 @@ from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm,
 from .forms import NonLocalizedEventFormHelper, CandidateFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
+from .tasks import target_run_mpc
 
 import json
 import requests
@@ -332,6 +334,36 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         if tns_query_status is not None:
             messages.add_message(request,99,tns_query_status)
             
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer
+
+class TargetMPCView(LoginRequiredMixin, RedirectView):
+    """
+    View that runs or reruns the kilonova candidate vetting code and stores the results
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view. Calls the kilonova vetting code.
+        """
+        # get all detections of the target in question
+        phot = ReducedDatum.objects.filter(target_id=kwargs["pk"], data_type="photometry",
+                                           value__magnitude__isnull=False)
+        if phot.exists():
+            messages.info(request, "Running minor planet checker. Refresh after ~1 minute to see matches.")
+            dramatiq_msg = target_run_mpc.send(phot.latest().id)  # check the latest detection
+            logger.info(dramatiq_msg)
+        else:
+            messages.error(request, "Must have at least one photometric detection to run minor planet checker.")
+
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):

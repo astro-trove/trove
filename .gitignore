@@ -5,4 +5,5 @@ data/
 _static/
 saguaro_tom/settings_local.py
 .DS_Store
+*.DAT
 venv/

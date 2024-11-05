@@ -1,7 +1,7 @@
 from django.urls import path
 
 from tom_targets.views import TargetGroupingView, TargetGroupingDeleteView
-from .views import TargetGroupingCreateView, CandidateListView, TargetReportView, TargetClassifyView, TargetVettingView
+from .views import TargetGroupingCreateView, CandidateListView, TargetReportView, TargetClassifyView, TargetVettingView, TargetMPCView
 from .views import ObservationCreateView, TargetNameSearchView, TargetListView
 from .views import CSSFieldListView, GWListView, GRBListView, NeutrinoListView
 from .views import CSSFieldExportView, CSSFieldSubmitView, EventCandidateCreateView, ProfileUpdateView
@@ -20,6 +20,7 @@ urlpatterns = [
     path('targets/<int:pk>/report/', TargetReportView.as_view(), name='report'),
     path('targets/<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
     path('targets/<int:pk>/vet/', TargetVettingView.as_view(), name='vet'),
+    path('targets/<int:pk>/mpc/', TargetMPCView.as_view(), name='mpc'),
     path('targets/search/', TargetNameSearchView.as_view(), name='search'),
     path('targets/', TargetListView.as_view(), name='list'),
     path('observations/<str:facility>/create/', ObservationCreateView.as_view(), name='create'),

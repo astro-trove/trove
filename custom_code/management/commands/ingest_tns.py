@@ -3,6 +3,7 @@ from django.conf import settings
 from django.db import connection
 from tom_targets.models import Target
 from custom_code.hooks import target_post_save
+from custom_code.tasks import target_run_mpc
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.alertstream_handlers import pick_slack_channel, send_slack
 from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
@@ -21,6 +22,8 @@ def vet_or_post_error(target):
         # set the tns query time limit to infinity because we don't care if we
         # need to wait for this script to run
         target_post_save(target, created=True, tns_time_limit=np.inf)
+        latest_det = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False).latest()
+        target_run_mpc.send(latest_det.id)
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
         logger.error(''.join(traceback.format_exception(e)))
