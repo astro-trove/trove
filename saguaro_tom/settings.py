@@ -336,6 +336,7 @@ HARVESTERS = {
 EXTRA_FIELDS = [
     {'name': 'Classification', 'type': 'string'},
     {'name': 'Redshift', 'type': 'number'},
+    {'name': 'MW E(B-V)', 'type': 'number'},
 ]
 
 # Authentication strategy can either be LOCKED (required login for all views)

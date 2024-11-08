@@ -9,6 +9,7 @@ import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
+from astroquery.ipac.irsa.irsa_dust import IrsaDust
 from healpix_alchemy.constants import HPX
 from django.conf import settings
 
@@ -69,6 +70,16 @@ def target_post_save(target, created, tns_time_limit:int=5):
         target.galactic_lng = coord.galactic.l.deg
         target.galactic_lat = coord.galactic.b.deg
         target.save()
+
+        if target.extra_fields.get('MW E(B-V)') is None:
+            try:
+                mwebv = IrsaDust.get_query_table(coord, section='ebv')['ext SandF ref'][0]
+            except Exception as e:
+                logger.error(f'Error querying IRSA dust for {target.name}')
+            else:
+                update_or_create_target_extra(target, 'MW E(B-V)', mwebv)
+                messages.append(f'MW E(B-V) set to {mwebv:.4f}')
+
 
         update_or_create_target_extra(target=target, key='healpix', value=HPX.skycoord_to_healpix(coord))
 
