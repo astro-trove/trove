@@ -28,7 +28,8 @@ class Command(BaseCommand):
             message = f'The last GW alert for {latest_event} was received {dt / 3600.:.1f} hours ago'
             logger.info(message)
         else:
-            message = f'The last GW alert for {latest_event} was not received'
+            message = (f'The last GW alert for <https://gracedb.ligo.org/superevents/{latest_event}/|{latest_event}> '
+                       f'was not received')
             logger.warning(message)
             headers = {'Content-Type': 'application/json'}
             data = json.dumps({'text': message}).encode('ascii')

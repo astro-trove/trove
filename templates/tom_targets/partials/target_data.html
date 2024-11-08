@@ -48,18 +48,20 @@
   <dd class="col-sm-6">{{ value }}</dd>
 {% endfor %}
 </dl>
-{% if target.tags %}
+{% if target.targetextra_set %}
 <h4>Point Source Matches</h4>
 <dl class="row">
-{% for key, value in target.tags.items %}
-{% if key|slice:':4' != 'Host' and key|slice:':4' != 'Best' and key != 'healpix' %}
-<dt class="col-sm-6">{{ key }}</dt>
-    {% if key|slice:'-6:' == 'Offset' %}
-        <dd class="col-sm-6">{{ value|floatformat:1 }}"</dd>
-    {% elif key|slice:'-5:' == 'Prob.' %}
-        <dd class="col-sm-6">{{ value|percentformat:0 }}</dd>
+{% for target_extra in target.targetextra_set.all %}
+{% if target_extra.key|slice:':4' != 'Host' and target_extra.key|slice:':4' != 'Best' and target_extra.key != 'healpix' %}
+<dt class="col-sm-6">{{ target_extra.key }}</dt>
+    {% if target_extra.key|slice:'-6:' == 'Offset' %}
+        <dd class="col-sm-6">{{ target_extra.float_value|floatformat:1 }}"</dd>
+    {% elif target_extra.key|slice:'-5:' == 'Prob.' %}
+        <dd class="col-sm-6">{{ target_extra.float_value|percentformat:0 }}</dd>
+    {% elif target_extra.key|slice:'-4:' == 'Date' %}
+        <dd class="col-sm-6">{{ target_extra.time_value|date:"Y-m-d" }}</dd>
     {% else %}
-        <dd class="col-sm-6">{{ value }}</dd>
+        <dd class="col-sm-6">{{ target_extra.value }}</dd>
     {% endif %}
 {% endif %}
 {% endfor %}
