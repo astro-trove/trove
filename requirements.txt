@@ -1,5 +1,6 @@
 astroplan
 astropy
+astroquery
 django
 django-crispy-forms
 django-dramatiq
