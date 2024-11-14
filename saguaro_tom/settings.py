@@ -247,6 +247,7 @@ FACILITIES = {
         'programs': {
             'Binospec': MMT_BINOSPEC_PROGRAMS,
             'MMIRS': MMT_MMIRS_PROGRAMS,
+            'MMTCam': MMT_MMTCAM_PROGRAMS,
         },
     },
     'SWIFT': {

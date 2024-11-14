@@ -17,6 +17,7 @@ LASAIR_TOKEN = ''       # API key for the Lasair broker
 LCO_API_KEY = ''        # API key for Las Cumbres Observatory
 MMT_BINOSPEC_PROGRAMS = [] # list of (API key, human-readable name) for MMT+Binospec
 MMT_MMIRS_PROGRAMS = [] # list of (API key, human-readable name) for MMT+MMIRS
+MMT_MMTCAM_PROGRAMS = [] # list of (API key, human-readable name) for MMT+MMTCam
 POSTGRES_DB = ''        # name of the Postgres database
 POSTGRES_HOST = ''      # hostname or IP address of the Postgres database server
 POSTGRES_PASSWORD = ''  # password for the Postgres database
