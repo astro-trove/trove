@@ -45,12 +45,12 @@
 {% else %}
         <div class="col-md-4">
         <dl class="row">
-            <dt class="col-sm-4">Image Energy Range</dt>
-            <dd class="col-sm-8">{{ sequence.details.image_energy_range }}</dd>
-            <dt class="col-sm-4">Net Count Rate</dt>
-            <dd class="col-sm-8">{{ sequence.details.net_count_rate|floatformat }}</dd>
+            <dt class="col-sm-4">Energy</dt>
+            <dd class="col-sm-8">{{ sequence.details.image_energy_range }} keV</dd>
+            <dt class="col-sm-4">Count Rate</dt>
+            <dd class="col-sm-8">{{ sequence.details.net_count_rate|floatformat }} s<sup>-1</sup></dd>
             <dt class="col-sm-4">Image S/N</dt>
-            <dd class="col-sm-8">{{ sequence.details.image_snr|floatformat }} Hz</dd>
+            <dd class="col-sm-8">{{ sequence.details.image_snr|floatformat }}</dd>
         </dl>
     </div>
 {% endif %}
