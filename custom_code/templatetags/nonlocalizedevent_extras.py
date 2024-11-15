@@ -10,6 +10,8 @@ SI_PREFIXES = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q']
 
 @register.filter
 def format_inverse_far(far):
+    if not far:
+        return ''
     inv_far = 3.168808781402895e-08 / far  # 1/Hz to yr
     if inv_far > 1.:
         log1000 = math.log10(inv_far) / 3.

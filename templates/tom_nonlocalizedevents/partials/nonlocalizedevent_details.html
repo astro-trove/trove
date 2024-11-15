@@ -31,7 +31,7 @@
             {% endfor %}
         </dl>
     </div>
-{% else %}
+{% elif sequence.details.group == 'Burst' %}
     <div class="col-md-4">
         <dl class="row">
             <dt class="col-sm-4">Group</dt>
@@ -40,6 +40,17 @@
             <dd class="col-sm-8">{{ sequence.details.duration|millisecondformat }}</dd>
             <dt class="col-sm-4">Frequency</dt>
             <dd class="col-sm-8">{{ sequence.details.central_frequency|floatformat }} Hz</dd>
+        </dl>
+    </div>
+{% else %}
+        <div class="col-md-4">
+        <dl class="row">
+            <dt class="col-sm-4">Image Energy Range</dt>
+            <dd class="col-sm-8">{{ sequence.details.image_energy_range }}</dd>
+            <dt class="col-sm-4">Net Count Rate</dt>
+            <dd class="col-sm-8">{{ sequence.details.net_count_rate|floatformat }}</dd>
+            <dt class="col-sm-4">Image S/N</dt>
+            <dd class="col-sm-8">{{ sequence.details.image_snr|floatformat }} Hz</dd>
         </dl>
     </div>
 {% endif %}
