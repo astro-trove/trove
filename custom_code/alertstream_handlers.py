@@ -291,6 +291,7 @@ def handle_einstein_probe_alert(message, metadata):
     else:
         update_all_credible_region_percents_for_survey_fields(localization)
         if skymap is not None:
+            skymap['PROBDENSITY'].unit = '1 / sr'
             calculate_credible_region(skymap, localization)
             calculate_footprint_probabilities(skymap, localization)
 
