@@ -1,3 +1,4 @@
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from django.contrib.auth.models import Group
 from django.conf import settings
@@ -8,13 +9,14 @@ import smtplib
 import logging
 import json
 from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, get_most_likely_class
-from .healpix_utils import update_all_credible_region_percents_for_survey_fields
+from .healpix_utils import update_all_credible_region_percents_for_survey_fields, create_elliptical_localization
 from .cssfield_selection import calculate_footprint_probabilities
 from .models import CredibleRegionContour, Profile
 from astropy.table import Table
 from io import BytesIO
 import astropy_healpix as ah
 import numpy as np
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -239,3 +241,47 @@ def handle_message_and_send_alerts(message, metadata):
                 calculate_footprint_probabilities(skymap, localization)
 
     logger.info(f'Finished processing alert for {nle.event_id}')
+
+
+def handle_einstein_probe_alert(message, metadata):
+    alert = message.content[0]
+    logger.warning(f"Handling Einstein Probe alert: {alert}")
+
+    nonlocalizedevent, nle_created = NonLocalizedEvent.objects.get_or_create(
+        event_id=alert['id'][0],
+        event_type=NonLocalizedEvent.NonLocalizedEventType.UNKNOWN,
+    )
+    if nle_created:
+        logger.info(f"Ingested a new x-ray event with id {nonlocalizedevent.event_id} from EP alert stream")
+
+    # create the localization from ra, dec, radius
+    try:
+        localization = create_elliptical_localization(
+            nonlocalizedevent=nonlocalizedevent,
+            center=[alert.get('ra'), alert.get('dec')], radius=alert.get('ra_dec_error'),
+        )
+    except Exception as e:
+        localization = None
+        logger.error(f'Could not create EventLocalization for event: {nonlocalizedevent.event_id}. Exception: {e}')
+        logger.error(traceback.format_exc())
+
+    logger.debug(f"Storing EP alert: {alert}")
+
+    # Now ingest the sequence for that event
+    event_sequence, es_created = EventSequence.objects.update_or_create(
+        nonlocalizedevent=nonlocalizedevent,
+        localization=localization,
+        sequence_id=nonlocalizedevent.sequences.count() + 1,
+        details={key: alert.get(key) for key in
+                 ['trigger_time', 'image_energy_range', 'net_count_rate', 'image_snr', 'additional_info']},
+        event_subtype=alert.get('instrument'),
+        ingestor_source='hop',
+    )
+    if es_created and localization is None:
+        warning_msg = (
+            f'{"Creating" if es_created else "Updating"} EventSequence without EventLocalization:'
+            f'{event_sequence} for NonLocalizedEvent: {nonlocalizedevent}'
+        )
+        logger.warning(warning_msg)
+
+    return nonlocalizedevent, event_sequence
