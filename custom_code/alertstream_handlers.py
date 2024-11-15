@@ -256,12 +256,13 @@ def handle_einstein_probe_alert(message, metadata):
 
     # create the localization from ra, dec, radius
     try:
-        localization = create_elliptical_localization(
+        localization, skymap = create_elliptical_localization(
             nonlocalizedevent=nonlocalizedevent,
             center=[alert.get('ra'), alert.get('dec')], radius=alert.get('ra_dec_error'),
         )
     except Exception as e:
         localization = None
+        skymap = None
         logger.error(f'Could not create EventLocalization for event: {nonlocalizedevent.event_id}. Exception: {e}')
         logger.error(traceback.format_exc())
 
@@ -284,5 +285,13 @@ def handle_einstein_probe_alert(message, metadata):
             f'{event_sequence} for NonLocalizedEvent: {nonlocalizedevent}'
         )
         logger.warning(warning_msg)
+
+    if CredibleRegionContour.objects.filter(localization=localization).exists():
+        logger.info(f'Localization {localization.id} already exists')
+    else:
+        update_all_credible_region_percents_for_survey_fields(localization)
+        if skymap is not None:
+            calculate_credible_region(skymap, localization)
+            calculate_footprint_probabilities(skymap, localization)
 
     return nonlocalizedevent, event_sequence

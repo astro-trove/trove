@@ -9,9 +9,7 @@ from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile, uniq_t
 from tom_nonlocalizedevents.healpix_utils import update_all_credible_region_percents_for_candidates
 from tom_surveys.models import SurveyField
 from tom_targets.models import Target
-from .alertstream_handlers import calculate_credible_region
-from .cssfield_selection import calculate_footprint_probabilities
-from .models import SurveyFieldCredibleRegion, CredibleRegionContour
+from .models import SurveyFieldCredibleRegion
 import numpy as np
 from scipy.stats import multivariate_normal
 from ligo.skymap.moc import bayestar_adaptive_grid
@@ -216,11 +214,4 @@ def create_elliptical_localization(nonlocalizedevent, center, radius, conf_inv=0
                     return EventLocalization.objects.get(nonlocalizedevent=nonlocalizedevent, skymap_hash=skymap_hash)
                 raise e
 
-    if CredibleRegionContour.objects.filter(localization=localization).exists():
-        logger.info(f'Localization {localization.id} already exists')
-    else:
-        update_all_credible_region_percents_for_survey_fields(localization)
-        calculate_credible_region(skymap, localization)
-        calculate_footprint_probabilities(skymap, localization)
-
-    return localization
+    return localization, skymap
