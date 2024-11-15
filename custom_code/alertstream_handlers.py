@@ -147,7 +147,8 @@ def calculate_credible_region(skymap, localization, probability=0.9):
     # Find the pixels included in this sum
     skymap90 = skymap[:index_90].group_by('level')
     credible_region_90 = {str(group['level'][0]): [ipix.item() for ipix in group['ipix']] for group in skymap90.groups}
-    credible_region_90.setdefault(str(skymap.meta['MOCORDER']), [])  # must include the highest order
+    if 'MOCORDER' in skymap.meta:
+        credible_region_90.setdefault(str(skymap.meta['MOCORDER']), [])  # must include the highest order
     # Create the CredibleRegionContour object
     CredibleRegionContour(localization=localization, probability=probability, pixels=credible_region_90).save()
     logger.info('Calculated skymap contours')
