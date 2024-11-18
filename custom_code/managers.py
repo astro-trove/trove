@@ -1,16 +1,16 @@
-from django.db import models
+from tom_targets.base_models import TargetMatchManager
 
 
-class StrictTargetMatchManager(models.Manager):
+class StrictTargetMatchManager(TargetMatchManager):
     """
-    Return Queryset for target with name matching string.
+    Custom Match Manager for extending the built-in TargetMatchManager.
     """
 
-    def check_for_fuzzy_match(self, name):
+    def match_name(self, name):
         """
         Returns a queryset exactly matching name that is received
-        :param name: The string against which target names and aliases will be matched.
-        :return: queryset containing matching Targets.
+        :param name: The string against which target names will be matched.
+        :return: queryset containing matching Target(s).
         """
-        queryset = super().get_queryset().filter(name=name)
+        queryset = self.match_exact_name(name)
         return queryset

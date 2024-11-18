@@ -187,10 +187,11 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        new_or_updated_targets = itertools.chain(updated_targets_coords, updated_targets, new_targets)
+        new_or_updated_targets = [updated_targets_coords, updated_targets, new_targets]
 
-        for target in new_or_updated_targets:
-            vet_or_post_error(target)
+        for targets in new_or_updated_targets:
+            for target in targets:
+                vet_or_post_error(target)
 
         for target in new_targets:
             # check if any of the possible host galaxies are within 40 Mpc
@@ -225,11 +226,12 @@ class Command(BaseCommand):
             seq = nle.sequences.last()
             nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
             target_ids = []
-            for target in new_or_updated_targets:
-                first_det = target.reduceddatum_set.filter(data_type='photometry',
-                                                           value__magnitude__isnull=False).earliest()
-                if nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
-                    target_ids.append(target.id)
+            for targets in new_or_updated_targets:
+                for target in targets:
+                    first_det = target.reduceddatum_set.filter(data_type='photometry',
+                                                               value__magnitude__isnull=False).earliest()
+                    if nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
+                        target_ids.append(target.id)
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
             for candidate in candidates:
                 format_kwargs = {'nle': nle, 'target': candidate.target}

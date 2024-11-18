@@ -247,6 +247,7 @@ FACILITIES = {
         'programs': {
             'Binospec': MMT_BINOSPEC_PROGRAMS,
             'MMIRS': MMT_MMIRS_PROGRAMS,
+            'MMTCam': MMT_MMTCAM_PROGRAMS,
         },
     },
     'SWIFT': {
@@ -336,6 +337,7 @@ HARVESTERS = {
 EXTRA_FIELDS = [
     {'name': 'Classification', 'type': 'string'},
     {'name': 'Redshift', 'type': 'number'},
+    {'name': 'MW E(B-V)', 'type': 'number'},
 ]
 
 # Authentication strategy can either be LOCKED (required login for all views)
