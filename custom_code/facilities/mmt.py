@@ -1,5 +1,6 @@
 from tom_mmt.mmt import (MMTBinospecObservationForm, MMTBinospecImagingForm, MMTBinospecSpectroscopyForm,
-                         MMTMMIRSObservationForm, MMTMMIRSImagingForm, MMTMMIRSSpectroscopyForm, MMTFacility)
+                         MMTMMIRSObservationForm, MMTMMIRSImagingForm, MMTMMIRSSpectroscopyForm, MMTFacility,
+                         MMTCamObservationForm)
 from crispy_forms.layout import Layout, HTML
 from django.conf import settings
 
@@ -13,6 +14,13 @@ MMIRS_NOTE = 'Please use a random 30" dither pattern (4 exposures per position i
 
 
 class CustomBinospecObservationForm(MMTBinospecObservationForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'notes' not in kwargs['initial']:
+            kwargs['initial']['notes'] = SAGUARO_NOTE
+
+
+class CustomMMTCamObservationForm(MMTCamObservationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'notes' not in kwargs['initial']:
@@ -55,4 +63,5 @@ class CustomMMTFacility(MMTFacility):
         'Binospec_Spectroscopy': CustomBinospecSpectroscopyForm,
         'MMIRS_Imaging': CustomMMIRSImagingForm,
         'MMIRS_Spectroscopy': CustomMMIRSSpectroscopyForm,
+        'MMTCam': CustomMMTCamObservationForm,
     }
