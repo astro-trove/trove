@@ -26,8 +26,9 @@ def vet_or_post_error(target):
         # set the tns query time limit to infinity because we don't care if we
         # need to wait for this script to run
         target_post_save(target, created=True, tns_time_limit=np.inf)
-        latest_det = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False).latest()
-        target_run_mpc.send(latest_det.id)
+        detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
+        if detections.exists():
+            target_run_mpc.send(detections.latest().id)
         mjd_now = Time.now().mjd
         atlas_query.send(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
     except Exception as e:
@@ -208,8 +209,9 @@ class Command(BaseCommand):
 
             # if there was nearby host galaxy found, check the last nondetection
             photometry = target.reduceddatum_set.filter(data_type='photometry')
-            first_det = photometry.filter(value__magnitude__isnull=False).earliest()
-            last_nondet = photometry.filter(value__magnitude__isnull=True, timestamp__lt=first_det.timestamp).latest()
+            first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
+            last_nondet = photometry.filter(value__magnitude__isnull=True,
+                                            timestamp__lt=first_det.timestamp).order_by('timestamp').last()
             if first_det and last_nondet:
                 time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
                 dmag_lnondet = (last_nondet.value['limit'] - first_det.value['magnitude']) / (time_lnondet / 24.)
