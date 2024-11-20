@@ -49,17 +49,17 @@ def format_distance(localization):
 
 @register.filter
 def format_area(area):
-    unit = 'deg'
+    unit = 'deg²'
     if area < 1.:
-        area *= 60.
-        unit = 'arcmin'
+        area *= 3600.
+        unit = 'arcmin²'
     if area < 1.:
-        area *= 60.
-        unit = 'arcsec'
+        area *= 3600.
+        unit = 'arcsec²'
     if area >= 10.:
-        return f'{area:.0f} {unit}²'
+        return f'{area:.0f} {unit}'
     else:
-        return f'{area:.1f} {unit}²'
+        return f'{area:.1f} {unit}'
 
 
 @register.filter
