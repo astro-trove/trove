@@ -48,6 +48,21 @@ def format_distance(localization):
 
 
 @register.filter
+def format_area(area):
+    unit = 'deg'
+    if area < 1.:
+        area *= 60.
+        unit = 'arcmin'
+    if area < 1.:
+        area *= 60.
+        unit = 'arcsec'
+    if area >= 10.:
+        return f'{area:.0f} {unit}²'
+    else:
+        return f'{area:.1f} {unit}²'
+
+
+@register.filter
 def get_most_likely_class(details):
     if details['group'] == 'CBC':
         classification = details['classification']
@@ -97,4 +112,65 @@ def nonlocalizedevent_details(context, localization=None):
         sequence = localization.external_coincidences.last().sequences.last()
     else:
         sequence = localization.sequences.last()
-    return {'sequence': sequence}
+
+    if sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GRAVITATIONAL_WAVE:
+        if sequence.details['group'] == 'CBC':
+            details_to_display = [
+                [
+                    ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
+                    ('Instrument', '+'.join(sequence.details['instruments'])),
+                    ('50% Area', format_area(sequence.localization.area_50)),
+                    ('90% Area', format_area(sequence.localization.area_90)),
+                ],
+                [
+                    ('1/FAR', format_inverse_far(sequence.details['far'])),
+                    ('Distance', format_distance(sequence.localization)),
+                ] +
+                [(prop, f'{prob:.0%}') for prop, prob in sequence.details['properties'].items()],
+                [(classification, f'{prob:.0%}') for classification, prob in sequence.details['classification'].items()],
+            ]
+        elif sequence.details['group'] == 'Burst':
+            details_to_display = [
+                [
+                    ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
+                    ('Instrument', '+'.join(sequence.details['instruments'])),
+                    ('50% Area', format_area(sequence.localization.area_50)),
+                    ('90% Area', format_area(sequence.localization.area_90)),
+                ],
+                [
+                    ('1/FAR', format_inverse_far(sequence.details['far'])),
+                    ('Duration', millisecondformat(sequence.details['duration'])),
+                    ('Frequency', f'{sequence.details["central_frequency"]:.0f} Hz'),
+                ]
+            ]
+        else:
+            details_to_display = []
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GAMMA_RAY_BURST:
+        details_to_display = [
+            [
+                ('Event Type', sequence.nonlocalizedevent.event_type),
+                ('Instrument', sequence.details['notice_type'].split()[0]),
+                ('50% Area', format_area(sequence.localization.area_50)),
+                ('90% Area', format_area(sequence.localization.area_90)),
+            ],
+            [
+                ('Significance', sequence.details['data_signif'].replace(' [sigma]', 'σ')),
+                ('Interval', millisecondformat(float(sequence.details['data_interval'].split()[0]))),
+                ('Energy', '[' + sequence.details['e_range'].replace(' -', ',').replace(']', '').replace(' [', '] ')),
+            ]
+        ]
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.UNKNOWN:  # Einstein probe
+        details_to_display = [
+            [
+                ('Event Type', 'X-ray Transient'),
+                ('Instrument', sequence.details['instrument']),
+                ('50% Area', format_area(sequence.localization.area_50)),
+                ('90% Area', format_area(sequence.localization.area_90)),
+            ],
+            [
+                ('Image S/N', sequence.details['image_snr']),
+                ('Count Rate', f'{sequence.details["net_count_rate"]} s⁻¹'),
+                ('Energy', f'{sequence.details["image_energy_range"]} keV'),
+            ]
+        ]
+    return {'details': details_to_display}
