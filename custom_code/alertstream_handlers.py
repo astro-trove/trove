@@ -295,4 +295,8 @@ def handle_einstein_probe_alert(message, metadata):
             calculate_credible_region(skymap, localization)
             calculate_footprint_probabilities(skymap, localization)
 
-    return nonlocalizedevent, event_sequence
+    slack_alert = f'Received Einstein Probe trigger <{settings.NLE_LINKS[0][0]}|{{nle.event_id}}>'
+    json_data = json.dumps({'text': slack_alert.format(nle=nonlocalizedevent)}).encode('ascii')
+    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
+
+    logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')
