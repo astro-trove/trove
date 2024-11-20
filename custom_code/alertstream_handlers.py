@@ -270,15 +270,14 @@ def handle_einstein_probe_alert(message, metadata):
     logger.debug(f"Storing EP alert: {alert}")
 
     # Now ingest the sequence for that event
-    details = {key: alert.get(key) for key in ['image_energy_range', 'net_count_rate', 'image_snr', 'additional_info']}
+    details = {key: alert.get(key) for key in
+               ['instrument', 'image_energy_range', 'net_count_rate', 'image_snr', 'additional_info']}
     details['time'] = alert.get('trigger_time')  # to match IGWN alerts
     event_sequence, es_created = EventSequence.objects.update_or_create(
         nonlocalizedevent=nonlocalizedevent,
         localization=localization,
         sequence_id=nonlocalizedevent.sequences.count() + 1,
         details=details,
-        event_subtype=alert.get('instrument'),
-        ingestor_source='hop',
     )
     if es_created and localization is None:
         warning_msg = (
