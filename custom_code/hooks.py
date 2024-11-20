@@ -109,6 +109,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
                     messages.append(f'Updated coordinates to {target.ra:.6f}, {target.dec:.6f} based on TNS')
 
                 # ingest any photometry
+                n_new_phot = 0
                 for candidate in tns_reply['photometry']:
                     jd = Time(candidate['jd'], format='jd', scale='utc')
                     value = {'filter': candidate['filters']['name']}
@@ -118,13 +119,15 @@ def target_post_save(target, created, tns_time_limit:int=5):
                         value['limit'] = candidate['limflux']
                     if candidate['fluxerr']:  # not empty or zero
                         value['error'] = candidate['fluxerr']
-                    rd, _ = ReducedDatum.objects.get_or_create(
+                    rd, created = ReducedDatum.objects.get_or_create(
                         timestamp=jd.to_datetime(timezone=TimezoneInfo()),
                         value=value,
                         source_name=candidate['telescope']['name'] + ' (TNS)',
                         data_type='photometry',
                         target=target)
-                messages.append(f'Added {len(tns_reply["photometry"]):d} photometry points from the TNS')
+                    n_new_phot += created
+                if n_new_phot:
+                    messages.append(f'Added {n_new_phot:d} photometry points from the TNS')
 
                 # if query is successful, use these up-to-date versions instead of what's in the local copy
                 iau_name = tns_reply['name_prefix'] + tns_reply['objname']
