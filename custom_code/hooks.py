@@ -124,7 +124,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
                         source_name=candidate['telescope']['name'] + ' (TNS)',
                         data_type='photometry',
                         target=target)
-                    messages.append(f'Added {len(tns_reply["photometry"]):d} photometry points from the TNS')
+                messages.append(f'Added {len(tns_reply["photometry"]):d} photometry points from the TNS')
 
                 # if query is successful, use these up-to-date versions instead of what's in the local copy
                 iau_name = tns_reply['name_prefix'] + tns_reply['objname']
