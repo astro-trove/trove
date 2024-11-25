@@ -215,12 +215,16 @@ def prepare_and_send_alerts(nle, seq):
 
 def handle_message_and_send_alerts(message, metadata):
     # get skymap bytes out for later
+    skymaps = []
     try:
         event = message.content[0]['event']
-        skymap_bytes = None if event is None else event.get('skymap')
+        if event is not None:
+            skymaps.append(event.get('skymap'))
+            external_coincidence = event.get('external_coincidence')
+            if external_coincidence is not None:
+                skymaps.append(external_coincidence.get('combined_skymap'))
     except Exception as e:  # no matter what, do not crash the listener before ingesting the alert
         logger.error(f'Could not extract skymap from alert: {e}')
-        skymap_bytes = None
 
     # ingest NonLocalizedEvent into the TOM database
     nle, seq = handle_igwn_message(message, metadata)
@@ -231,7 +235,7 @@ def handle_message_and_send_alerts(message, metadata):
 
     localizations = prepare_and_send_alerts(nle, seq)
 
-    for localization in localizations:
+    for skymap_bytes, localization in zip(skymaps, localizations):
         if CredibleRegionContour.objects.filter(localization=localization).exists():
             logger.info(f'Localization {localization.id} already exists')
         else:

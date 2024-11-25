@@ -1,6 +1,7 @@
 from django import template
 from django.db.models import Max
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from custom_code.templatetags.skymap_extras import get_preferred_localization
 import math
 
 register = template.Library()
@@ -108,6 +109,7 @@ def nonlocalizedevent_details(context, localization=None):
             return
         nle = NonLocalizedEvent.objects.get(event_id=event_id)
         sequence = nle.sequences.last()
+        localization = get_preferred_localization(nle)
     elif localization.external_coincidences.exists():
         sequence = localization.external_coincidences.last().sequences.last()
     else:
@@ -119,12 +121,12 @@ def nonlocalizedevent_details(context, localization=None):
                 [
                     ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
                     ('Instrument', '+'.join(sequence.details['instruments'])),
-                    ('50% Area', format_area(sequence.localization.area_50)),
-                    ('90% Area', format_area(sequence.localization.area_90)),
+                    ('50% Area', format_area(localization.area_50)),
+                    ('90% Area', format_area(localization.area_90)),
                 ],
                 [
                     ('1/FAR', format_inverse_far(sequence.details['far'])),
-                    ('Distance', format_distance(sequence.localization)),
+                    ('Distance', format_distance(localization)),
                 ] +
                 [(prop, f'{prob:.0%}') for prop, prob in sequence.details['properties'].items()],
                 [(classification, f'{prob:.0%}') for classification, prob in sequence.details['classification'].items()],
@@ -134,8 +136,8 @@ def nonlocalizedevent_details(context, localization=None):
                 [
                     ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
                     ('Instrument', '+'.join(sequence.details['instruments'])),
-                    ('50% Area', format_area(sequence.localization.area_50)),
-                    ('90% Area', format_area(sequence.localization.area_90)),
+                    ('50% Area', format_area(localization.area_50)),
+                    ('90% Area', format_area(localization.area_90)),
                 ],
                 [
                     ('1/FAR', format_inverse_far(sequence.details['far'])),
@@ -150,8 +152,8 @@ def nonlocalizedevent_details(context, localization=None):
             [
                 ('Event Type', sequence.nonlocalizedevent.event_type),
                 ('Instrument', sequence.details['notice_type'].split()[0]),
-                ('50% Area', format_area(sequence.localization.area_50)),
-                ('90% Area', format_area(sequence.localization.area_90)),
+                ('50% Area', format_area(localization.area_50)),
+                ('90% Area', format_area(localization.area_90)),
             ],
             [
                 ('Significance', sequence.details['data_signif'].replace(' [sigma]', 'σ')),
@@ -164,8 +166,8 @@ def nonlocalizedevent_details(context, localization=None):
             [
                 ('Event Type', 'X-ray Transient'),
                 ('Instrument', sequence.details['instrument']),
-                ('50% Area', format_area(sequence.localization.area_50)),
-                ('90% Area', format_area(sequence.localization.area_90)),
+                ('50% Area', format_area(localization.area_50)),
+                ('90% Area', format_area(localization.area_90)),
             ],
             [
                 ('Image S/N', sequence.details['image_snr']),

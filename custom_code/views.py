@@ -26,6 +26,7 @@ from .forms import NonLocalizedEventFormHelper, CandidateFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
 from .tasks import target_run_mpc
+from .templatetags.skymap_extras import get_preferred_localization
 
 import json
 import requests
@@ -413,9 +414,7 @@ class CSSFieldListView(FilterView):
             return EventLocalization.objects.get(id=self.kwargs['localization_id'])
         elif 'event_id' in self.kwargs:
             nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
-            seq = nle.sequences.last()
-            if seq is not None:
-                return seq.localization
+            return get_preferred_localization(nle)
 
     def get_nonlocalizedevent(self):
         if 'localization_id' in self.kwargs:
