@@ -249,7 +249,7 @@ def handle_message_and_send_alerts(message, metadata):
 
 
 def handle_einstein_probe_alert(message, metadata):
-    alert = message.content[0]
+    alert = message.content
     logger.warning(f"Handling Einstein Probe alert: {alert}")
 
     nonlocalizedevent, nle_created = NonLocalizedEvent.objects.get_or_create(
