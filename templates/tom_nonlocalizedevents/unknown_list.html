@@ -1,0 +1,73 @@
+{% extends 'tom_common/index.html' %}
+{% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras %}
+{% block title %}X-ray Transients{% endblock %}
+{% block content %}
+<h1>X-ray Transients</h1>
+<div class="row">
+    <div class="col-md-12">
+    <form action="" method="get" class="form">
+      {% crispy filter.form %}
+    </form>
+    </div>
+</div>
+<div class="row">
+    <div class="col-md-12">
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    {% if object_list %}
+    <table class="table">
+      <thead>
+      <tr>
+        <th scope="col">Detail Page</th>
+        <th scope="col" title="Survey Plans">Plans</th>
+        <th scope="col" title="Survey Observations">Obs.</th>
+        <th scope="col" title="Survey Candidates">Cand.</th>
+        <th scope="col" title="Hermes">Hermes</th>
+      </tr>
+      </thead>
+      <tbody>
+      {% for event in object_list %}
+      {% if event.sequences.last.details.significant %}
+      <tr style="font-weight: bold">
+      {% else %}
+      <tr>
+      {% endif %}
+        <td><a href="{% url 'nonlocalizedevents:detail'  event.id %}" target="_blank">{{ event.event_id }}</a></td>
+        <td title="Survey Plans">
+        {% for localization in event.localizations|sort_localizations %}
+            {% if localization.external_coincidences.exists %}
+                <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
+                   title="{{ localization.external_coincidences.last.sequences.last.event_subtype }} Combined"
+                   target="_blank">
+                {{ localization.external_coincidences.last.sequences.last.sequence_id }}c
+            {% else %}
+                <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
+                   title="{{ localization.sequences.last.event_subtype }}"
+                   target="_blank">
+                {{ localization.sequences.last.sequence_id }}
+            {% endif %}
+            </a>
+        {% endfor %}
+        </td>
+        <td title="Survey Observations">
+            <a href="{% url 'surveys:observations' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Obs.</a>
+        </td>
+        <td title="Survey Candidates">
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">Cand.</a>
+        </td>
+        <td title="Hermes">
+          <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    {% else %}
+    <p>No events have been created. Create Superevents via the admin interface, the REST API,
+        or the readstreams management command.</p>
+    <p>Coming soon: event creation from the <a href="{% url 'tom_alerts:list' %}">HERMES Alert Broker</a>.</p>
+    {% endif %}
+    </div>
+</div>
+
+{% endblock content %}

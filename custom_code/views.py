@@ -609,6 +609,17 @@ class NeutrinoListView(NonLocalizedEventListView):
         return qs
 
 
+class UnknownListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/unknown_list.html'
+
+    def get_queryset(self):
+        qs = NonLocalizedEvent.objects.filter(event_type='UNK').order_by('-created')
+        return qs
+
+
 class ProfileUpdateView(LoginRequiredMixin, UpdateView):
     model = Profile
     template_name = 'tom_common/update_user_profile.html'
