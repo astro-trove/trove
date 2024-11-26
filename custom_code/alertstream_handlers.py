@@ -217,12 +217,13 @@ def handle_message_and_send_alerts(message, metadata):
     # get skymap bytes out for later
     skymaps = []
     try:
-        event = message.content[0]['event']
+        alert = message.content[0]
+        event = alert.get('event')
         if event is not None:
             skymaps.append(event.get('skymap'))
-            external_coincidence = event.get('external_coincidence')
-            if external_coincidence is not None:
-                skymaps.append(external_coincidence.get('combined_skymap'))
+        external_coinc = alert.get('external_coinc')
+        if external_coinc is not None:
+            skymaps.append(external_coinc.get('combined_skymap'))
     except Exception as e:  # no matter what, do not crash the listener before ingesting the alert
         logger.error(f'Could not extract skymap from alert: {e}')
 
