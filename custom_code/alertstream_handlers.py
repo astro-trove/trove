@@ -8,7 +8,7 @@ import requests
 import smtplib
 import logging
 import json
-from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, get_most_likely_class
+from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, format_area, get_most_likely_class
 from .healpix_utils import update_all_credible_region_percents_for_survey_fields, create_elliptical_localization
 from .cssfield_selection import calculate_footprint_probabilities
 from .models import CredibleRegionContour, Profile
@@ -29,13 +29,13 @@ ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequenc
 """
 
 ALERT_TEXT_LOCALIZATION = """Distance = {{distance}}
-50% Area = {{seq.localization.area_50:.0f}} deg²
-90% Area = {{seq.localization.area_90:.0f}} deg²
+50% Area = {{area_50}}
+90% Area = {{area_90}}
 """
 
 ALERT_TEXT_EXTERNAL_COINCIDENCE = """Distance (comb.) = {{distance_external}}
-50% Area (comb.) = {{seq.external_coincidence.localization.area_50:.0f}} deg²
-90% Area (comb.) = {{seq.external_coincidence.localization.area_90:.0f}} deg²
+50% Area (comb.) = {{area_50_external}}
+90% Area (comb.) = {{area_90_external}}
 """
 
 ALERT_TEXT_CLASSIFICATION = """Has NS = {{HasNS:.0%}}
@@ -191,8 +191,12 @@ def prepare_and_send_alerts(nle, seq):
             alert_text = ALERT_TEXT[len(localizations)]
             if localizations:
                 format_kwargs['distance'] = format_distance(localizations[0])
+                format_kwargs['area_50'] = format_area(localizations[0].area_50)
+                format_kwargs['area_90'] = format_area(localizations[0].area_90)
             if len(localizations) > 1:
                 format_kwargs['distance_external'] = format_distance(localizations[1])
+                format_kwargs['area_50_external'] = format_area(localizations[1].area_50)
+                format_kwargs['area_90_external'] = format_area(localizations[1].area_90)
         format_kwargs.update(seq.details['properties'])
         format_kwargs.update(seq.details['classification'])
         format_kwargs.update(seq.details)
