@@ -19,6 +19,9 @@ For customization instructions, see tom_common/base.html
         <li class="nav-item">
             <a class="nav-link" href="{% url 'custom_code:neutrino-list' %}" style="color:black">Neutrinos</a>
         </li>
+        <li class="nav-item">
+            <a class="nav-link" href="{% url 'custom_code:unknown-list' %}" style="color:black">X-ray Transients</a>
+        </li>
     </ul>
 </li>
 <li class="nav-item {% if 'targets' in request.resolver_match.route %}active{% endif %}">

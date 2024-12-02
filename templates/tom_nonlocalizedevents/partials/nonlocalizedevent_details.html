@@ -1,46 +1,13 @@
 {% load nonlocalizedevent_extras %}
 <div class="row">
+{% for column in details %}
     <div class="col-md-4">
         <dl class="row">
-            <dt class="col-sm-4">1/FAR</dt>
-            <dd class="col-sm-8">{{ sequence.details.far|format_inverse_far }}</dd>
-            {% if sequence.details.group == 'CBC' %}
-                <dt class="col-sm-4">Distance</dt>
-                <dd class="col-sm-8">{{ sequence.localization|format_distance }}</dd>
-            {% endif %}
-            <dt class="col-sm-4">50% Area</dt>
-            <dd class="col-sm-8">{{ sequence.localization.area_50|floatformat:0 }} deg²</dd>
-            <dt class="col-sm-4">90% Area</dt>
-            <dd class="col-sm-8">{{ sequence.localization.area_90|floatformat:0 }} deg²</dd>
+        {% for key, value in column %}
+            <dt class="col-sm-4">{{ key }}</dt>
+            <dd class="col-sm-8">{{ value }}</dd>
+        {% endfor %}
         </dl>
     </div>
-{% if sequence.details.group == 'CBC' %}
-    <div class="col-md-4">
-        <dl class="row">
-            {% for property, prob in sequence.details.properties.items %}
-                <dt class="col-sm-4">{{ property }}</dt>
-                <dd class="col-sm-8">{{ prob|percentformat }}</dd>
-            {% endfor %}
-        </dl>
-    </div>
-    <div class="col-md-4">
-        <dl class="row">
-            {% for class, prob in sequence.details.classification.items %}
-                <dt class="col-sm-4">{{ class }}</dt>
-                <dd class="col-sm-8">{{ prob|percentformat }}</dd>
-            {% endfor %}
-        </dl>
-    </div>
-{% else %}
-    <div class="col-md-4">
-        <dl class="row">
-            <dt class="col-sm-4">Group</dt>
-            <dd class="col-sm-8">{{ sequence.details.group }}</dd>
-            <dt class="col-sm-4">Duration</dt>
-            <dd class="col-sm-8">{{ sequence.details.duration|millisecondformat }}</dd>
-            <dt class="col-sm-4">Frequency</dt>
-            <dd class="col-sm-8">{{ sequence.details.central_frequency|floatformat }} Hz</dd>
-        </dl>
-    </div>
-{% endif %}
+{% endfor %}
 </div>

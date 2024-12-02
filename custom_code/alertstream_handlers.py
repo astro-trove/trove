@@ -1,3 +1,4 @@
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from django.contrib.auth.models import Group
 from django.conf import settings
@@ -7,14 +8,15 @@ import requests
 import smtplib
 import logging
 import json
-from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, get_most_likely_class
-from .healpix_utils import update_all_credible_region_percents_for_survey_fields
+from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, format_area, get_most_likely_class
+from .healpix_utils import update_all_credible_region_percents_for_survey_fields, create_elliptical_localization
 from .cssfield_selection import calculate_footprint_probabilities
 from .models import CredibleRegionContour, Profile
 from astropy.table import Table
 from io import BytesIO
 import astropy_healpix as ah
 import numpy as np
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +29,13 @@ ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequenc
 """
 
 ALERT_TEXT_LOCALIZATION = """Distance = {{distance}}
-50% Area = {{seq.localization.area_50:.0f}} deg²
-90% Area = {{seq.localization.area_90:.0f}} deg²
+50% Area = {{area_50}}
+90% Area = {{area_90}}
 """
 
 ALERT_TEXT_EXTERNAL_COINCIDENCE = """Distance (comb.) = {{distance_external}}
-50% Area (comb.) = {{seq.external_coincidence.localization.area_50:.0f}} deg²
-90% Area (comb.) = {{seq.external_coincidence.localization.area_90:.0f}} deg²
+50% Area (comb.) = {{area_50_external}}
+90% Area (comb.) = {{area_90_external}}
 """
 
 ALERT_TEXT_CLASSIFICATION = """Has NS = {{HasNS:.0%}}
@@ -145,7 +147,8 @@ def calculate_credible_region(skymap, localization, probability=0.9):
     # Find the pixels included in this sum
     skymap90 = skymap[:index_90].group_by('level')
     credible_region_90 = {str(group['level'][0]): [ipix.item() for ipix in group['ipix']] for group in skymap90.groups}
-    credible_region_90.setdefault(str(skymap.meta['MOCORDER']), [])  # must include the highest order
+    if 'MOCORDER' in skymap.meta:
+        credible_region_90.setdefault(str(skymap.meta['MOCORDER']), [])  # must include the highest order
     # Create the CredibleRegionContour object
     CredibleRegionContour(localization=localization, probability=probability, pixels=credible_region_90).save()
     logger.info('Calculated skymap contours')
@@ -188,8 +191,12 @@ def prepare_and_send_alerts(nle, seq):
             alert_text = ALERT_TEXT[len(localizations)]
             if localizations:
                 format_kwargs['distance'] = format_distance(localizations[0])
+                format_kwargs['area_50'] = format_area(localizations[0].area_50)
+                format_kwargs['area_90'] = format_area(localizations[0].area_90)
             if len(localizations) > 1:
                 format_kwargs['distance_external'] = format_distance(localizations[1])
+                format_kwargs['area_50_external'] = format_area(localizations[1].area_50)
+                format_kwargs['area_90_external'] = format_area(localizations[1].area_90)
         format_kwargs.update(seq.details['properties'])
         format_kwargs.update(seq.details['classification'])
         format_kwargs.update(seq.details)
@@ -212,12 +219,17 @@ def prepare_and_send_alerts(nle, seq):
 
 def handle_message_and_send_alerts(message, metadata):
     # get skymap bytes out for later
+    skymaps = []
     try:
-        event = message.content[0]['event']
-        skymap_bytes = None if event is None else event.get('skymap')
+        alert = message.content[0]
+        event = alert.get('event')
+        if event is not None:
+            skymaps.append(event.get('skymap'))
+        external_coinc = alert.get('external_coinc')
+        if external_coinc is not None:
+            skymaps.append(external_coinc.get('combined_skymap'))
     except Exception as e:  # no matter what, do not crash the listener before ingesting the alert
         logger.error(f'Could not extract skymap from alert: {e}')
-        skymap_bytes = None
 
     # ingest NonLocalizedEvent into the TOM database
     nle, seq = handle_igwn_message(message, metadata)
@@ -228,7 +240,7 @@ def handle_message_and_send_alerts(message, metadata):
 
     localizations = prepare_and_send_alerts(nle, seq)
 
-    for localization in localizations:
+    for skymap_bytes, localization in zip(skymaps, localizations):
         if CredibleRegionContour.objects.filter(localization=localization).exists():
             logger.info(f'Localization {localization.id} already exists')
         else:
@@ -239,3 +251,61 @@ def handle_message_and_send_alerts(message, metadata):
                 calculate_footprint_probabilities(skymap, localization)
 
     logger.info(f'Finished processing alert for {nle.event_id}')
+
+
+def handle_einstein_probe_alert(message, metadata):
+    alert = message.content
+    logger.warning(f"Handling Einstein Probe alert: {alert}")
+
+    nonlocalizedevent, nle_created = NonLocalizedEvent.objects.get_or_create(
+        event_id=alert['id'][0],
+        event_type=NonLocalizedEvent.NonLocalizedEventType.UNKNOWN,
+    )
+    if nle_created:
+        logger.info(f"Ingested a new x-ray event with id {nonlocalizedevent.event_id} from EP alert stream")
+
+    # create the localization from ra, dec, radius
+    try:
+        localization, skymap = create_elliptical_localization(
+            nonlocalizedevent=nonlocalizedevent,
+            center=[alert.get('ra'), alert.get('dec')], radius=alert.get('ra_dec_error'),
+        )
+    except Exception as e:
+        localization = None
+        skymap = None
+        logger.error(f'Could not create EventLocalization for event: {nonlocalizedevent.event_id}. Exception: {e}')
+        logger.error(traceback.format_exc())
+
+    logger.debug(f"Storing EP alert: {alert}")
+
+    # Now ingest the sequence for that event
+    details = {key: alert.get(key) for key in
+               ['instrument', 'image_energy_range', 'net_count_rate', 'image_snr', 'additional_info']}
+    details['time'] = alert.get('trigger_time')  # to match IGWN alerts
+    event_sequence, es_created = EventSequence.objects.update_or_create(
+        nonlocalizedevent=nonlocalizedevent,
+        localization=localization,
+        sequence_id=nonlocalizedevent.sequences.count() + 1,
+        details=details,
+    )
+    if es_created and localization is None:
+        warning_msg = (
+            f'{"Creating" if es_created else "Updating"} EventSequence without EventLocalization:'
+            f'{event_sequence} for NonLocalizedEvent: {nonlocalizedevent}'
+        )
+        logger.warning(warning_msg)
+
+    if CredibleRegionContour.objects.filter(localization=localization).exists():
+        logger.info(f'Localization {localization.id} already exists')
+    else:
+        update_all_credible_region_percents_for_survey_fields(localization)
+        if skymap is not None:
+            skymap['PROBDENSITY'].unit = '1 / sr'
+            calculate_credible_region(skymap, localization)
+            calculate_footprint_probabilities(skymap, localization)
+
+    slack_alert = f'Received Einstein Probe trigger <{settings.NLE_LINKS[0][0]}|{{nle.event_id}}>'
+    json_data = json.dumps({'text': slack_alert.format(nle=nonlocalizedevent)}).encode('ascii')
+    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
+
+    logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')

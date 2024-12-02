@@ -84,14 +84,20 @@ def skymap(context, localization, survey_candidates=None, survey_observations=No
     return extras
 
 
+def get_preferred_localization(nle):
+    seq = nle.sequences.last()
+    if seq is not None:
+        return seq.localization if seq.external_coincidence is None else seq.external_coincidence.localization
+
+
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html', takes_context=True)
 def skymap_event_id(context, survey_candidates=None, survey_observations=None):
     event_id = context['request'].GET.get('localization_event')
     if event_id is None:
         return
     nle = NonLocalizedEvent.objects.get(event_id=event_id)
-    seq = nle.sequences.last()
-    return skymap(context, seq.localization, survey_candidates, survey_observations)
+    localization = get_preferred_localization(nle)
+    return skymap(context, localization, survey_candidates, survey_observations)
 
 
 @register.filter
