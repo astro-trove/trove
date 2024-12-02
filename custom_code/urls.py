@@ -5,6 +5,7 @@ from .views import TargetGroupingCreateView, CandidateListView, TargetReportView
 from .views import ObservationCreateView, TargetNameSearchView, TargetListView
 from .views import CSSFieldListView, GWListView, GRBListView, NeutrinoListView, UnknownListView
 from .views import CSSFieldExportView, CSSFieldSubmitView, EventCandidateCreateView, ProfileUpdateView
+from tom_nonlocalizedevents.views import SupereventIdView
 
 from tom_common.api_router import SharedAPIRootRouter
 
@@ -28,6 +29,7 @@ urlpatterns = [
     path('nonlocalizedevents/grb/', GRBListView.as_view(), name='grb-list'),
     path('nonlocalizedevents/neutrino/', NeutrinoListView.as_view(), name='neutrino-list'),
     path('nonlocalizedevents/unknown/', UnknownListView.as_view(), name='unknown-list'),
+    path('nonlocalizedevents/<str:event_id>/', SupereventIdView.as_view(), name='event-detail'),  # prioritize event_id
     path('nonlocalizedevents/<int:localization_id>/cssfields/', CSSFieldListView.as_view(), name='css-fields'),
     path('nonlocalizedevents/<str:event_id>/cssfields/', CSSFieldListView.as_view(), name='css-fields-latest'),
     path('nonlocalizedevents/<int:localization_id>/cssfields/export/', CSSFieldExportView.as_view(), name='css-fields-export'),
