@@ -247,6 +247,7 @@ FACILITIES = {
         'programs': {
             'Binospec': MMT_BINOSPEC_PROGRAMS,
             'MMIRS': MMT_MMIRS_PROGRAMS,
+            'MMTCam': MMT_MMTCAM_PROGRAMS,
         },
     },
     'SWIFT': {
@@ -272,6 +273,7 @@ DATA_PRODUCT_TYPES = {
     'image_file': ('image_file', 'Image File'),
     'MMT': ('MMT', 'MMT File'),
     'atlas_photometry': ('atlas_photometry', 'ATLAS Photometry'),
+    'LCO': ('LCO', 'LCO File'),
 }
 
 DATA_PROCESSORS = {
@@ -279,14 +281,15 @@ DATA_PROCESSORS = {
     'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
     'MMT': 'tom_mmt.mmt.MMTDataProcessor',
     'atlas_photometry': 'custom_code.atlas.ClippedStackedAtlasProcessor',
+    'LCO': 'custom_code.facilities.lco.LCODataProcessor',
 }
 
 TOM_FACILITY_CLASSES = [
-    'tom_observations.facilities.lco.LCOFacility',
+    'custom_code.facilities.lco.CustomLCOFacility',
     'tom_observations.facilities.gemini.GEMFacility',
     'tom_observations.facilities.soar.SOARFacility',
     'tom_observations.facilities.lt.LTFacility',
-    'custom_code.facilities.CustomMMTFacility',
+    'custom_code.facilities.mmt.CustomMMTFacility',
     'tom_swift.swift.SwiftFacility',
 ]
 
@@ -334,6 +337,7 @@ HARVESTERS = {
 EXTRA_FIELDS = [
     {'name': 'Classification', 'type': 'string'},
     {'name': 'Redshift', 'type': 'number'},
+    {'name': 'MW E(B-V)', 'type': 'number'},
 ]
 
 # Authentication strategy can either be LOCKED (required login for all views)
@@ -397,31 +401,11 @@ ALERT_STREAMS = [
             'USERNAME': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME),
             'PASSWORD': os.getenv('SCIMMA_AUTH_PASSWORD', SCIMMA_AUTH_PASSWORD),
             'TOPIC_HANDLERS': {
+                'gcn.notices.einstein_probe.wxt.alert': 'custom_code.alertstream_handlers.handle_einstein_probe_alert',
                 'igwn.gwalert': 'custom_code.alertstream_handlers.handle_message_and_send_alerts'
             },
         },
     },
-    {
-        'ACTIVE': False,
-        'NAME': 'tom_alertstreams.alertstreams.gcn.GCNClassicAlertStream',
-        # The keys of the OPTIONS dictionary become (lower-case) properties of the AlertStream instance.
-        'OPTIONS': {
-            # see https://github.com/nasa-gcn/gcn-kafka-python#to-use for configuration details.
-            'GCN_CLASSIC_CLIENT_ID': os.getenv('GCN_CLASSIC_CLIENT_ID', GCN_CLIENT_ID),
-            'GCN_CLASSIC_CLIENT_SECRET': os.getenv('GCN_CLASSIC_CLIENT_SECRET', GCN_CLIENT_SECRET),
-            'DOMAIN': 'gcn.nasa.gov',  # optional, defaults to 'gcn.nasa.gov'
-            'CONFIG': {  # optional
-                # 'group.id': 'tom_alertstreams - llindstrom@lco.global',
-                # 'auto.offset.reset': 'earliest',
-                # 'enable.auto.commit': False
-            },
-            'TOPIC_HANDLERS': {
-                'gcn.classic.text.LVC_PRELIMINARY': 'tom_nonlocalizedevents.alertstream_handlers.gcn_event_handler.handle_message',
-                'gcn.classic.text.LVC_INITIAL': 'tom_nonlocalizedevents.alertstream_handlers.gcn_event_handler.handle_message',
-                'gcn.classic.text.LVC_RETRACTION': 'tom_nonlocalizedevents.alertstream_handlers.gcn_event_handler.handle_retraction',
-            },
-        },
-    }
 ]
 
 VUE_FRONTEND_DIR_TOM_NONLOCAL = os.path.join(STATIC_ROOT, 'tom_nonlocalizedevents/vue')

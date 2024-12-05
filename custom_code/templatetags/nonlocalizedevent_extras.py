@@ -1,6 +1,7 @@
 from django import template
 from django.db.models import Max
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from custom_code.templatetags.skymap_extras import get_preferred_localization
 import math
 
 register = template.Library()
@@ -10,6 +11,8 @@ SI_PREFIXES = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q']
 
 @register.filter
 def format_inverse_far(far):
+    if not far:
+        return ''
     inv_far = 3.168808781402895e-08 / far  # 1/Hz to yr
     if inv_far > 1.:
         log1000 = math.log10(inv_far) / 3.
@@ -43,6 +46,21 @@ def format_distance(localization):
         dist_std /= 1000.
         unit = 'Gpc'
     return f'{dist_mean:.0f} ± {dist_std:.0f} {unit}' if dist_mean > 10. else f'{dist_mean:.1f} ± {dist_std:.1f} {unit}'
+
+
+@register.filter
+def format_area(area):
+    unit = 'deg²'
+    if area < 1.:
+        area *= 3600.
+        unit = 'arcmin²'
+    if area < 1.:
+        area *= 3600.
+        unit = 'arcsec²'
+    if area >= 10.:
+        return f'{area:.0f} {unit}'
+    else:
+        return f'{area:.1f} {unit}'
 
 
 @register.filter
@@ -91,8 +109,70 @@ def nonlocalizedevent_details(context, localization=None):
             return
         nle = NonLocalizedEvent.objects.get(event_id=event_id)
         sequence = nle.sequences.last()
+        localization = get_preferred_localization(nle)
     elif localization.external_coincidences.exists():
         sequence = localization.external_coincidences.last().sequences.last()
     else:
         sequence = localization.sequences.last()
-    return {'sequence': sequence}
+
+    if sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GRAVITATIONAL_WAVE:
+        if sequence.details['group'] == 'CBC':
+            details_to_display = [
+                [
+                    ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
+                    ('Instrument', '+'.join(sequence.details['instruments'])),
+                    ('50% Area', format_area(localization.area_50)),
+                    ('90% Area', format_area(localization.area_90)),
+                ],
+                [
+                    ('1/FAR', format_inverse_far(sequence.details['far'])),
+                    ('Distance', format_distance(localization)),
+                ] +
+                [(prop, f'{prob:.0%}') for prop, prob in sequence.details['properties'].items()],
+                [(classification, f'{prob:.0%}') for classification, prob in sequence.details['classification'].items()],
+            ]
+        elif sequence.details['group'] == 'Burst':
+            details_to_display = [
+                [
+                    ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
+                    ('Instrument', '+'.join(sequence.details['instruments'])),
+                    ('50% Area', format_area(localization.area_50)),
+                    ('90% Area', format_area(localization.area_90)),
+                ],
+                [
+                    ('1/FAR', format_inverse_far(sequence.details['far'])),
+                    ('Duration', millisecondformat(sequence.details['duration'])),
+                    ('Frequency', f'{sequence.details["central_frequency"]:.0f} Hz'),
+                ]
+            ]
+        else:
+            details_to_display = []
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GAMMA_RAY_BURST:
+        details_to_display = [
+            [
+                ('Event Type', sequence.nonlocalizedevent.event_type),
+                ('Instrument', sequence.details['notice_type'].split()[0]),
+                ('50% Area', format_area(localization.area_50)),
+                ('90% Area', format_area(localization.area_90)),
+            ],
+            [
+                ('Significance', sequence.details['data_signif'].replace(' [sigma]', 'σ')),
+                ('Interval', millisecondformat(float(sequence.details['data_interval'].split()[0]))),
+                ('Energy', '[' + sequence.details['e_range'].replace(' -', ',').replace(']', '').replace(' [', '] ')),
+            ]
+        ]
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.UNKNOWN:  # Einstein probe
+        details_to_display = [
+            [
+                ('Event Type', 'X-ray Transient'),
+                ('Instrument', sequence.details['instrument']),
+                ('50% Area', format_area(localization.area_50)),
+                ('90% Area', format_area(localization.area_90)),
+            ],
+            [
+                ('Image S/N', sequence.details['image_snr']),
+                ('Count Rate', f'{sequence.details["net_count_rate"]} s⁻¹'),
+                ('Energy', f'{sequence.details["image_energy_range"]} keV'),
+            ]
+        ]
+    return {'details': details_to_display}

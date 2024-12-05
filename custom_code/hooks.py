@@ -2,7 +2,7 @@ import logging
 from requests import Response
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
-from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
+from kne_cand_vetting.survey_phot import TNS_get, query_ZTFpubphot
 from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
 import json
@@ -10,6 +10,7 @@ import numpy as np
 from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
+from astroquery.ipac.irsa.irsa_dust import IrsaDust
 from healpix_alchemy.constants import HPX
 from django.conf import settings
 
@@ -71,6 +72,16 @@ def target_post_save(target, created, tns_time_limit:int=5):
         target.galactic_lat = coord.galactic.b.deg
         target.save()
 
+        if target.extra_fields.get('MW E(B-V)') is None:
+            try:
+                mwebv = IrsaDust.get_query_table(coord, section='ebv')['ext SandF ref'][0]
+            except Exception as e:
+                logger.error(f'Error querying IRSA dust for {target.name}')
+            else:
+                update_or_create_target_extra(target, 'MW E(B-V)', mwebv)
+                messages.append(f'MW E(B-V) set to {mwebv:.4f}')
+
+
         update_or_create_target_extra(target=target, key='healpix', value=HPX.skycoord_to_healpix(coord))
 
         qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
@@ -80,6 +91,57 @@ def target_post_save(target, created, tns_time_limit:int=5):
             for iau_name, redshift, classification, internal_names in tns_results:
                 if target.name[2:] == iau_name[2:]:  # choose the name that already matches, if more than one
                     break
+
+            # now query the real TNS by name for even more recent updates
+            get_obj = [("objname", iau_name[2:]), ("objid", ""), ("photometry", "1"), ("spectra", "0")]  # remove prefix
+            response, time_to_wait = TNS_get(get_obj,
+                                             settings.BROKERS['TNS']['bot_id'],
+                                             settings.BROKERS['TNS']['bot_name'],
+                                             settings.BROKERS['TNS']['api_key'],
+                                             timelimit=tns_time_limit)
+            if response is not None:
+                tns_reply = response.json()['data']['reply']
+
+                # update the coordinates if needed
+                if target.ra != tns_reply['radeg'] or target.dec != tns_reply['decdeg']:
+                    target.ra = tns_reply['radeg']
+                    target.dec = tns_reply['decdeg']
+                    target.save()
+                    messages.append(f'Updated coordinates to {target.ra:.6f}, {target.dec:.6f} based on TNS')
+
+                # ingest any photometry
+                n_new_phot = 0
+                for candidate in tns_reply['photometry']:
+                    jd = Time(candidate['jd'], format='jd', scale='utc')
+                    value = {'filter': candidate['filters']['name']}
+                    if candidate['flux']:  # detection
+                        value['magnitude'] = candidate['flux']
+                    else:
+                        value['limit'] = candidate['limflux']
+                    if candidate['fluxerr']:  # not empty or zero
+                        value['error'] = candidate['fluxerr']
+                    rd, created = ReducedDatum.objects.get_or_create(
+                        timestamp=jd.to_datetime(timezone=TimezoneInfo()),
+                        value=value,
+                        source_name=candidate['telescope']['name'] + ' (TNS)',
+                        data_type='photometry',
+                        target=target)
+                    n_new_phot += created
+                if n_new_phot:
+                    messages.append(f'Added {n_new_phot:d} photometry points from the TNS')
+
+                # if query is successful, use these up-to-date versions instead of what's in the local copy
+                iau_name = tns_reply['name_prefix'] + tns_reply['objname']
+                redshift = tns_reply['redshift']
+                classification = tns_reply['object_type']['name']
+                internal_names = tns_reply['internal_names']
+
+            else:
+                tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
+                tns_query_status += f' If it is important that you have all of the photometry we encourage you try again in {time_to_wait}s!'
+                logger.info(tns_query_status)
+
+            # update the target details from the TNS query, if successful, or from the local copy in the database
             if target.name != iau_name:
                 target.name = iau_name
                 target.save()

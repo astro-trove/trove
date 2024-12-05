@@ -25,17 +25,19 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
     % vi settings_local.py
   ```
 
-  3. Install dependencies:
+  3. Create virtual environment and install dependencies:
 
   ```bash
-    % python3 -m pip install --upgrade pip
-    % python3 -m pip install -r requirements.txt
+    % cd /var/www/saguaro_tom
+    % python3 -m venv venv
+    % source venv/bin/activate
+    % pip install --upgrade pip
+    % pip install -r requirements.txt
   ```
 
   4. Run the development server:
 
   ```bash
-    % cd /var/www/saguaro_tom
     % python3 manage.py collectstatic # only the first time you start the development server
     % python3 manage.py runserver
   ```
@@ -67,17 +69,17 @@ Then (as root) enable the sites:
 ## Running the alert listener
 The alert listener is now integrated into the TOM. It should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
-@reboot /var/www/saguaro_tom/manage.py readstreams > /home/saguaro/alertstreams.log 2>&1
+@reboot sleep 40 && /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py readstreams > /home/saguaro/alertstreams.log 2>&1
 ```
 
 If it does not restart, or you need to restart the listener manually, run the following on `sand`. First, kill any other instances are running:
 ```
-sudo pkill -f readstreams
+pkill -f readstreams
 ```
 
 Then run
 ```
-sudo nohup /var/www/saguaro_tom/manage.py readstreams > /home/saguaro/alertstreams.log 2>&1 &
+nohup /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py readstreams > /home/saguaro/alertstreams.log 2>&1 &
 ```
 
 ## Allowing for asynchronous tasks
@@ -86,29 +88,29 @@ Redis is installed according to the instructions on its [readme](https://github.
 Dramatiq is configured according to the [TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/managing_data/single_target_data_service.html#configuring-your-tom-to-serve-tasks-asynchronously).
 These should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
-@reboot /usr/local/bin/redis-server > /home/saguaro/redis.log 2>&1
-@reboot /var/www/saguaro_tom/manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
+@reboot sleep 50 && /usr/local/bin/redis-server > /home/saguaro/redis.log 2>&1
+@reboot sleep 60 && /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
 ```
 
 If either of these does not restart, or you need to restart them manually, run the following on `sand`. First, kill any other instances are running:
 ```
-sudo pkill -f redis-server
-sudo pkill -f rundramatiq
+pkill -f redis-server
+pkill -f rundramatiq
 ```
 
 Then run
 ```
-sudo nohup redis-server > /home/saguaro/redis.log 2>&1 &
-sudo nohup /var/www/saguaro_tom/manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1 &
+nohup redis-server > /home/saguaro/redis.log 2>&1 &
+nohup /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1 &
 ```
 
 ## Other periodic tasks
 Several other tasks run every hour as cronjobs (as root):
 ```
-0 * * * * /var/www/saguaro_tom/manage.py report_pointings > /home/saguaro/report_pointings.log 2>&1
-0 * * * * /var/www/saguaro_tom/manage.py updatestatus > /home/saguaro/observation_status.log 2>&1
-0 * * * * /var/www/saguaro_tom/manage.py verify_listener > /home/saguaro/verify_listener.log 2>&1
-10 * * * * /var/www/saguaro_tom/manage.py ingest_tns > /home/saguaro/ingest_tns.log 2>&1
+0 * * * * /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py report_pointings > /home/saguaro/report_pointings.log 2>&1
+0 * * * * /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py updatestatus > /home/saguaro/observation_status.log 2>&1
+0 * * * * /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py verify_listener > /home/saguaro/verify_listener.log 2>&1
+5 * * * * /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py ingest_tns > /home/saguaro/ingest_tns.log 2>&1
 ```
 
 Respectively, these:

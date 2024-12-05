@@ -17,6 +17,7 @@ LASAIR_TOKEN = ''       # API key for the Lasair broker
 LCO_API_KEY = ''        # API key for Las Cumbres Observatory
 MMT_BINOSPEC_PROGRAMS = [] # list of (API key, human-readable name) for MMT+Binospec
 MMT_MMIRS_PROGRAMS = [] # list of (API key, human-readable name) for MMT+MMIRS
+MMT_MMTCAM_PROGRAMS = [] # list of (API key, human-readable name) for MMT+MMTCam
 POSTGRES_DB = ''        # name of the Postgres database
 POSTGRES_HOST = ''      # hostname or IP address of the Postgres database server
 POSTGRES_PASSWORD = ''  # password for the Postgres database
@@ -34,6 +35,7 @@ TARGET_LINKS = [  # links to TOMs for target pages, {target.name} is replaced by
     ('https://tom0.edu/targets/{target.id}/', 'Name of TOM 0'),  # TOM corresponding to Slack workspace 0
     ('https://tom1.edu/targets/{target.name}/', 'Name of TOM 1'),  # TOM corresponding to Slack workspace 1
 ]
+SLACK_EP_URL = 'https://hooks.slack.com/services/.../.../...'  # incoming webhook for Einstein Probe alerts
 SLACK_TNS_URL = 'https://hooks.slack.com/services/.../.../...'  # incoming webhook for TNS transient alerts
 SLACK_URLS = [  # list of lists of Slack URLs for incoming webhooks
     [  # list of URLs for Slack workspace 0

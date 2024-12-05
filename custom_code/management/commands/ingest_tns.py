@@ -2,10 +2,15 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import connection
 from tom_targets.models import Target
+from tom_dataproducts.tasks import atlas_query
 from custom_code.hooks import target_post_save
+from custom_code.tasks import target_run_mpc
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.alertstream_handlers import pick_slack_channel, send_slack
 from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
+from datetime import datetime, timedelta
+from astropy.time import Time
+import itertools
 import requests
 import json
 import logging
@@ -25,6 +30,13 @@ def vet_or_post_error(target):
             logger.warn(tns_query_status)
             json_data = json.dumps({'text': tns_query_status}).encode('ascii')
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})            
+
+        detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
+        if detections.exists():
+            target_run_mpc.send(detections.latest().id)
+        mjd_now = Time.now().mjd
+        atlas_query.send(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
+                         
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
         logger.error(''.join(traceback.format_exception(e)))
@@ -35,12 +47,19 @@ class Command(BaseCommand):
 
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
 
-    def handle(self, **kwargs):
+    def add_arguments(self, parser):
+        parser.add_argument('--lookback-days-nle', help='Nonlocalized events are considered active for this many days',
+                            type=float, default=7.)
+        parser.add_argument('--lookback-days-obs', help='Associate transients whose first detection was within this '
+                                                        'many days of the nonlocalized event',
+                            type=float, default=3.)
+
+    def handle(self, lookback_days_nle=7., lookback_days_obs=3., **kwargs):
 
         updated_targets_coords = Target.objects.raw(
             """
             --STEP 0: update coordinates of existing targets with TNS names
-            UPDATE tom_targets_target AS tt
+            UPDATE tom_targets_basetarget AS tt
             SET name=CONCAT(tns.name_prefix, tns.name), ra=tns.ra, dec=tns.declination, modified=NOW()
             FROM tns_q3c as tns
             WHERE SUBSTRING(tt.name, 3)=tns.name AND q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
@@ -56,7 +75,7 @@ class Command(BaseCommand):
                 --STEP 1: crossmatch TNS transients with existing targets and store in tns_matches table
                 CREATE TEMPORARY TABLE tns_matches AS
                 SELECT target.id, target.name, t.tns_name, t.sep, t.ra, t.dec
-                FROM tom_targets_target AS target LEFT JOIN LATERAL (
+                FROM tom_targets_basetarget AS target LEFT JOIN LATERAL (
                     SELECT CONCAT(tns.name_prefix, tns.name) AS tns_name,
                         q3c_dist(target.ra, target.dec, tns.ra, tns.declination) AS sep,
                         tns.ra,
@@ -82,7 +101,7 @@ class Command(BaseCommand):
         updated_targets = Target.objects.raw(
             """
             --STEP 2: update existing targets (if needed) to match closest TNS transient
-            UPDATE tom_targets_target AS tt
+            UPDATE tom_targets_basetarget AS tt
             SET name=tm.tns_name, ra=tm.ra, dec=tm.dec, modified=NOW()
             FROM top_tns_matches AS tm
             WHERE tt.name=tm.name AND (tm.name != tm.tns_name OR sep > 0)
@@ -138,9 +157,9 @@ class Command(BaseCommand):
                 WHERE target_id IN (SELECT old_id FROM targets_to_merge);
                 
                 UPDATE tom_targets_targetlist_targets
-                SET target_id=new_id
+                SET basetarget_id=new_id
                 FROM targets_to_merge
-                WHERE target_id=old_id;
+                WHERE basetarget_id=old_id;
                 
                 UPDATE tom_targets_targetname
                 SET target_id=new_id
@@ -151,7 +170,7 @@ class Command(BaseCommand):
 
         deleted_targets = Target.objects.raw(
             """
-            DELETE FROM tom_targets_target
+            DELETE FROM tom_targets_basetarget
             WHERE id IN (
                 SELECT old_id FROM targets_to_merge
             )
@@ -165,7 +184,7 @@ class Command(BaseCommand):
         new_targets = Target.objects.raw(
             """
             --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
-            INSERT INTO tom_targets_target (name, type, created, modified, ra, dec, epoch, scheme)
+            INSERT INTO tom_targets_basetarget (name, type, created, modified, ra, dec, epoch, scheme)
             SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), ra, declination, 2000, ''
             FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate in the TNS
             ON CONFLICT (name) DO NOTHING
@@ -174,22 +193,20 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        for target in updated_targets_coords:
-            vet_or_post_error(target)
+        new_or_updated_targets = [updated_targets_coords, updated_targets, new_targets]
 
-        for target in updated_targets:
-            vet_or_post_error(target)
+        for targets in new_or_updated_targets:
+            for target in targets:
+                vet_or_post_error(target)
 
         for target in new_targets:
-            vet_or_post_error(target)
-
             # check if any of the possible host galaxies are within 40 Mpc
             target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
             if target_extra is None:
                 continue
             for galaxy in json.loads(target_extra.value):
                 if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
-                    slack_alert = (f'<{settings.TARGET_LINKS[0][0]}/|{target.name}> is {galaxy["Offset"]:.1f}" from '
+                    slack_alert = (f'<{settings.TARGET_LINKS[0][0]}|{target.name}> is {galaxy["Offset"]:.1f}" from '
                                    f'galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.').format(target=target)
                     break
             else:
@@ -212,13 +229,20 @@ class Command(BaseCommand):
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
         # automatically associate with nonlocalized events
-        active_nles = get_active_nonlocalizedevents(lookback_days=7.)
-        target_ids = [target.id for target in new_targets] + [target.id for target in updated_targets]
-        for nle in active_nles:
+        for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
             seq = nle.sequences.last()
+            nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+            target_ids = []
+            for targets in new_or_updated_targets:
+                for target in targets:
+                    first_det = target.reduceddatum_set.filter(data_type='photometry',
+                                                               value__magnitude__isnull=False).earliest()
+                    if nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
+                        target_ids.append(target.id)
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
             for candidate in candidates:
-                format_kwargs = {'nle': nle, 'target': candidate.target}
-                slack_alert = ('<{target_link}|{{target.name}}> falls in the '
+                credible_region = candidate.credibleregions.order_by('smallest_percent').first().smallest_percent
+                format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
+                slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
                                'localization region of <{nle_link}|{{nle.event_id}}>')
                 send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
