@@ -14,7 +14,7 @@ CSS_FOOTPRINT = np.array([[-w, -h], [-w, h], [w, h], [w, -h], [-w, -h]])
 
 def centers_to_vertices(centers, footprint):
     """Calculate the vertices for a pointing from its center and footprint"""
-    if centers.size:
+    if centers.ndim == 2:
         cos_dec = np.cos(np.deg2rad(centers[:, ::-1]))
         cos_dec[:, 1] = 1.  # take cosine of dec and divide the RAs by it
         return (centers[:, np.newaxis] + footprint / cos_dec[:, np.newaxis]).tolist()
@@ -91,7 +91,7 @@ def skymap_event_id(context, survey_candidates=None, survey_observations=None):
         return
     nle = NonLocalizedEvent.objects.get(event_id=event_id)
     seq = nle.sequences.last()
-    return skymap(seq.localization, survey_candidates, survey_observations)
+    return skymap(context, seq.localization, survey_candidates, survey_observations)
 
 
 @register.filter

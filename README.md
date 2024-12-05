@@ -67,7 +67,7 @@ Then (as root) enable the sites:
 ## Running the alert listener
 The alert listener is now integrated into the TOM. It should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
-@reboot cd /var/www/saguaro_tom/; python manage.py readstreams > /home/saguaro/alertstreams.log 2>&1
+@reboot /var/www/saguaro_tom/manage.py readstreams > /home/saguaro/alertstreams.log 2>&1
 ```
 
 If it does not restart, or you need to restart the listener manually, run the following on `sand`. First, kill any other instances are running:
@@ -77,8 +77,7 @@ sudo pkill -f readstreams
 
 Then run
 ```
-cd /var/www/saguaro_tom/
-sudo nohup python manage.py readstreams > /home/saguaro/alertstreams.log 2>&1 &
+sudo nohup /var/www/saguaro_tom/manage.py readstreams > /home/saguaro/alertstreams.log 2>&1 &
 ```
 
 ## Allowing for asynchronous tasks
@@ -88,7 +87,7 @@ Dramatiq is configured according to the [TOM Toolkit documentation](https://tom-
 These should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
 @reboot /usr/local/bin/redis-server > /home/saguaro/redis.log 2>&1
-@reboot cd /var/www/saguaro_tom/; python manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
+@reboot /var/www/saguaro_tom/manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
 ```
 
 If either of these does not restart, or you need to restart them manually, run the following on `sand`. First, kill any other instances are running:
@@ -99,9 +98,8 @@ sudo pkill -f rundramatiq
 
 Then run
 ```
-sudo nohup redis-server > /home/saguaro/redis.log 2>&1
-cd /var/www/saguaro_tom/
-sudo nohup python manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
+sudo nohup redis-server > /home/saguaro/redis.log 2>&1 &
+sudo nohup /var/www/saguaro_tom/manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1 &
 ```
 
 ## Other periodic tasks
