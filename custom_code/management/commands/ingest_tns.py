@@ -236,7 +236,8 @@ class Command(BaseCommand):
                         target_ids.append(target.id)
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
             for candidate in candidates:
-                format_kwargs = {'nle': nle, 'target': candidate.target}
-                slack_alert = ('<{target_link}|{{target.name}}> falls in the '
+                credible_region = candidate.credibleregions.order_by('smallest_percent').first().smallest_percent
+                format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
+                slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
                                'localization region of <{nle_link}|{{nle.event_id}}>')
                 send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
