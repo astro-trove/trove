@@ -29,8 +29,7 @@ def vet_or_post_error(target):
         if tns_query_status is not None:
             logger.warn(tns_query_status)
             json_data = json.dumps({'text': tns_query_status}).encode('ascii')
-            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})            
-
+            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
         detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
         if detections.exists():
             target_run_mpc.send(detections.latest().id)
@@ -56,6 +55,14 @@ class Command(BaseCommand):
 
     def handle(self, lookback_days_nle=7., lookback_days_obs=3., **kwargs):
 
+
+        ## THIS IS A TEST, THE LINE SHOULD THROW AN ERROR AND SHOULD BE REMOVED!
+        vet_or_post_error(Target(
+            name="2025abc",
+            ra=10,
+            dec=10
+        ))
+        
         updated_targets_coords = Target.objects.raw(
             """
             --STEP 0: update coordinates of existing targets with TNS names

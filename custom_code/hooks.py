@@ -2,7 +2,7 @@ import logging
 from requests import Response
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
-from kne_cand_vetting.survey_phot import TNS_get, query_ZTFpubphot
+from kne_cand_vetting.survey_phot import TNS_get, query_ZTFpubphot, query_TNSphot
 from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
 import json
@@ -99,7 +99,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
                                              settings.BROKERS['TNS']['bot_name'],
                                              settings.BROKERS['TNS']['api_key'],
                                              timelimit=tns_time_limit)
-            if response is not None:
+            if response is not None and response.status_code == 200:
                 tns_reply = response.json()['data']['reply']
 
                 # update the coordinates if needed
@@ -137,8 +137,11 @@ def target_post_save(target, created, tns_time_limit:int=5):
                 internal_names = tns_reply['internal_names']
 
             else:
-                tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
-                tns_query_status += f' If it is important that you have all of the photometry we encourage you try again in {time_to_wait}s!'
+                if isinstance(response, Response):
+                    tns_query_status = f"TNS Request responded with code {response.status_code}!\n{response}"
+                else:
+                    tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
+                    
                 logger.info(tns_query_status)
 
             # update the target details from the TNS query, if successful, or from the local copy in the database
