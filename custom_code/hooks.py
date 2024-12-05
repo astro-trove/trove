@@ -1,4 +1,5 @@
 import logging
+from requests import Response
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import query_TNSphot, query_ZTFpubphot
@@ -100,8 +101,15 @@ def target_post_save(target, created, tns_time_limit:int=5):
                                     settings.BROKERS['TNS']['bot_name'],
                                     settings.BROKERS['TNS']['api_key'],
                                     timelimit=tns_time_limit)
+            if tnsphot is None or (isinstance(tnsphot, Response) and tnsphot.status_code != 200):
+                if isinstance(tnsphot, Response):
+                    tns_query_status = f"TNS Request responded with code {tnsphot.status_code}!\n{tnsphot}"
+                else:
+                    tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
+                    
+                logger.info(tns_query_status)
 
-            if tnsphot is not None:
+            else:
                 for candidate in tnsphot:
                     jd = Time(candidate['jd'], format='jd', scale='utc')
                     value = {'filter': candidate['F']}
@@ -117,9 +125,6 @@ def target_post_save(target, created, tns_time_limit:int=5):
                         source_name=candidate['tel']+' (TNS)',
                         data_type='photometry',
                         target=target)
-            else:
-                tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
-                logger.info(tns_query_status)
                 
         update_or_create_target_extra(target=target, key='QSO Match', value=qso[0])
         if qso[0] != 'None':
