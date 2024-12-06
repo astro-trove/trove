@@ -2,7 +2,7 @@ import logging
 from requests import Response
 from kne_cand_vetting.catalogs import static_cats_query
 from kne_cand_vetting.galaxy_matching import galaxy_search
-from kne_cand_vetting.survey_phot import TNS_get, query_ZTFpubphot, query_TNSphot
+from kne_cand_vetting.survey_phot import TNS_get, query_ZTFpubphot
 from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
 import json
