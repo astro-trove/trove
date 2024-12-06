@@ -101,7 +101,8 @@ pkill -f rundramatiq
 Then run
 ```
 nohup redis-server > /home/saguaro/redis.log 2>&1 &
-nohup /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1 &
+cd /var/www/saguaro_tom/
+nohup venv/bin/python manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1 &
 ```
 
 ## Other periodic tasks
