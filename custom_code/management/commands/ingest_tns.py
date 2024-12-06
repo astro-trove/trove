@@ -54,14 +54,6 @@ class Command(BaseCommand):
                             type=float, default=3.)
 
     def handle(self, lookback_days_nle=7., lookback_days_obs=3., **kwargs):
-
-
-        ## THIS IS A TEST, THE LINE SHOULD THROW AN ERROR AND SHOULD BE REMOVED!
-        vet_or_post_error(Target(
-            name="2025abc",
-            ra=10,
-            dec=10
-        ))
         
         updated_targets_coords = Target.objects.raw(
             """
