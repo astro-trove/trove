@@ -45,10 +45,11 @@ class Command(BaseCommand):
         now = Time.now()
         lookback_window_obs = now - lookback_days_obs * u.day
         active_nles = get_active_nonlocalizedevents(lookback_window_obs, lookback_days_nle, test=test)
+        active_nles = active_nles.filter(event_type=NonLocalizedEvent.NonLocalizedEventType.GRAVITATIONAL_WAVE)
         if not active_nles.exists():
-            logger.info('No active nonlocalized events found')
+            logger.info('No active GW events found')
             return
-        logger.info(f'Found active nonlocalized events: {", ".join([nle.event_id for nle in active_nles])}')
+        logger.info(f'Found active GW events: {", ".join([nle.event_id for nle in active_nles])}')
 
         recent_obs = SurveyObservationRecord.objects.filter(created__gt=lookback_window_obs.to_datetime(TimezoneInfo()),
                                                             created__lte=now.to_datetime(TimezoneInfo()))
