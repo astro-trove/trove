@@ -18,12 +18,14 @@ def get_active_nonlocalizedevents(t0=None, lookback_days=3., test=False):
     """
     if t0 is None:
         t0 = Time.now()
-    lookback_window_nle = t0 - lookback_days * u.day
-    active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle.isot,
-                                                   sequences__details__significant=True,
-                                                   state='ACTIVE',
-                                                   event_id__startswith='MS' if test else 'S').distinct()
-    return active_nles
+    lookback_window_nle = (t0 - lookback_days * u.day).isot
+    active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle, state='ACTIVE')
+    active_nles = active_nles.exclude(sequences__details__significant=False)
+    if test:
+        active_nles = active_nles.filter(event_id__startswith='MS')
+    else:
+        active_nles = active_nles.exclude(event_id__startswith='MS')
+    return active_nles.distinct()
 
 
 class Command(BaseCommand):

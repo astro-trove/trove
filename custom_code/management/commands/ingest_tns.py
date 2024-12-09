@@ -244,4 +244,10 @@ class Command(BaseCommand):
                 format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
                 slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
                                'localization region of <{nle_link}|{{nle.event_id}}>')
-                send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
+                if nle.event_type == nle.NonLocalizedEventType.GRAVITATIONAL_WAVE:
+                    send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
+                elif nle.event_type == nle.NonLocalizedEventType.UNKNOWN:
+                    body = slack_alert.format(nle_link=settings.NLE_LINKS[0][0],
+                                              target_link=settings.TARGET_LINKS[0][0])
+                    json_data = json.dumps({'text': body.format(**format_kwargs)}).encode('ascii')
+                    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
