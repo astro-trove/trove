@@ -2,8 +2,8 @@
 <table class="table table-striped">
   <thead><tr>
     <th>Timestamp</th>
-    <th>Filename</th>
     <th>Source</th>
+    <th>Filename</th>
     <th>Share</th>
     <th>Delete</th>
   </tr></thead>
@@ -11,8 +11,8 @@
   {% for datum in datums %}
     <tr>
       <td>{{ datum.timestamp }}</td>
-      <td><a href="{{ datum.data_product.data.url }}" download>{{ datum.data_product.get_file_name|truncatechars:25 }}</a></td>
       <td>{{ datum.source_name }}</td>
+      <td><a href="{{ datum.data_product.data.url }}" download>{{ datum.data_product.get_file_name|truncatechars:25 }}</a></td>
       <td>
         {% if sharing_destinations %}
           <button type="button" class="btn btn-info" data-toggle="collapse" data-target="#share-{{ forloop.counter }}">Share</button>
