@@ -170,8 +170,8 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     # scale the y-axis manually so that we know the range ahead of time and can scale the secondary y-axis to match
     if all_ydata:
         all_ydata = np.concatenate(all_ydata)
-        ymin = np.nanmin(all_ydata)
-        ymax = np.nanmax(all_ydata)
+        ymin = np.nanpercentile(all_ydata, 0.1)
+        ymax = np.nanpercentile(all_ydata, 99.9)
         yrange = ymax - ymin
         ymin_view = ymin - 0.05 * yrange
         ymax_view = ymax + 0.05 * yrange
