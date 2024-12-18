@@ -124,6 +124,7 @@
         </div>
       <div class="tab-pane" id="spectroscopy">
         {% spectroscopy_for_target target %}
+        {% get_spectroscopy_data object %}
       </div>
 
       {% comments_enabled as comments_are_enabled %}
