@@ -1,10 +1,11 @@
-import mimetypes
 from specutils import Spectrum1D
 from tom_dataproducts.processors.data_serializers import SpectrumSerializer
 from tom_dataproducts.processors.spectroscopy_processor import SpectroscopyProcessor as OldSpectroscopyProcessor
 from tom_dataproducts.exceptions import InvalidFileFormatException
 from lightcurve_fitting.speccal import readspec
 import numpy as np
+
+TELESCOPE_ALIASES = {'2m0-01': 'FTN', '2m0-02': 'FTS'}
 
 
 class SpectroscopyProcessor(OldSpectroscopyProcessor):
@@ -32,7 +33,7 @@ class SpectroscopyProcessor(OldSpectroscopyProcessor):
                               spectral_axis=wavelength * self.DEFAULT_WAVELENGTH_UNITS)
         serialized_spectrum = FiniteSpectrumSerializer().serialize(spectrum)
 
-        return [(obs_date.to_datetime(), serialized_spectrum, '')]  # no support for source_name yet
+        return [(obs_date.to_datetime(), serialized_spectrum, TELESCOPE_ALIASES.get(telescope, telescope))]
 
 
 class FiniteSpectrumSerializer(SpectrumSerializer):
