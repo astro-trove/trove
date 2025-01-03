@@ -100,12 +100,14 @@ def target_post_save(target, created, tns_time_limit:int=5):
                                              settings.BROKERS['TNS']['api_key'],
                                              timelimit=tns_time_limit)
             if response is not None and response.status_code == 200:
-                tns_reply = response.json()['data']['reply']
+                tns_reply = response.json()['data']
 
                 # update the coordinates if needed
-                if target.ra != tns_reply['radeg'] or target.dec != tns_reply['decdeg']:
-                    target.ra = tns_reply['radeg']
-                    target.dec = tns_reply['decdeg']
+                radeg = float(tns_reply['radeg'])
+                decdeg = float(tns_reply['decdeg'])
+                if target.ra != radeg or target.dec != decdeg:
+                    target.ra = radeg
+                    target.dec = decdeg
                     target.save()
                     messages.append(f'Updated coordinates to {target.ra:.6f}, {target.dec:.6f} based on TNS')
 
@@ -115,11 +117,11 @@ def target_post_save(target, created, tns_time_limit:int=5):
                     jd = Time(candidate['jd'], format='jd', scale='utc')
                     value = {'filter': candidate['filters']['name']}
                     if candidate['flux']:  # detection
-                        value['magnitude'] = candidate['flux']
+                        value['magnitude'] = float(candidate['flux'])
                     else:
-                        value['limit'] = candidate['limflux']
+                        value['limit'] = float(candidate['limflux'])
                     if candidate['fluxerr']:  # not empty or zero
-                        value['error'] = candidate['fluxerr']
+                        value['error'] = float(candidate['fluxerr'])
                     rd, created = ReducedDatum.objects.get_or_create(
                         timestamp=jd.to_datetime(timezone=TimezoneInfo()),
                         value=value,
@@ -132,7 +134,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
                 # if query is successful, use these up-to-date versions instead of what's in the local copy
                 iau_name = tns_reply['name_prefix'] + tns_reply['objname']
-                redshift = tns_reply['redshift']
+                redshift = float(tns_reply['redshift'])
                 classification = tns_reply['object_type']['name']
                 internal_names = tns_reply['internal_names']
 

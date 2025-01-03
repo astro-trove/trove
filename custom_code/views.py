@@ -128,7 +128,7 @@ def upload_files_to_tns(files):
     https://sandbox.wis-tns.org/sites/default/files/api/TNS_bulk_reports_manual.pdf
     """
     json_data = {'api_key': TNS['api_key']}
-    response = requests.post(TNS_URL + '/file-upload', headers={'User-Agent': TNS_MARKER}, data=json_data, files=files)
+    response = requests.post(TNS_URL + '/set/file-upload', headers={'User-Agent': TNS_MARKER}, data=json_data, files=files)
     response.raise_for_status()
     new_filenames = response.json()['data']
     logger.info(f"Uploaded {', '.join(new_filenames)} to the TNS")
@@ -141,7 +141,7 @@ def send_tns_report(data):
     https://sandbox.wis-tns.org/sites/default/files/api/TNS_bulk_reports_manual.pdf
     """
     json_data = {'api_key': TNS['api_key'], 'data': data}
-    response = requests.post(TNS_URL + '/bulk-report', headers={'User-Agent': TNS_MARKER}, data=json_data)
+    response = requests.post(TNS_URL + '/set/bulk-report', headers={'User-Agent': TNS_MARKER}, data=json_data)
     response.raise_for_status()
     report_id = response.json()['data']['report_id']
     logger.info(f'Sent TNS report ID {report_id:d}')
@@ -158,7 +158,7 @@ def get_tns_report_reply(report_id, request):
     json_data = {'api_key': TNS['api_key'], 'report_id': report_id}
     for _ in range(6):
         time.sleep(5)
-        response = requests.post(TNS_URL + '/bulk-report-reply', headers={'User-Agent': TNS_MARKER}, data=json_data)
+        response = requests.post(TNS_URL + '/get/bulk-report-reply', headers={'User-Agent': TNS_MARKER}, data=json_data)
         if response.ok:
             break
     response.raise_for_status()
