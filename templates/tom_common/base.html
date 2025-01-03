@@ -44,6 +44,9 @@
           {% include 'tom_common/navbar_content.html' %}
 
         </ul>
+        <form action="{% url 'custom_code:search' %}" class="form-inline">
+          <input type="search" name="name" placeholder="Search by name">
+        </form>
         <ul class="navbar-nav ml-auto" id="login-buttons">
         {% navbar_login %}
         </ul>
