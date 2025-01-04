@@ -134,7 +134,8 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
                 # if query is successful, use these up-to-date versions instead of what's in the local copy
                 iau_name = tns_reply['name_prefix'] + tns_reply['objname']
-                redshift = float(tns_reply['redshift'])
+                if tns_reply['redshift']:
+                    redshift = float(tns_reply['redshift'])
                 classification = tns_reply['object_type']['name']
                 internal_names = tns_reply['internal_names']
 
