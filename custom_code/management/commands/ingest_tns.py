@@ -7,10 +7,10 @@ from custom_code.hooks import target_post_save
 from custom_code.tasks import target_run_mpc
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.alertstream_handlers import pick_slack_channel, send_slack
+from custom_code.templatetags.skymap_extras import get_preferred_localization
 from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
 from datetime import datetime, timedelta
 from astropy.time import Time
-import itertools
 import requests
 import json
 import logging
@@ -230,6 +230,7 @@ class Command(BaseCommand):
         # automatically associate with nonlocalized events
         for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
             seq = nle.sequences.last()
+            localization = get_preferred_localization(nle)
             nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
             target_ids = []
             for targets in new_or_updated_targets:
@@ -240,7 +241,7 @@ class Command(BaseCommand):
                         target_ids.append(target.id)
             candidates = create_candidates_from_targets(seq, target_ids=target_ids)
             for candidate in candidates:
-                credible_region = candidate.credibleregions.order_by('smallest_percent').first().smallest_percent
+                credible_region = candidate.credibleregions.get(localization=localization).smallest_percent
                 format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
                 slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
                                'localization region of <{nle_link}|{{nle.event_id}}>')
