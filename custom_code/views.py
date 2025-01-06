@@ -19,9 +19,9 @@ from tom_observations.views import ObservationCreateView as OldObservationCreate
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
 from tom_surveys.models import SurveyObservationRecord
 from tom_treasuremap.reporting import report_to_treasure_map
-from .models import Candidate, SurveyFieldCredibleRegion, Profile
+from .models import Candidate, SurveyFieldCredibleRegion
 from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
-from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm, ProfileUpdateForm
+from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import NonLocalizedEventFormHelper, CandidateFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
@@ -618,22 +618,6 @@ class UnknownListView(NonLocalizedEventListView):
     def get_queryset(self):
         qs = NonLocalizedEvent.objects.filter(event_type='UNK').order_by('-created')
         return qs
-
-
-class ProfileUpdateView(LoginRequiredMixin, UpdateView):
-    model = Profile
-    template_name = 'tom_common/update_user_profile.html'
-    form_class = ProfileUpdateForm
-
-    def get_success_url(self):
-        """
-        Returns the redirect URL for a successful update. If the current user is a superuser, returns the URL for the
-        user list. Otherwise, returns the URL for updating the current user.
-
-        :returns: URL for user list or update user
-        :rtype: str
-        """
-        return reverse_lazy('custom_code:profile-update', kwargs={'pk': self.get_object().id})
 
 
 class EventCandidateCreateView(LoginRequiredMixin, RedirectView):

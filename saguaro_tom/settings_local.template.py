@@ -1,5 +1,4 @@
 ALERT_EMAIL_FROM = ''   # email address from which the alerts are sent
-ALERT_SMS_FROM = ''     # phone number from which the text message alerts are sent
 ALLOWED_HOST = ''       # hostname or IP address of the web server (leave blank for development)
 ATLAS_API_KEY = ''      # API key for the ATLAS forced photometry server
 CONTACT_EMAIL = ''      # contact email for MMT observation request notes
@@ -55,5 +54,3 @@ SWIFT_USERNAME = ''     # username for the Swift ToO API
 SWIFT_SHARED_SECRET = '' # shared secret for the Swift ToO API
 TNS_API_KEY = ''        # API key for the Transient Name Server
 TREASUREMAP_API_KEY = '' # API key for the Gravitational Wave Treasure Map
-TWILIO_ACCOUNT_SID = '' # account ID for Twilio text message alerts
-TWILIO_AUTH_TOKEN = ''  # authorization token for Twilio text message alerts

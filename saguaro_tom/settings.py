@@ -61,7 +61,6 @@ INSTALLED_APPS = [
     'custom_code',
     'tom_surveys',
     'tom_treasuremap',
-    'phonenumber_field',
     'django_dramatiq',
 ]
 

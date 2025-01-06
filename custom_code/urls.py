@@ -4,7 +4,7 @@ from tom_targets.views import TargetGroupingView, TargetGroupingDeleteView
 from .views import TargetGroupingCreateView, CandidateListView, TargetReportView, TargetClassifyView, TargetVettingView, TargetMPCView
 from .views import ObservationCreateView, TargetNameSearchView, TargetListView
 from .views import CSSFieldListView, GWListView, GRBListView, NeutrinoListView, UnknownListView
-from .views import CSSFieldExportView, CSSFieldSubmitView, EventCandidateCreateView, ProfileUpdateView
+from .views import CSSFieldExportView, CSSFieldSubmitView, EventCandidateCreateView
 from tom_nonlocalizedevents.views import SupereventIdView
 
 from tom_common.api_router import SharedAPIRootRouter
@@ -35,5 +35,4 @@ urlpatterns = [
     path('nonlocalizedevents/<int:localization_id>/cssfields/export/', CSSFieldExportView.as_view(), name='css-fields-export'),
     path('nonlocalizedevents/<int:localization_id>/cssfields/submit/', CSSFieldSubmitView.as_view(), name='css-fields-submit'),
     path('nonlocalizedevents/<str:event_id>/createcandidate/<int:target_id>/', EventCandidateCreateView.as_view(), name='create-candidate'),
-    path('profile/<int:pk>/update/', ProfileUpdateView.as_view(), name='profile-update'),
 ]

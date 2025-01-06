@@ -4,7 +4,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Submit, HTML
 from crispy_forms.bootstrap import AppendedText, PrependedAppendedText
 from tom_targets.models import TargetList
-from .models import TargetListExtra, Profile
+from .models import TargetListExtra
 from datetime import datetime
 import json
 import os
@@ -361,19 +361,6 @@ class TargetClassifyForm(forms.Form):
                 fits_filename = new_filenames[1]
             report_data['classification_report']['0']['spectra']['spectra_group']['0']['fits_file'] = fits_filename
         return json.dumps(report_data)
-
-
-class ProfileUpdateForm(forms.ModelForm):
-    """
-    Form used for updating user profiles.
-    """
-    class Meta:
-        model = Profile
-        exclude = ('user',)
-        labels = {
-            'bbh_alerts': 'BBH alerts (HasNS < 1%)',
-            'ns_alerts': 'NS alerts (HasNS > 1%)',
-        }
 
 
 class NonLocalizedEventFormHelper(FormHelper):

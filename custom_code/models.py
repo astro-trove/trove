@@ -2,10 +2,7 @@ from datetime import datetime
 from dateutil.parser import parse
 
 from django.db import models
-from django.conf import settings
-from django.dispatch import receiver
 from django.contrib.auth.models import User
-from phonenumber_field.modelfields import PhoneNumberField
 from tom_targets.models import Target, TargetList
 from tom_nonlocalizedevents.models import EventLocalization
 from tom_surveys.models import SurveyField, SurveyObservationRecord
@@ -165,19 +162,3 @@ class CredibleRegionContour(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['localization', 'probability'], name='unique_localization_probability')
         ]
-
-
-class Profile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    phone_number = PhoneNumberField(null=True, region='US')
-    test_alerts = models.BooleanField(default=False)
-    subthreshold_alerts = models.BooleanField(default=False)
-    burst_alerts = models.BooleanField(default=False)
-    bbh_alerts = models.BooleanField(default=False)
-    ns_alerts = models.BooleanField(default=False)
-
-
-@receiver(models.signals.post_save, sender=settings.AUTH_USER_MODEL)
-def create_profile(sender, instance=None, created=False, **kwargs):
-    if created:
-        Profile(user=instance).save()

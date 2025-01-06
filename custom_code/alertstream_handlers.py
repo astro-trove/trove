@@ -2,7 +2,6 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from django.contrib.auth.models import Group
 from django.conf import settings
-from twilio.rest import Client
 from email.mime.text import MIMEText
 import requests
 import smtplib
@@ -11,7 +10,7 @@ import json
 from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, format_area, get_most_likely_class
 from .healpix_utils import update_all_credible_region_percents_for_survey_fields, create_elliptical_localization
 from .cssfield_selection import calculate_footprint_probabilities
-from .models import CredibleRegionContour, Profile
+from .models import CredibleRegionContour
 from astropy.table import Table
 from io import BytesIO
 import astropy_healpix as ah
@@ -19,8 +18,6 @@ import numpy as np
 import traceback
 
 logger = logging.getLogger(__name__)
-
-twilio_client = Client(settings.TWILIO_ACCOUNT_SID, settings.TWILIO_AUTH_TOKEN)
 
 ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequence_id}}
 {{nle.event_id}} ({{significance}})
@@ -65,24 +62,6 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_EXTERNAL_COINCIDENCE + ALERT_TEXT_CLASSIFICATION +
     ALERT_LINKS,
 ]
-
-
-def send_text(body, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True):
-    """This doesn't currently work"""
-    body_ascii = body.replace('±', '+/-').replace('²', '2')
-    for user in Profile.objects.all():
-        if is_test_alert:
-            subscribed = user.test_alerts
-        elif not is_significant:
-            subscribed = user.subthreshold_alerts
-        elif is_burst:
-            subscribed = user.burst_alerts
-        elif has_ns:
-            subscribed = user.ns_alerts
-        else:
-            subscribed = user.bbh_alerts
-        if subscribed and user.phone_number is not None:
-            twilio_client.messages.create(body=body_ascii, from_=settings.ALERT_SMS_FROM, to=user.phone_number.as_e164)
 
 
 def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True,
