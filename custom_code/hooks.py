@@ -102,12 +102,13 @@ def target_post_save(target, created, tns_time_limit:int=5):
             if response is not None and response.status_code == 200:
                 tns_reply = response.json()['data']
 
-                # update the coordinates if needed
-                radeg = float(tns_reply['radeg'])
-                decdeg = float(tns_reply['decdeg'])
-                if target.ra != radeg or target.dec != decdeg:
-                    target.ra = radeg
-                    target.dec = decdeg
+                # update the coordinates if needed; use strings instead of radeg/decdeg to match local TNS copy
+                rastr = coord.ra.to_string(unit='hourangle', sep=':', precision=3, pad=True)
+                decstr = coord.dec.to_string(sep=':', precision=2, pad=True)
+                if rastr != tns_reply['ra'] or decstr != tns_reply['dec']:
+                    tns_coord = SkyCoord(tns_reply['ra'], tns_reply['dec'], unit=('hourangle', 'deg'))
+                    target.ra = tns_coord.ra.deg
+                    target.dec = tns_coord.dec.deg
                     target.save()
                     messages.append(f'Updated coordinates to {target.ra:.6f}, {target.dec:.6f} based on TNS')
 
