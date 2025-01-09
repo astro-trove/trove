@@ -114,7 +114,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
                 # ingest any photometry
                 n_new_phot = 0
-                for candidate in tns_reply['photometry']:
+                for candidate in tns_reply.get('photometry', []):
                     jd = Time(candidate['jd'], format='jd', scale='utc')
                     value = {'filter': candidate['filters']['name']}
                     if candidate['flux']:  # detection
