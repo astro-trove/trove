@@ -30,7 +30,13 @@ ALERT_TEXT_LOCALIZATION = """Distance = {{distance}}
 90% Area = {{area_90}}
 """
 
-ALERT_TEXT_EXTERNAL_COINCIDENCE = """Distance (comb.) = {{distance_external}}
+ALERT_TEXT_EXTERNAL_COINCIDENCE = """
+Coincident with {{observatory}} {{search}}
+GCN Notice {{gcn_notice_id}}
+Δt = {{time_difference:.2f}} s
+1/FAR (time) = {{inverse_far_time}}
+1/FAR (time + pos.) = {{inverse_far_time_pos}}
+Distance (comb.) = {{distance_external}}
 50% Area (comb.) = {{area_50_external}}
 90% Area (comb.) = {{area_90_external}}
 """
@@ -59,7 +65,7 @@ Frequency = {{central_frequency:.0f}} Hz
 ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
-    ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_EXTERNAL_COINCIDENCE + ALERT_TEXT_CLASSIFICATION +
+    ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_EXTERNAL_COINCIDENCE +
     ALERT_LINKS,
 ]
 
@@ -161,6 +167,9 @@ def prepare_and_send_alerts(nle, seq):
             'inverse_far': format_inverse_far(seq.details['far']),
             'significance': 'significant' if is_significant else 'subthreshold',
         }
+        format_kwargs.update(seq.details['properties'])
+        format_kwargs.update(seq.details['classification'])
+        format_kwargs.update(seq.details)
         if nle.state == 'RETRACTED':
             alert_text = ALERT_TEXT_RETRACTION
         elif is_burst:
@@ -173,12 +182,12 @@ def prepare_and_send_alerts(nle, seq):
                 format_kwargs['area_50'] = format_area(localizations[0].area_50)
                 format_kwargs['area_90'] = format_area(localizations[0].area_90)
             if len(localizations) > 1:
+                format_kwargs.update(seq.external_coincidence.details)
+                format_kwargs['inverse_far_time'] = format_inverse_far(format_kwargs['time_coincidence_far'])
+                format_kwargs['inverse_far_time_pos'] = format_inverse_far(format_kwargs['time_sky_position_coincidence_far'])
                 format_kwargs['distance_external'] = format_distance(localizations[1])
                 format_kwargs['area_50_external'] = format_area(localizations[1].area_50)
                 format_kwargs['area_90_external'] = format_area(localizations[1].area_90)
-        format_kwargs.update(seq.details['properties'])
-        format_kwargs.update(seq.details['classification'])
-        format_kwargs.update(seq.details)
     except Exception as e:
         logger.error(f'Could not parse GW alert: {e}')
         alert_text = f'Received a GW alert that could not be parsed. Check GraceDB: {nle.gracedb_url}'
@@ -188,7 +197,7 @@ def prepare_and_send_alerts(nle, seq):
         is_burst = False
         has_ns = False
     if is_significant and not is_burst and has_ns:
-        at = 'here' if 'RETRACTED' in alert_text else 'channel'
+        at = 'here' if nle.state == 'RETRACTED' else 'channel'
     else:
         at = None
     send_slack(alert_text, format_kwargs,
