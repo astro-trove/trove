@@ -7,6 +7,7 @@ from django.db.models import Q
 import functools
 import operator
 from datetime import datetime, timedelta
+import sys
 from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from .models import Candidate
@@ -184,7 +185,7 @@ class NonLocalizedEventFilter(django_filters.FilterSet):
         max_far = 3.168808781402895e-08 / float(min_inv_far)  # yr to 1/Hz
         return queryset.filter(**{name + '__lte': max_far}).distinct()  # TODO: only look at latest update
     inv_far_min = django_filters.NumberFilter('sequences__details__far',
-                                              method='inv_far_filter', label='1/FAR', min_value=0.,
+                                              method='inv_far_filter', label='1/FAR', min_value=sys.float_info.epsilon,
                                               help_text='Significant CBC alerts have 1/FAR > 0.5 yr')
 
     # classification = django_filters.MultipleChoiceFilter(
