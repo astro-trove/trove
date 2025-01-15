@@ -65,7 +65,9 @@ def format_area(area):
 
 @register.filter
 def get_most_likely_class(details):
-    if details['group'] == 'CBC':
+    if not details:
+        return
+    elif details['group'] == 'CBC':
         classification = details['classification']
         return max(classification, key=classification.get)
     else:  # burst
