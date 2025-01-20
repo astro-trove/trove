@@ -39,3 +39,7 @@
 .supsubz sup {
     top: 0.1em;
 }
+
+.galaxies td {
+    vertical-align: bottom;
+}
