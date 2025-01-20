@@ -17,7 +17,7 @@ def format_inverse_far(far):
     if inv_far > 1.:
         log1000 = math.log10(inv_far) / 3.
         i = int(log1000)
-        if i < 10:
+        if i < len(SI_PREFIXES):
             inv_far *= 1000. ** -i
             unit = SI_PREFIXES[i] + 'yr'
         else:
