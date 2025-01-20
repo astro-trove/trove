@@ -26,9 +26,7 @@
         <th scope="col" title="Survey Plans">Plans</th>
         <th scope="col" title="Survey Observations">Obs.</th>
         <th scope="col" title="Survey Candidates">Cand.</th>
-        <th scope="col" title="Hermes">Hermes</th>
-        <th scope="col" title="GraceDB">GraceDB</th>
-        <th scope="col" title="Gravitational Wave Treasure Map">GWTM</th>
+        <th scope="col" title="External Links">Ext. Links</th>
       </tr>
       </thead>
       <tbody>
@@ -73,14 +71,16 @@
         <td title="Survey Candidates">
             <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">Cand.</a>
         </td>
-        <td title="Hermes">
-          <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
-        </td>
-        <td title="GraceDB">
-          <a href="{{ event.gracedb_url }}" target="_blank">GraceDB</a>
-        </td>
-        <td title="Gravitational Wave Treasure Map">
-            <a href="{{ event.treasuremap_url }}" target="_blank">GWTM</a>
+        <td title="External Links">
+          <a href="{{ event.hermes_url }}" target="_blank">
+              <img src="https://hermes.lco.global/favicon.ico" alt="Hermes" title="Hermes" class="hermes icon" />
+          </a>
+          <a href="{{ event.gracedb_url }}" target="_blank">
+              <img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" />
+          </a>
+          <a href="{{ event.treasuremap_url }}" target="_blank">
+              <img src="https://treasuremap.space/static/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" />
+          </a>
         </td>
       </tr>
       {% endfor %}
