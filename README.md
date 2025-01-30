@@ -89,7 +89,7 @@ Dramatiq is configured according to the [TOM Toolkit documentation](https://tom-
 These should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
 @reboot sleep 50 && /usr/local/bin/redis-server > /home/saguaro/redis.log 2>&1
-@reboot sleep 60 && cd /var/www/saguaro_tom/ && venv/bin/python manage.py rundramatiq > /home/saguaro/dramatiq.log 2>&1
+@reboot sleep 60 && /usr/local/bin/redis-cli flushdb && cd /var/www/saguaro_tom/ && venv/bin/python manage.py rundramatiq -t 1 > /home/saguaro/dramatiq.log 2>&1
 ```
 
 If either of these does not restart, or you need to restart them manually, run the following on `sand`. First, kill any other instances are running:
