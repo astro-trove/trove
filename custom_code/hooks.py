@@ -17,8 +17,17 @@ from django.conf import settings
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
 
+TNS_PREFIXES = ["AT", "SN", "TDE"]
+
 logger = logging.getLogger(__name__)
 
+def _remove_tns_prefix(name, tns_prefixes=TNS_PREFIXES):
+    """Remove the TNS prefix defined in TNS_PREFIXES"""
+    for prefix in tns_prefixes:
+        if name[:len(prefix)] != prefix: continue
+        return name[len(prefix):] 
+
+    logger.exception(f"TNS Prefix for the transient {name} is unknown! We are continuing, but please check!")
 
 def process_reduced_ztf_data(target, candidates):
     """Ingest data from the ZTF JSON format into ``ReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
@@ -86,14 +95,16 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
         qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
-
+            
         if tns_results:
             for iau_name, redshift, classification, internal_names in tns_results:
-                if target.name[2:] == iau_name[2:]:  # choose the name that already matches, if more than one
+                # choose the name that already matches, if more than one
+                # and make sure we ignore TNS classification prefixes that can change
+                if _remove_tns_prefix(target.name) == _remove_tns_prefix(iau_name):
                     break
 
             # now query the real TNS by name for even more recent updates
-            get_obj = [("objname", iau_name[2:]), ("objid", ""), ("photometry", "1"), ("spectra", "0")]  # remove prefix
+            get_obj = [("objname", _remove_tns_prefix(iau_name)), ("objid", ""), ("photometry", "1"), ("spectra", "0")]  # remove prefix
             response, time_to_wait = TNS_get(get_obj,
                                              settings.BROKERS['TNS']['bot_id'],
                                              settings.BROKERS['TNS']['bot_name'],
@@ -142,7 +153,10 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
             else:
                 if isinstance(response, Response):
-                    tns_query_status = f"TNS Request responded with code {response.status_code}!\n{response}"
+                    tns_query_status = f"""
+TNS Request responded with code {response.status_code}: {response.reason}
+"""
+                    print(tns_query_status)
                 else:
                     tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
                     
