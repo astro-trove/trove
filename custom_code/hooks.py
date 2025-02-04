@@ -172,9 +172,9 @@ TNS Request responded with code {response.status_code}: {response.reason}
             if redshift is not None and np.isfinite(redshift) and target.extra_fields.get('Redshift') != redshift:
                 update_or_create_target_extra(target, 'Redshift', redshift)
                 messages.append(f"Redshift set to {redshift}")
-            for internal_name in internal_names.split(','):
-                alias = internal_name.strip().replace('SN ', 'SN').replace('AT ', 'AT')
-                if alias and alias != target.name and not TargetName.objects.filter(name=alias).exists():
+            for alias in internal_names.split(','):
+                if (alias and alias.replace(' ', '') != target.name.replace(' ', '')
+                        and not TargetName.objects.filter(name=alias).exists()):
                     tn = TargetName.objects.create(target=target, name=alias)
                     messages.append(f'Added alias {tn.name} from TNS')
                 

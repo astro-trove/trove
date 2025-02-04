@@ -24,7 +24,7 @@ from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalized
 from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
 from .forms import NonLocalizedEventFormHelper, CandidateFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
-from .hooks import target_post_save, update_or_create_target_extra
+from .hooks import target_post_save, update_or_create_target_extra, _remove_tns_prefix
 from .tasks import target_run_mpc
 from .templatetags.skymap_extras import get_preferred_localization
 
@@ -258,7 +258,7 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
     def get_initial(self):
         target = Target.objects.get(pk=self.kwargs['pk'])
         initial = {
-            'name': target.name.replace('AT', '').replace('SN', ''),
+            'name': _remove_tns_prefix(target.name),
             'classifier': f'{self.request.user.get_full_name()}, on behalf of SAGUARO',
         }
         classifications = target.targetextra_set.filter(key='Classification')
