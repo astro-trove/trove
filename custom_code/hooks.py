@@ -156,7 +156,6 @@ def target_post_save(target, created, tns_time_limit:int=5):
                     tns_query_status = f"""
 TNS Request responded with code {response.status_code}: {response.reason}
 """
-                    print(tns_query_status)
                 else:
                     tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
                     
