@@ -61,7 +61,8 @@ class Command(BaseCommand):
             UPDATE tom_targets_basetarget AS tt
             SET name=CONCAT(tns.name_prefix, tns.name), ra=tns.ra, dec=tns.declination, modified=NOW()
             FROM tns_q3c as tns
-            WHERE SUBSTRING(tt.name, 3)=tns.name AND q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
+            WHERE REGEXP_REPLACE(tt.name, '^[^0-9]*', '')=tns.name
+            AND q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
             RETURNING tt.*;
             """
         )
