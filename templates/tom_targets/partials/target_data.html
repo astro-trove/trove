@@ -8,10 +8,10 @@
     {% endif %}
     <dd class="col-sm-9">
         {{ target_name }}
-        {% with target_name|slice:":3" as prefix %}
-        {% if prefix == "AT1" or prefix == "AT2" or prefix == "SN1" or prefix == "SN2" %}
-            <a href="https://www.wis-tns.org/object/{{ target_name|slice:"2:" }}" target="_blank"><img src="https://www.wis-tns.org/sites/default/files/favicon.png" alt="TNS" title="TNS" class="icon" /></a>
-        {% elif prefix == "ZTF" %}
+        {% with target_name|split_name as name %}
+        {% if name.has_tns_prefix %}
+            <a href="https://www.wis-tns.org/object/{{ name.basename }}" target="_blank"><img src="https://www.wis-tns.org/sites/default/files/favicon.png" alt="TNS" title="TNS" class="icon" /></a>
+        {% elif name.prefix == "ZTF" %}
             <a href="https://alerce.online/object/{{ target_name }}" target="_blank"><img src="https://alerce.online/favicon.ico" alt="ALeRCE" title="ALeRCE" class="icon" /></a>
             <a href="https://antares.noirlab.edu/loci/lookup/{{ target_name }}" target="_blank"><img src="https://antares.noirlab.edu/favicon.ico" alt="ANTARES" title="ANTARES" class="icon" /></a>
             <a href="https://fink-portal.org/{{ target_name }}" target="_blank"><img src="https://fink-portal.org/assets/favicon.ico" alt="Fink" title="Fink" class="icon" /></a>

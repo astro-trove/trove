@@ -1,8 +1,11 @@
 from django import template
 from astropy.coordinates import SkyCoord
 import json
+import re
 
 register = template.Library()
+
+TNS_PREFIXES = ["AT", "SN", "TDE"]
 
 
 @register.filter
@@ -15,6 +18,15 @@ def ecliptic_lng(target):
 def ecliptic_lat(target):
     sc = SkyCoord(target.ra, target.dec, unit='deg')
     return sc.barycentrictrueecliptic.lat.deg
+
+
+@register.filter
+def split_name(name):
+    """Splits the name into a prefix, consisting of no digits, and a basename, which starts with its first digit"""
+    res = re.match('(?P<prefix>\D*)(?P<basename>.*)', name)
+    name = res.groupdict()
+    name['has_tns_prefix'] = name['prefix'] in TNS_PREFIXES
+    return name
 
 
 @register.inclusion_tag('tom_targets/partials/aladin_custom.html')

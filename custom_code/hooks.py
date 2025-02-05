@@ -5,6 +5,7 @@ from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import TNS_get, query_ZTFpubphot
 from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
+from .templatetags.target_extras import split_name
 import json
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
@@ -17,17 +18,8 @@ from django.conf import settings
 DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
 COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
 
-TNS_PREFIXES = ["AT", "SN", "TDE"]
-
 logger = logging.getLogger(__name__)
 
-def _remove_tns_prefix(name, tns_prefixes=TNS_PREFIXES):
-    """Remove the TNS prefix defined in TNS_PREFIXES"""
-    for prefix in tns_prefixes:
-        if name[:len(prefix)] != prefix: continue
-        return name[len(prefix):] 
-
-    logger.exception(f"TNS Prefix for the transient {name} is unknown! We are continuing, but please check!")
 
 def process_reduced_ztf_data(target, candidates):
     """Ingest data from the ZTF JSON format into ``ReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
@@ -100,11 +92,12 @@ def target_post_save(target, created, tns_time_limit:int=5):
             for iau_name, redshift, classification, internal_names in tns_results:
                 # choose the name that already matches, if more than one
                 # and make sure we ignore TNS classification prefixes that can change
-                if _remove_tns_prefix(target.name) == _remove_tns_prefix(iau_name):
+                basename = split_name(iau_name)['basename']
+                if basename == split_name(target.name)['basename']:
                     break
 
             # now query the real TNS by name for even more recent updates
-            get_obj = [("objname", _remove_tns_prefix(iau_name)), ("objid", ""), ("photometry", "1"), ("spectra", "0")]  # remove prefix
+            get_obj = [("objname", basename), ("objid", ""), ("photometry", "1"), ("spectra", "0")]
             response, time_to_wait = TNS_get(get_obj,
                                              settings.BROKERS['TNS']['bot_id'],
                                              settings.BROKERS['TNS']['bot_name'],
