@@ -1,9 +1,11 @@
-{% load targets_extras %}
-{% if target.name|slice:":2" == "AT" %}
+{% load targets_extras target_extras %}
+{% with target.name|split_name as name %}
+{% if name.has_tns_prefix %}
     <a href="{% url 'custom_code:classify' pk=target.id %}" title="Classify target on TNS" class="btn btn-secondary">Classify</a>
-{% elif target.name|slice:":2" != "SN" %}
+{% else %}
     <a href="{% url 'custom_code:report' pk=target.id %}" title="Report target to TNS" class="btn btn-secondary">Report</a>
 {% endif %}
+{% endwith %}
 <a href="{% url 'tom_targets:update' pk=target.id %}" title="Edit target details" class="btn btn-primary">Edit</a>
 {% if sharing %}
     <a href="{% url 'tom_targets:share' pk=target.id %}" title="Share target" class="btn btn-info">Share</a>

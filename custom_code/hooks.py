@@ -5,6 +5,7 @@ from kne_cand_vetting.galaxy_matching import galaxy_search
 from kne_cand_vetting.survey_phot import TNS_get, query_ZTFpubphot
 from tom_targets.models import TargetExtra, TargetName
 from tom_dataproducts.models import ReducedDatum
+from .templatetags.target_extras import split_name
 import json
 import numpy as np
 from astropy.cosmology import FlatLambdaCDM
@@ -86,14 +87,17 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
         qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
-
+            
         if tns_results:
             for iau_name, redshift, classification, internal_names in tns_results:
-                if target.name[2:] == iau_name[2:]:  # choose the name that already matches, if more than one
+                # choose the name that already matches, if more than one
+                # and make sure we ignore TNS classification prefixes that can change
+                basename = split_name(iau_name)['basename']
+                if basename == split_name(target.name)['basename']:
                     break
 
             # now query the real TNS by name for even more recent updates
-            get_obj = [("objname", iau_name[2:]), ("objid", ""), ("photometry", "1"), ("spectra", "0")]  # remove prefix
+            get_obj = [("objname", basename), ("objid", ""), ("photometry", "1"), ("spectra", "0")]
             response, time_to_wait = TNS_get(get_obj,
                                              settings.BROKERS['TNS']['bot_id'],
                                              settings.BROKERS['TNS']['bot_name'],
@@ -142,7 +146,9 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
             else:
                 if isinstance(response, Response):
-                    tns_query_status = f"TNS Request responded with code {response.status_code}!\n{response}"
+                    tns_query_status = f"""
+TNS Request responded with code {response.status_code}: {response.reason}
+"""
                 else:
                     tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
                     
@@ -159,9 +165,9 @@ def target_post_save(target, created, tns_time_limit:int=5):
             if redshift is not None and np.isfinite(redshift) and target.extra_fields.get('Redshift') != redshift:
                 update_or_create_target_extra(target, 'Redshift', redshift)
                 messages.append(f"Redshift set to {redshift}")
-            for internal_name in internal_names.split(','):
-                alias = internal_name.strip().replace('SN ', 'SN').replace('AT ', 'AT')
-                if alias and alias != target.name and not TargetName.objects.filter(name=alias).exists():
+            for alias in internal_names.split(','):
+                if (alias and alias.replace(' ', '') != target.name.replace(' ', '')
+                        and not TargetName.objects.filter(name=alias).exists()):
                     tn = TargetName.objects.create(target=target, name=alias)
                     messages.append(f'Added alias {tn.name} from TNS')
                 

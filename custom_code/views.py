@@ -27,6 +27,7 @@ from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATIO
 from .hooks import target_post_save, update_or_create_target_extra
 from .tasks import target_run_mpc
 from .templatetags.skymap_extras import get_preferred_localization
+from .templatetags.target_extras import split_name
 
 import json
 import requests
@@ -258,7 +259,7 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
     def get_initial(self):
         target = Target.objects.get(pk=self.kwargs['pk'])
         initial = {
-            'name': target.name.replace('AT', '').replace('SN', ''),
+            'name': split_name(target.name)['basename'],
             'classifier': f'{self.request.user.get_full_name()}, on behalf of SAGUARO',
         }
         classifications = target.targetextra_set.filter(key='Classification')
