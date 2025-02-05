@@ -21,6 +21,7 @@ def ecliptic_lat(target):
 
 
 @register.filter
+@stringfilter
 def split_name(name):
     """Splits the name into a prefix, consisting of no digits, and a basename, which starts with its first digit"""
     res = re.match('(?P<prefix>\D*)(?P<basename>.*)', name)
