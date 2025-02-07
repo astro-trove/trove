@@ -233,7 +233,7 @@ class TargetReportForm(forms.Form):
                                 "limiting_flux": self.cleaned_data['limiting_flux'],
                                 "exptime": self.cleaned_data['exposure_time'],
                                 "observer": self.cleaned_data['observer'],
-                                "comments": self.cleaned_data['comments'],
+                                "comments": self.cleaned_data['photometry_remarks'],
                             },
                         }
                     },
