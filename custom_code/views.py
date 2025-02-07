@@ -37,10 +37,7 @@ from io import StringIO
 import paramiko
 import os
 
-DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".format(**settings.DATABASES['default'])
-
-# from tom_catalogs.harvesters.tns import TNS_URL
-TNS_URL = 'https://sandbox.wis-tns.org/api'  # TODO: change this to the main site
+from tom_catalogs.harvesters.tns import TNS_URL
 TNS = settings.BROKERS['TNS']  # includes the API credentials
 TNS_MARKER = 'tns_marker' + json.dumps({'tns_id': TNS['bot_id'], 'type': 'bot', 'name': TNS['bot_name']})
 TNS_FILTER_IDS = {name: fid for fid, name in TNS_FILTER_CHOICES}
