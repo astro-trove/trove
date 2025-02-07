@@ -31,7 +31,7 @@
           <td>{{ observation.scheduled_start }}</td>
           {% if request.GET.localization_event %}<td>{{ observation.scheduled_start | time_after_event:request.GET.localization_event }}</td>{% endif %}
           <td>{{ observation.status }}</td>
-          <td><a href="{% url 'custom_code:candidates' %}?obsdate_range_after={{ observation.scheduled_start }}&obsdate_range_before={{ observation.scheduled_start | secondslater:1 }}&observation_record__survey_field={{ observation.survey_field.name }}&classification=0&order=-mlscore_real" target="_blank">{{ observation.candidate_set.count }}</a></td>
+          <td><a href="{% url 'custom_code:candidates' %}?obsdate_range_after={{ observation.scheduled_start }}&obsdate_range_before={{ observation.scheduled_start | secondslater:1 }}&observation_record__survey_field={{ observation.survey_field.name }}&localization_event={{ request.GET.localization_event }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">{{ observation.candidate_set.count }}</a></td>
         </tr>
         {% empty %}
         <tr>
