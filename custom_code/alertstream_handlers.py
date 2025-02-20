@@ -78,7 +78,7 @@ ALERT_TEXT = [  # index = number of localizations available
 def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True,
                all_workspaces=True, at=None):
     if is_test_alert:
-        return
+        channel = None
     elif not is_significant:
         channel = 0
     elif is_burst:
@@ -93,6 +93,8 @@ def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is
     for url_list, (nle_link, service), (target_link, _) in zip(settings.SLACK_URLS, settings.NLE_LINKS, settings.TARGET_LINKS):
         body_slack = body.format(nle_link=nle_link, service=service, target_link=target_link).format(**format_kwargs)
         logger.info(f'Sending GW alert: {body_slack}')
+        if channel is None:
+            break  # just print out test alerts for debugging
         json_data = json.dumps({'text': body_slack})
         requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
         if not all_workspaces:
