@@ -62,6 +62,11 @@ Duration = {{duration_ms:.0f}} ms
 Frequency = {{central_frequency:.0f}} Hz
 """ + ALERT_LINKS
 
+ALERT_TEXT_SSM = ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + """Has NS = {{HasNS:.0%}}
+Has Mass Gap = {{HasMassGap:.0%}}
+Has SSM = {{HasSSM:.0%}}
+""" + ALERT_LINKS
+
 ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
@@ -176,7 +181,10 @@ def prepare_and_send_alerts(nle, seq):
             alert_text = ALERT_TEXT_BURST
             format_kwargs['duration_ms'] = seq.details['duration'] * 1000.
         else:
-            alert_text = ALERT_TEXT[len(localizations)]
+            if seq.details['search'] == 'SSM':
+                alert_text = ALERT_TEXT_SSM
+            else:
+                alert_text = ALERT_TEXT[len(localizations)]
             if localizations:
                 format_kwargs['distance'] = format_distance(localizations[0])
                 format_kwargs['area_50'] = format_area(localizations[0].area_50)

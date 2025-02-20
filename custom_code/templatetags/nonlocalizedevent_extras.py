@@ -67,6 +67,8 @@ def format_area(area):
 def get_most_likely_class(details):
     if not details:
         return
+    elif details['search'] == 'SSM':
+        return details['search']
     elif details['group'] == 'CBC':
         classification = details['classification']
         return max(classification, key=classification.get)
