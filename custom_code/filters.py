@@ -3,13 +3,13 @@ import django_filters
 from tom_surveys.models import SurveyField
 import json
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, OuterRef, Subquery
 import functools
 import operator
 from datetime import datetime, timedelta
 import sys
 from tom_targets.utils import cone_search_filter
-from tom_nonlocalizedevents.models import NonLocalizedEvent
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from .models import Candidate
 from .cssfield_selection import rank_css_fields
 
@@ -181,35 +181,25 @@ class NonLocalizedEventFilter(django_filters.FilterSet):
     state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')))
 
     @staticmethod
-    def inv_far_filter(queryset, name, min_inv_far):
-        max_far = 3.168808781402895e-08 / float(min_inv_far)  # yr to 1/Hz
-        return queryset.filter(**{name + '__lte': max_far}).distinct()  # TODO: only look at latest update
-    inv_far_min = django_filters.NumberFilter('sequences__details__far',
-                                              method='inv_far_filter', label='1/FAR', min_value=sys.float_info.epsilon,
+    def last_sequence_filter(queryset, name, value):
+        """Filter on fields of the last EventSequence of a NonLocalizedEvent"""
+        name_parts = name.split('__')
+        field_name = '__'.join(name_parts[:-1])  # excluding the field lookup, e.g., __gte
+        if name_parts[-2] == 'far':
+            value = 3.168808781402895e-08 / float(value)  # yr to 1/Hz
+        elif name_parts[-2].startswith('Has'):
+            value = 0.01 * float(value)  # percent to decimal
+        else:
+            value = float(value)
+        last_value = EventSequence.objects.filter(nonlocalizedevent_id=OuterRef('id')).order_by('-sequence_id').values(field_name)[:1]
+        return queryset.annotate(**{field_name: Subquery(last_value)}).filter(**{name: value})
+
+    inv_far_min = django_filters.NumberFilter('details__far__lte',
+                                              method='last_sequence_filter', label='1/FAR', min_value=sys.float_info.epsilon,
                                               help_text='Significant CBC alerts have 1/FAR > 0.5 yr')
-
-    # classification = django_filters.MultipleChoiceFilter(
-    #     choices=(
-    #         ('BNS', 'BNS'),
-    #         ('NSBH', 'NSBH'),
-    #         ('BBH', 'BBH'),
-    #         ('Burst', 'Burst'),
-    #         ('Terrestrial', 'Terrestrial'),
-    #     ),
-    #     label='Classification(s)',
-    #     help_text="Doesn't currently work",
-    # )
-    distance_max = django_filters.NumberFilter('sequences__localization__distance_mean',
-                                               lookup_expr='lte', label='Distance', min_value=0.,
-                                               distinct=True)  # TODO: only look at latest update
-
-    @staticmethod
-    def percent_gte_decimal(queryset, name, value):
-        """Compare a float to a Django Decimal in a JSON-serializable way"""
-        return queryset.filter(**{name + '__gte': 0.01 * float(value)}).distinct()  # TODO: only look at latest update
-    has_ns_min = django_filters.NumberFilter('sequences__details__properties__HasNS',
-                                             method='percent_gte_decimal', label='HasNS',
-                                             min_value=0., max_value=100., help_text='Very slow')
-    has_remnant_min = django_filters.NumberFilter('sequences__details__properties__HasRemnant',
-                                                  method='percent_gte_decimal', label='HasRemnant',
-                                                  min_value=0., max_value=100., help_text='Very slow')
+    distance_max = django_filters.NumberFilter('localization__distance_mean__lte',
+                                               method='last_sequence_filter', label='Distance', min_value=0.)
+    has_ns_min = django_filters.NumberFilter('details__properties__HasNS__gte',
+                                             method='last_sequence_filter', label='HasNS', min_value=0., max_value=100.)
+    has_remnant_min = django_filters.NumberFilter('details__properties__HasRemnant__gte',
+                                                  method='last_sequence_filter', label='HasRemnant', min_value=0., max_value=100.)
