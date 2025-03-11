@@ -11,9 +11,9 @@ from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMix
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
-from guardian.shortcuts import get_objects_for_user
 
 from tom_targets.models import Target, TargetList
+from tom_targets.permissions import targets_for_user
 from tom_dataproducts.models import ReducedDatum
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
@@ -117,7 +117,7 @@ class CandidateListView(FilterView):
         :rtype: QuerySet
         """
         return super().get_queryset().filter(
-            target__in=get_objects_for_user(self.request.user, 'tom_targets.view_target')
+            target__in=targets_for_user(self.request.user, Target.objects.all(), 'view_target')
         ).annotate(detections=Count('target__candidate'))
 
 
