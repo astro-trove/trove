@@ -150,7 +150,7 @@ class SurveyFieldCredibleRegion(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['localization', 'survey_field'], name='unique_localization_survey_field')
         ]
-        ordering = ['-probability_contained']
+        ordering = ['group', 'rank_in_group', '-probability_contained']
 
 
 class CredibleRegionContour(models.Model):

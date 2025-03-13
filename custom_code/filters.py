@@ -164,9 +164,7 @@ class CSSFieldFilter(django_filters.Filter):
     def filter(self, queryset, value):
         if value:
             rank_css_fields(queryset, n_groups=value[0], n_select=value[1], now=value[2])
-            return queryset.filter(group__isnull=False, rank_in_group__isnull=False).order_by('group', 'rank_in_group')
-        else:
-            return queryset.order_by('group', 'rank_in_group')
+        return queryset
 
 
 class CSSFieldCredibleRegionFilter(django_filters.FilterSet):
