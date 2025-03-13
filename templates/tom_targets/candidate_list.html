@@ -19,7 +19,7 @@
 <div class="row">
   <div class="col-md-12">
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
-    <table class="table table-hover">
+    <table class="table table-sm table-hover">
       <thead>
         <tr>
           <th>Target</th>
@@ -28,6 +28,7 @@
           <th>Mag.</th>
           <th>FW HM</th>
           <th>S/N</th>
+          <th># Det.</th>
           <th>ML Old</th>
           <th>ML Real</th>
           <th>ML Bog.</th>
@@ -65,6 +66,7 @@
           <td>{{ candidate.mag|floatformat:"1" }}</td>
           <td>{{ candidate.fwhm|floatformat:"1" }}</td>
           <td>{{ candidate.snr|floatformat:"1" }}</td>
+          <td>{{ candidate.target.candidate_set.count }}</td>
           <td>{{ candidate.mlscore|floatformat:"2" }}</td>
           <td>{{ candidate.mlscore_real|floatformat:"2" }}</td>
           <td>{{ candidate.mlscore_bogus|floatformat:"2" }}</td>
