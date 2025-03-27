@@ -106,10 +106,12 @@ def target_post_save(target, created, tns_time_limit:int=5):
             if response is not None and response.status_code == 200:
                 tns_reply = response.json()['data']
 
-                # update the coordinates if needed
-                if target.ra != tns_reply['radeg'] or target.dec != tns_reply['decdeg']:
-                    target.ra = tns_reply['radeg']
-                    target.dec = tns_reply['decdeg']
+                # update the coordinates if needed; round to same number of sig figs as CSV files to avoid infinite loop
+                tns_ra = float(f'{tns_reply["radeg"]:.14g}')
+                tns_dec = float(f'{tns_reply["decdeg"]:.14g}')
+                if target.ra != tns_ra or target.dec != tns_dec:
+                    target.ra = tns_ra
+                    target.dec = tns_dec
                     target.save()
                     messages.append(f'Updated coordinates to {target.ra:.6f}, {target.dec:.6f} based on TNS')
 
