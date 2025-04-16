@@ -86,11 +86,13 @@ class Command(BaseCommand):
                 ) AS t ON true
                 WHERE t.tns_name IS NOT NULL;
                 
+                -- the top_tns_matches table tells you the target names and coordinates we are going to adopt
                 CREATE TEMPORARY TABLE top_tns_matches AS
                 SELECT DISTINCT ON (tns_name) *
                 FROM tns_matches
-                ORDER BY tns_name, sep, name; -- if there are duplicates in the TNS, use the earlier one
+                ORDER BY tns_name, name=tns_name desc, sep; -- prefer the one that already has the TNS name, if any
                 
+                -- after this, the tns_matches table tells you which targets need to be merged and deleted
                 DELETE FROM tns_matches
                 WHERE name IN (
                     SELECT name from top_tns_matches
@@ -186,7 +188,7 @@ class Command(BaseCommand):
             --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
             INSERT INTO tom_targets_basetarget (name, type, created, modified, ra, dec, epoch, scheme)
             SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), ra, declination, 2000, ''
-            FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate in the TNS
+            FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate of AT2016jlf in the TNS
             ON CONFLICT (name) DO NOTHING
             RETURNING *;
             """
