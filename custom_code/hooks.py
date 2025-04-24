@@ -147,6 +147,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
                 if isinstance(response, Response):
                     tns_query_status = f"""
 TNS Request responded with code {response.status_code}: {response.reason}
+For {iau_name} (https://wis-tns.org/object/{iau_name})
 """
                 else:
                     tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'

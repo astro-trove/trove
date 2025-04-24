@@ -19,7 +19,7 @@ import numpy as np
 
 
 logger = logging.getLogger(__name__)
-
+logging.basicConfig(format='%(levelname)s%(asctime)s:s%(message)s')
 
 def vet_or_post_error(target):
     try:
