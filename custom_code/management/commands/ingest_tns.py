@@ -17,9 +17,10 @@ import logging
 import traceback
 import numpy as np
 
-
 logger = logging.getLogger(__name__)
-
+new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
+for handler in logger.handlers:
+    handler.setFormatter(new_format)
 
 def vet_or_post_error(target):
     try:
