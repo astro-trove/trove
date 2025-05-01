@@ -19,7 +19,9 @@ DB_CONNECT = "postgresql+psycopg2://{USER}:{PASSWORD}@{HOST}:{PORT}/{NAME}".form
 COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
 
 logger = logging.getLogger(__name__)
-
+new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
+for handler in logger.handlers:
+    handler.setFormatter(new_format)
 
 def process_reduced_ztf_data(target, candidates):
     """Ingest data from the ZTF JSON format into ``ReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
@@ -87,7 +89,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
 
         qso, qoffset, asassn, asassnoffset, tns_results, gaia, gaiaoffset, gaiaclass, ps1prob, ps1, ps1offset = \
             static_cats_query([target.ra], [target.dec], db_connect=DB_CONNECT)
-            
+
         if tns_results:
             for iau_name, redshift, classification, internal_names in tns_results:
                 # choose the name that already matches, if more than one
@@ -103,13 +105,16 @@ def target_post_save(target, created, tns_time_limit:int=5):
                                              settings.BROKERS['TNS']['bot_name'],
                                              settings.BROKERS['TNS']['api_key'],
                                              timelimit=tns_time_limit)
+
             if response is not None and response.status_code == 200:
                 tns_reply = response.json()['data']
 
-                # update the coordinates if needed
-                if target.ra != tns_reply['radeg'] or target.dec != tns_reply['decdeg']:
-                    target.ra = tns_reply['radeg']
-                    target.dec = tns_reply['decdeg']
+                # update the coordinates if needed; round to same number of sig figs as CSV files to avoid infinite loop
+                tns_ra = float(f'{tns_reply["radeg"]:.14g}')
+                tns_dec = float(f'{tns_reply["decdeg"]:.14g}')
+                if target.ra != tns_ra or target.dec != tns_dec:
+                    target.ra = tns_ra
+                    target.dec = tns_dec
                     target.save()
                     messages.append(f'Updated coordinates to {target.ra:.6f}, {target.dec:.6f} based on TNS')
 
@@ -144,7 +149,7 @@ def target_post_save(target, created, tns_time_limit:int=5):
             else:
                 if isinstance(response, Response):
                     tns_query_status = f"""
-TNS Request responded with code {response.status_code}: {response.reason}
+TNS Request for <https://wis-tns.org/object/{iau_name}|{iau_name}> responded with code {response.status_code}: {response.reason}
 """
                 else:
                     tns_query_status = f'We ran out of API calls to the TNS with {time_to_wait}s left! This exceeded the {tns_time_limit}s limit!'
