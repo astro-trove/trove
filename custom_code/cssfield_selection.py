@@ -170,3 +170,4 @@ def rank_css_fields(queryset, n_select=12, n_groups=3, now=None):
             else:
                 logger.warning('No adjacent fields to select')
                 break
+    logger.info(f'Created new survey plan with {n_groups:d} groups of {n_select:d} fields')

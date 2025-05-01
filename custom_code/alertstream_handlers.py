@@ -9,7 +9,7 @@ import logging
 import json
 from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, format_area, get_most_likely_class
 from .healpix_utils import update_all_credible_region_percents_for_survey_fields, create_elliptical_localization
-from .cssfield_selection import calculate_footprint_probabilities
+from .cssfield_selection import calculate_footprint_probabilities, rank_css_fields
 from .models import CredibleRegionContour
 from astropy.table import Table
 from io import BytesIO
@@ -247,6 +247,7 @@ def handle_message_and_send_alerts(message, metadata):
                 skymap = Table.read(BytesIO(skymap_bytes))
                 calculate_credible_region(skymap, localization)
                 calculate_footprint_probabilities(skymap, localization)
+                rank_css_fields(localization.surveyfieldcredibleregions)
 
     logger.info(f'Finished processing alert for {nle.event_id}')
 
@@ -301,6 +302,7 @@ def handle_einstein_probe_alert(message, metadata):
             skymap['PROBDENSITY'].unit = '1 / sr'
             calculate_credible_region(skymap, localization)
             calculate_footprint_probabilities(skymap, localization)
+            rank_css_fields(localization.surveyfieldcredibleregions)
 
     slack_alert = f'Received Einstein Probe trigger <{settings.NLE_LINKS[0][0]}|{{nle.event_id}}>'
     json_data = json.dumps({'text': slack_alert.format(nle=nonlocalizedevent)}).encode('ascii')

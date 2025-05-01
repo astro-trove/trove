@@ -35,12 +35,12 @@
         <td title="Survey Plans">
         {% for localization in event.localizations|sort_localizations %}
             {% if localization.external_coincidences.exists %}
-                <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
+                <a href="{% url 'custom_code:css-fields' localization.id %}"
                    title="{{ localization.external_coincidences.last.sequences.last.event_subtype }} Combined"
                    target="_blank">
                 {{ localization.external_coincidences.last.sequences.last.sequence_id }}c
             {% else %}
-                <a href="{% url 'custom_code:css-fields' localization.id %}?grouping_ngroups=3&grouping_nfields=12"
+                <a href="{% url 'custom_code:css-fields' localization.id %}"
                    title="{{ localization.sequences.last.event_subtype }}"
                    target="_blank">
                 {{ localization.sequences.last.sequence_id }}
