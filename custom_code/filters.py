@@ -3,7 +3,7 @@ import django_filters
 from tom_surveys.models import SurveyField
 import json
 from django.conf import settings
-from django.db.models import Q, OuterRef, Subquery
+from django.db.models import Q, OuterRef, Subquery, Count
 import functools
 import operator
 from datetime import datetime, timedelta
@@ -118,7 +118,8 @@ class CandidateFilter(django_filters.FilterSet):
     localization = LocalizationFilter(label='Localization')
 
     order = django_filters.OrderingFilter(
-        fields=['observation_record__scheduled_start', 'ra', 'dec', 'snr', 'mag', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
+        fields=['observation_record__scheduled_start', 'ra', 'dec', 'snr', 'mag',
+                'detections', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
         field_labels={
             'snr': 'S/N',
             'mag': 'Magnitude',
