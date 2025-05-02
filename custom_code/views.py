@@ -3,6 +3,7 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect, StreamingHttpResponse
 from django.views.generic.base import RedirectView
@@ -117,7 +118,7 @@ class CandidateListView(FilterView):
         """
         return super().get_queryset().filter(
             target__in=get_objects_for_user(self.request.user, 'tom_targets.view_target')
-        )
+        ).annotate(detections=Count('target__candidate'))
 
 
 def upload_files_to_tns(files):
