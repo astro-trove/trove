@@ -1,13 +1,12 @@
 from django import template
 from ..models import Candidate, TargetListExtra
-from tom_targets.models import TargetExtra
-from guardian.shortcuts import get_objects_for_user
+from tom_targets.models import Target, TargetExtra
+from tom_targets.permissions import targets_for_user
 from tom_surveys.models import SurveyField, SurveyObservationRecord
 from .skymap_extras import CSS_FOOTPRINT, centers_to_vertices
 import numpy as np
 from matplotlib.path import Path
 import json
-import numpy as np
 
 register = template.Library()
 
@@ -79,6 +78,6 @@ def recent_confirmed_targets(context, limit=10):
     Displays a list of the most recently created targets in the TOM up to the given limit, or 10 if not specified.
     """
     user = context['request'].user
-    targets_for_user = get_objects_for_user(user, 'tom_targets.view_target')
-    confirmed_targets_for_user = targets_for_user.exclude(name__startswith='J')
+    all_targets_for_user = targets_for_user(user, Target.objects.all(), 'view_target')
+    confirmed_targets_for_user = all_targets_for_user.exclude(name__startswith='J')
     return {'targets': confirmed_targets_for_user.order_by('-created')[:limit]}

@@ -187,8 +187,8 @@ class Command(BaseCommand):
         new_targets = Target.objects.raw(
             """
             --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
-            INSERT INTO tom_targets_basetarget (name, type, created, modified, ra, dec, epoch, scheme)
-            SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), ra, declination, 2000, ''
+            INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
+            SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, ''
             FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate of AT2016jlf in the TNS
             ON CONFLICT (name) DO NOTHING
             RETURNING *;
