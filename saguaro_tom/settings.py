@@ -61,7 +61,8 @@ INSTALLED_APPS = [
     'custom_code',
     'tom_surveys',
     'tom_treasuremap',
-    'django_dramatiq',
+    'django_tasks',
+    'django_tasks.backends.database',
 ]
 
 SITE_ID = 1
@@ -103,18 +104,10 @@ CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
 WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
 
-DRAMATIQ_BROKER = {
-    "BROKER": "dramatiq.brokers.redis.RedisBroker",
-    "OPTIONS": {
-        "url": "redis://localhost:6379"
-    },
-    "MIDDLEWARE": [
-        "dramatiq.middleware.AgeLimit",
-        "dramatiq.middleware.TimeLimit",
-        "dramatiq.middleware.Callbacks",
-        "dramatiq.middleware.Retries",
-        "django_dramatiq.middleware.DbConnectionsMiddleware",
-    ]
+TASKS = {
+    "default": {
+        "BACKEND": "django_tasks.backends.database.DatabaseBackend"
+    }
 }
 
 # Database

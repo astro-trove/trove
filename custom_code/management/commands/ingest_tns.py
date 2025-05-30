@@ -33,9 +33,9 @@ def vet_or_post_error(target):
             requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
         detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
         if detections.exists():
-            target_run_mpc.send(detections.latest().id)
+            target_run_mpc.enqueue(detections.latest().id)
         mjd_now = Time.now().mjd
-        atlas_query.send(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
+        atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
                          
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'

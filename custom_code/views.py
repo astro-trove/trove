@@ -359,8 +359,7 @@ class TargetMPCView(LoginRequiredMixin, RedirectView):
                                            value__magnitude__isnull=False)
         if phot.exists():
             messages.info(request, "Running minor planet checker. Refresh after ~1 minute to see matches.")
-            dramatiq_msg = target_run_mpc.send(phot.latest().id)  # check the latest detection
-            logger.info(dramatiq_msg)
+            target_run_mpc.enqueue(phot.latest().id)  # check the latest detection
         else:
             messages.error(request, "Must have at least one photometric detection to run minor planet checker.")
 
