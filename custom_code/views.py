@@ -492,7 +492,13 @@ class CSSFieldExportView(CSSFieldListView):
     def post(self, request, *args, **kwargs):
         css_credible_regions = self.get_selected_fields(request)
         text = ''.join([generate_prog_file(group) for group in css_credible_regions])
-        return self.render_to_response(text)
+        file_buffer = StringIO(text)
+        file_buffer.seek(0)  # goto the beginning of the buffer
+        response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
+        nle = self.get_nonlocalizedevent()
+        filename = f"Saguaro_{nle.event_id}.prog"
+        response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
+        return response
 
     def get_selected_fields(self, request):
         target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
@@ -504,21 +510,6 @@ class CSSFieldExportView(CSSFieldListView):
         # evaluate this as a list now to maintain the order
         groups = [list(credible_regions.filter(group=g).order_by('rank_in_group')) for g in group_numbers]
         return groups
-
-    def render_to_response(self, text, **response_kwargs):
-        """
-        Returns a response containing the exported .prog file(s) of selected fields.
-
-        :returns: response class with ASCII
-        :rtype: StreamingHttpResponse
-        """
-        file_buffer = StringIO(text)
-        file_buffer.seek(0)  # goto the beginning of the buffer
-        response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
-        nle = self.get_nonlocalizedevent()
-        filename = f"Saguaro_{nle.event_id}.prog"
-        response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
-        return response
 
 
 class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
