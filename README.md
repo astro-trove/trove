@@ -83,27 +83,20 @@ nohup /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py readst
 ```
 
 ## Allowing for asynchronous tasks
-We use [redis](https://redis.io) and [dramatiq](https://dramatiq.io) to run asynchronous tasks (e.g., ATLAS forced photometry queries).
-Redis is installed according to the instructions on its [readme](https://github.com/redis/redis).
-Dramatiq is configured according to the [TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/managing_data/single_target_data_service.html#configuring-your-tom-to-serve-tasks-asynchronously).
-These should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
+To run asynchronous tasks (ATLAS forced photometry queries and minor planet checking),
+we use [django-tasks](https://github.com/realOrangeOne/django-tasks),
+configured according to the [TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/code/backgroundtasks.html).
+The asynchronous workers should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
-@reboot sleep 50 && /usr/local/bin/redis-server > /home/saguaro/redis.log 2>&1
-@reboot sleep 60 && /usr/local/bin/redis-cli flushdb && cd /var/www/saguaro_tom/ && venv/bin/python manage.py rundramatiq -t 1 > /home/saguaro/dramatiq.log 2>&1
-```
-
-If either of these does not restart, or you need to restart them manually, run the following on `sand`. First, kill any other instances are running:
-```
-pkill -f redis-server
-pkill -f rundramatiq
+@reboot sleep 60 && cd /var/www/saguaro_tom/ && venv/bin/python manage.py db_worker -v3 > /home/saguaro/django-tasks.log 2>&1
 ```
 
-Then run
+If either of these does not restart, or you need to restart them manually, run the following on `sand`:
 ```
-nohup redis-server > /home/saguaro/redis.log 2>&1 &
-redis-cli flushdb
+pkill -f db_worker
 cd /var/www/saguaro_tom/
-nohup venv/bin/python manage.py rundramatiq -t 1 > /home/saguaro/dramatiq.log 2>&1 &
+source venv/bin/activate
+nohup ./manage.py db_worker -v3 > /home/saguaro/django-tasks.log 2>&1 &
 ```
 
 ## Other periodic tasks

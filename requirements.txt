@@ -3,7 +3,6 @@ astropy
 astroquery
 django
 django-crispy-forms
-django-dramatiq
 django-extensions
 django-filter
 django-guardian
