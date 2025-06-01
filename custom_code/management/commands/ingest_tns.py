@@ -35,7 +35,7 @@ def vet_or_post_error(target):
         if detections.exists():
             target_run_mpc.enqueue(detections.latest().id)
         mjd_now = Time.now().mjd
-        atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
+        atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry', queue_name="atlas")
                          
     except Exception as e:
         slack_alert = f'Error vetting TNS target {target.name}:\n{e}'

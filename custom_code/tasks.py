@@ -9,7 +9,7 @@ from .hooks import update_or_create_target_extra
 logger = logging.getLogger(__name__)
 
 
-@task
+@task(queue_name="mpc")
 def target_run_mpc(latest_det_id, _verbose=False):
     """check if a given photometric detection is a minor planet"""
     latest_det = ReducedDatum.objects.get(id=latest_det_id)
