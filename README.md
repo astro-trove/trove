@@ -88,7 +88,7 @@ we use [django-tasks](https://github.com/realOrangeOne/django-tasks),
 configured according to the [TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/code/backgroundtasks.html).
 The asynchronous workers should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
 ```
-@reboot sleep 60 && cd /var/www/saguaro_tom/ && venv/bin/python manage.py db_worker -v3 > /home/saguaro/django-tasks.log 2>&1
+@reboot sleep 60 && cd /var/www/saguaro_tom/ && venv/bin/python manage.py db_worker --queue-name '*' -v3 > /home/saguaro/django-tasks.log 2>&1
 ```
 
 If either of these does not restart, or you need to restart them manually, run the following on `sand`:
