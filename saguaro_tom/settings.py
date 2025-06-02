@@ -107,7 +107,7 @@ WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
 TASKS = {
     "default": {
         "BACKEND": "django_tasks.backends.database.DatabaseBackend",
-        "QUEUES": ["default", "mpc", "atlas"]
+        "QUEUES": ["default", "mpc"]
     }
 }
 
