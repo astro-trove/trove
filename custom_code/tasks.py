@@ -2,14 +2,14 @@ import logging
 from kne_cand_vetting.mpc import minor_planet_match
 from tom_dataproducts.models import ReducedDatum
 from astropy.time import Time
-import dramatiq
+from django_tasks import task
 
 from .hooks import update_or_create_target_extra
 
 logger = logging.getLogger(__name__)
 
 
-@dramatiq.actor
+@task(queue_name="mpc")
 def target_run_mpc(latest_det_id, _verbose=False):
     """check if a given photometric detection is a minor planet"""
     latest_det = ReducedDatum.objects.get(id=latest_det_id)

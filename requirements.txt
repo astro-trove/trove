@@ -3,11 +3,10 @@ astropy
 astroquery
 django
 django-crispy-forms
-django-dramatiq
 django-extensions
 django-filter
 django-guardian
-dramatiq[watch, redis]
+django-tasks
 healpix-alchemy
 healpy
 kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
@@ -15,7 +14,7 @@ lightcurve-fitting
 ligo.skymap
 matplotlib
 numpy
-tomtoolkit==2.24.0
+tomtoolkit==2.24.2
 tom-alertstreams
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
 tom-nonlocalizedevents==0.8.1
