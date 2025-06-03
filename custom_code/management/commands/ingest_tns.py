@@ -58,7 +58,7 @@ class Command(BaseCommand):
         
         updated_targets_coords = Target.objects.raw(
             """
-            --STEP 0: update coordinates of existing targets with TNS names
+            --STEP 0: update coordinates and prefix of existing targets with TNS names
             UPDATE tom_targets_basetarget AS tt
             SET name=CONCAT(tns.name_prefix, tns.name), ra=tns.ra, dec=tns.declination, modified=NOW()
             FROM tns_q3c as tns
@@ -103,7 +103,7 @@ class Command(BaseCommand):
 
         updated_targets = Target.objects.raw(
             """
-            --STEP 2: update existing targets (if needed) to match closest TNS transient
+            --STEP 2: update existing non-TNS targets within 2" of a TNS transient to have the TNS name and coordinates
             UPDATE tom_targets_basetarget AS tt
             SET name=tm.tns_name, ra=tm.ra, dec=tm.dec, modified=NOW()
             FROM top_tns_matches AS tm
@@ -196,63 +196,65 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        new_or_updated_targets = [updated_targets_coords, updated_targets, new_targets]
+        new_or_updated_targets = [new_targets, updated_targets]
 
         for targets in new_or_updated_targets:
             for target in targets:
                 vet_or_post_error(target)
 
-        for target in new_targets:
-            # check if any of the possible host galaxies are within 40 Mpc
-            target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
-            if target_extra is None:
-                continue
-            for galaxy in json.loads(target_extra.value):
-                if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
-                    slack_alert = (f'<{settings.TARGET_LINKS[0][0]}|{target.name}> is {galaxy["Offset"]:.1f}" from '
-                                   f'galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.').format(target=target)
-                    break
-            else:
-                continue
+                # check if any of the possible host galaxies are within 40 Mpc
+                target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
+                if target_extra is None:
+                    continue
+                for galaxy in json.loads(target_extra.value):
+                    if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
+                        slack_alert = (f'<{settings.TARGET_LINKS[0][0]}|{target.name}> is {galaxy["Offset"]:.1f}" from '
+                                       f'galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.').format(target=target)
+                        break
+                else:
+                    continue
 
-            # if there was nearby host galaxy found, check the last nondetection
-            photometry = target.reduceddatum_set.filter(data_type='photometry')
-            first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
-            last_nondet = photometry.filter(value__magnitude__isnull=True,
-                                            timestamp__lt=first_det.timestamp).order_by('timestamp').last()
-            if first_det and last_nondet:
-                time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
-                dmag_lnondet = (last_nondet.value['limit'] - first_det.value['magnitude']) / (time_lnondet / 24.)
-                slack_alert += (f' The last nondetection was {time_lnondet:.1f} hours before detection,'
-                                f' during which time it rose >{dmag_lnondet:.1f} mag/day.')
-            else:
-                slack_alert += ' No nondetection was reported.'
+                # if there was nearby host galaxy found, check the last nondetection
+                photometry = target.reduceddatum_set.filter(data_type='photometry')
+                first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
+                last_nondet = photometry.filter(value__magnitude__isnull=True,
+                                                timestamp__lt=first_det.timestamp).order_by('timestamp').last()
+                if first_det and last_nondet:
+                    time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
+                    dmag_lnondet = (last_nondet.value['limit'] - first_det.value['magnitude']) / (time_lnondet / 24.)
+                    slack_alert += (f' The last nondetection was {time_lnondet:.1f} hours before detection,'
+                                    f' during which time it rose >{dmag_lnondet:.1f} mag/day.')
+                else:
+                    slack_alert += ' No nondetection was reported.'
 
-            json_data = json.dumps({'text': slack_alert}).encode('ascii')
-            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+                json_data = json.dumps({'text': slack_alert}).encode('ascii')
+                requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
-        # automatically associate with nonlocalized events
-        for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
-            seq = nle.sequences.last()
-            localization = get_preferred_localization(nle)
-            nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
-            target_ids = []
-            for targets in new_or_updated_targets:
-                for target in targets:
-                    first_det = target.reduceddatum_set.filter(data_type='photometry', value__magnitude__isnull=False
-                                                               ).order_by('timestamp').first()
-                    if first_det and nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
-                        target_ids.append(target.id)
-            candidates = create_candidates_from_targets(seq, target_ids=target_ids)
-            for candidate in candidates:
-                credible_region = candidate.credibleregions.get(localization=localization).smallest_percent
-                format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
-                slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
-                               'localization region of <{nle_link}|{{nle.event_id}}>')
-                if nle.event_type == nle.NonLocalizedEventType.GRAVITATIONAL_WAVE:
-                    send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
-                elif nle.event_type == nle.NonLocalizedEventType.UNKNOWN:
-                    body = slack_alert.format(nle_link=settings.NLE_LINKS[0][0],
-                                              target_link=settings.TARGET_LINKS[0][0])
-                    json_data = json.dumps({'text': body.format(**format_kwargs)}).encode('ascii')
-                    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
+            # automatically associate with nonlocalized events
+            for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
+                seq = nle.sequences.last()
+                localization = get_preferred_localization(nle)
+                nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+                target_ids = []
+                for targets in new_or_updated_targets:
+                    for target in targets:
+                        first_det = target.reduceddatum_set.filter(data_type='photometry', value__magnitude__isnull=False
+                                                                   ).order_by('timestamp').first()
+                        if first_det and nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
+                            target_ids.append(target.id)
+                candidates = create_candidates_from_targets(seq, target_ids=target_ids)
+                for candidate in candidates:
+                    credible_region = candidate.credibleregions.get(localization=localization).smallest_percent
+                    format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
+                    slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
+                                   'localization region of <{nle_link}|{{nle.event_id}}>')
+                    if nle.event_type == nle.NonLocalizedEventType.GRAVITATIONAL_WAVE:
+                        send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
+                    elif nle.event_type == nle.NonLocalizedEventType.UNKNOWN:
+                        body = slack_alert.format(nle_link=settings.NLE_LINKS[0][0],
+                                                  target_link=settings.TARGET_LINKS[0][0])
+                        json_data = json.dumps({'text': body.format(**format_kwargs)}).encode('ascii')
+                        requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
+
+        for target in updated_targets_coords:
+            vet_or_post_error(target)
