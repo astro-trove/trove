@@ -86,18 +86,26 @@ nohup /var/www/saguaro_tom/venv/bin/python /var/www/saguaro_tom/manage.py readst
 To run asynchronous tasks (ATLAS forced photometry queries and minor planet checking),
 we use [django-tasks](https://github.com/realOrangeOne/django-tasks),
 configured according to the [TOM Toolkit documentation](https://tom-toolkit.readthedocs.io/en/stable/code/backgroundtasks.html).
-The asynchronous workers should automatically restart when `sand` restarts, thanks to this cronjob (run as root):
+The asynchronous workers should automatically restart when `sand` restarts, thanks to this cronjob:
 ```
-@reboot sleep 60 && cd /var/www/saguaro_tom/ && venv/bin/python manage.py db_worker --queue-name '*' -v3 > /home/saguaro/django-tasks.log 2>&1
+@reboot sleep 60 && cd /var/www/saguaro_tom/ && for i in $(seq 1 48); do venv/bin/python manage.py db_worker --queue-name '*' -v3 > /home/saguaro/django_tasks_logs/django-tasks.${i}.log 2>&1; done
 ```
 
-If either of these does not restart, or you need to restart them manually, run the following on `sand`:
+If the workers do not restart, or you need to restart them manually, run the following on `sand`:
 ```
 pkill -f db_worker
 cd /var/www/saguaro_tom/
 source venv/bin/activate
-nohup ./manage.py db_worker -v3 > /home/saguaro/django-tasks.log 2>&1 &
+for i in $(seq 1 48)
+    do nohup venv/bin/python manage.py db_worker --queue-name '*' -v3 > /home/saguaro/django_tasks_logs/django-tasks.${i}.log 2>&1 &
+done
 ```
+
+To view what their logs all at once, run:
+```
+tail -f ~/django_tasks_logs/*
+```
+Press Ctrl+C to exit that view.
 
 ## Other periodic tasks
 Several other tasks run every hour as cronjobs (as root):
