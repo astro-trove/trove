@@ -196,9 +196,7 @@ class Command(BaseCommand):
         )
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        new_or_updated_targets = [new_targets, updated_targets]
-
-        for targets in new_or_updated_targets:
+        for targets in [new_targets, updated_targets]:
             for target in targets:
                 vet_or_post_error(target)
 
@@ -230,31 +228,31 @@ class Command(BaseCommand):
                 json_data = json.dumps({'text': slack_alert}).encode('ascii')
                 requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
-            # automatically associate with nonlocalized events
-            for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
-                seq = nle.sequences.last()
-                localization = get_preferred_localization(nle)
-                nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
-                target_ids = []
-                for targets in new_or_updated_targets:
-                    for target in targets:
-                        first_det = target.reduceddatum_set.filter(data_type='photometry', value__magnitude__isnull=False
-                                                                   ).order_by('timestamp').first()
-                        if first_det and nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
-                            target_ids.append(target.id)
-                candidates = create_candidates_from_targets(seq, target_ids=target_ids)
-                for candidate in candidates:
-                    credible_region = candidate.credibleregions.get(localization=localization).smallest_percent
-                    format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
-                    slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
-                                   'localization region of <{nle_link}|{{nle.event_id}}>')
-                    if nle.event_type == nle.NonLocalizedEventType.GRAVITATIONAL_WAVE:
-                        send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
-                    elif nle.event_type == nle.NonLocalizedEventType.UNKNOWN:
-                        body = slack_alert.format(nle_link=settings.NLE_LINKS[0][0],
-                                                  target_link=settings.TARGET_LINKS[0][0])
-                        json_data = json.dumps({'text': body.format(**format_kwargs)}).encode('ascii')
-                        requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
-
         for target in updated_targets_coords:
             vet_or_post_error(target)
+
+        # automatically associate with nonlocalized events
+        for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
+            seq = nle.sequences.last()
+            localization = get_preferred_localization(nle)
+            nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+            target_ids = []
+            for targets in [new_targets, updated_targets, updated_targets_coords]:
+                for target in targets:
+                    first_det = target.reduceddatum_set.filter(data_type='photometry', value__magnitude__isnull=False
+                                                               ).order_by('timestamp').first()
+                    if first_det and nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
+                        target_ids.append(target.id)
+            candidates = create_candidates_from_targets(seq, target_ids=target_ids)
+            for candidate in candidates:
+                credible_region = candidate.credibleregions.get(localization=localization).smallest_percent
+                format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
+                slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
+                               'localization region of <{nle_link}|{{nle.event_id}}>')
+                if nle.event_type == nle.NonLocalizedEventType.GRAVITATIONAL_WAVE:
+                    send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
+                elif nle.event_type == nle.NonLocalizedEventType.UNKNOWN:
+                    body = slack_alert.format(nle_link=settings.NLE_LINKS[0][0],
+                                              target_link=settings.TARGET_LINKS[0][0])
+                    json_data = json.dumps({'text': body.format(**format_kwargs)}).encode('ascii')
+                    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
