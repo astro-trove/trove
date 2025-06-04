@@ -64,7 +64,7 @@ class Command(BaseCommand):
             FROM tns_q3c as tns
             WHERE REGEXP_REPLACE(tt.name, '^[^0-9]*', '')=tns.name
             AND (q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
-                 OR tns.name != CONCAT(tns.name_prefix, tns.name))
+                 OR tt.name != CONCAT(tns.name_prefix, tns.name))
             RETURNING tt.*;
             """
         )
