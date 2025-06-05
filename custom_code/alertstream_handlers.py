@@ -314,7 +314,7 @@ def handle_einstein_probe_alert(message, metadata):
     ep_ra = alert.get('ra')
     ep_dec = alert.get('dec')
     ep_name = alert['id'][0]
-    t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec)
+    t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec, permissions='PUBLIC')
     alert_text = ALERT_TEXT_EP.format(nle_link=settings.NLE_LINKS[0][0], target_link=settings.TARGET_LINKS[0][0]
                                      ).format(nle=nonlocalizedevent, t_ep=t_ep)
 
