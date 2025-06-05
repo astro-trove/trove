@@ -1,4 +1,4 @@
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from django.contrib.auth.models import Group
 from django.conf import settings
@@ -315,6 +315,7 @@ def handle_einstein_probe_alert(message, metadata):
     ep_dec = alert.get('dec')
     ep_name = alert['id'][0]
     t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec, permissions='PUBLIC')
+    EventCandidate.objects.create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
     alert_text = ALERT_TEXT_EP.format(nle_link=settings.NLE_LINKS[0][0], target_link=settings.TARGET_LINKS[0][0]
                                      ).format(nle=nonlocalizedevent, target=t_ep)
 
