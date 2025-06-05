@@ -21,7 +21,7 @@ from tom_targets.models import Target
 logger = logging.getLogger(__name__)
 
 # for einstein probe
-ALERT_TEXT_EP = """Einstein Probe trigger {{t_ep.name}}
+ALERT_TEXT_EP = """Einstein Probe trigger {{target.name}}
 <{nle_link}|Localization>
 <{target_link}|Target>
 """
