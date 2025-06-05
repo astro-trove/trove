@@ -21,10 +21,9 @@ from tom_targets.models import Target
 logger = logging.getLogger(__name__)
 
 # for einstein probe
-ALERT_TEXT_INTRO_EP = """EinsteinProbe id={t_ep.name}
-RA =  {t_ep.ra}
-Dec = {t_ep.dec}
-Error = {ep_error}
+ALERT_TEXT_EP = """Einstein Probe trigger {{t_ep.name}}
+<{{nle_link}}|Localization>
+<{{target_link}}|Target>
 """
 
 ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequence_id}}
@@ -315,17 +314,13 @@ def handle_einstein_probe_alert(message, metadata):
     ep_ra = alert.get('ra')
     ep_dec = alert.get('dec')
     ep_name = alert['id'][0]
-    ep_error = alert.get('ra_dec_error')
-    t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra = ep_ra, dec = ep_dec)
+    t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec)
+    alert_text = ALERT_TEXT_EP.format(nle_link=settings.NLE_LINKS[0][0], target_link=settings.TARGET_LINKS[0][0]
+                                     ).format(nle=nonlocalizedevent, t_ep=t_ep)
 
     # send SMS, Slack, and email alerts
-    ALERT_TEXT_URL_EP = "https://sand.as.arizona.edu/saguaro_tom/targets/{t_ep.id}/"
-    targ_link = f'Target Created <{ALERT_TEXT_URL_EP}|{{t_ep.id}}>'
-    non_localized_link = f'Localization <{settings.NLE_LINKS[0][0]}|{{nle.event_id}}>'
-    alert_text = ALERT_TEXT_INTRO_EP + non_localized_link + targ_link
     logger.info(f'Sending EP alert: {alert_text}')
-
-    json_data = json.dumps({'text': alert_text.format(nle=nonlocalizedevent,t_ep=t_ep,ep_error=ep_error)}).encode('ascii')
+    json_data = json.dumps({'text': alert_text}).encode('ascii')
     requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
     logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')
