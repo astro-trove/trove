@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 # for einstein probe
 ALERT_TEXT_EP = """Einstein Probe trigger {{t_ep.name}}
-<{{nle_link}}|Localization>
-<{{target_link}}|Target>
+<{nle_link}|Localization>
+<{target_link}|Target>
 """
 
 ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequence_id}}
