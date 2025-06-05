@@ -326,6 +326,6 @@ def handle_einstein_probe_alert(message, metadata):
     logger.info(f'Sending EP alert: {alert_text}')
 
     json_data = json.dumps({'text': alert_text.format(nle=nonlocalizedevent,t_ep=t_ep,ep_error=ep_error)}).encode('ascii')
-    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'applic1Gation/json'})
+    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
     logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')
