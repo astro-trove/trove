@@ -2,47 +2,21 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import connection
 from tom_targets.models import Target
-from tom_dataproducts.tasks import atlas_query
-from custom_code.hooks import target_post_save
-from custom_code.tasks import target_run_mpc
 from custom_code.healpix_utils import create_candidates_from_targets
-from custom_code.alertstream_handlers import pick_slack_channel, send_slack
+from custom_code.alertstream_handlers import pick_slack_channel, send_slack, vet_or_post_error
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
 from datetime import datetime, timedelta
-from astropy.time import Time
 import requests
 import json
 import logging
-import traceback
-import numpy as np
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-def vet_or_post_error(target):
-    try:
-        # set the tns query time limit to infinity because we don't care if we
-        # need to wait for this script to run
-        _, tns_query_status = target_post_save(target, created=True, tns_time_limit=np.inf)
-        if tns_query_status is not None:
-            logger.warn(tns_query_status)
-            json_data = json.dumps({'text': tns_query_status}).encode('ascii')
-            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
-        detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
-        if detections.exists():
-            target_run_mpc.enqueue(detections.latest().id)
-        mjd_now = Time.now().mjd
-        atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
-                         
-    except Exception as e:
-        slack_alert = f'Error vetting TNS target {target.name}:\n{e}'
-        logger.error(''.join(traceback.format_exception(e)))
-        json_data = json.dumps({'text': slack_alert}).encode('ascii')
-        requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
-        
+
 class Command(BaseCommand):
 
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
@@ -199,7 +173,7 @@ class Command(BaseCommand):
 
         for targets in [new_targets, updated_targets]:
             for target in targets:
-                vet_or_post_error(target)
+                vet_or_post_error(target, slack_url=settings.SLACK_TNS_URL)
 
                 # check if any of the possible host galaxies are within 40 Mpc
                 target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
@@ -230,7 +204,7 @@ class Command(BaseCommand):
                 requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
         for target in updated_targets_coords:
-            vet_or_post_error(target)
+            vet_or_post_error(target, slack_url=settings.SLACK_TNS_URL)
 
         # automatically associate with nonlocalized events
         for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):

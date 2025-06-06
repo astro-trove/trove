@@ -63,7 +63,7 @@ def update_or_create_target_extra(target, key, value):
     te.save()
 
 
-def target_post_save(target, created, tns_time_limit:int=5):
+def target_post_save(target, created, tns_time_limit: float=5.):
     """This hook runs following update of a target."""
     logger.info('Target post save hook: %s created: %s', target, created)
 
