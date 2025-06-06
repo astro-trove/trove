@@ -2,6 +2,8 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, Even
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from django.contrib.auth.models import Group
 from django.conf import settings
+from django.urls import reverse
+import urllib
 from email.mime.text import MIMEText
 import requests
 import smtplib
@@ -21,9 +23,8 @@ from tom_targets.models import Target
 logger = logging.getLogger(__name__)
 
 # for einstein probe
-ALERT_TEXT_EP = """Einstein Probe trigger {{target.name}}
-<{nle_link}|Localization>
-<{target_link}|Target>
+ALERT_TEXT_EP = """Einstein Probe trigger <{target_link}|{{target.name}}>
+ - <{survey_obs_link}|Survey Observations>
 """
 
 ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequence_id}}
@@ -316,8 +317,13 @@ def handle_einstein_probe_alert(message, metadata):
     ep_name = alert['id'][0]
     t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec, permissions='PUBLIC')
     EventCandidate.objects.create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
-    alert_text = ALERT_TEXT_EP.format(nle_link=settings.NLE_LINKS[0][0], target_link=settings.TARGET_LINKS[0][0]
-                                     ).format(nle=nonlocalizedevent, target=t_ep)
+
+    query = {'localization_event': nonlocalizedevent.event_id, 'localization_prob': 95, 'localization_dt': 3}
+    survey_obs_link = (f"https://{settings.ALLOWED_HOST}/{settings.FORCE_SCRIPT_NAME}"
+                      f"{reverse('surveys:observations')}?{urllib.parse.urlencode(query)}")
+
+    alert_text = ALERT_TEXT_EP.format(survey_obs_link=survey_obs_link, target_link=settings.TARGET_LINKS[0][0]
+                                     ).format(target=t_ep)
 
     # send SMS, Slack, and email alerts
     logger.info(f'Sending EP alert: {alert_text}')
