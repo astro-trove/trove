@@ -319,9 +319,7 @@ def handle_einstein_probe_alert(message, metadata):
     EventCandidate.objects.create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
 
     query = {'localization_event': nonlocalizedevent.event_id, 'localization_prob': 95, 'localization_dt': 3}
-    survey_obs_link = (f"https://{settings.ALLOWED_HOST}/{settings.FORCE_SCRIPT_NAME}"
-                      f"{reverse('surveys:observations')}?{urllib.parse.urlencode(query)}")
-
+    survey_obs_link = f"https://{settings.ALLOWED_HOST}{reverse('surveys:observations')}?{urllib.parse.urlencode(query)}"
     alert_text = ALERT_TEXT_EP.format(survey_obs_link=survey_obs_link, target_link=settings.TARGET_LINKS[0][0]
                                      ).format(target=t_ep)
 
