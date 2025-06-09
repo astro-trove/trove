@@ -17,7 +17,7 @@ numpy
 tomtoolkit==2.24.5
 tom-alertstreams
 tom-mmt @ git+https://github.com/griffin-h/tom_mmt
-tom-nonlocalizedevents==0.8.1
+tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
 tom-swift==0.2.0
 paramiko
 plotly
