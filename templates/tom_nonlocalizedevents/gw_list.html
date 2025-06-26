@@ -66,10 +66,10 @@
         {% endfor %}
         </td>
         <td title="Survey Observations">
-            <a href="{% url 'surveys:observations' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">Obs.</a>
+            <a href="{% url 'surveys:observations' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">{{ event|n_survey_obs }}</a>
         </td>
         <td title="Survey Candidates">
-            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">Cand.</a>
+            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">{{ event|n_survey_cands }}</a>
         </td>
         <td title="External Links">
           <a href="{{ event.hermes_url }}" target="_blank"><img src="https://hermes.lco.global/favicon.ico" alt="Hermes" title="Hermes" class="hermes icon" /></a>
