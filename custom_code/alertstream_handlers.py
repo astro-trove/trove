@@ -1,23 +1,35 @@
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from django.contrib.auth.models import Group
 from django.conf import settings
+from django.urls import reverse
+import urllib
 from email.mime.text import MIMEText
 import requests
 import smtplib
 import logging
 import json
+from tom_dataproducts.tasks import atlas_query
+from .hooks import target_post_save
+from .tasks import target_run_mpc
 from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, format_area, get_most_likely_class
 from .healpix_utils import update_all_credible_region_percents_for_survey_fields, create_elliptical_localization
 from .cssfield_selection import calculate_footprint_probabilities, rank_css_fields
 from .models import CredibleRegionContour
 from astropy.table import Table
+from astropy.time import Time
 from io import BytesIO
 import astropy_healpix as ah
 import numpy as np
 import traceback
+from tom_targets.models import Target
 
 logger = logging.getLogger(__name__)
+
+# for einstein probe
+ALERT_TEXT_EP = """Einstein Probe trigger <{target_link}|{{target.name}}>
+ — <{survey_obs_link}|Survey Observations>
+"""
 
 ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequence_id}}
 {{nle.event_id}} ({{significance}})
@@ -73,6 +85,28 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_TEXT_EXTERNAL_COINCIDENCE +
     ALERT_LINKS,
 ]
+
+
+def vet_or_post_error(target, slack_url=settings.SLACK_TNS_URL):
+    try:
+        # set the tns query time limit to infinity because we don't care if we
+        # need to wait for this script to run
+        _, tns_query_status = target_post_save(target, created=True, tns_time_limit=np.inf)
+        if tns_query_status is not None:
+            logger.warning(tns_query_status)
+            json_data = json.dumps({'text': tns_query_status}).encode('ascii')
+            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+        detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
+        if detections.exists():
+            target_run_mpc.enqueue(detections.latest().id)
+        mjd_now = Time.now().mjd
+        atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
+
+    except Exception as e:
+        slack_alert = f'Error vetting target {target.name}:\n{e}'
+        logger.error(''.join(traceback.format_exception(e)))
+        json_data = json.dumps({'text': slack_alert}).encode('ascii')
+        requests.post(slack_url, data=json_data, headers={'Content-Type': 'application/json'})
 
 
 def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True,
@@ -304,8 +338,20 @@ def handle_einstein_probe_alert(message, metadata):
             calculate_footprint_probabilities(skymap, localization)
             rank_css_fields(localization.surveyfieldcredibleregions)
 
-    slack_alert = f'Received Einstein Probe trigger <{settings.NLE_LINKS[0][0]}|{{nle.event_id}}>'
-    json_data = json.dumps({'text': slack_alert.format(nle=nonlocalizedevent)}).encode('ascii')
+    ep_ra = alert.get('ra')
+    ep_dec = alert.get('dec')
+    ep_name = alert['id'][0]
+    t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec, permissions='PUBLIC')
+    EventCandidate.objects.create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
+    vet_or_post_error(t_ep, slack_url=settings.SLACK_EP_URL)
+    query = {'localization_event': nonlocalizedevent.event_id, 'localization_prob': 95, 'localization_dt': 3}
+    survey_obs_link = f"https://{settings.ALLOWED_HOST}{reverse('surveys:observations')}?{urllib.parse.urlencode(query)}"
+    alert_text = ALERT_TEXT_EP.format(survey_obs_link=survey_obs_link, target_link=settings.TARGET_LINKS[0][0]
+                                     ).format(target=t_ep)
+
+    # send SMS, Slack, and email alerts
+    logger.info(f'Sending EP alert: {alert_text}')
+    json_data = json.dumps({'text': alert_text}).encode('ascii')
     requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
 
     logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')
