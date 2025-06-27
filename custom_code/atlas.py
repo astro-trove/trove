@@ -42,7 +42,7 @@ class CustomAtlasForcedPhotometryQueryForm(BaseSingleTargetDataServiceQueryForm)
         try:
             min_date_float = float(cleaned_data['min_date'])
             if min_date_float > 0:
-                min_date_mjd = Time(min_date_float, format='mjd')
+                min_date_mjd = Time(min_date_float, format='mjd').mjd
             else:
                 min_date_mjd = Time.now().mjd + min_date_float
         except ValueError:
@@ -55,7 +55,7 @@ class CustomAtlasForcedPhotometryQueryForm(BaseSingleTargetDataServiceQueryForm)
         try:
             max_date_float = float(cleaned_data['max_date'])
             if max_date_float > 0:
-                max_date_mjd = Time(max_date_float, format='mjd')
+                max_date_mjd = Time(max_date_float, format='mjd').mjd
             else:
                 max_date_mjd = Time.now().mjd + max_date_float
         except ValueError:
