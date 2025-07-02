@@ -34,22 +34,12 @@ TARGET_LINKS = [  # links to TOMs for target pages, {target.name} is replaced by
     ('https://tom0.edu/targets/{target.id}/', 'Name of TOM 0'),  # TOM corresponding to Slack workspace 0
     ('https://tom1.edu/targets/{target.name}/', 'Name of TOM 1'),  # TOM corresponding to Slack workspace 1
 ]
-SLACK_EP_URL = 'https://hooks.slack.com/services/.../.../...'  # incoming webhook for Einstein Probe alerts
-SLACK_TNS_URL = 'https://hooks.slack.com/services/.../.../...'  # incoming webhook for TNS transient alerts
-SLACK_URLS = [  # list of lists of Slack URLs for incoming webhooks
-    [  # list of URLs for Slack workspace 0
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-subthreshold
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-burst
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-bbh
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-ns
-    ],
-    [  # list of URLs for Slack workspace 1
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-subthreshold
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-burst
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-bbh
-        'https://hooks.slack.com/services/.../.../...',  # incoming webhook for #alerts-ns
-    ],
+SLACK_TOKENS_GW = [  # Slack API tokens for GW alerts
+    '',  # Slack workspace 0
+    '',  # Slack workspace 1
 ]
+SLACK_TOKEN_EP = ''  # Slack API token for Einstein Probe alerts
+SLACK_TOKEN_TNS = ''  # Slack API token for TNS transient alerts
 SWIFT_USERNAME = ''     # username for the Swift ToO API
 SWIFT_SHARED_SECRET = '' # shared secret for the Swift ToO API
 TNS_API_KEY = ''        # API key for the Transient Name Server

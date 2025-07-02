@@ -7,7 +7,7 @@ from custom_code.alertstream_handlers import pick_slack_channel, send_slack, vet
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
 from datetime import datetime, timedelta
-import requests
+from slack_sdk import WebClient
 import json
 import logging
 
@@ -15,6 +15,9 @@ logger = logging.getLogger(__name__)
 new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
 for handler in logger.handlers:
     handler.setFormatter(new_format)
+
+slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
+slack_ep = WebClient(settings.SLACK_TOKEN_EP)
 
 
 class Command(BaseCommand):
@@ -173,7 +176,7 @@ class Command(BaseCommand):
 
         for targets in [new_targets, updated_targets]:
             for target in targets:
-                vet_or_post_error(target, slack_url=settings.SLACK_TNS_URL)
+                vet_or_post_error(target, slack_tns, channel='alerts-tns')
 
                 # check if any of the possible host galaxies are within 40 Mpc
                 target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
@@ -199,12 +202,10 @@ class Command(BaseCommand):
                                     f' during which time it rose >{dmag_lnondet:.1f} mag/day.')
                 else:
                     slack_alert += ' No nondetection was reported.'
-
-                json_data = json.dumps({'text': slack_alert}).encode('ascii')
-                requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+                slack_tns.chat_postMessage(channel='alerts-tns', text=slack_alert)
 
         for target in updated_targets_coords:
-            vet_or_post_error(target, slack_url=settings.SLACK_TNS_URL)
+            vet_or_post_error(target, slack_tns, channel='alerts-tns')
 
         # automatically associate with nonlocalized events
         for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
@@ -229,5 +230,4 @@ class Command(BaseCommand):
                 elif nle.event_type == nle.NonLocalizedEventType.UNKNOWN:
                     body = slack_alert.format(nle_link=settings.NLE_LINKS[0][0],
                                               target_link=settings.TARGET_LINKS[0][0])
-                    json_data = json.dumps({'text': body.format(**format_kwargs)}).encode('ascii')
-                    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
+                    slack_ep.chat_postMessage(channel='alerts-ep', text=body.format(**format_kwargs))

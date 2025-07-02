@@ -5,10 +5,9 @@ from django.conf import settings
 from django.urls import reverse
 import urllib
 from email.mime.text import MIMEText
-import requests
+from slack_sdk import WebClient
 import smtplib
 import logging
-import json
 from tom_dataproducts.tasks import atlas_query
 from .hooks import target_post_save
 from .tasks import target_run_mpc
@@ -86,16 +85,18 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_LINKS,
 ]
 
+slack_ep = WebClient(settings.SLACK_TOKEN_EP)
+slack_gw = [WebClient(token) for token in settings.SLACK_TOKENS_GW]
 
-def vet_or_post_error(target, slack_url=settings.SLACK_TNS_URL):
+
+def vet_or_post_error(target, slack_client, channel):
     try:
         # set the tns query time limit to infinity because we don't care if we
         # need to wait for this script to run
         _, tns_query_status = target_post_save(target, created=True, tns_time_limit=np.inf)
         if tns_query_status is not None:
             logger.warning(tns_query_status)
-            json_data = json.dumps({'text': tns_query_status}).encode('ascii')
-            requests.post(settings.SLACK_TNS_URL, data=json_data, headers={'Content-Type': 'application/json'})
+            slack_client.chat_postMessage(channel=channel, text=tns_query_status)
         detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
         if detections.exists():
             target_run_mpc.enqueue(detections.latest().id)
@@ -103,10 +104,8 @@ def vet_or_post_error(target, slack_url=settings.SLACK_TNS_URL):
         atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
 
     except Exception as e:
-        slack_alert = f'Error vetting target {target.name}:\n{e}'
         logger.error(''.join(traceback.format_exception(e)))
-        json_data = json.dumps({'text': slack_alert}).encode('ascii')
-        requests.post(slack_url, data=json_data, headers={'Content-Type': 'application/json'})
+        slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
 
 
 def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True,
@@ -114,23 +113,21 @@ def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is
     if is_test_alert:
         channel = None
     elif not is_significant:
-        channel = 0
+        channel = 'alerts-subthreshold'
     elif is_burst:
-        channel = 1
+        channel = 'alerts-burst'
     elif not has_ns:
-        channel = 2
+        channel = 'alerts-bbh'
     else:
-        channel = 3
+        channel = 'alerts-ns'
     if at is not None:
         body = f'<!{at}>\n' + body
-    headers = {'Content-Type': 'application/json'}
-    for url_list, (nle_link, service), (target_link, _) in zip(settings.SLACK_URLS, settings.NLE_LINKS, settings.TARGET_LINKS):
+    for slack_client, (nle_link, service), (target_link, _) in zip(slack_gw, settings.NLE_LINKS, settings.TARGET_LINKS):
         body_slack = body.format(nle_link=nle_link, service=service, target_link=target_link).format(**format_kwargs)
         logger.info(f'Sending GW alert: {body_slack}')
         if channel is None:
             break  # just print out test alerts for debugging
-        json_data = json.dumps({'text': body_slack})
-        requests.post(url_list[channel], data=json_data.encode('ascii'), headers=headers)
+        slack_client.chat_postMessage(channel=channel, text=body_slack)
         if not all_workspaces:
             break
 
@@ -343,7 +340,7 @@ def handle_einstein_probe_alert(message, metadata):
     ep_name = alert['id'][0]
     t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec, permissions='PUBLIC')
     EventCandidate.objects.create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
-    vet_or_post_error(t_ep, slack_url=settings.SLACK_EP_URL)
+    vet_or_post_error(t_ep, slack_ep, channel='alerts-ep')
     query = {'localization_event': nonlocalizedevent.event_id, 'localization_prob': 95, 'localization_dt': 3}
     survey_obs_link = f"https://{settings.ALLOWED_HOST}{reverse('surveys:observations')}?{urllib.parse.urlencode(query)}"
     alert_text = ALERT_TEXT_EP.format(survey_obs_link=survey_obs_link, target_link=settings.TARGET_LINKS[0][0]
@@ -351,7 +348,6 @@ def handle_einstein_probe_alert(message, metadata):
 
     # send SMS, Slack, and email alerts
     logger.info(f'Sending EP alert: {alert_text}')
-    json_data = json.dumps({'text': alert_text}).encode('ascii')
-    requests.post(settings.SLACK_EP_URL, data=json_data, headers={'Content-Type': 'application/json'})
+    slack_ep.chat_postMessage(channel='alerts-ep', text=alert_text)
 
     logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')

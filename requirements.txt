@@ -24,6 +24,7 @@ plotly
 psycopg2-binary
 python-dateutil
 requests
+slack-sdk
 specutils
 SQLAlchemy
 whitenoise
