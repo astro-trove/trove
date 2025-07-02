@@ -22,6 +22,7 @@ import astropy_healpix as ah
 import numpy as np
 import traceback
 from tom_targets.models import Target
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +156,7 @@ def send_email(subject, body, is_test_alert=False):
 
 
 def calculate_credible_region(skymap, localization, probability=0.9):
+    t0 = time.time()
     """store the credible region contour for skymap plotting"""
     # Sort the pixels of the sky map by descending probability density
     skymap.sort('PROBDENSITY', reverse=True)
@@ -174,7 +176,8 @@ def calculate_credible_region(skymap, localization, probability=0.9):
         credible_region_90.setdefault(str(skymap.meta['MOCORDER']), [])  # must include the highest order
     # Create the CredibleRegionContour object
     CredibleRegionContour(localization=localization, probability=probability, pixels=credible_region_90).save()
-    logger.info('Calculated skymap contours')
+    dt = time.time() - t0
+    logger.info(f'Calculated skymap contours in {dt:.0f} s')
 
 
 def pick_slack_channel(seq):

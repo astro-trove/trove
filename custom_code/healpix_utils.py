@@ -19,6 +19,7 @@ import uuid
 import sys
 import json
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +38,7 @@ def update_all_credible_region_percents_for_survey_fields(eventlocalization):
     """
     This function creates a credible region linkage for each of the survey fields in the event localization specified
     """
+    t0 = time.time()
     with Session(sa_engine) as session:
 
         cum_prob = sa.func.sum(
@@ -79,7 +81,8 @@ def update_all_credible_region_percents_for_survey_fields(eventlocalization):
                         'smallest_percent': int(prob * 100.0)
                     }
                 )
-    logger.info('Updated credible regions for survey fields')
+    dt = time.time() - t0
+    logger.info(f'Updated credible regions for survey fields in {dt:.0f} s')
 
 
 class SaTargetExtra(Base):

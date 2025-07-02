@@ -6,6 +6,7 @@ from astropy.coordinates import AltAz, EarthLocation, SkyCoord, get_body, spheri
 from astropy.time import Time, TimezoneInfo
 from astropy import units as u
 import logging
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,7 @@ def z_rot(theta_deg):
 
 def calculate_footprint_probabilities(skymap, localization):
     """get the total probability in each CSS field footprint"""
+    t0 = time.time()
     flat = bayestar.rasterize(skymap)
     probs = healpy.reorder(flat['PROB'], 'NESTED', 'RING')
     nside = healpy.npix2nside(len(probs))
@@ -111,7 +113,8 @@ def calculate_footprint_probabilities(skymap, localization):
             prob += probs[ind]
         cr.probability_contained = prob
         cr.save()
-    logger.info('Updated probabilities for CSS fields')
+    dt = time.time() - t0
+    logger.info(f'Updated probabilities for CSS fields in {dt:.0f} s')
 
 
 CSS_LOCATION = EarthLocation(lat=32.4433333333 * u.deg, lon=-110.788888889 * u.deg, height=2790 * u.m)
@@ -150,6 +153,7 @@ def observable_tonight(target, now=None):
 
 
 def rank_css_fields(queryset, n_select=12, n_groups=3, now=None):
+    t0 = time.time()
     queryset.update(group=None, rank_in_group=None)  # erase any previous ranking
     queryset = queryset.filter(survey_field__has_reference=True).order_by('-probability_contained')
     fields_remaining = list(queryset)
@@ -170,4 +174,5 @@ def rank_css_fields(queryset, n_select=12, n_groups=3, now=None):
             else:
                 logger.warning('No adjacent fields to select')
                 break
-    logger.info(f'Created new survey plan with {n_groups:d} groups of {n_select:d} fields')
+    dt = time.time() - t0
+    logger.info(f'Created new survey plan with {n_groups:d} groups of {n_select:d} fields in {dt:.0f} s')
