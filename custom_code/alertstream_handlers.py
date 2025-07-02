@@ -345,8 +345,6 @@ def handle_einstein_probe_alert(message, metadata):
     survey_obs_link = f"https://{settings.ALLOWED_HOST}{reverse('surveys:observations')}?{urllib.parse.urlencode(query)}"
     alert_text = ALERT_TEXT_EP.format(survey_obs_link=survey_obs_link, target_link=settings.TARGET_LINKS[0][0]
                                      ).format(target=t_ep)
-
-    # send SMS, Slack, and email alerts
     logger.info(f'Sending EP alert: {alert_text}')
     slack_ep.chat_postMessage(channel='alerts-ep', text=alert_text)
 
