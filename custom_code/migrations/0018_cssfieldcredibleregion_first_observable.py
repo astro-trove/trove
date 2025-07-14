@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("custom_code", "0017_profile_burst_alerts"),
+        ("custom_code", "0015_cssfield_has_reference"),
     ]
 
     operations = [

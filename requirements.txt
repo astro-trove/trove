@@ -9,16 +9,13 @@ django-guardian
 django-tasks
 healpix-alchemy
 healpy
-kne-cand-vetting @ git+https://github.com/SAGUARO-MMA/kne-cand-vetting
 lightcurve-fitting
 ligo.skymap
 matplotlib
 numpy
 tomtoolkit==2.24.5
 tom-alertstreams
-tom-mmt @ git+https://github.com/griffin-h/tom_mmt
 tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
-tom-swift==0.2.0
 paramiko
 plotly
 psycopg2-binary

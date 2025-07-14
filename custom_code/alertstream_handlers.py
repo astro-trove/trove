@@ -10,7 +10,6 @@ import smtplib
 import logging
 from tom_dataproducts.tasks import atlas_query
 from .hooks import target_post_save
-from .tasks import target_run_mpc
 from .templatetags.nonlocalizedevent_extras import format_inverse_far, format_distance, format_area, get_most_likely_class
 from .healpix_utils import update_all_credible_region_percents_for_survey_fields, create_elliptical_localization
 from .cssfield_selection import calculate_footprint_probabilities, rank_css_fields
@@ -98,11 +97,8 @@ def vet_or_post_error(target, slack_client, channel):
         if tns_query_status is not None:
             logger.warning(tns_query_status)
             slack_client.chat_postMessage(channel=channel, text=tns_query_status)
-        detections = target.reduceddatum_set.filter(data_type="photometry", value__magnitude__isnull=False)
-        if detections.exists():
-            target_run_mpc.enqueue(detections.latest().id)
-        mjd_now = Time.now().mjd
-        atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
+            mjd_now = Time.now().mjd
+            atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
 
     except Exception as e:
         logger.error(''.join(traceback.format_exception(e)))

@@ -12,6 +12,4 @@
 {% endif %}
 <a href="{% url 'tom_targets:delete' pk=target.id %}" title="Delete target" class="btn btn-danger">Delete</a>
 
-<a href="{% url 'custom_code:mpc' pk=target.id %}" title="Run MPC on target" class="btn btn-warning">MPC</a>
-
 {% get_buttons target %}

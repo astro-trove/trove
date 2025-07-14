@@ -210,44 +210,7 @@ CACHES = {
 # TOM Specific configuration
 TARGET_TYPE = 'SIDEREAL'
 
-FACILITIES = {
-    'LCO': {
-        'portal_url': 'https://observe.lco.global',
-        'api_key': LCO_API_KEY,
-    },
-    'GEM': {
-        'portal_url': {
-            'GS': 'https://139.229.34.15:8443',
-            'GN': 'https://128.171.88.221:8443',
-        },
-        'api_key': {
-            'GS': GEM_S_API_KEY,
-            'GN': GEM_N_API_KEY,
-        },
-        'user_email': '',
-        'programs': {
-            'GS-YYYYS-T-NNN': {
-                'MM': 'Std: Some descriptive text',
-                'NN': 'Rap: Some descriptive text'
-            },
-            'GN-YYYYS-T-NNN': {
-                'QQ': 'Std: Some descriptive text',
-                'PP': 'Rap: Some descriptive text',
-            },
-        },
-    },
-    'MMT': {
-        'programs': {
-            'Binospec': MMT_BINOSPEC_PROGRAMS,
-            'MMIRS': MMT_MMIRS_PROGRAMS,
-            'MMTCam': MMT_MMTCAM_PROGRAMS,
-        },
-    },
-    'SWIFT': {
-        'SWIFT_USERNAME': SWIFT_USERNAME,
-        'SWIFT_SHARED_SECRET': SWIFT_SHARED_SECRET,
-    },
-}
+FACILITIES = {}
 
 SINGLE_TARGET_DATA_SERVICES = {
     'ATLAS': {
@@ -264,27 +227,14 @@ DATA_PRODUCT_TYPES = {
     'fits_file': ('fits_file', 'FITS File'),
     'spectroscopy': ('spectroscopy', 'Spectroscopy'),
     'image_file': ('image_file', 'Image File'),
-    'MMT': ('MMT', 'MMT File'),
     'atlas_photometry': ('atlas_photometry', 'ATLAS Photometry'),
-    'LCO': ('LCO', 'LCO File'),
 }
 
 DATA_PROCESSORS = {
     'photometry': 'tom_dataproducts.processors.photometry_processor.PhotometryProcessor',
     'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
-    'MMT': 'tom_mmt.mmt.MMTDataProcessor',
-    'atlas_photometry': 'custom_code.atlas.ClippedStackedAtlasProcessor',
-    'LCO': 'custom_code.facilities.lco.LCODataProcessor',
+    # TODO: custom processor for ATLAS forced photometry
 }
-
-TOM_FACILITY_CLASSES = [
-    'custom_code.facilities.lco.CustomLCOFacility',
-    'tom_observations.facilities.gemini.GEMFacility',
-    'tom_observations.facilities.soar.SOARFacility',
-    'tom_observations.facilities.lt.LTFacility',
-    'custom_code.facilities.mmt.CustomMMTFacility',
-    'tom_swift.swift.SwiftFacility',
-]
 
 TOM_ALERT_CLASSES = [
     'tom_alerts.brokers.alerce.ALeRCEBroker',
