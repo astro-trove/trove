@@ -3,8 +3,6 @@ from django.db.models import Max
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from custom_code.filters import LocalizationFilter
-from custom_code.models import Candidate
-from tom_surveys.models import SurveyObservationRecord
 import math
 
 register = template.Library()
@@ -111,11 +109,6 @@ def sort_localizations(localizations):
 @register.filter
 def n_survey_obs(nonlocalizedevent, prob=95., dt=3):
     return LocalizationFilter().filter(SurveyObservationRecord.objects.all(), (nonlocalizedevent, prob, dt)).count()
-
-
-@register.filter
-def n_survey_cands(nonlocalizedevent, prob=95., dt=3):
-    return LocalizationFilter().filter(Candidate.objects.all(), (nonlocalizedevent, prob, dt)).count()
 
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/nonlocalizedevent_details.html', takes_context=True)

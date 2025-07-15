@@ -59,8 +59,6 @@ INSTALLED_APPS = [
     'tom_nonlocalizedevents',
     'webpack_loader',
     'custom_code',
-    'tom_surveys',
-    'tom_treasuremap',
     'django_tasks',
     'django_tasks.backends.database',
 ]

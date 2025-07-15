@@ -27,23 +27,6 @@ For customization instructions, see tom_common/base.html
 <li class="nav-item {% if 'targets' in request.resolver_match.route %}active{% endif %}">
     <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
 </li>
-<li class="nav-item dropdown {% if request.resolver_match.namespace == 'surveys' or request.resolver_match.url_name == 'candidates' or request.resolver_match.namespace == 'treasuremap' %}active{% endif %}"">
-    <a class="nav-link dropdown-toggle" data-toggle="dropdown">Surveys</a>
-    <ul class="dropdown-menu">
-        <li class="nav-item">
-            <a class="nav-link" href="{% url 'surveys:observations' %}" style="color:black">Observations</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:candidates' %}?obsdate_range_after={% now 'Y-m-d' %}&classification=0&order=-mlscore_real" style="color:black">Candidates</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:candidates' %}?target__name__startswith=AT,SN,TDE&order=-observation_record__scheduled_start" style="color:black">TNS Transients</a>
-        </li>
-        <li class="nav-item">
-            <a class="nav-link" href="{% url 'treasuremap:list' %}" style="color:black">Treasure Map</a>
-        </li>
-    </ul>
-</li>
 <li class="nav-item {% if request.resolver_match.namespace == 'alerts' %}active{% endif %}">
     <a class="nav-link" href="{% url 'alerts:list' %}">Alerts</a>
 </li>

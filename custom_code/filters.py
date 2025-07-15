@@ -1,17 +1,11 @@
 import django.forms
 import django_filters
-from tom_surveys.models import SurveyField
 import json
 from django.conf import settings
-from django.db.models import Q, OuterRef, Subquery, Count
-import functools
-import operator
+from django.db.models import OuterRef, Subquery
 from datetime import datetime, timedelta
 import sys
-from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
-from .models import Candidate
-from .cssfield_selection import rank_css_fields
 
 CREDIBLE_REGION_PROBABILITIES = json.loads(settings.CREDIBLE_REGION_PROBABILITIES)
 CREDIBLE_REGION_CHOICES = [(int(100. * p), f'{p:.0%}') for p in CREDIBLE_REGION_PROBABILITIES]
@@ -59,119 +53,15 @@ class LocalizationFilter(django_filters.Filter):
                 return queryset.none()
             tmin = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
             tmax = datetime.now(tmin.tzinfo) if dt is None else tmin + timedelta(days=dt)
-            if queryset.model == Candidate:
-                filter_kwargs = {
-                    'observation_record__survey_field__credibleregions__localization': seq.localization,
-                    'observation_record__survey_field__credibleregions__smallest_percent__lte': prob,
-                    'observation_record__scheduled_start__gte': tmin,
-                    'observation_record__scheduled_start__lte': tmax,
-                }
-            else:  # assume the model is SurveyObservationRecord itself
-                filter_kwargs = {
-                    'survey_field__credibleregions__localization': seq.localization,
-                    'survey_field__credibleregions__smallest_percent__lte': prob,
-                    'scheduled_start__gte': tmin,
-                    'scheduled_start__lte': tmax,
-                }
+            filter_kwargs = {
+                'survey_field__credibleregions__localization': seq.localization,
+                'survey_field__credibleregions__smallest_percent__lte': prob,
+                'scheduled_start__gte': tmin,
+                'scheduled_start__lte': tmax,
+            }
             return queryset.filter(**filter_kwargs)
         else:
             return queryset
-
-
-class CandidateFilter(django_filters.FilterSet):
-    cone_search = django_filters.CharFilter(method='filter_cone_search', label='Cone Search',
-                                            help_text='RA, Dec, Search Radius (degrees)')
-
-    def filter_cone_search(self, queryset, name, value):
-        """
-        Perform a cone search filter on this filter's queryset,
-        using the cone search utlity method and the specified RA, DEC
-        """
-        if name == 'cone_search':
-            ra, dec, radius = value.split(',')
-        else:
-            return queryset
-
-        ra = float(ra)
-        dec = float(dec)
-
-        return cone_search_filter(queryset, ra, dec, radius)
-
-    @staticmethod
-    def multifilter(queryset, name, value):
-        values = [val.strip() for val in value.split(',')]
-        include = [Q(**{name: val}) for val in values if not val.startswith('-')]
-        exclude = [Q(**{name: val[1:]}) for val in values if val.startswith('-')]
-        query = functools.reduce(operator.or_, include, Q()) & ~functools.reduce(operator.or_, exclude, Q())
-        return queryset.filter(query)
-
-    target__name__startswith = django_filters.CharFilter(method='multifilter', label='Name Starts With',
-                                                         help_text='e.g., "SN,AT" (SN or AT), "-J" (not J)')
-    observation_record__survey_field = django_filters.ModelChoiceFilter(queryset=SurveyField.objects, label='Survey Field')
-    classification = django_filters.ChoiceFilter(choices=[(0, 'Transient'), (1, 'Moving Object')])
-    snr_range = django_filters.RangeFilter('snr', label='S/N')
-    mag_range = django_filters.RangeFilter('mag', label='Magnitude')
-    obsdate_range = django_filters.DateTimeFromToRangeFilter('observation_record__scheduled_start', label='Obs. Date')
-    mlscore_range = django_filters.RangeFilter('mlscore', 'gte', label='ML Old')
-    mlscore_real_range = django_filters.RangeFilter('mlscore_real', label='ML Real')
-    mlscore_bogus_range = django_filters.RangeFilter('mlscore_bogus', label='ML Bogus')
-    localization = LocalizationFilter(label='Localization')
-
-    order = django_filters.OrderingFilter(
-        fields=['observation_record__scheduled_start', 'ra', 'dec', 'snr', 'mag',
-                'detections', 'mlscore', 'mlscore_real', 'mlscore_bogus'],
-        field_labels={
-            'snr': 'S/N',
-            'mag': 'Magnitude',
-            'observation_record__scheduled_start': 'Obs. Date',
-            'mlscore': 'ML Old',
-            'mlscore_real': 'ML Real',
-            'mlscore_bogus': 'ML Bogus',
-            'ra': 'R.A.',
-            'dec': 'Dec.'
-        }
-    )
-
-
-class CSSFieldWidget(django.forms.widgets.MultiWidget):
-    def __init__(self, **kwargs):
-        widgets = {
-            'ngroups': django.forms.NumberInput(attrs={'placeholder': '# groups'}),
-            'nfields': django.forms.NumberInput(attrs={'placeholder': '# fields'}),
-            'now': django.forms.DateTimeInput(attrs={'placeholder': 'UT night start'}),
-        }
-        super().__init__(widgets, **kwargs)
-
-    def decompress(self, value):
-        return value or (None, None)
-
-
-class CSSFieldField(django.forms.MultiValueField):
-    def __init__(self, **kwargs):
-        fields = (
-            django.forms.IntegerField(min_value=0, initial=3),
-            django.forms.IntegerField(min_value=0, initial=12),
-            django.forms.DateTimeField(initial=datetime.utcnow())
-        )
-        super().__init__(fields, widget=CSSFieldWidget, **kwargs)
-
-    def compress(self, data_list):
-        return data_list
-
-
-class CSSFieldFilter(django_filters.Filter):
-    field_class = CSSFieldField
-
-    def filter(self, queryset, value):
-        if value:
-            rank_css_fields(queryset, n_groups=value[0], n_select=value[1], now=value[2])
-        return queryset
-
-
-class CSSFieldCredibleRegionFilter(django_filters.FilterSet):
-    grouping = CSSFieldFilter(label='Grouping')
-    order = django_filters.OrderingFilter(fields=['name', 'ra', 'dec', 'probability_contained',
-                                                  'group', 'rank_in_group'])
 
 
 class NonLocalizedEventFilter(django_filters.FilterSet):

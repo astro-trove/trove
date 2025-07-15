@@ -3,15 +3,10 @@ from django.forms import inlineformset_factory
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Column, Submit, HTML
 from crispy_forms.bootstrap import AppendedText, PrependedAppendedText
-from tom_targets.models import TargetList
-from .models import TargetListExtra
 from datetime import datetime
 import json
 import os
 
-
-TargetListExtraFormset = inlineformset_factory(TargetList, TargetListExtra, fields=('key', 'value'),
-                                               widgets={'value': forms.TextInput()})
 
 TNS_FILTER_CHOICES = [
     (0, "Other"),
@@ -382,31 +377,3 @@ class NonLocalizedEventFormHelper(FormHelper):
                 )
             )
         )
-
-
-class CandidateFormHelper(FormHelper):
-    layout = Layout(
-        Row(
-            Column('obsdate_range'),
-            Column('mag_range'),
-            Column('snr_range'),
-            Column('mlscore_range'),
-            Column('mlscore_real_range'),
-            Column('mlscore_bogus_range'),
-        ),
-        Row(
-            Column('target__name__startswith'),
-            Column('cone_search'),
-            Column('observation_record__survey_field'),
-            Column('classification'),
-            Column('localization'),
-            Column('order'),
-        ),
-        Row(
-            Column(
-                Submit('submit', 'Filter'),
-                HTML('<a href="{% url \'custom_code:candidates\' %}" class="btn btn-secondary" title="Reset">Reset</a>'),
-                css_class='text-right',
-            )
-        )
-    )

@@ -16,7 +16,6 @@ numpy
 tomtoolkit==2.24.5
 tom-alertstreams
 tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
-paramiko
 plotly
 psycopg2-binary
 python-dateutil

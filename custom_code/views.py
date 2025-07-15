@@ -3,7 +3,6 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect, StreamingHttpResponse
 from django.views.generic.base import RedirectView
@@ -12,30 +11,20 @@ from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
-from tom_targets.models import Target, TargetList
-from tom_targets.permissions import targets_for_user
-from tom_dataproducts.models import ReducedDatum
+from tom_targets.models import Target
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization, EventCandidate
-from tom_surveys.models import SurveyObservationRecord
-from tom_treasuremap.reporting import report_to_treasure_map
-from .models import Candidate, SurveyFieldCredibleRegion
-from .filters import CandidateFilter, CSSFieldCredibleRegionFilter, NonLocalizedEventFilter
-from .forms import TargetListExtraFormset, TargetReportForm, TargetClassifyForm
-from .forms import NonLocalizedEventFormHelper, CandidateFormHelper
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
+from .filters import NonLocalizedEventFilter
+from .forms import TargetReportForm, TargetClassifyForm
+from .forms import NonLocalizedEventFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
-from .templatetags.skymap_extras import get_preferred_localization
 from .templatetags.target_extras import split_name
 
 import json
 import requests
 import time
-from io import StringIO
-
-import paramiko
-import os
 
 from tom_catalogs.harvesters.tns import TNS_URL
 TNS = settings.BROKERS['TNS']  # includes the API credentials
@@ -45,79 +34,6 @@ TNS_INSTRUMENT_IDS = {name: iid for iid, name in TNS_INSTRUMENT_CHOICES}
 TNS_CLASSIFICATION_IDS = {name: cid for cid, name in TNS_CLASSIFICATION_CHOICES}
 
 logger = logging.getLogger(__name__)
-
-
-class TargetGroupingCreateView(LoginRequiredMixin, CreateView):
-    """
-    View that handles the creation of ``TargetList`` objects, also known as target groups. Requires authentication.
-    """
-    model = TargetList
-    fields = ['name']
-    success_url = reverse_lazy('targets:targetgrouping')
-    template_name = 'tom_targets/targetlist_form.html'
-
-    def form_valid(self, form):
-        """
-        Runs after form validation. Creates the ``TargetList``, and creates any ``TargetListExtra`` objects,
-        then redirects to the success URL.
-
-        :param form: Form data for target creation
-        :type form: subclass of TargetCreateForm
-        """
-        super().form_valid(form)
-        extra = TargetListExtraFormset(self.request.POST)
-        if extra.is_valid():
-            extra.instance = self.object
-            extra.save()
-        else:
-            form.add_error(None, extra.errors)
-            form.add_error(None, extra.non_form_errors())
-            return super().form_invalid(form)
-        return redirect(self.get_success_url())
-
-    def get_context_data(self, **kwargs):
-        """
-        Inserts certain form data into the context dict.
-
-        :returns: Dictionary with the following keys:
-
-                  `type_choices`: ``tuple``: Tuple of 2-tuples of strings containing available target types in the TOM
-
-                  `extra_form`: ``FormSet``: Django formset with fields for arbitrary key/value pairs
-        :rtype: dict
-        """
-        context = super(TargetGroupingCreateView, self).get_context_data(**kwargs)
-        context['extra_form'] = TargetListExtraFormset()
-        return context
-
-
-class CandidateListView(FilterView):
-    """
-    View for listing candidates in the TOM.
-    """
-    template_name = 'tom_targets/candidate_list.html'
-    paginate_by = 100
-    strict = False
-    model = Candidate
-    filterset_class = CandidateFilter
-    formhelper_class = CandidateFormHelper
-
-    def get_filterset(self, filterset_class):
-        kwargs = self.get_filterset_kwargs(filterset_class)
-        filterset = filterset_class(**kwargs)
-        filterset.form.helper = self.formhelper_class()
-        return filterset
-
-    def get_queryset(self):
-        """
-        Gets the set of ``Candidate`` objects associated with ``Target`` objects that the user has permission to view.
-
-        :returns: Set of ``Candidate`` objects
-        :rtype: QuerySet
-        """
-        return super().get_queryset().filter(
-            target__in=targets_for_user(self.request.user, Target.objects.all(), 'view_target')
-        ).annotate(detections=Count('target__candidate'))
 
 
 def upload_files_to_tns(files):
@@ -365,153 +281,6 @@ class TargetListView(OldTargetListView):
     """
     def get_queryset(self):
         return super().get_queryset().exclude(name__startswith='J')
-
-
-class CSSFieldListView(FilterView):
-    """
-    View for listing candidates in the TOM.
-    """
-    template_name = 'tom_nonlocalizedevents/cssfield_list.html'
-    paginate_by = 100
-    strict = False
-    model = SurveyFieldCredibleRegion
-    filterset_class = CSSFieldCredibleRegionFilter
-
-    def get_eventlocalization(self):
-        if 'localization_id' in self.kwargs:
-            return EventLocalization.objects.get(id=self.kwargs['localization_id'])
-        elif 'event_id' in self.kwargs:
-            nle = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
-            return get_preferred_localization(nle)
-
-    def get_nonlocalizedevent(self):
-        if 'localization_id' in self.kwargs:
-            localization = EventLocalization.objects.get(id=self.kwargs['localization_id'])
-            return localization.nonlocalizedevent
-        elif 'event_id' in self.kwargs:
-            return NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        localization = self.get_eventlocalization()
-        if localization is None:
-            return queryset.none()
-        else:
-            return queryset.filter(localization=localization)
-
-    def get_context_data(self, *, object_list=None, **kwargs):
-        context = super().get_context_data(object_list=object_list, **kwargs)
-        context['nonlocalizedevent'] = self.get_nonlocalizedevent()
-        context['eventlocalization'] = self.get_eventlocalization()
-        return context
-
-
-def generate_prog_file(css_credible_regions):
-    return ','.join([cr.survey_field.name for cr in css_credible_regions]) + '\n'
-
-
-def submit_to_css(css_credible_regions, event_id, request=None):
-    filenames = []
-    try:
-        with paramiko.SSHClient() as ssh:
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            ssh.connect(settings.CSS_HOSTNAME, username=settings.CSS_USERNAME,
-                        disabled_algorithms={'pubkeys': ['rsa-sha2-256', 'rsa-sha2-512']})
-            # See https://www.paramiko.org/changelog.html#2.9.0 for why disabled_algorithms is required
-            sftp = ssh.open_sftp()
-            for i, group in enumerate(css_credible_regions):
-                filename = f'Saguaro_{event_id}_{i + 1:d}.prog'
-                filenames.append(filename)
-                with sftp.open(os.path.join(settings.CSS_DIRNAME, filename), 'w') as f:
-                    f.write(generate_prog_file(group))
-                banner = f'Submitted {filename} to CSS'
-                logger.info(banner)
-                if request is not None:
-                    messages.success(request, banner)
-    except Exception as e:
-        logger.error(str(e))
-        if request is not None:
-            messages.error(request, str(e))
-    return filenames
-
-
-def create_observation_records(credible_regions, observation_id, user, facility, parameters=None):
-    records = []
-    for group, oid in zip(credible_regions, observation_id):
-        for cr in group:
-            record = SurveyObservationRecord.objects.create(
-                survey_field=cr.survey_field,
-                user=user,
-                facility=facility,
-                parameters=parameters or {},
-                observation_id=oid,
-                status='PENDING',
-                scheduled_start=cr.scheduled_start,
-            )
-            cr.observation_record = record
-            cr.save()
-            records.append(record)
-    return records
-
-
-class CSSFieldExportView(CSSFieldListView):
-    """
-    View that handles the export of CSS Fields to .prog file(s).
-    """
-    def post(self, request, *args, **kwargs):
-        css_credible_regions = self.get_selected_fields(request)
-        text = ''.join([generate_prog_file(group) for group in css_credible_regions])
-        file_buffer = StringIO(text)
-        file_buffer.seek(0)  # goto the beginning of the buffer
-        response = StreamingHttpResponse(file_buffer, content_type="text/ascii")
-        nle = self.get_nonlocalizedevent()
-        filename = f"Saguaro_{nle.event_id}.prog"
-        response['Content-Disposition'] = 'attachment; filename="{}"'.format(filename)
-        return response
-
-    def get_selected_fields(self, request):
-        target_ids = None if request.POST.get('isSelectAll') == 'True' else request.POST.getlist('selected-target')
-        localization = self.get_eventlocalization()
-        credible_regions = localization.surveyfieldcredibleregions.filter(group__isnull=False)
-        if target_ids is not None:
-            credible_regions = credible_regions.filter(id__in=target_ids)
-        group_numbers = list(credible_regions.order_by('group').values_list('group', flat=True).distinct())
-        # evaluate this as a list now to maintain the order
-        groups = [list(credible_regions.filter(group=g).order_by('rank_in_group')) for g in group_numbers]
-        return groups
-
-
-class CSSFieldSubmitView(LoginRequiredMixin, RedirectView, CSSFieldExportView):
-    """
-    View that handles the submission of CSS Fields to CSS and reporting to the GW Treasure Map.
-    """
-    def post(self, request, *args, **kwargs):
-        """
-        Method that handles the POST requests for this view.
-        """
-        css_credible_regions = self.get_selected_fields(request)
-        nle = self.get_nonlocalizedevent()
-        filenames = submit_to_css(css_credible_regions, nle.event_id, request=request)
-        params = {'pos_angle': 0., 'depth': 20.5, 'depth_unit': 'ab_mag', 'band': 'open'}
-        records = create_observation_records(css_credible_regions, filenames, request.user, 'CSS', params)
-        response = report_to_treasure_map(records, nle)
-        for message in response['SUCCESSES']:
-            messages.success(request, message)
-        for message in response['WARNINGS']:
-            messages.warning(request, message)
-        for message in response['ERRORS']:
-            messages.error(request, message)
-        return HttpResponseRedirect(self.get_redirect_url())
-
-    def get_redirect_url(self):
-        """
-        Returns redirect URL as specified in the HTTP_REFERER field of the request.
-
-        :returns: referer
-        :rtype: str
-        """
-        referer = self.request.META.get('HTTP_REFERER', '/')
-        return referer
 
 
 class NonLocalizedEventListView(FilterView):

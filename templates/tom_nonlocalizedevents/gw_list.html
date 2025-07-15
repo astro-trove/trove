@@ -23,9 +23,6 @@
         <th scope="col" title="Distance">Distance</th>
         <th scope="col" title="Has Neutron Star?">NS?</th>
         <th scope="col" title="Has Remnant?">Bright?</th>
-        <th scope="col" title="Survey Plans">Plans</th>
-        <th scope="col" title="Survey Observations">Obs.</th>
-        <th scope="col" title="Survey Candidates">Cand.</th>
         <th scope="col" title="External Links">Ext. Links</th>
       </tr>
       </thead>
@@ -49,28 +46,6 @@
         <td title="Distance">{{ event.sequences.last.localization | format_distance }}</td>
         <td title="Has Neutron Star?">{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
         <td title="Has Remnant?">{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
-        <td title="Survey Plans">
-        {% for localization in event.localizations|sort_localizations %}
-            {% if localization.external_coincidences.exists %}
-                <a href="{% url 'custom_code:css-fields' localization.id %}"
-                   title="{{ localization.external_coincidences.last.sequences.last.event_subtype }} Combined"
-                   target="_blank">
-                {{ localization.external_coincidences.last.sequences.last.sequence_id }}c
-            {% else %}
-                <a href="{% url 'custom_code:css-fields' localization.id %}"
-                   title="{{ localization.sequences.last.event_subtype }}"
-                   target="_blank">
-                {{ localization.sequences.last.sequence_id }}
-            {% endif %}
-            </a>
-        {% endfor %}
-        </td>
-        <td title="Survey Observations">
-            <a href="{% url 'surveys:observations' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3" target="_blank">{{ event|n_survey_obs }}</a>
-        </td>
-        <td title="Survey Candidates">
-            <a href="{% url 'custom_code:candidates' %}?localization_event={{ event.event_id }}&localization_prob=95&localization_dt=3&classification=0&order=-mlscore_real" target="_blank">{{ event|n_survey_cands }}</a>
-        </td>
         <td title="External Links">
           <a href="{{ event.hermes_url }}" target="_blank"><img src="https://hermes.lco.global/favicon.ico" alt="Hermes" title="Hermes" class="hermes icon" /></a>
           <a href="{{ event.gracedb_url }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
