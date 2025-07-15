@@ -28,7 +28,7 @@ ALLOWED_HOSTS = [ALLOWED_HOST, 'localhost', '127.0.0.1']
 
 # Application definition
 
-TOM_NAME = 'SAGUARO'
+TOM_NAME = 'TROVE'
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -80,7 +80,7 @@ MIDDLEWARE = [
     'tom_common.middleware.AuthStrategyMiddleware',
 ]
 
-ROOT_URLCONF = 'saguaro_tom.urls'
+ROOT_URLCONF = 'trove.urls'
 
 TEMPLATES = [
     {
@@ -101,7 +101,7 @@ TEMPLATES = [
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
-WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
+WSGI_APPLICATION = 'trove.wsgi.application'
 
 TASKS = {
     "default": {

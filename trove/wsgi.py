@@ -20,7 +20,7 @@ print(f'SAGUARO-TOM> Python Info: {sys.version_info}')
 # +
 # setup / path(s)
 # -
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'saguaro_tom.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trove.settings')
 
 
 # +
