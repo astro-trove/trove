@@ -38,11 +38,11 @@ class SaTargetExtra(Base):
 def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
     """
     Creates an EventCandidate for each target that falls within the `prob` credible region of the localization region
-    associated with `eventsequence`. If no `target_ids` are given, all targets (not starting with "J") created after the
+    associated with `eventsequence`. If no `target_ids` are given, all targets created after the
     event time are considered.
     """
     if target_ids is None:
-        targets = Target.objects.exclude(name__startswith='J').filter(created__gte=eventsequence.details['time'])
+        targets = Target.objects.filter(created__gte=eventsequence.details['time'])
         target_ids = list(targets.values_list('pk', flat=True))
 
     with Session(sa_engine) as session:

@@ -12,7 +12,7 @@ from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
 from tom_targets.models import Target
-from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView, TargetListView as OldTargetListView
+from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from .filters import NonLocalizedEventFilter
@@ -271,16 +271,6 @@ class TargetNameSearchView(OldTargetNameSearchView):
     def get(self, request, *args, **kwargs):
         self.kwargs['name'] = request.GET.get('name').strip()
         return super().get(request, *args, **kwargs)
-
-
-class TargetListView(OldTargetListView):
-    """
-    View for listing targets in the TOM. Only shows targets that the user is authorized to view. Requires authorization.
-
-    Identical to the built-in TargetListView but does not display unconfirmed candidates (names starting with "J")
-    """
-    def get_queryset(self):
-        return super().get_queryset().exclude(name__startswith='J')
 
 
 class NonLocalizedEventListView(FilterView):
