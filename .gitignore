@@ -3,7 +3,7 @@ db.sqlite3
 .idea
 data/
 _static/
-trove/settings_local.py
+saguaro_tom/settings_local.py
 .DS_Store
 *.DAT
 venv/

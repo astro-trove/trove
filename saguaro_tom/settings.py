@@ -80,7 +80,7 @@ MIDDLEWARE = [
     'tom_common.middleware.AuthStrategyMiddleware',
 ]
 
-ROOT_URLCONF = 'trove.urls'
+ROOT_URLCONF = 'saguaro_tom.urls'
 
 TEMPLATES = [
     {
@@ -101,7 +101,7 @@ TEMPLATES = [
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 
-WSGI_APPLICATION = 'trove.wsgi.application'
+WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
 
 TASKS = {
     "default": {
