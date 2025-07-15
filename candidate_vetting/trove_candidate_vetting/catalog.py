@@ -1,10 +1,12 @@
 """
 This is an abstract base class for catalogs
 """
+import os
 from abc import ABC, abstractmethod
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from django.db import models
+
+from .util import RADIUS_ARCSEC, cone_search_q3c 
 
 # database connection constants
 DB_HOST = os.getenv('POSTGRES_HOST', 'localhost')
@@ -48,32 +50,15 @@ class Catalog(ABC):
         This is an abstract method and must be implemented to construct the class
         """
         return NotImplemented
-
-    def _package_coords(ra, dec, radius_as):
-        """Package lists of ra and dec into a tuple and convert the radius to degrees
-
-        Parameters
-        ----------
-        ra : list[float]
-            A list of RA floats in degrees
-        dec : list[float]
-            A list of dec floats in degrees
-        radius_as : float
-            The search radius in arcseconds
-
-        Returns
-        -------
-        tuple, float
-            A tuple of RA, Decs and the radius in degrees
-        """
-        return tuple(zip(ra, dec)), radius_as/3600
-
     
 class StaticCatalog(Catalog):
+
+    ra_colname = None
+    dec_colname = None
+    catalog_model = None
+    
     def __init__(
             self,
-            name:str,
-            db_connect:str=DB_CONNECT,
             verbose:bool=False
     ):
         """A catalog object for querying static astronomy catalogs (like galaxy
@@ -90,24 +75,38 @@ class StaticCatalog(Catalog):
         """
 
         self.catalog_type = "static"
+        
+        super().__init__(self.__class__.__name__, verbose=verbose)        
 
-        # connect to database
-        try:
-            self.engine = create_engine(db_connect)
-            get_session = sessionmaker(bind=engine)
-            self.session = get_session()
-        except Exception as _e2:
-            if self._verbose:
-                print(f"{_e2}")
-            raise Exception(f"Failed to connect to database")
+    def __init_subclass__(cls, *args, **kwargs):
+        if not getattr(cls, 'ra_colname'):
+            # then default to ra
+            cls.ra_colname = "ra"
+        if not getattr(cls, 'dec_colname'):
+            # then default to dec
+            cls.dec_colname = "dec"
+        if not getattr(cls, "catalog_model") and not isinstance(cls.catalog_model, models.Model):
+            raise TypeError(f"Can't instantiate abstract class {cls.__name__} without catalog_model attribute defined")
 
-        super().__init__(name, verbose=verbose)
+        return super().__init_subclass__(*args, **kwargs)
 
+    def query(self, ra, dec, radius=RADIUS_ARCSEC):
+        """Do a cone search query on this catalog 
+        """
+        return cone_search_q3c(
+            self.catalog_model.objects.all(),
+            ra,
+            dec,
+            radius=radius,
+            ra_colname=self.ra_colname,
+            dec_colname=self.dec_colname
+        )
+    
 class PhotCatalog(Catalog):
     def __init__(
             self,
             name:str,
-            nthreads:int=2
+            nthreads:int=2,
             verbose:bool=False
     ):
         """A catalog object for querying photometry catalogs (like ZTF and ATLAS)
