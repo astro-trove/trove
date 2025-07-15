@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'custom_code',
     'django_tasks',
     'django_tasks.backends.database',
+    'candidate_vetting'
 ]
 
 SITE_ID = 1
