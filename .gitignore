@@ -7,3 +7,4 @@ saguaro_tom/settings_local.py
 .DS_Store
 *.DAT
 venv/
+candidate_vetting/vetting_app/vetting_app/settings_local.py
