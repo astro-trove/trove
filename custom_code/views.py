@@ -4,16 +4,15 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.http import HttpResponseRedirect, StreamingHttpResponse
+from django.http import HttpResponseRedirect
 from django.views.generic.base import RedirectView
-from django.views.generic.edit import CreateView, TemplateResponseMixin, FormMixin, ProcessFormView, UpdateView
+from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView, UpdateView
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
 from tom_targets.models import Target
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
-from tom_observations.views import ObservationCreateView as OldObservationCreateView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from .filters import NonLocalizedEventFilter
 from .forms import TargetReportForm, TargetClassifyForm
@@ -212,25 +211,6 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
 
     def get_success_url(self):
         return reverse_lazy('targets:detail', kwargs=self.kwargs)
-
-
-class ObservationCreateView(OldObservationCreateView):
-    """
-    Modify the built-in ObservationCreateView to populate any "magnitude" field with the latest observed magnitude
-    """
-    template_name = 'tom_observations/observation_form.html'
-
-    def get_initial(self):
-        initial = super().get_initial()
-        target = self.get_target()
-        photometry = target.reduceddatum_set.filter(data_type='photometry')
-        if photometry.exists():
-            latest_photometry = photometry.latest().value
-            if 'magnitude' in latest_photometry:
-                initial['magnitude'] = latest_photometry['magnitude']
-            elif 'limit' in latest_photometry:
-                initial['magnitude'] = latest_photometry['limit']
-        return initial
 
 
 class TargetVettingView(LoginRequiredMixin, RedirectView):

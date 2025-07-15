@@ -295,8 +295,6 @@ TARGET_PERMISSIONS_ONLY = True
 # for example: OPEN_URLS = ['/', '/about']
 OPEN_URLS = []
 
-MATCH_MANAGERS = {'Target': 'custom_code.managers.StrictTargetMatchManager'}
-
 HOOKS = {
     'target_post_save': 'custom_code.hooks.target_post_save',
     'observation_change_state': 'tom_common.hooks.observation_change_state',

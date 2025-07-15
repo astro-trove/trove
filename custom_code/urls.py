@@ -1,7 +1,7 @@
 from django.urls import path
 
 from .views import TargetReportView, TargetClassifyView, TargetVettingView
-from .views import ObservationCreateView, TargetNameSearchView
+from .views import TargetNameSearchView
 from .views import GWListView, GRBListView, NeutrinoListView, UnknownListView
 from .views import EventCandidateCreateView
 from tom_nonlocalizedevents.views import SupereventIdView
@@ -17,7 +17,6 @@ urlpatterns = [
     path('targets/<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
     path('targets/<int:pk>/vet/', TargetVettingView.as_view(), name='vet'),
     path('targets/search/', TargetNameSearchView.as_view(), name='search'),
-    path('observations/<str:facility>/create/', ObservationCreateView.as_view(), name='create'),
     path('nonlocalizedevents/gw/', GWListView.as_view(), name='gw-list'),
     path('nonlocalizedevents/grb/', GRBListView.as_view(), name='grb-list'),
     path('nonlocalizedevents/neutrino/', NeutrinoListView.as_view(), name='neutrino-list'),

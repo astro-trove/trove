@@ -21,38 +21,6 @@ A.init.then(() => {
     var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun Exclusion'});
     aladin.addOverlay(sun_overlay);
     sun_overlay.add(A.circle(sun_ra, sun_dec, 15));
-    var survey_fields = {{ survey_fields }};
-    var survey_field_colors = ['#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff']
-    for (let g in survey_fields) {
-        var color = survey_field_colors[g % 6];
-        var group = survey_fields[g];
-        g++;
-        var fields_overlay = A.graphicOverlay({color: color, name: 'Survey Fields ' + g});
-        aladin.addOverlay(fields_overlay);
-        for (let i in group) {
-            fields_overlay.add(A.polyline(group[i]));
-        }
-    }
-    var pending_observations = {{ pending_observations }};
-    var pending_fields_overlay = A.graphicOverlay({color: '#aaa', name: 'Pending Observations'});
-    aladin.addOverlay(pending_fields_overlay);
-    for (let i in pending_observations) {
-        pending_fields_overlay.add(A.polyline(pending_observations[i]));
-    }
-    var survey_candidates = A.catalog({color: '#eee', name: 'Survey Candidates'});
-    aladin.addCatalog(survey_candidates);
-    {% for candidate in survey_candidates|slice:":100" %}
-        var cat_ra = {{ candidate.target.ra }};
-        var cat_dec = {{ candidate.target.dec }};
-        var cat_name = '{{ candidate.target.name }}'
-        survey_candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
-    {% endfor %}
-    var completed_observations = {{ completed_observations }};
-    var completed_fields_overlay = A.graphicOverlay({color: '#eee', name: 'Completed Observations'});
-    aladin.addOverlay(completed_fields_overlay);
-    for (let i in completed_observations) {
-        completed_fields_overlay.add(A.polyline(completed_observations[i]));
-    }
     var candidates = A.catalog({color: '#84f', name: 'Linked Candidates'});
     aladin.addCatalog(candidates);
     {% for candidate in candidates %}

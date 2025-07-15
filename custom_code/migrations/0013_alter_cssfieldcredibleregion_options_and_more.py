@@ -6,19 +6,16 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
+    initial = True
+
     dependencies = [
         (
             "tom_nonlocalizedevents",
             "0017_alter_eventsequence_external_coincidence_and_more",
         ),
-        ("custom_code", "0012_cssfieldcredibleregion_probability_contained"),
     ]
 
     operations = [
-        migrations.AlterModelOptions(
-            name="cssfieldcredibleregion",
-            options={"ordering": ["-probability_contained"]},
-        ),
         migrations.CreateModel(
             name="CredibleRegionContour",
             fields=[

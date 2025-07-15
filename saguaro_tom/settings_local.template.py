@@ -1,7 +1,5 @@
-ALERT_EMAIL_FROM = ''   # email address from which the alerts are sent
 ALLOWED_HOST = ''       # hostname or IP address of the web server (leave blank for development)
 ATLAS_API_KEY = ''      # API key for the ATLAS forced photometry server
-CONTACT_EMAIL = ''      # contact email for MMT observation request notes
 DEBUG = False           # set to True to display error tracebacks in browser, leave False in production
 FORCE_SCRIPT_NAME = ''  # the subdomain where you will host the site (leave blank for development)
 GCN_CLIENT_ID = ''      # client ID for GCN Classic over Kafka

@@ -1,14 +1,12 @@
 from django.conf import settings
 from django.db import transaction
 from django.db.utils import IntegrityError
-from healpix_alchemy.types import Point
 import sqlalchemy as sa
 from sqlalchemy.orm import declarative_base, Session
 from tom_nonlocalizedevents.models import EventCandidate, EventLocalization, SkymapTile
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile, uniq_to_bigintrange
 from tom_nonlocalizedevents.healpix_utils import update_all_credible_region_percents_for_candidates
 from tom_targets.models import Target
-from .models import SurveyFieldCredibleRegion
 import numpy as np
 from scipy.stats import multivariate_normal
 from ligo.skymap.moc import bayestar_adaptive_grid
@@ -18,7 +16,6 @@ import uuid
 import sys
 import json
 import logging
-import time
 
 logger = logging.getLogger(__name__)
 
