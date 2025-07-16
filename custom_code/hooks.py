@@ -54,19 +54,15 @@ def update_or_create_target_extra(target, key, value):
     te.save()
 
 
-def target_post_save(target, created, tns_time_limit: float=5.):
+def target_post_save(target, created):
     """This hook runs following update of a target."""
     logger.info('Target post save hook: %s created: %s', target, created)
 
     messages = []
     tns_query_status = None
     if created:
-        coord = SkyCoord(target.ra, target.dec, unit='deg')
-        target.galactic_lng = coord.galactic.l.deg
-        target.galactic_lat = coord.galactic.b.deg
-        target.save()
-
         if target.extra_fields.get('MW E(B-V)') is None:
+            coord = SkyCoord(target.ra, target.dec, unit='deg')
             try:
                 mwebv = IrsaDust.get_query_table(coord, section='ebv')['ext SandF ref'][0]
             except Exception as e:
@@ -74,8 +70,6 @@ def target_post_save(target, created, tns_time_limit: float=5.):
             else:
                 update_or_create_target_extra(target, 'MW E(B-V)', mwebv)
                 messages.append(f'MW E(B-V) set to {mwebv:.4f}')
-
-        update_or_create_target_extra(target=target, key='healpix', value=HPX.skycoord_to_healpix(coord))
 
         # TODO: add all the vetting code
         #  - cone search on static copy of the TNS

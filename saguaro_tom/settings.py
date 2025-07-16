@@ -61,7 +61,8 @@ INSTALLED_APPS = [
     'custom_code',
     'django_tasks',
     'django_tasks.backends.database',
-    'candidate_vetting'
+    'candidate_vetting',
+    'trove_targets',
 ]
 
 SITE_ID = 1
@@ -363,3 +364,5 @@ WEBPACK_LOADER = {
 TOM_API_URL = os.getenv('TOM_API_URL', os.path.join(ALLOWED_HOST, FORCE_SCRIPT_NAME))
 HERMES_API_URL = os.getenv('HERMES_API_URL', 'https://hermes.lco.global')
 CREDIBLE_REGION_PROBABILITIES = '[0.25, 0.5, 0.75, 0.9, 0.95]'
+
+TARGET_MODEL_CLASS = 'trove_targets.models.Target'
