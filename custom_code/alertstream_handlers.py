@@ -17,7 +17,7 @@ from io import BytesIO
 import astropy_healpix as ah
 import numpy as np
 import traceback
-from tom_targets.models import Target
+from trove_targets.models import Target
 import time
 
 logger = logging.getLogger(__name__)
@@ -88,9 +88,8 @@ slack_gw = [WebClient(token) for token in settings.SLACK_TOKENS_GW]
 
 def vet_or_post_error(target, slack_client, channel):
     try:
-        # set the tns query time limit to infinity because we don't care if we
-        # need to wait for this script to run
-        _, tns_query_status = target_post_save(target, created=True, tns_time_limit=np.inf)
+        target.save()  # to do coordinate conversions
+        _, tns_query_status = target_post_save(target, created=True)
         if tns_query_status is not None:
             logger.warning(tns_query_status)
             slack_client.chat_postMessage(channel=channel, text=tns_query_status)

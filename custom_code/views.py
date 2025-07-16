@@ -11,7 +11,7 @@ from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
 
-from tom_targets.models import Target
+from trove_targets.models import Target
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from .filters import NonLocalizedEventFilter

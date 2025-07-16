@@ -6,7 +6,7 @@ from sqlalchemy.orm import declarative_base, Session
 from tom_nonlocalizedevents.models import EventCandidate, EventLocalization, SkymapTile
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile, uniq_to_bigintrange
 from tom_nonlocalizedevents.healpix_utils import update_all_credible_region_percents_for_candidates
-from tom_targets.models import Target
+from trove_targets.models import Target
 import numpy as np
 from scipy.stats import multivariate_normal
 from ligo.skymap.moc import bayestar_adaptive_grid
@@ -24,12 +24,10 @@ CREDIBLE_REGION_PROBABILITIES = sorted(json.loads(settings.CREDIBLE_REGION_PROBA
 Base = declarative_base()
 
 
-class SaTargetExtra(Base):
-    __tablename__ = 'tom_targets_targetextra'
-    id = sa.Column(sa.Integer, primary_key=True)
-    target_id = sa.Column(sa.Integer, nullable=False)
-    key = sa.Column(sa.String, nullable=False)
-    value = sa.Column(sa.String, nullable=False)
+class SaTarget(Base):
+    __tablename__ = 'trove_targets_target'
+    basetarget_ptr_id = sa.Column(sa.Integer, primary_key=True)
+    healpix = sa.Column(sa.BigInteger)
 
 
 def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
@@ -66,12 +64,11 @@ def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
         ).scalar_subquery()
 
         query = sa.select(
-            SaTargetExtra.target_id
+            SaTarget.basetarget_ptr_id
         ).filter(
-            SaTargetExtra.target_id.in_(target_ids),
-            SaTargetExtra.key == 'healpix',
+            SaTarget.basetarget_ptr_id.in_(target_ids),
             SaSkymapTile.localization_id == eventsequence.localization.id,
-            SaSkymapTile.tile.contains(sa.cast(SaTargetExtra.value, sa.BigInteger)),
+            SaSkymapTile.tile.contains(SaTarget.healpix),
             SaSkymapTile.probdensity >= min_probdensity
         )
 

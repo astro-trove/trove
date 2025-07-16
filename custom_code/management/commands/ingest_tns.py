@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import connection
-from tom_targets.models import Target
+from trove_targets.models import Target
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.alertstream_handlers import pick_slack_channel, send_slack, vet_or_post_error
 from custom_code.templatetags.skymap_extras import get_preferred_localization
