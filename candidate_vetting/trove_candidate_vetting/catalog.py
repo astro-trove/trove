@@ -122,5 +122,6 @@ class PhotCatalog(Catalog):
         """
 
         self.catalog_type = "photometry"
+        self.nthreads = nthreads
         super().__init__(name, verbose=verbose)
 
