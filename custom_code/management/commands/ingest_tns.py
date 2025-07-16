@@ -5,8 +5,8 @@ from trove_targets.models import Target
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.alertstream_handlers import pick_slack_channel, send_slack, vet_or_post_error
 from custom_code.templatetags.skymap_extras import get_preferred_localization
-from tom_treasuremap.management.commands.report_pointings import get_active_nonlocalizedevents
-from datetime import datetime, timedelta
+from tom_nonlocalizedevents.models import NonLocalizedEvent
+from datetime import datetime, timedelta, timezone
 from slack_sdk import WebClient
 import json
 import logging
@@ -18,6 +18,23 @@ for handler in logger.handlers:
 
 slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
 slack_ep = WebClient(settings.SLACK_TOKEN_EP)
+
+
+def get_active_nonlocalizedevents(t0=None, lookback_days=3., test=False):
+    """
+    Returns a queryset containing "active" NonLocalizedEvents, significant events that happened less than
+    `lookback_days` before `t0` and have not been retracted. Use `test=True` to query mock events instead of real ones.
+    """
+    if t0 is None:
+        t0 = datetime.now(tz=timezone.utc)
+    lookback_window_nle = (t0 - timedelta(days=lookback_days)).isoformat()
+    active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle, state='ACTIVE')
+    active_nles = active_nles.exclude(sequences__details__significant=False)
+    if test:
+        active_nles = active_nles.filter(event_id__startswith='MS')
+    else:
+        active_nles = active_nles.exclude(event_id__startswith='MS')
+    return active_nles.distinct()
 
 
 class Command(BaseCommand):
