@@ -1,0 +1,67 @@
+{% extends 'tom_common/base.html' %}
+{% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras %}
+{% block title %}Candidates{% endblock %}
+{% block content %}
+{% if request.GET.nonlocalizedevent %}
+<h1>Candidates for <a href="{% url 'nonlocalizedevents:detail' request.GET.nonlocalizedevent %}" target="_blank">{{ request.GET.nonlocalizedevent|event_id_from_pk }}</a></h1>
+{% nonlocalizedevent_details %}
+<div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
+{% else %}
+<h1>Candidates</h1>
+{% endif %}
+<div class="row">
+  <div class="col-md-10">
+  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <table class="table table-sm table-hover">
+      <thead>
+        <tr>
+          <th>Target</th>
+          <th>Event</th>
+          <th>Viable</th>
+          <th>Reason</th>
+          <th>Priority</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for candidate in object_list %}
+        <tr>
+          <td>
+            {% if candidate.target is not None %}
+              <a href="{% url 'targets:detail' candidate.target.id %}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
+            {% else %}
+              None
+            {% endif %}
+          </td>
+          <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
+          <td>{{ candidate.viable }}</td>
+          <td>{{ candidate.viability_reason }}</td>
+          <td>{{ candidate.priority }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="10">
+            {% if target_count == 0 %}
+            No candidates yet.
+            {% else %}
+            No candidates match those filters.
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  </div>
+  <div class="col-md-2">
+    <form action="" method="get" class="form">
+        {% crispy filter.form %}
+      {% buttons %}
+        <button type="submit" class="btn btn-primary">
+          Filter
+        </button>
+        <a href="{% url 'custom_code:event-candidates' %}" class="btn btn-secondary" title="Reset">Reset</a>
+      {% endbuttons %}
+    </form>
+  </div>
+</div>
+{% endblock %}

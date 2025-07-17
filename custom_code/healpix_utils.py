@@ -136,18 +136,12 @@ def create_elliptical_localization(nonlocalizedevent, center, radius, conf_inv=0
                         'date': date
                     }
                 )
-                if not is_new:
-                    # This is added to protect against race conditions where the localization has already been added
-                    return localization
-                for i, row in enumerate(skymap):
-                    # This is necessary to make sure we don't get an underflow error in postgres
-                    # when operating with the probdensity float field
-                    probdensity = row['PROBDENSITY'] if row['PROBDENSITY'] > sys.float_info.min else 0
-                    SkymapTile.objects.create(
-                        localization=localization,
-                        tile=uniq_to_bigintrange(row['UNIQ']),
-                        probdensity=probdensity,
-                    )
+                if is_new:  # protect against race conditions where the localization has already been added
+                    tiles = [SkymapTile(localization=localization,
+                                        tile=uniq_to_bigintrange(row['UNIQ']),
+                                        probdensity=row['PROBDENSITY'])
+                             for row in skymap[skymap['PROBDENSITY'] > sys.float_info.min]]  # avoid underflow error
+                    SkymapTile.objects.bulk_create(tiles)
             except IntegrityError as e:
                 if 'unique constraint' in e.message:
                     return EventLocalization.objects.get(nonlocalizedevent=nonlocalizedevent, skymap_hash=skymap_hash)

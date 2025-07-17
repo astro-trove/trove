@@ -5,6 +5,7 @@ from .views import TargetNameSearchView
 from .views import GWListView, GRBListView, NeutrinoListView, UnknownListView
 from .views import EventCandidateCreateView
 from tom_nonlocalizedevents.views import SupereventIdView
+from trove_nonlocalizedevents.views import EventCandidateListView
 
 from tom_common.api_router import SharedAPIRootRouter
 
@@ -23,4 +24,5 @@ urlpatterns = [
     path('nonlocalizedevents/unknown/', UnknownListView.as_view(), name='unknown-list'),
     path('nonlocalizedevents/<str:event_id>/', SupereventIdView.as_view(), name='event-detail'),  # prioritize event_id
     path('nonlocalizedevents/<str:event_id>/createcandidate/<int:target_id>/', EventCandidateCreateView.as_view(), name='create-candidate'),
+    path('eventcandidates/', EventCandidateListView.as_view(), name='event-candidates'),
 ]

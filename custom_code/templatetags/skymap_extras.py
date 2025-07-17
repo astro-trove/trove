@@ -47,10 +47,10 @@ def get_preferred_localization(nle):
 
 @register.inclusion_tag('tom_nonlocalizedevents/partials/skymap.html', takes_context=True)
 def skymap_event_id(context):
-    event_id = context['request'].GET.get('localization_event')
+    event_id = context['request'].GET.get('nonlocalizedevent')
     if event_id is None:
         return
-    nle = NonLocalizedEvent.objects.get(event_id=event_id)
+    nle = NonLocalizedEvent.objects.get(id=event_id)
     localization = get_preferred_localization(nle)
     return skymap(context, localization)
 

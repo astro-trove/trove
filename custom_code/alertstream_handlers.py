@@ -336,3 +336,60 @@ def handle_einstein_probe_alert(message, metadata):
     slack_ep.chat_postMessage(channel='alerts-ep', text=alert_text)
 
     logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')
+
+
+def handle_icecube_alert(alert):
+    logger.warning(f"Handling Einstein Probe alert: {alert}")
+
+    nonlocalizedevent, nle_created = NonLocalizedEvent.objects.get_or_create(
+        event_id=alert['RunNum_EventNum'],
+        event_type=NonLocalizedEvent.NonLocalizedEventType.NEUTRINO,
+    )
+    if nle_created:
+        logger.info(f"Ingested a new x-ray event with id {nonlocalizedevent.event_id} from EP alert stream")
+
+    # create the localization from ra, dec, radius
+    try:
+        localization, skymap = create_elliptical_localization(
+            nonlocalizedevent=nonlocalizedevent,
+            center=[alert['RA [deg]'], alert['Dec [deg]']], radius=alert['Error90 [arcmin]'] / 60.,
+        )
+    except Exception as e:
+        localization = None
+        skymap = None
+        logger.error(f'Could not create EventLocalization for event: {nonlocalizedevent.event_id}. Exception: {e}')
+        logger.error(traceback.format_exc())
+
+    logger.debug(f"Storing EP alert: {alert}")
+
+    # Now ingest the sequence for that event
+    icecube_keys = {
+        'time': 'Time UT',
+        'notice_type': 'NoticeType',
+        'energy': 'Energy',
+        'signalness': 'Signalness',
+        'far': 'FAR [#/yr]'
+    }
+    details = {key: alert[val] for key, val in icecube_keys.items()}
+    details['time'] = alert.get('trigger_time')  # to match IGWN alerts
+    event_sequence, es_created = EventSequence.objects.update_or_create(
+        nonlocalizedevent=nonlocalizedevent,
+        localization=localization,
+        sequence_id=alert['Rev'],
+        details=details,
+    )
+    if es_created and localization is None:
+        warning_msg = (
+            f'{"Creating" if es_created else "Updating"} EventSequence without EventLocalization:'
+            f'{event_sequence} for NonLocalizedEvent: {nonlocalizedevent}'
+        )
+        logger.warning(warning_msg)
+
+    if CredibleRegionContour.objects.filter(localization=localization).exists():
+        logger.info(f'Localization {localization.id} already exists')
+    else:
+        if skymap is not None:
+            skymap['PROBDENSITY'].unit = '1 / sr'
+            calculate_credible_region(skymap, localization)
+
+    logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')

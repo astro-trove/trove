@@ -10,10 +10,13 @@ SI_PREFIXES = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q']
 
 
 @register.filter
-def format_inverse_far(far):
+def format_inverse_far(far, inv_Hz=True):
     if not far:
         return ''
-    inv_far = 3.168808781402895e-08 / far  # 1/Hz to yr
+    if inv_Hz:
+        inv_far = 3.168808781402895e-08 / far  # 1/Hz to yr
+    else:
+        inv_far = 1. / far
     if inv_far > 1.:
         log1000 = math.log10(inv_far) / 3.
         i = int(log1000)
@@ -108,10 +111,10 @@ def sort_localizations(localizations):
 @register.inclusion_tag('tom_nonlocalizedevents/partials/nonlocalizedevent_details.html', takes_context=True)
 def nonlocalizedevent_details(context, localization=None):
     if localization is None:
-        event_id = context['request'].GET.get('localization_event')
+        event_id = context['request'].GET.get('nonlocalizedevent')
         if event_id is None:
             return
-        nle = NonLocalizedEvent.objects.get(event_id=event_id)
+        nle = NonLocalizedEvent.objects.get(id=event_id)
         sequence = nle.sequences.last()
         localization = get_preferred_localization(nle)
     elif localization.external_coincidences.exists():
@@ -179,4 +182,24 @@ def nonlocalizedevent_details(context, localization=None):
                 ('Energy', f'{sequence.details["image_energy_range"]} keV'),
             ]
         ]
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.NEUTRINO:
+        details_to_display = [
+            [
+                ('Event Type', f'Neutrino {sequence.details["notice_type"].title()}'),
+                ('50% Area', format_area(localization.area_50)),
+                ('90% Area', format_area(localization.area_90)),
+            ],
+            [
+                ('1/FAR', format_inverse_far(sequence.details['far'], inv_Hz=False)),
+                ('Energy', f'{sequence.details["energy"]} TeV'),
+                ('Signalness', sequence.details['signalness']),
+            ],
+        ]
+    else:
+        details_to_display = []
     return {'details': details_to_display}
+
+
+@register.filter
+def event_id_from_pk(pk):
+    return NonLocalizedEvent.objects.get(pk=pk).event_id

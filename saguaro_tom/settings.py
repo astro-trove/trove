@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'django_tasks.backends.database',
     'candidate_vetting',
     'trove_targets',
+    'trove_nonlocalizedevents',
 ]
 
 SITE_ID = 1
