@@ -101,6 +101,12 @@ class StaticCatalog(Catalog):
             ra_colname=self.ra_colname,
             dec_colname=self.dec_colname
         )
+
+    def _standardize_df(self, df):
+        if not getattr(self, "colmap"):
+            raise TypeError("Missing the colmap, can't standardize dataset!")
+        df = df.rename(columns=self.colmap)
+        return df[list(self.colmap.values())]
     
 class PhotCatalog(Catalog):
     def __init__(
