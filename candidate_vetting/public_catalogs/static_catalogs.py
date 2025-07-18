@@ -3,11 +3,12 @@ Define the static catalogs for querying
 """
 from astropy import units as u
 
-from django.db.models import Func
+from django.db.models import Func, Q
 from django.conf import settings
 cosmo = settings.COSMO
 
 from .catalog import StaticCatalog
+from .util import PS1_POINT_SOURCE_THRESHOLD, RADIUS_ARCSEC
 from ..models import (
     AsassnQ3C,
     DesiSpecQ3C,
@@ -115,15 +116,20 @@ class Hecate(StaticCatalog):
         "objname":"name",
         "d":"lumdist", # Mpc
         "e_d":"lumdist_err", # Mpc
-        "d_lo68":"lumdist_neg_err", # Mpc
-        "d_hi68":"lumdist_pos_err", # Mpc
         "ra":"ra",
         "dec":"dec",
         "r":"default_mag" # magnitude to use for pcc
     }
 
     def to_standardized_catalog(self, df):
-        return self._standardize_df(df)
+        df["lumdist_neg_err"] = df.d - df.d_lo68
+        df["lumdist_pos_err"] = df.d_up68 - df.d
+
+        self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
+        self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
+        
+        df = self._standardize_df(df)
+        return df
     
 class LsDr10(StaticCatalog):
     catalog_model = LsDr10Q3C
@@ -144,19 +150,29 @@ class LsDr10(StaticCatalog):
             "default_mag":"default_mag",
             "z_phot_mean":"z",
             "z_phot_std":"z_err",
-            "z_phot_l68":"z_neg_err",
-            "z_phot_u68":"z_pos_err"
         }
 
         super().__init__()
 
     def to_standardized_catalog(self, df):
+        df["z_neg_err"] = df.z_phot_mean - df.z_phot_l68
+        df["z_pos_err"] = df.z_phot_u68 - df.z_phot_mean
+
+        self.colmap["z_neg_err"] = "z_neg_err"
+        self.colmap["z_pos_err"] = "z_pos_err"
+        
         df = self._standardize_df(df)
         df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value
         df["lumdist_err"] = cosmo.luminosity_distance(df.z_err).to(u.Mpc).value
         df["lumdist_neg_err"] = cosmo.luminosity_distance(df.z_neg_err).to(u.Mpc).value
         df["lumdist_pos_err"] = cosmo.luminosity_distance(df.z_pos_err).to(u.Mpc).value
         return df
+
+    def query(self, ra, dec, radius=RADIUS_ARCSEC):
+        query_set = super().query(ra, dec, radius)
+        return query_set.filter(
+            Q(default_mag__gte=18) | ~Q(mtype="PSF") 
+        )
         
 class Milliquas(StaticCatalog):
     catalog_model = MilliquasQ3C
@@ -171,7 +187,8 @@ class Ps1(StaticCatalog):
         "z_err":"z_err",
         "rmeanpsfmag":"default_mag" # mag col to use for pcc
     }
-
+    mag_colname = "rmeanpsfmag"
+    
     def to_standardized_catalog(self, df):
         df = self._standardize_df(df)
         df["z_neg_err"] = df.z_err
@@ -181,7 +198,23 @@ class Ps1(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         return df
-        
+
+class Ps1Galaxy(Ps1):
+
+    def query(self, ra, dec, radius=RADIUS_ARCSEC):
+        query_set = super().query(ra, dec, radius)
+        return query_set.filter(
+            ps_score__lte = PS1_POINT_SOURCE_THRESHOLD
+        )
+
+class Ps1PointSource(Ps1):
+
+    def query(self, ra, dec, radius=RADIUS_ARCSEC):
+        query_set = super().query(ra, dec, radius)
+        return query_set.filter(
+            ps_score__gt = PS1_POINT_SOURCE_THRESHOLD
+        )
+    
 class RomaBzcat(StaticCatalog):
     catalog_model = RomaBzcatQ3C
     

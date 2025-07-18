@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 
 from django.db import models
 
-from .util import RADIUS_ARCSEC, cone_search_q3c 
+from .util import RADIUS_ARCSEC, cone_search_q3c, pcc_q3c 
 
 # database connection constants
 DB_HOST = os.getenv('POSTGRES_HOST', 'localhost')
@@ -102,6 +102,17 @@ class StaticCatalog(Catalog):
             dec_colname=self.dec_colname
         )
 
+    def _pcc_filter(self, ra, dec, pcc_max=0.5):
+        return pcc_q3c(
+            self.catalog_model.objects.all(),
+            ra,
+            dec,
+            pcc_max,
+            self.mag_colname,
+            ra_colname=self.ra_colname,
+            dec_colname=self.dec_colname
+        )
+        
     def _standardize_df(self, df):
         if not getattr(self, "colmap"):
             raise TypeError("Missing the colmap, can't standardize dataset!")

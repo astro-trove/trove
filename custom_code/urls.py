@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import TargetReportView, TargetClassifyView, TargetVettingView
+from .views import TargetReportView, TargetClassifyView
 from .views import TargetNameSearchView
 from .views import GWListView, GRBListView, NeutrinoListView, UnknownListView
 from .views import EventCandidateCreateView
@@ -16,7 +16,6 @@ app_name = 'custom_code'
 urlpatterns = [
     path('targets/<int:pk>/report/', TargetReportView.as_view(), name='report'),
     path('targets/<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
-    path('targets/<int:pk>/vet/', TargetVettingView.as_view(), name='vet'),
     path('targets/search/', TargetNameSearchView.as_view(), name='search'),
     path('nonlocalizedevents/gw/', GWListView.as_view(), name='gw-list'),
     path('nonlocalizedevents/grb/', GRBListView.as_view(), name='grb-list'),
