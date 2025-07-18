@@ -1,6 +1,15 @@
 """
 Page views for candidate vetting
 """
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic.base import RedirectView
+from django.http import HttpResponseRedirect
+
+from trove_targets.models import Target
+from custom_code.hooks import target_post_save
+
+import requests
 
 class TargetVettingView(LoginRequiredMixin, RedirectView):
     """

@@ -27,7 +27,7 @@
         <tr>
           <td>
             {% if candidate.target is not None %}
-              <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ event.id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
+              <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
             {% else %}
               None
             {% endif %}
