@@ -83,6 +83,7 @@ MIDDLEWARE = [
     'tom_common.middleware.Raise403Middleware',
     'tom_common.middleware.ExternalServiceMiddleware',
     'tom_common.middleware.AuthStrategyMiddleware',
+    'candidate_vetting.middleware.ThreadLocalMiddleware',
 ]
 
 ROOT_URLCONF = 'saguaro_tom.urls'

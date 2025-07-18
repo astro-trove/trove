@@ -1,6 +1,8 @@
 """
 Page views for candidate vetting
 """
+from urllib.parse import urlparse, parse_qs
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import RedirectView
@@ -20,7 +22,23 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         Method that handles the GET requests for this view. Calls the kilonova vetting code.
         """        
         target = Target.objects.get(pk=kwargs['pk'])
-        banners, tns_query_status = target_post_save(target, created=True)
+
+        # get the nonlocalized event name from the referer
+        query_params = parse_qs(
+            urlparse(
+                request.META.get("HTTP_REFERER")
+            ).query
+        )
+        nonlocalized_event_name = query_params.get("nonlocalizedevent")
+        if nonlocalized_event_name is not None:
+            # because parse_qs returns lists for each query item
+            nonlocalized_event_name = nonlocalized_event_name[0]
+
+        banners, tns_query_status = target_post_save(
+            target,
+            created=True,
+            nonlocalized_event_name=nonlocalized_event_name
+        )
         for banner in banners:
             messages.success(request, banner)
 
@@ -29,7 +47,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
 
         return HttpResponseRedirect(self.get_redirect_url())
 
-    def get_redirect_url(self, nonlocalized_event_name):
+    def get_redirect_url(self):
         """
         Returns redirect URL as specified in the HTTP_REFERER field of the request.
 

@@ -55,7 +55,7 @@ def update_or_create_target_extra(target, key, value):
     te.save()
 
 
-def target_post_save(target, created):
+def target_post_save(target, created, nonlocalized_event_name=None):
     """This hook runs following update of a target."""
     logger.info('Target post save hook: %s created: %s', target, created)
 
@@ -72,15 +72,15 @@ def target_post_save(target, created):
                 update_or_create_target_extra(target, 'MW E(B-V)', mwebv)
                 messages.append(f'MW E(B-V) set to {mwebv:.4f}')
 
-        nonlocalized_event_name = request.GET.get('nonlocalizedevent', None)
-        if nonlocalized_event_name is None:
-            logger.error(f'No Non-Localized event associated with this target!')
-            messages.append('No non-localized event associated with this target, unable to vet!')
+        # TODO: add a check for the type of non-localized event
+        #       For now we are just always running the BNS vetting
+        if nonlocalized_event_name is not None:
+            vet_bns(target.id, nonlocalized_event_name)
         else:
-            # TODO: add a check for the type of non-localized event
-            vet_bns(nonlocalized_event_name, target.id)
-
-    if target.redshift and target.redshift >= 0.02 and target.distance is None:
+            messages.append("Could not run vetting on this target because there are no non-localized events associated with it!")
+            
+    redshift = target.targetextra_set.filter(key='Redshift')
+    if redshift.exists() and redshift.first().float_value >= 0.02 and target.distance is None:
         messages.append(f'Updating distance of {target.name} based on redshift')
         target.distance = settings.cosmo.luminosity_distance(target.redshift).to('Mpc').value
         target.save()

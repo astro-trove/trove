@@ -2,6 +2,7 @@
 The "pipeline" to vet BNS nonlocalized events
 """
 import logging
+from typing import Optional
 from astropy.time import Time
 
 from .vet import (
@@ -20,7 +21,7 @@ from tom_nonlocalizedevents.models import EventCandidate, NonLocalizedEvent
 
 logger = logging.getLogger(__name__)
 
-def vet_bns(target_id:int, nonlocalized_event_name:str):
+def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None):
 
     # get the correct EventCandidate object for this target_id and nonlocalized event
     nonlocalized_event = NonLocalizedEvent.objects.get(

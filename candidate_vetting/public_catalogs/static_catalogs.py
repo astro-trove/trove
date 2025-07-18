@@ -2,6 +2,7 @@
 Define the static catalogs for querying
 """
 from astropy import units as u
+import pandas as pd
 
 from django.db.models import Func, Q
 from django.conf import settings
@@ -89,8 +90,15 @@ class GladePlus(StaticCatalog):
         df = self._standardize_df(df)
         df["z_neg_err"] = df.z_err
         df["z_pos_err"] = df.z_err
+
+        lumdist_err = pd.Series(
+            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value,
+            index = df.index
+        )
+        df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
+
         return df
 
 class Gwgc(StaticCatalog):

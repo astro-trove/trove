@@ -137,7 +137,7 @@ def skymap_association(
 
     # write the query for the Target table
     query = sa.select(
-        SaSkymapTile.probdensity
+        cum_prob
     ).filter(
         SaTarget.basetarget_ptr_id == target_id,
         SaSkymapTile.localization_id == localization.id,
@@ -149,8 +149,13 @@ def skymap_association(
     with Session(sa_engine) as session:
         skymap_score = session.execute(
             query
-        ).fetchall()[0]
-    return skymap_score[0]
+        ).fetchall()
+
+    if len(skymap_score) == 0:
+        return 0
+
+    # need [0][0] because it is a list of tuples
+    return 1 - float(skymap_score[0][0])
         
 def pcc(r:list[float], m:list[float]):
     """
