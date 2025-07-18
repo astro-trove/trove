@@ -65,10 +65,6 @@ class LocalizationFilter(django_filters.Filter):
 
 
 class NonLocalizedEventFilter(django_filters.FilterSet):
-    prefix = django_filters.ChoiceFilter(choices=(('S', 'Real'), ('MS', 'Test')), label='Alert Type',
-                                         field_name='event_id', lookup_expr='startswith')
-    state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')))
-
     @staticmethod
     def last_sequence_filter(queryset, name, value):
         """Filter on fields of the last EventSequence of a NonLocalizedEvent"""
@@ -76,13 +72,18 @@ class NonLocalizedEventFilter(django_filters.FilterSet):
         field_name = '__'.join(name_parts[:-1])  # excluding the field lookup, e.g., __gte
         if name_parts[-2] == 'far':
             value = 3.168808781402895e-08 / float(value)  # yr to 1/Hz
-        elif name_parts[-2].startswith('Has'):
+        elif name_parts[-2].startswith('Has') or 'signalness' in name:
             value = 0.01 * float(value)  # percent to decimal
         else:
             value = float(value)
         last_value = EventSequence.objects.filter(nonlocalizedevent_id=OuterRef('id')).order_by('-sequence_id').values(field_name)[:1]
         return queryset.annotate(**{field_name: Subquery(last_value)}).filter(**{name: value})
 
+
+class GWFilter(NonLocalizedEventFilter):
+    prefix = django_filters.ChoiceFilter(choices=(('S', 'Real'), ('MS', 'Test')), label='Alert Type',
+                                         field_name='event_id', lookup_expr='startswith')
+    state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')))
     inv_far_min = django_filters.NumberFilter('details__far__lte',
                                               method='last_sequence_filter', label='1/FAR', min_value=sys.float_info.epsilon,
                                               help_text='Significant CBC alerts have 1/FAR > 0.5 yr')
@@ -92,3 +93,15 @@ class NonLocalizedEventFilter(django_filters.FilterSet):
                                              method='last_sequence_filter', label='HasNS', min_value=0., max_value=100.)
     has_remnant_min = django_filters.NumberFilter('details__properties__HasRemnant__gte',
                                                   method='last_sequence_filter', label='HasRemnant', min_value=0., max_value=100.)
+
+
+class NeutrinoFilter(NonLocalizedEventFilter):
+    notice_type = django_filters.ChoiceFilter('details__notice_type', label='Notice Type',
+                                              choices=[('BRONZE', 'Bronze'), ('GOLD', 'Gold')])
+    inv_far_min = django_filters.NumberFilter('details__far__lte',
+                                              method='last_sequence_filter', label='1/FAR', min_value=sys.float_info.epsilon)
+    energy_min = django_filters.NumberFilter('details__energy__gte',
+                                             method='last_sequence_filter', label='Energy', min_value=0.)
+    signalness_min = django_filters.NumberFilter('details__signalness__gte',
+                                                 method='last_sequence_filter', label='Signalness', min_value=0., max_value=100.)
+    time = django_filters.DateFromToRangeFilter(field_name='details__time', label='Time', method='last_sequence_filter')

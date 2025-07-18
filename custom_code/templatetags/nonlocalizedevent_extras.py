@@ -196,11 +196,12 @@ def nonlocalizedevent_details(context, localization=None):
             ],
             [
                 ('1/FAR', format_inverse_far_yr(sequence.details['far'])),
-                ('Energy', f'{sequence.details["energy"]} TeV'),
-                ('Signalness', sequence.details['signalness']),
+                ('Energy', f'{sequence.details["energy"]:.0f} TeV'),
+                ('Signalness', percentformat(sequence.details['signalness'])),
             ],
             [
-                ('Time', sequence.details['time']),
+                ('Date', sequence.details['time'][:10]),
+                ('Time', sequence.details['time'][11:22]),
             ],
         ]
     else:

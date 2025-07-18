@@ -14,9 +14,9 @@ from guardian.mixins import PermissionListMixin
 from trove_targets.models import Target
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
-from .filters import NonLocalizedEventFilter
+from .filters import GWFilter, NeutrinoFilter
 from .forms import TargetReportForm, TargetClassifyForm
-from .forms import NonLocalizedEventFormHelper
+from .forms import GWFormHelper, NeutrinoFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
 from .hooks import target_post_save, update_or_create_target_extra
 from .templatetags.target_extras import split_name
@@ -258,9 +258,7 @@ class NonLocalizedEventListView(FilterView):
     Unadorned Django ListView subclass for NonLocalizedEvent model.
     """
     model = NonLocalizedEvent
-    filterset_class = NonLocalizedEventFilter
     paginate_by = 100
-    formhelper_class = NonLocalizedEventFormHelper
 
     def get_filterset(self, filterset_class):
         kwargs = self.get_filterset_kwargs(filterset_class)
@@ -279,6 +277,8 @@ class GWListView(NonLocalizedEventListView):
     Unadorned Django ListView subclass for NonLocalizedEvent model.
     """
     template_name = 'tom_nonlocalizedevents/gw_list.html'
+    filterset_class = GWFilter
+    formhelper_class = GWFormHelper
 
     def get_queryset(self):
         qs = NonLocalizedEvent.objects.filter(event_type='GW').order_by('-created')
@@ -301,6 +301,8 @@ class NeutrinoListView(NonLocalizedEventListView):
     Unadorned Django ListView subclass for NonLocalizedEvent model.
     """
     template_name = 'tom_nonlocalizedevents/neutrino_list.html'
+    filterset_class = NeutrinoFilter
+    formhelper_class = NeutrinoFormHelper
 
     def get_queryset(self):
         qs = NonLocalizedEvent.objects.filter(event_type='NU').order_by('-created')

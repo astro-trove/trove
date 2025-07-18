@@ -357,7 +357,7 @@ class TargetClassifyForm(forms.Form):
         return json.dumps(report_data)
 
 
-class NonLocalizedEventFormHelper(FormHelper):
+class GWFormHelper(FormHelper):
     layout = Layout(
             Row(
                 Column('prefix'),
@@ -367,6 +367,25 @@ class NonLocalizedEventFormHelper(FormHelper):
                 Column(PrependedAppendedText('distance_max', '<', 'Mpc')),
                 Column(PrependedAppendedText('has_ns_min', '>', '%')),
                 Column(PrependedAppendedText('has_remnant_min', '>', '%')),
+            ),
+            Row(
+                Column(
+                    Submit('submit', 'Filter'),
+                    HTML('<a href="{{ request.path }}" class="btn btn-secondary" title="Reset">Reset</a>'),
+                    css_class='text-right',
+                )
+            )
+        )
+
+
+class NeutrinoFormHelper(FormHelper):
+    layout = Layout(
+            Row(
+                Column('notice_type'),
+                Column(PrependedAppendedText('inv_far_min', '>', 'yr')),
+                Column(PrependedAppendedText('energy_min', '>', 'TeV')),
+                Column(PrependedAppendedText('signalness_min', '>', '%')),
+                Column('time'),
             ),
             Row(
                 Column(
