@@ -17,7 +17,11 @@
     <table class="table">
       <thead>
       <tr>
-        <th scope="col">Detail Page</th>
+        <th scope="col">Trigger ID</th>
+        <th scope="col">1/FAR</th>
+        <th scope="col">Energy (TeV)</th>
+        <th scope="col">Signalness</th>
+        <th scope="col">Date</th>
         <th scope="col" title="Hermes">Hermes</th>
       </tr>
       </thead>
@@ -29,6 +33,10 @@
       <tr>
       {% endif %}
         <td><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a></td>
+        <td>{{ event.sequences.last.details.far|format_inverse_far_yr }}</td>
+        <td>{{ event.sequences.last.details.energy|floatformat:2 }}</td>
+        <td>{{ event.sequences.last.details.signalness|floatformat:5 }}</td>
+        <td>{{ event.sequences.last.details.time|slice:":19" }}</td>
         <td title="Hermes">
           <a href="{{ event.hermes_url }}" target="_blank">Hermes</a>
         </td>

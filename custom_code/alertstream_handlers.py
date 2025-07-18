@@ -13,6 +13,7 @@ from .healpix_utils import create_elliptical_localization
 from .models import CredibleRegionContour
 from astropy.table import Table
 from astropy.time import Time
+from datetime import datetime
 from io import BytesIO
 import astropy_healpix as ah
 import numpy as np
@@ -360,18 +361,17 @@ def handle_icecube_alert(alert):
         logger.error(f'Could not create EventLocalization for event: {nonlocalizedevent.event_id}. Exception: {e}')
         logger.error(traceback.format_exc())
 
-    logger.debug(f"Storing EP alert: {alert}")
+    logger.debug(f"Storing IceCube alert: {alert}")
 
     # Now ingest the sequence for that event
     icecube_keys = {
-        'time': 'Time UT',
         'notice_type': 'NoticeType',
         'energy': 'Energy',
         'signalness': 'Signalness',
         'far': 'FAR [#/yr]'
     }
     details = {key: alert[val] for key, val in icecube_keys.items()}
-    details['time'] = alert.get('trigger_time')  # to match IGWN alerts
+    details['time'] = datetime.strptime(alert['Date'] + alert['Time UT'], '%y/%m/%d%H:%M:%S.%f').isoformat()
     event_sequence, es_created = EventSequence.objects.update_or_create(
         nonlocalizedevent=nonlocalizedevent,
         localization=localization,

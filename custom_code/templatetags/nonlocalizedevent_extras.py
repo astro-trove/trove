@@ -10,13 +10,10 @@ SI_PREFIXES = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q']
 
 
 @register.filter
-def format_inverse_far(far, inv_Hz=True):
+def format_inverse_far_yr(far):
     if not far:
         return ''
-    if inv_Hz:
-        inv_far = 3.168808781402895e-08 / far  # 1/Hz to yr
-    else:
-        inv_far = 1. / far
+    inv_far = 1. / far
     if inv_far > 1.:
         log1000 = math.log10(inv_far) / 3.
         i = int(log1000)
@@ -34,6 +31,14 @@ def format_inverse_far(far, inv_Hz=True):
         return f'{inv_far:.0f} {unit}'
     else:
         return f'{inv_far:.1f} {unit}'
+
+
+@register.filter
+def format_inverse_far(far):
+    if not far:
+        return ''
+    far_yr = far / 3.168808781402895e-08  # 1/Hz to 1/yr
+    return format_inverse_far_yr(far_yr)
 
 
 @register.filter
@@ -190,9 +195,12 @@ def nonlocalizedevent_details(context, localization=None):
                 ('90% Area', format_area(localization.area_90)),
             ],
             [
-                ('1/FAR', format_inverse_far(sequence.details['far'], inv_Hz=False)),
+                ('1/FAR', format_inverse_far_yr(sequence.details['far'])),
                 ('Energy', f'{sequence.details["energy"]} TeV'),
                 ('Signalness', sequence.details['signalness']),
+            ],
+            [
+                ('Time', sequence.details['time']),
             ],
         ]
     else:
