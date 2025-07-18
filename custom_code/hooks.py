@@ -1,6 +1,7 @@
 import logging
 from tom_targets.models import TargetExtra
 from tom_dataproducts.models import ReducedDatum
+from candidate_vetting.vet_bns import vet_bns
 from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
@@ -71,15 +72,14 @@ def target_post_save(target, created):
                 update_or_create_target_extra(target, 'MW E(B-V)', mwebv)
                 messages.append(f'MW E(B-V) set to {mwebv:.4f}')
 
-        # TODO: add all the vetting code
-        #  - cone search on static copy of the TNS
-        #  - if TNS match, query live TNS (handling any timeouts) for
-        #    photometry, coord/name updates, redshift, spec class, aliases
-        #  - cone search for point source matches
-        #  - larger cone search for host galaxy matches
-        #  - ZTF/LSST photometry & aliases from brokers
-        #  - minor planet checker (spawn async process if slow)
-
+        nonlocalized_event_name = request.GET.get('nonlocalizedevent', None)
+        if nonlocalized_event_name is None:
+            logger.error(f'No Non-Localized event associated with this target!')
+            messages.append('No non-localized event associated with this target, unable to vet!')
+        else:
+            # TODO: add a check for the type of non-localized event
+            vet_bns(nonlocalized_event_name, target.id)
+            
     redshift = target.targetextra_set.filter(key='Redshift')
     if redshift.exists() and redshift.first().float_value >= 0.02 and target.distance is None:
         messages.append(f'Updating distance of {target.name} based on redshift')

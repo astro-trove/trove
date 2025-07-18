@@ -6,7 +6,7 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
-
+from tom_nonlocalizedevents.models import EventCandidate
 
 class AsassnQ3C(models.Model):
     aid = models.AutoField(primary_key=True)
@@ -867,3 +867,9 @@ class TnsQ3C(models.Model):
     class Meta:
         managed = False
         db_table = 'tns_q3c'
+
+class ScoreFactor(models.Model):
+    id = models.AutoField(primary_key=True)
+    event_candidate = models.ForeignKey(EventCandidate, on_delete=models.CASCADE)
+    key = models.CharField(max_length=200)
+    value = models.CharField(max_length=200)
