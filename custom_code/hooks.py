@@ -6,7 +6,7 @@ from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
 from astroquery.ipac.irsa.irsa_dust import IrsaDust
-from healpix_alchemy.constants import HPX
+from django.conf import settings
 
 COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
 
@@ -79,11 +79,10 @@ def target_post_save(target, created):
         else:
             # TODO: add a check for the type of non-localized event
             vet_bns(nonlocalized_event_name, target.id)
-            
-    redshift = target.targetextra_set.filter(key='Redshift')
-    if redshift.exists() and redshift.first().float_value >= 0.02 and target.distance is None:
+
+    if target.redshift and target.redshift >= 0.02 and target.distance is None:
         messages.append(f'Updating distance of {target.name} based on redshift')
-        target.distance = COSMOLOGY.luminosity_distance(redshift.first().float_value).to('Mpc').value
+        target.distance = settings.cosmo.luminosity_distance(target.redshift).to('Mpc').value
         target.save()
 
     for message in messages:

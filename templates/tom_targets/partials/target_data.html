@@ -43,6 +43,20 @@
   <dd class="col-sm-5">{{ target|ecliptic_lat|floatformat:6 }}</dd>
 </dl>
 <dl class="row">
+  {% for key, value in target.as_dict.items %}
+    {% if value != None and value != '' and key != 'name' and key != 'ra' and key != 'dec' and key != 'galactic_lng' and key != 'galactic_lat' and key != 'type' and key != 'epoch' %}
+      <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+    {% if key == 'redshift' or key == 'mwebv' %}
+      <dd class="col-sm-6">{{ value|floatformat:4 }}</dd>
+    {% elif key == 'permissions' %}
+      <dd class="col-sm-6">{{ value|title }}</dd>
+    {% else %}
+      <dd class="col-sm-6">{{ value|truncate_value_for_display }}</dd>
+    {% endif %}
+    {% endif %}
+  {% endfor %}
+</dl>
+<dl class="row">
 {% for key, value in extras.items %}
   <dt class="col-sm-6">{{ key }}</dt>
   <dd class="col-sm-6">{{ value }}</dd>

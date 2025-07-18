@@ -7,6 +7,7 @@ django-extensions
 django-filter
 django-guardian
 django-tasks
+dustmaps
 healpix-alchemy
 healpy
 lightcurve-fitting

@@ -6,7 +6,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.http import HttpResponseRedirect
 from django.views.generic.base import RedirectView
-from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView, UpdateView
+from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView
 from django_filters.views import FilterView
 from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
@@ -179,9 +179,8 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
             classification = classifications.first().value
             if classification in TNS_CLASSIFICATION_IDS:
                 initial['classification'] = (TNS_CLASSIFICATION_IDS[classification], classification)
-        redshift = target.targetextra_set.filter(key='Redshift')
-        if redshift.exists():
-            initial['redshift'] = redshift.first().value
+        if target.redshift:
+            initial['redshift'] = target.redshift
         spectra = target.reduceddatum_set.filter(data_type='spectroscopy')
         if spectra.exists():
             spectrum = spectra.latest()
@@ -204,7 +203,7 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
             update_or_create_target_extra(target, 'Classification', classification)
             messages.success(self.request, f"Classification set to {classification}")
             if form.cleaned_data['redshift']:
-                update_or_create_target_extra(target, 'Redshift', form.cleaned_data['redshift'])
+                target.redshift = form.cleaned_data['redshift']
                 messages.success(self.request, f"Redshift set to {form.cleaned_data['redshift']}")
 
         return redirect(self.get_success_url())

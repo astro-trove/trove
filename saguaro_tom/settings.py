@@ -16,6 +16,8 @@ import os
 import tempfile
 from astropy.cosmology import FlatLambdaCDM
 from astropy import units as _u
+import warnings
+
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -375,3 +377,19 @@ COSMO = FlatLambdaCDM(
     Tcmb0 = 2.725 * _u.K,
     Om0 = 0.3
 )
+
+# dust maps for Milky Way extinction
+os.environ['DUSTMAPS_CONFIG_FNAME'] = os.path.join(BASE_DIR, '.dustmapsrc')
+with warnings.catch_warnings(action='ignore'):
+    from dustmaps import sfd
+
+try:
+    sfd_query = sfd.SFDQuery()
+except FileNotFoundError:
+    sfd.fetch()
+    sfd_query = sfd.SFDQuery()
+
+def sf11(*args):
+    return 0.86 * sfd_query(*args)
+
+DUST_MAP = sf11
