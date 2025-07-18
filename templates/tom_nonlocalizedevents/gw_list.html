@@ -17,7 +17,7 @@
     <table class="table">
       <thead>
       <tr>
-        <th scope="col">Detail Page</th>
+        <th scope="col">GraceID</th>
         <th scope="col" title="Inverse False Alarm Rate">1/FAR</th>
         <th scope="col" title="Most Likely Classification">Class.</th>
         <th scope="col" title="Distance">Distance</th>
@@ -34,7 +34,7 @@
       <tr>
       {% endif %}
         <td>
-            <a href="{% url 'nonlocalizedevents:event-detail'  event.event_id %}" target="_blank">{{ event.event_id }}</a>
+            <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a>
             {% if event.state == "RETRACTED" %}
                 <span title="retracted">&#x274c;</span> {# red X emoji #}
             {% elif event.sequences.last.event_subtype != "PRELIMINARY" %}
