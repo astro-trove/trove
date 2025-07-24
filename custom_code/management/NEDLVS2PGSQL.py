@@ -88,10 +88,10 @@ def create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, P
             finally:
                 logger.debug("continuing.")
 
-def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, aptable, rows):
+def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, NEDLVS_table, rows):
     stringified_chunk = ""
 
-    chunked_vals = get_SQL_values(aptable, rows)
+    chunked_vals = get_SQL_values(NEDLVS_table, rows)
 
     for vals in chunked_vals:
         stringified_chunk += f"{vals}, "
