@@ -1,17 +1,14 @@
+import argparse
+import logging 
+
 from   astropy.table import Table
+import numpy as np
 import psycopg
 
-from   settings_local import *
-import NEDLVS
+logger = logging.getLogger(__name__)
 
-SOURCE_DATA =       "NEDLVS_20250602.fits"
-POSTGRES_DB =       "NEDLVS"
-POSTGRES_TABLE =    "NEDLVS"
 
-# #####################################################################
-# Encapsulate processing steps into functions
-# #####################################################################
-def convert_dtypes(ap_dtype: str) -> str:
+def get_SQL_type(NEDLVS_dtype: str) -> str:
         conversion_table = {
             '|S19':     "text",
             '|S1':      "text",
@@ -24,17 +21,17 @@ def convert_dtypes(ap_dtype: str) -> str:
             '|S5':      "text"
         }
 
-        return conversion_table[ap_dtype]
+        return conversion_table[NEDLVS_dtype]
 
-def relational_schema(NEDLVS_table: Table) -> str:
+def get_relational_schema(NEDLVS_table: Table) -> str:
     new_schema = "( "
 
     # ap_types = set() # used in devel to get src data types (in the fits file, not implementation)
-    for i in range(len(NEDLVS_table.colnames)):
-        colname = NEDLVS_table.colnames[i]
+    for col_index in range(len(NEDLVS_table.colnames)):
+        colname = NEDLVS_table.colnames[col_index]
         np_dtype = str(type(NEDLVS_table[colname][0]))
-        ap_dtype = NEDLVS_table[NEDLVS_table.colnames[i]].dtype.str
-        converted = convert_dtypes(ap_dtype)
+        ap_dtype = NEDLVS_table[NEDLVS_table.colnames[col_index]].dtype.str
+        converted = get_SQL_type(ap_dtype)
         
         # ap_types.add(ap_dtype) # used in devel to get src data types (in the fits file, not implementation)
         new_schema += f"\n{colname.ljust(20)}\t{converted},"
@@ -44,69 +41,125 @@ def relational_schema(NEDLVS_table: Table) -> str:
     # print(ap_types) # used in devel to get src data types (in the fits file, not implementation)
     return new_schema
 
-def record2values(NEDLVS2_table: Table, row: int) -> str:
+def get_SQL_values(NEDLVS_table: Table, rows) -> list[str]:
     # String will look like "INSERT INTO {TABLENAME} VALUES ('<pad string with single quote>', <comma separate everything>);"
-    values = "( "
+    all_values = []
+    
+    cols = range(len(NEDLVS_table.columns))
 
-    cols = range(len(NEDLVS2_table.columns))
+    for row_index in rows:
+        values = "( "
+        for col_index in cols:
+            value = str(NEDLVS_table[row_index][col_index])
+            valtype = get_SQL_type(NEDLVS_table[NEDLVS_table.colnames[col_index]].dtype.str)
 
-    for current_col in cols:
-        value = str(NEDLVS2_table[row][current_col])
-        
-        if value == "--":
-             value = "null"
+            if value == "--":
+                    value = "null"
 
-        if value == "text":
-            values += f"\'{value}\', "
-        else:
-            values += f"{value}, "
+            if valtype == "text":
+                value = value.replace('"', '"""')
+                value = value.replace("'", "''")
+                values += f"\'{value}\', "
+            else:
+                values += f"{value}, "
 
-    values = values[:-2] # strip trailing comma bc PGSQL syntax won't accept it
-    values += " )"
+        values = values[:-2] # strip trailing comma bc PGSQL syntax won't accept it
+        values += " )"
 
-    return values
+        all_values.append(values)
 
+    return all_values
 
-# #####################################################################
-# Interfacing with PGSQL server starts here
-# ##################################################################### 
+def create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, table_schema):
+    # #####################################################################
+    # Create the new table using the new schema
+    # #####################################################################
+    # TODO: overwrite records, overwrite schema, append? This needs a better fallback.
+    SQL_statement = f"CREATE TABLE {POSTGRES_TABLE} {table_schema};"
+    logger.debug(SQL_statement)
+    with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_PORT, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(SQL_statement)
+                conn.commit()
+            except psycopg.errors.DuplicateTable:
+                logger.debug(f"Table {POSTGRES_TABLE} already exists. Attemtping to continue with existing schema...")
+            except Exception as e:
+                logger.debug(e)
+            finally:
+                logger.debug("continuing.")
 
-table = Table.read(SOURCE_DATA)
+def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, aptable, rows):
+    stringified_chunk = ""
 
-# #####################################################################
-# Define the relational schema from source data
-# #####################################################################
-new_schema = relational_schema(table)
+    chunked_vals = get_SQL_values(aptable, rows)
 
+    for vals in chunked_vals:
+        stringified_chunk += f"{vals}, "
 
-# #####################################################################
-# Create the new table using the new schema
-# #####################################################################
-# TODO: overwrite records, overwrite schema, append?
-SQL_statement = f"CREATE TABLE {POSTGRES_TABLE} {new_schema};"
-print(SQL_statement)
-with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_port, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
-    with conn.cursor() as cur:
-        try:
-            cur.execute(SQL_statement)
-            conn.commit()
-        except psycopg.errors.DuplicateTable:
-            print(f"Table {POSTGRES_TABLE} already exists. Attemtping to continue with existing schema...")
-        except Exception as e:
-            print(e)
+    stringified_chunk = stringified_chunk[:-2] # remove trailing ", "
+    
+    # make insert statement
+    SQL_statement = f"INSERT INTO {POSTGRES_TABLE} VALUES {stringified_chunk};"
 
-# #####################################################################
-# Insert records into the new table
-# #####################################################################
-for i in range(len(table)):
-    SQL_statement = f"INSERT INTO {POSTGRES_TABLE} VALUES {record2values(table, i)};"
-    print(SQL_statement)
-    with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_port, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
+    # connect to db & insert
+    with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_PORT, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
         with conn.cursor() as cur:
             try:
                 cur.execute(SQL_statement)
                 conn.commit()
             except Exception as e:
-                print(e)
+                logger.debug(e)
 
-print(f"{__file__} done.")
+def parse_and_insert(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_TABLE, POSTGRES_USER, POSTGRES_PASSWORD, source_data, chunksize):
+    
+    table = Table.read(source_data)
+
+    new_schema = get_relational_schema(table)
+
+    create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, new_schema)
+
+    # #####################################################################
+    # Insert records for each chunk
+    # #####################################################################
+    for chunk in range((len(table) // chunksize) + 1):
+        logger.info(f"chunk {chunk} of {(len(table) // chunksize) + 1}")
+        
+        rows = np.arange(chunk * chunksize, min(chunk * chunksize + chunksize, len(table)))
+        
+        insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, table, rows)
+
+
+# #####################################################################
+# Run as standalone application
+# #####################################################################
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    logger.info(f"started {__file__}.")        
+
+    # #####################################################################
+    # Accept command line args
+    # #####################################################################
+    parser = argparse.ArgumentParser(
+        prog="NEDLVS2PGSQL",
+        description="Parse FITS file of NEDLVS2 data and insert records \
+            into a Postgres DB")
+    
+    parser.add_argument('--nedlvs_file',                    help='FITS file of NASA/IPAC Extragalactic Database (NED) Local Volume Sample (LVS)')
+    parser.add_argument('--pghost',                         help='Host that a PGSQL server runs on. Can be \"localhost\", a domain name, or IP address.')
+    parser.add_argument('--pgport', default=5432,           help='Port number the PGSQL listens on. Default is 5432.')
+    parser.add_argument('--pgdb',                           help='Name of the PG database to target.')
+    parser.add_argument('--pgtable',                        help='Name of table within the PG database to target.')
+    parser.add_argument('--pguser',                         help='User name necessary to access PGSQL server. This is configured by the server.')
+    parser.add_argument('--pgpasswd',                       help='User password to access PGSQL server. This is confiugred by the server.')
+    parser.add_argument('--chunksize', type=int, default=1, help='Count of howe many `VALUES` to INSERT per SQL statement.')
+
+    args = parser.parse_args()
+
+    # #####################################################################
+    # Do everything
+    # #####################################################################
+    parse_and_insert(args.pghost, args.pgport, args.pgdb, args.pgtable, args.pguser, args.pgpasswd, args.nedlvs_file, args.chunksize)
+    
+    logger.info(f"{__file__} done.")
+
