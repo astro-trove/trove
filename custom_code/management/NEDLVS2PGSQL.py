@@ -2,7 +2,6 @@ import argparse
 import logging 
 
 from   astropy.table import Table
-import numpy as np
 import psycopg
 
 logger = logging.getLogger(__name__)
@@ -125,7 +124,7 @@ def parse_and_insert(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_TABLE, 
     for chunk in range((len(table) // chunksize) + 1):
         logger.info(f"chunk {chunk} of {(len(table) // chunksize) + 1}")
         
-        rows = np.arange(chunk * chunksize, min(chunk * chunksize + chunksize, len(table)))
+        rows = range(chunk * chunksize, min(chunk * chunksize + chunksize, len(table)))
         
         insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, table, rows)
 
