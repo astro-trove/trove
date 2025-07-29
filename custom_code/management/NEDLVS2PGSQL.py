@@ -22,6 +22,7 @@ def get_SQL_type(NEDLVS_dtype: str) -> str:
 
         return conversion_table[NEDLVS_dtype]
 
+
 def get_relational_schema(NEDLVS_table: Table) -> str:
     new_schema = "( "
 
@@ -40,8 +41,8 @@ def get_relational_schema(NEDLVS_table: Table) -> str:
     # print(ap_types) # used in devel to get src data types (in the fits file, not implementation)
     return new_schema
 
+
 def get_SQL_values(NEDLVS_table: Table, rows) -> list[str]:
-    # String will look like "INSERT INTO {TABLENAME} VALUES ('<pad string with single quote>', <comma separate everything>);"
     all_values = []
     
     cols = range(len(NEDLVS_table.columns))
@@ -52,6 +53,9 @@ def get_SQL_values(NEDLVS_table: Table, rows) -> list[str]:
             value = str(NEDLVS_table[row_index][col_index])
             valtype = get_SQL_type(NEDLVS_table[NEDLVS_table.colnames[col_index]].dtype.str)
 
+            # #####################################################################
+            # TODO: make a more comprehensive, flexible fun for cleaning
+            # #####################################################################
             if value == "--":
                     value = "null"
 
@@ -69,27 +73,28 @@ def get_SQL_values(NEDLVS_table: Table, rows) -> list[str]:
 
     return all_values
 
+
 def create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, table_schema):
     # #####################################################################
-    # Create the new table using the new schema
+    # TODO: drop table & create new, edit in place?
     # #####################################################################
-    # TODO: overwrite records, overwrite schema, append? This needs a better fallback.
     SQL_statement = f"CREATE TABLE {POSTGRES_TABLE} {table_schema};"
     logger.debug(SQL_statement)
-    with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_PORT, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
+    with psycopg.connect(host=POSTGRES_HOST, port=POSTGRES_PORT, dbname=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD) as conn:
         with conn.cursor() as cur:
             try:
                 cur.execute(SQL_statement)
                 conn.commit()
             except psycopg.errors.DuplicateTable:
                 logger.debug(f"Table {POSTGRES_TABLE} already exists. Attemtping to continue with existing schema...")
-            except Exception as e:
-                logger.debug(e)
+            except Exception as e: raise
             finally:
                 logger.debug("continuing.")
 
-def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, NEDLVS_table, rows):
+
+def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, NEDLVS_table, rows: list[str]):
     stringified_chunk = ""
+    SQL_statement = ""
 
     chunked_vals = get_SQL_values(NEDLVS_table, rows)
 
@@ -110,30 +115,59 @@ def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POST
             except Exception as e:
                 logger.debug(e)
 
+
 def parse_and_insert(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_TABLE, POSTGRES_USER, POSTGRES_PASSWORD, source_data, chunksize):
+
+    SQL_statement = f"CREATE INDEX ON {POSTGRES_TABLE} (q3c_ang2ipix(ra, dec)); "
     
+    # #####################################################################
+    # Read source data
+    # #####################################################################
+    logger.debug("reading file into astropy table...")
     table = Table.read(source_data)
+    logger.debug("done.")
 
+    # #####################################################################
+    # Define new table schema
+    # #####################################################################
+    logger.debug("stringifying new table schema...")
     new_schema = get_relational_schema(table)
+    logger.debug("done.")
 
+    # #####################################################################
+    # Create new table in DB
+    # #####################################################################
+    logger.debug("requesting pgsql server create new table...")
     create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, new_schema)
+    logger.debug("done.")
 
     # #####################################################################
     # Insert records for each chunk
     # #####################################################################
     for chunk in range((len(table) // chunksize) + 1):
-        logger.info(f"chunk {chunk} of {(len(table) // chunksize) + 1}")
+        logger.info(f"inserting chunk {chunk + 1} of {(len(table) // chunksize) + 1}")
         
         rows = range(chunk * chunksize, min(chunk * chunksize + chunksize, len(table)))
         
         insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, table, rows)
+
+    # #####################################################################
+    # Index table using Q3C
+    # #####################################################################
+    with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_PORT, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
+        with conn.cursor() as cur:
+            try:
+                cur.execute(SQL_statement)
+                conn.commit()
+            except Exception as e:
+                logger.debug(e)
 
 
 # #####################################################################
 # Run as standalone application
 # #####################################################################
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.DEBUG)
     logger.info(f"started {__file__}.")        
 
     # #####################################################################
@@ -151,7 +185,7 @@ if __name__ == "__main__":
     parser.add_argument('--pgtable',                        help='Name of table within the PG database to target.')
     parser.add_argument('--pguser',                         help='User name necessary to access PGSQL server. This is configured by the server.')
     parser.add_argument('--pgpasswd',                       help='User password to access PGSQL server. This is confiugred by the server.')
-    parser.add_argument('--chunksize', type=int, default=1, help='Count of howe many `VALUES` to INSERT per SQL statement.')
+    parser.add_argument('--chunksize', type=int, default=1, help='Count of how many `VALUES` to INSERT per SQL statement.')
 
     args = parser.parse_args()
 
