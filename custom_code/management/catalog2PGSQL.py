@@ -178,9 +178,9 @@ if __name__ == "__main__":
 
     micromamba activate /var/www/saguaro_tom/TroveEnv/
 
-    python /var/www/saguaro_tom/custom_code/management/ingest.py /data/catalogs/NEDLVS_20250602.fits \
-    <POSTGRES_HOST> <POSTGRES_PORT> <POSTGRES_DB> <POSTGRES_TABLE> <POSTGRES_USER> <POSTGRES_PASSWORD> \ # do not enter passwords in CLI! (store in files w/ access controls, like this ex. bash script)
-    /var/www/saguaro_tom/custom_code/management/ingest.py /data/catalogs/NEDLVS_config.py \
+    python /var/www/saguaro_tom/custom_code/management/ingest.py /data/catalogs/NEDLVS_20250602.fits
+    <POSTGRES_HOST> <POSTGRES_PORT> <POSTGRES_DB> <POSTGRES_TABLE> <POSTGRES_USER> <POSTGRES_PASSWORD> # do not enter passwords in CLI! (store in files w/ access controls, like this ex. bash script)
+    /var/www/saguaro_tom/custom_code/management/ingest.py /data/catalogs/NEDLVS_config.py
     100000
 
     """
