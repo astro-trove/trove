@@ -109,11 +109,17 @@ def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POST
 
 
 def q3c_index_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE):
-    SQL_statement = f"CREATE INDEX ON {POSTGRES_TABLE} (q3c_ang2ipix(ra, dec)); "
+    SQL_statements = [f"CREATE INDEX ON {POSTGRES_TABLE} (q3c_ang2ipix(ra, dec));", \
+                      f"CLUSTER {POSTGRES_TABLE}_q3c_ang2ipix_idx ON {POSTGRES_TABLE};"] # docs recommend to "cluster" as well
     with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_PORT, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
         with conn.cursor() as cur:
             try:
-                cur.execute(SQL_statement)
+                cur.execute(SQL_statements[0])
+                conn.commit()
+            except Exception as e:
+                logger.debug(e)
+            try:
+                cur.execute(SQL_statements[1])
                 conn.commit()
             except Exception as e:
                 logger.debug(e) 
