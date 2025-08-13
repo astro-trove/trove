@@ -7,14 +7,11 @@ import sys
 from   astropy.table import Table
 import psycopg
 
+import numpy2PGSQL
+
 logger = logging.getLogger(__name__)
 
-
-def get_SQL_type(dtype: str, conversion_table: dict) -> str:
-        return conversion_table[dtype]
-
-
-def get_relational_schema(data_table: Table, conversion_table: dict) -> str:
+def get_relational_schema(data_table: Table) -> str:
     new_schema = "( "
 
     # ap_types = set() # used in devel to get src data types (in the fits file, not implementation)
@@ -22,7 +19,7 @@ def get_relational_schema(data_table: Table, conversion_table: dict) -> str:
         colname = data_table.colnames[col_index]
         np_dtype = str(type(data_table[colname][0]))
         ap_dtype = data_table[data_table.colnames[col_index]].dtype.str
-        converted = get_SQL_type(ap_dtype, conversion_table)
+        converted = numpy2PGSQL.convert(ap_dtype)
         
         # ap_types.add(ap_dtype) # used in devel to get src data types (in the fits file, not implementation)
         new_schema += f"\n{colname.ljust(20)}\t{converted},"
@@ -33,7 +30,7 @@ def get_relational_schema(data_table: Table, conversion_table: dict) -> str:
     return new_schema
 
 
-def get_SQL_values(data_table: Table, rows, conversion_table: dict) -> list[str]:
+def get_SQL_values(data_table: Table, rows) -> list[str]:
     all_values = []
     
     cols = range(len(data_table.columns))
@@ -42,7 +39,7 @@ def get_SQL_values(data_table: Table, rows, conversion_table: dict) -> list[str]
         values = "( "
         for col_index in cols:
             value = str(data_table[row_index][col_index])
-            valtype = get_SQL_type(data_table[data_table.colnames[col_index]].dtype.str, conversion_table)
+            valtype = numpy2PGSQL.convert(data_table[data_table.colnames[col_index]].dtype.str)
 
             # #####################################################################
             # TODO: make a more comprehensive, flexible fun. for cleaning
@@ -66,11 +63,16 @@ def get_SQL_values(data_table: Table, rows, conversion_table: dict) -> list[str]
 
 
 def create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, 
-                     table_schema: str):
+                     table_schema: str, drop_if_exists: bool = False):
     # #####################################################################
     # TODO: drop table & create new, edit in place?
     # #####################################################################
-    SQL_statement = f"CREATE TABLE {POSTGRES_TABLE} {table_schema};"
+    SQL_statement = ""
+    
+    if (drop_if_exists):
+        SQL_statement += f"DROP TABLE IF EXISTS {POSTGRES_TABLE};\n"
+    
+    SQL_statement += f"CREATE TABLE {POSTGRES_TABLE} {table_schema};"
     logger.debug(SQL_statement)
     with psycopg.connect(host=POSTGRES_HOST, port=POSTGRES_PORT, dbname=POSTGRES_DB, user=POSTGRES_USER, password=POSTGRES_PASSWORD) as conn:
         with conn.cursor() as cur:
@@ -85,11 +87,11 @@ def create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, P
 
 
 def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, 
-                  data_table, conversion_table: dict, rows: list[str]):
+                  data_table, rows: list[str]):
     stringified_chunk = ""
     SQL_statement = ""
 
-    chunked_vals = get_SQL_values(data_table, rows, conversion_table)
+    chunked_vals = get_SQL_values(data_table, rows)
 
     for vals in chunked_vals:
         stringified_chunk += f"{vals}, "
@@ -110,7 +112,7 @@ def insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POST
 
 def q3c_index_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE):
     SQL_statements = [f"CREATE INDEX ON {POSTGRES_TABLE} (q3c_ang2ipix(ra, dec));", \
-                      f"CLUSTER {POSTGRES_TABLE}_q3c_ang2ipix_idx ON {POSTGRES_TABLE};"] # docs recommend to "cluster" as well
+                      f"CLUSTER {POSTGRES_TABLE}_q3c_ang2ipix_idx ON {POSTGRES_TABLE};"] # q3c docs recommend to "cluster" as well
     with psycopg.connect(host=POSTGRES_HOST, user=POSTGRES_USER, port=POSTGRES_PORT, password=POSTGRES_PASSWORD, dbname=POSTGRES_DB) as conn:
         with conn.cursor() as cur:
             try:
@@ -126,7 +128,7 @@ def q3c_index_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, PO
 
 
 def parse_and_insert(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_TABLE, POSTGRES_USER, POSTGRES_PASSWORD, 
-                     source_data: Table, conversion_table: dict, processing: callable, chunksize: int):
+                     source_data: Table, processing: callable, chunksize: int):
 
     # #####################################################################
     # Read source data
@@ -143,14 +145,14 @@ def parse_and_insert(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_TABLE, 
     # Define new table schema
     # #####################################################################
     logger.debug("stringifying new table schema...")
-    new_schema = get_relational_schema(table, conversion_table)
+    new_schema = get_relational_schema(table)
     logger.debug("done.")
 
     # #####################################################################
     # Create new table in DB
     # #####################################################################
     logger.debug("requesting pgsql server create new table...")
-    create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, new_schema)
+    create_SQL_table(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, new_schema, True)
     logger.debug("done.")
 
     # #####################################################################
@@ -161,8 +163,7 @@ def parse_and_insert(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_TABLE, 
         
         rows = range(chunk * chunksize, min(chunk * chunksize + chunksize, len(table)))
         
-        insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, table, 
-                      conversion_table, rows)
+        insert_values(POSTGRES_HOST, POSTGRES_PORT, POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_TABLE, table, rows)
     logger.info(f"Done inserting values.")
 
     # #####################################################################
@@ -225,7 +226,7 @@ if __name__ == "__main__":
     # Do everything
     # #####################################################################
     parse_and_insert(args.pghost, args.pgport, args.pgdb, args.pgtable, args.pguser, args.pgpasswd, args.catalog_file, 
-                     config.conversion_table, config.processing, args.chunksize)
+                     config.processing, args.chunksize)
     
     logger.info(f"{__file__} done.")
 
