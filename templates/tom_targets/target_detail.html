@@ -59,15 +59,6 @@
       <li class="nav-item">
         <a class="nav-link active" id="photometry-tab" href="#photometry" role="tab" data-toggle="tab">Photometry</a>
       </li>
-      <li class="nav-item">
-        <a class="nav-link" id="spectroscopy-tab" href="#spectroscopy" role="tab" data-toggle="tab">Spectroscopy</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" id="manage-data-tab" href="#manage-data" role="tab" data-toggle="tab">Manage Data</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" id="manage-groups-tab" href="#manage-groups" role="tab" data-toggle="tab">Manage Groups</a>
-      </li>
     </ul>
     <div class="tab-content">
       <div class="tab-pane" id='host-galaxy'>
@@ -77,21 +68,6 @@
       <div class="tab-pane" id="score-detail">
 	<h4>Score Details</h4>
 	{% display_score_details target.id %}
-      </div>
-      <div class="tab-pane" id="manage-data">
-        {% if user.is_authenticated %}
-          {% query_single_target_data_service object %}
-          <br />
-          <br />
-        {% endif %}
-        {% if user.is_authenticated %}
-          {% upload_dataproduct object %}
-        {% endif %}
-        {% dataproduct_list_for_target object %}
-      </div>
-      <div class="tab-pane" id="manage-groups">
-        {% target_groups target %}
-      </div>
       <div class="tab-pane active" id="photometry">
         {% photometry_for_target target %}
         {% get_photometry_data object %}
@@ -100,7 +76,6 @@
         {% spectroscopy_for_target target %}
         {% get_spectroscopy_data object %}
       </div>
-
       {% comments_enabled as comments_are_enabled %}
       <hr/>
       <h5>Comments</h5>
