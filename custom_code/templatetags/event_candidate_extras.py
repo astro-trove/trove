@@ -34,7 +34,9 @@ def display_score_details(target_id):
         return "Target ID is None!"
 
     target = Target.objects.get(id=target_id)
-
+    
     score_details = []
     for event_candidate in target.eventcandidate_set.all():
         score_details.append(event_candidate.scorefactor_set.all())
+
+    return score_details
