@@ -64,7 +64,7 @@ def recent_photometry(context, target, limit=1):
     return recent_det
 
 
-@register.inclusion_tag('tom_dataproducts/partials/photometry_for_target.html', takes_context=True)
+@register.inclusion_tag('tom_dataproducts/partials/data_plot_for_target.html', takes_context=True)
 def photometry_for_target(context, target, width=700, height=600, background=None, label_color=None, grid=True):
     """
     Renders a photometric plot for a target.
