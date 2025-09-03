@@ -393,3 +393,4 @@ def sf11(*args):
     return 0.86 * sfd_query(*args)
 
 DUST_MAP = sf11
+COMMENTS_ENABLED = False

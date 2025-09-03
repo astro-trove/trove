@@ -17,9 +17,7 @@
         <tr>
           <th>Target</th>
           <th>Event</th>
-          <th>Viable</th>
-          <th>Reason</th>
-          <th>Priority</th>
+          <th>Score (out of 100)</th>
         </tr>
       </thead>
       <tbody>
@@ -33,8 +31,6 @@
             {% endif %}
           </td>
           <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
-          <td>{{ candidate.viable }}</td>
-          <td>{{ candidate.viability_reason }}</td>
           <td>{{ candidate.priority }}</td>
         </tr>
         {% empty %}

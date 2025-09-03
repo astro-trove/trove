@@ -18,7 +18,7 @@ register = template.Library()
 
 
 # copied from tom_base except for datum.source_name was added to the "name" of each data series
-@register.inclusion_tag('tom_dataproducts/partials/spectroscopy_for_target.html', takes_context=True)
+@register.inclusion_tag('tom_dataproducts/partials/data_plot_for_target.html', takes_context=True)
 def spectroscopy_for_target(context, target, dataproduct=None):
     """
     Renders a spectroscopic plot for a ``Target``. If a ``DataProduct`` is specified, it will only render a plot with
