@@ -31,7 +31,7 @@ QueryResult
 PS1_POINT_SOURCE_THRESHOLD = 0.83
 
 class ConeSearch(Func):
-    function = "q3c_radial_query"
+    function = "q3c_join"
     arity = 5
     output_field = BooleanField()
 
@@ -78,10 +78,10 @@ def cone_search_q3c(
 
     return queryset.filter(
         ConeSearch(
-            ra_colname,
-            dec_colname,
             ra,
             dec,
+            ra_colname,
+            dec_colname,
             radius/3600
         )
     )

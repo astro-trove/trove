@@ -178,9 +178,10 @@ class LsDr10(StaticCatalog):
 
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
-        return query_set.filter(
-            Q(default_mag__gte=18) | ~Q(mtype="PSF") 
-        )
+        return query_set.exclude(
+            default_mag__lt = 18,
+            mtype = "PSF" 
+        ) # exclude PSF magnitudes that are likely point sources
         
 class Milliquas(StaticCatalog):
     catalog_model = MilliquasQ3C
