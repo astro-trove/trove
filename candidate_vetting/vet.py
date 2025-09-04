@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from trove_targets.models import Target
+from tom_targets.models import TargetExtra
 from .models import ScoreFactor
 from custom_code.healpix_utils import SaTarget
 from tom_nonlocalizedevents.models import (
@@ -100,6 +101,51 @@ def update_score_factor(event_candidate, key, value):
 def update_event_candidate_score(event_candidate, score):
     event_candidate.priority = score
     event_candidate.save()
+
+def _save_host_galaxy_df(df, target):
+
+    col_map = {
+        "name":"ID",
+        "pcc":"PCC",
+        "offset":"Offset",
+        "ra":"RA",
+        "dec": "Dec",
+        "lumdist":"Dist",
+        "lumdist_err":"DistErr",
+        "z":"z",
+        "z_err":"zErr",
+        "default_mag":"Mags",
+        "catalog":"Source"
+    }
+    newdf = df[
+        [
+            "name",
+            "pcc",
+            "offset",
+            "ra",
+            "dec",
+            "lumdist",
+            "z",
+            "default_mag",
+            "catalog"
+        ]
+    ]
+    newdf["z_err"] = [
+        [neg, pos] if neg != pos # errors are asymmetric
+        else neg # errors are not assymetric
+        for neg, pos in zip(df.z_neg_err, df.z_pos_err)
+    ]
+    newdf["lumdist_err"] = [
+        [neg, pos] if neg != pos # errors are asymmetric
+        else neg # errors are not assymetric
+        for neg, pos in zip(df.lumdist_neg_err, df.lumdist_pos_err)
+    ]
+    newdf = newdf.rename(columns=col_map)
+    targ, created = TargetExtra.objects.get_or_create(
+        target=target,
+        key="Host Galaxies",
+        value=newdf.to_json(orient="records")
+    )
     
 def skymap_association(
         nonlocalized_event_name:str,
@@ -227,6 +273,7 @@ def host_association(target_id:int, radius=5*60, nkeep=N_TOP_PCC):
     # calculate Pcc
     catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
     seps = coord.separation(catalog_coord).arcsec
+    df["offset"] = seps
     df["pcc"] = pcc(df["default_mag"], seps)
     
     # now find duplicated galaxies within _radius
@@ -250,6 +297,9 @@ def host_association(target_id:int, radius=5*60, nkeep=N_TOP_PCC):
     end = time.time()
     print(df)
     print(f"Queries finished in {end-start}s")
+
+    # save the host galaxy dataframe to the TargetExtra "Host Galaxies" keyword
+    _save_host_galaxy_df(df, target)
     
     return df
 
