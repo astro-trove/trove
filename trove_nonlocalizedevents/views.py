@@ -22,4 +22,6 @@ class EventCandidateListView(FilterView):
         """
         return super().get_queryset().filter(
             target__in=targets_for_user(self.request.user, Target.objects.all(), 'view_target')
+        ).order_by(
+            "-priority" # this sorts the table by the priority in descending order
         )
