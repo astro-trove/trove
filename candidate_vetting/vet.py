@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Session
 
 from trove_targets.models import Target
+from tom_targets.models import TargetExtra
 from .models import ScoreFactor
 from custom_code.healpix_utils import SaTarget
 from tom_nonlocalizedevents.models import (
@@ -100,6 +101,55 @@ def update_score_factor(event_candidate, key, value):
 def update_event_candidate_score(event_candidate, score):
     event_candidate.priority = score
     event_candidate.save()
+
+def _save_host_galaxy_df(df, target):
+
+    # first delete the host galaxy key for this target if it already exists
+    if TargetExtra.objects.filter(target_id=target.id, key="Host Galaxies").exists():
+        TargetExtra.objects.filter(target_id=target.id, key="Host Galaxies").delete()
+    
+    col_map = {
+        "name":"ID",
+        "pcc":"PCC",
+        "offset":"Offset",
+        "ra":"RA",
+        "dec": "Dec",
+        "lumdist":"Dist",
+        "lumdist_err":"DistErr",
+        "z":"z",
+        "z_err":"zErr",
+        "default_mag":"Mags",
+        "catalog":"Source"
+    }
+    newdf = df[
+        [
+            "name",
+            "pcc",
+            "offset",
+            "ra",
+            "dec",
+            "lumdist",
+            "z",
+            "default_mag",
+            "catalog"
+        ]
+    ]
+    newdf["z_err"] = [
+        [neg, pos] if neg != pos # errors are asymmetric
+        else neg # errors are not assymetric
+        for neg, pos in zip(df.z_neg_err, df.z_pos_err)
+    ]
+    newdf["lumdist_err"] = [
+        [neg, pos] if neg != pos # errors are asymmetric
+        else neg # errors are not assymetric
+        for neg, pos in zip(df.lumdist_neg_err, df.lumdist_pos_err)
+    ]
+    newdf = newdf.rename(columns=col_map)
+    TargetExtra.objects.update_or_create(
+        target=target,
+        key="Host Galaxies",
+        value=newdf.to_json(orient="records")
+    )
     
 def skymap_association(
         nonlocalized_event_name:str,
@@ -177,7 +227,7 @@ def pcc(r:list[float], m:list[float]):
 
     return prob
         
-def host_association(target_id:int, radius=5*60, nkeep=N_TOP_PCC):
+def host_association(target_id:int, radius=50, nkeep=N_TOP_PCC):
     """
     Find all of the potential hosts associated with this target
     """
@@ -199,8 +249,8 @@ def host_association(target_id:int, radius=5*60, nkeep=N_TOP_PCC):
     res = []
     for catalog in catalogs:
         cat = catalog()
-        query_set = cat.query(ra, dec, radius)
-
+        query_set = cat.query(ra, dec, radius=radius)
+            
         # if no queries are returned we can skip this catalog
         if query_set.count() == 0: continue
 
@@ -227,31 +277,23 @@ def host_association(target_id:int, radius=5*60, nkeep=N_TOP_PCC):
     # calculate Pcc
     catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
     seps = coord.separation(catalog_coord).arcsec
+    df["offset"] = seps
     df["pcc"] = pcc(df["default_mag"], seps)
+
+    # TODO: We will need to put some deduplication code for the galaxy dataframe
+    #       here at some point. For now it seems to work without it though!
     
-    # now find duplicated galaxies within _radius
-    _radius = 2 # arcseconds
-    coords = SkyCoord(ra=df.ra.values*u.deg, dec=df.dec.values*u.deg)
-    idx1, idx2, _, _ = coords.search_around_sky(coords, _radius*u.arcsec)
-
-    # remove duplicated indices
-    # (since we are matching the same catalog against itself)
-    idx2 = idx2[idx1 != idx2]
-
-    # find the unique set of the indexes
-    close_indices = set(idx1.tolist() + idx2.tolist())
-
-    # Then drop the latter match
-    df = df.drop(index=np.unique(idx2)).reset_index(drop=True)
-
     # Finally, sort inversely by pcc
-    df = df.sort_values("pcc", ascending=True)[:nkeep]
+    ret_df = df.sort_values("pcc", ascending=True)[:nkeep]
     
     end = time.time()
-    print(df)
+    print(ret_df)
     print(f"Queries finished in {end-start}s")
+
+    # save the host galaxy dataframe to the TargetExtra "Host Galaxies" keyword
+    _save_host_galaxy_df(ret_df, target)
     
-    return df
+    return ret_df
 
 def host_distance_match(
         host_df:pd.DataFrame,
