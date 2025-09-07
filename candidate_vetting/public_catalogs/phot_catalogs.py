@@ -338,7 +338,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
             n_new_phot += created
         if n_new_phot:
-            logger.info(f'Added {n_new_phot:d} photometry points from the TNS')
+            logger.info(f'Added {n_new_phot:d} photometry points from ATLAS forced photometry')
 
         return bool(n_new_phot)
             
