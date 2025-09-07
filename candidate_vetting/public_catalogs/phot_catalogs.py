@@ -7,9 +7,14 @@ import time
 import json
 import logging
 import re
+import csv
+import math
+from operator import itemgetter
 from collections import OrderedDict
 
+import numpy as np
 from astropy.time import Time, TimezoneInfo
+from astropy import units
 from fundamentals.stats import rolling_window_sigma_clip
 from django.conf import settings
 
@@ -127,8 +132,8 @@ class TNS_Phot(PhotCatalog):
             )
 
             n_new_phot += created
-            if n_new_phot:
-                logger.info(f'Added {n_new_phot:d} photometry points from the TNS')
+        if n_new_phot:
+            logger.info(f'Added {n_new_phot:d} photometry points from the TNS')
 
         return bool(n_new_phot)
                 
@@ -208,8 +213,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
     def query(
             self,
-            ra:float,
-            dec:float,
+            target:Target,
             radius:float=RADIUS_ARCSEC,
             days_ago: float = 200.,
             token: str = None
@@ -219,6 +223,9 @@ class ATLAS_Forced_Phot(PhotCatalog):
         {_QUERY_METHOD_DOCSTRING}
         """
 
+        # get the RA and Dec from the target
+        ra, dec = target.ra, target.dec
+        
         _verbose = self._verbose
         
         BASEURL = "https://fallingstar-data.com/forcedphot"
@@ -299,14 +306,49 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         ATLASphot = self._ATLAS_stack(textdata)
 
-        return ATLASphot
+        # add the photometry to the target        
+        return self._add_phot(target, ATLASphot)
 
-    def _ATLAS_stack(self, textdata):
+    def _add_phot(self, target, data, signal_to_noise_cutoff = 3.0):        
+
+        n_new_phot = 0
+        for datum in data:
+            time = Time(datum['mjd'], format='mjd')
+            utc = TimezoneInfo(utc_offset=0*units.hour)
+            time.format = 'datetime'
+            value = {
+                'filter': str(datum['F']),
+                'telescope': 'ATLAS',
+            }
+            # If the signal is in the noise, calculate the non-detection limit from the reported flux uncertainty.
+            # see https://fallingstar-data.com/forcedphot/resultdesc/
+            signal_to_noise = datum['uJy'] / datum['duJy']
+            if signal_to_noise <= signal_to_noise_cutoff:
+                value['limit'] = 23.9 - 2.5 * np.log10(signal_to_noise_cutoff * datum['duJy'])
+            else:
+                value['magnitude'] = 23.9 - 2.5 * np.log10(datum['uJy'])
+                value['error'] = 2.5 / np.log(10.) / signal_to_noise
+
+            created = create_phot(
+                target = target,
+                time = time.to_datetime(timezone=utc),
+                fluxdict = value,
+                source = "ATLAS"
+            )
+
+            n_new_phot += created
+        if n_new_phot:
+            logger.info(f'Added {n_new_phot:d} photometry points from the TNS')
+
+        return bool(n_new_phot)
+            
+        
+    def _ATLAS_stack(self, filecontent):
         """
         Function adapted from David Young's :func:`plotter.plot_single_result`
         https://github.com/thespacedoctor/plot-results-from-atlas-force-photometry-service/blob/main/plot_atlas_fp.py
         """
-        epochs = self._ATLAS_read_and_sigma_clip_data(filecontent, log=log)
+        epochs = self._ATLAS_read_and_sigma_clip_data(filecontent, log=logger)
 
         # c = cyan, o = arange
         magnitudes = {
@@ -325,10 +367,10 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         # STACK PHOTOMETRY IF REQUIRED
         stacked_magnitudes = self._stack_photometry(magnitudes, binningDays=1)
-
+        
         return stacked_magnitudes
 
-    def _ATLAS_read_and_sigma_clip_data(filecontent, log, clippingSigma=2.2):
+    def _ATLAS_read_and_sigma_clip_data(self, filecontent, log, clippingSigma=2.2):
         """
         Function adapted from David Young's :func:`plotter.read_and_sigma_clip_data`
         https://github.com/thespacedoctor/plot-results-from-atlas-force-photometry-service/blob/main/plot_atlas_fp.py
@@ -400,7 +442,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
         # Returns ordered dictionary of all parameters
         return cepochs + oepochs
 
-    def _stack_photometry(magnitudes, binningDays=1.):
+    def _stack_photometry(self, magnitudes, binningDays=1.):
         # IF WE WANT TO 'STACK' THE PHOTOMETRY
         summedMagnitudes = {
             'c': {'mjds': [], 'mags': [], 'magErrs': [], 'n': [], 'lim5sig': []},
