@@ -248,7 +248,11 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         df = cat.to_standardized_catalog(df)
 
         # some extra cleaning before continuing
-        df = df[df.z > 0.02] # otherwise it probably isn't a real redshift
+        if "z" in df:
+            # we only need to do this if the redshift is in the dataframe
+            # if it isn't then that's fine because it means the catalog we are using
+            # had a derived distance in it already!
+            df = df[df.z > 0.02] # otherwise it probably isn't a real redshift
         df = df.dropna(
             subset=["default_mag", "ra", "dec", "lumdist"]
         ) # drop rows without the information we need

@@ -76,7 +76,7 @@ class Gaiadr3Variable(StaticCatalog):
 class GladePlus(StaticCatalog):
     catalog_model = GladePlusQ3C
     colmap = {
-        "sdss":"name",
+        "gn":"name",
         "z_helio":"z",
         "z_err":"z_err", 
         "d_l": "lumdist", # Mpc
@@ -131,7 +131,7 @@ class Hecate(StaticCatalog):
 
     def to_standardized_catalog(self, df):
         df["lumdist_neg_err"] = df.d - df.d_lo68
-        df["lumdist_pos_err"] = df.d_up68 - df.d
+        df["lumdist_pos_err"] = df.d_hi68 - df.d
 
         self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
         self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
