@@ -78,8 +78,7 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None):
     # do the Pcc analysis and find a host
     host_df = host_association(
         target_id,
-        radius = 5*60,
-        nkeep = 10
+        radius = 5*60
     )
     if len(host_df) != 0:
         # then run the distance comparison for each of these hosts
@@ -89,8 +88,8 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None):
             nonlocalized_event_name
         )
 
-        # choose the most likely host and take the score
-        host_score = host_df.iloc[0].dist_norm_joint_prob
+        # choose the maximum score out of the top 10 best hosts
+        host_score = host_df.dist_norm_joint_prob.max()
         update_score_factor(event_candidate, "host_distance_score", host_score)
 
     else:

@@ -44,8 +44,9 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     Ps1PointSource
 )
 
-# After we order the dataframe by the Pcc score, take this number of hosts from the top
-N_TOP_PCC = 50
+# After we order the dataframe by the Pcc score, remove any host matches with a greater
+# Pcc score than this
+PCC_THRESHOLD = 0.1
 
 class AsymmetricGaussian(rv_continuous):
     """
@@ -159,54 +160,38 @@ def skymap_association(
 
     # grab the EventLocalization object for nonlocalized_event_name
     localization = _localization_from_name(nonlocalized_event_name)
+
+    # find the healpix where this target is located
+    target_hpx_subq = sa.select(
+        SaTarget.healpix
+    ).filter(
+        SaTarget.basetarget_ptr_id == target_id
+    ).lateral()
     
-    # calculate the cumalative probability density for the tiles
-    # SHOULDN'T THIS BE STORED IN THE SaSkymapTile OBJECT???
-    cum_prob = sa.func.sum(
-        SaSkymapTile.probdensity * SaSkymapTile.tile.area
-    ).over(
-        order_by=SaSkymapTile.probdensity.desc()
-    ).label(
-        'cum_prob'
-    )
-
-    # find the localization region in the SaSkymapTile
-    subquery = sa.select(
-        SaSkymapTile.probdensity,
-        cum_prob
+    # find the probdensity at the tile of the target_id
+    # and for this localization id
+    probdensity_subq = sa.select(
+        sa.func.min(SaSkymapTile.probdensity).label("min_probdensity")
     ).filter(
+        SaSkymapTile.tile.contains(target_hpx_subq.c.healpix),
         SaSkymapTile.localization_id == localization.id
-    ).subquery()
-
-    # Filter on the skymap and take all of the tiles that are within the
-    # cumulative probability density contour passed in as "prob"
-    min_probdensity = sa.select(
-        sa.func.min(subquery.columns.probdensity)
+    )
+    
+    # then we can sum from that probability density to the maximum
+    cumprob_query = sa.select(
+        sa.func.sum(
+            SaSkymapTile.probdensity * SaSkymapTile.tile.area
+        )
     ).filter(
-        subquery.columns.cum_prob <= prob
-    ).scalar_subquery()
-
-    # write the query for the Target table
-    query = sa.select(
-        cum_prob
-    ).filter(
-        SaTarget.basetarget_ptr_id == target_id,
-        SaSkymapTile.localization_id == localization.id,
-        SaSkymapTile.tile.contains(SaTarget.healpix),
-        SaSkymapTile.probdensity >= min_probdensity
+        SaSkymapTile.probdensity >= probdensity_subq.c.min_probdensity,
+        SaSkymapTile.localization_id == localization.id
     )
 
-    # execute the query
+    # finally we can execute this cumprob_query and return 1 - the result
     with Session(sa_engine) as session:
-        skymap_score = session.execute(
-            query
-        ).fetchall()
+        cumprob = session.execute(cumprob_query).fetchall()
 
-    if len(skymap_score) == 0:
-        return 0
-
-    # need [0][0] because it is a list of tuples
-    return 1 - float(skymap_score[0][0])
+    return 1 - cumprob[0][0]
         
 def pcc(r:list[float], m:list[float]):
     """
@@ -227,7 +212,7 @@ def pcc(r:list[float], m:list[float]):
 
     return prob
         
-def host_association(target_id:int, radius=50, nkeep=N_TOP_PCC):
+def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
     """
     Find all of the potential hosts associated with this target
     """
@@ -282,9 +267,14 @@ def host_association(target_id:int, radius=50, nkeep=N_TOP_PCC):
 
     # TODO: We will need to put some deduplication code for the galaxy dataframe
     #       here at some point. For now it seems to work without it though!
+
+    # filter out anything above PCC_THRESHOLD
+    # Or, alternatively, only keep the best matching galaxy (if all of the galaxies
+    # have a Pcc greater than PCC_THRESHOLD)
+    pcc_threshold = max(pcc_threshold, df.pcc.min())
     
-    # Finally, sort inversely by pcc
-    ret_df = df.sort_values("pcc", ascending=True)[:nkeep]
+    # Finally, filter out anything <= pcc_threshold and sort inversely by pcc
+    ret_df = df[df.pcc <= pcc_threshold].sort_values("pcc", ascending=True)
     
     end = time.time()
     print(ret_df)
