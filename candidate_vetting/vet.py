@@ -92,11 +92,33 @@ def _localization_from_name(nonlocalized_event_name):
 
     return localization
 
+def _distance_at_healpix(nonlocalized_event_name, target_id):
+    """Computes the GW distance at the target_id healpix location"""
+
+    localization = _localization_from_name(nonlocalized_event_name)
+    # find the distance at the healpix
+    query = sa.select(
+        SaSkymapTile.distance_mean,
+        SaSkymapTile.distance_std
+    ).filter(
+        SaTarget.basetarget_ptr_id == target_id,
+        SaSkymapTile.localization_id == localization.id,
+        SaSkymapTile.tile.contains(SaTarget.healpix)
+    )
+
+    # execute the query
+    with Session(sa_engine) as session:
+        dist, dist_err = session.execute(
+            query
+        ).fetchall()[0]
+
+    return dist, dist_err
+
 def update_score_factor(event_candidate, key, value):
     ScoreFactor.objects.update_or_create(
         event_candidate = event_candidate,
         key = key,
-        value = value
+        defaults = dict(value = value)
     )
 
 def update_event_candidate_score(event_candidate, score):
@@ -295,23 +317,9 @@ def host_distance_match(
         nonlocalized_event_name:str
 ):
 
-    localization = _localization_from_name(nonlocalized_event_name)
     # find the distance at the healpix
-    query = sa.select(
-        SaSkymapTile.distance_mean,
-        SaSkymapTile.distance_std
-    ).filter(
-        SaTarget.basetarget_ptr_id == target_id,
-        SaSkymapTile.localization_id == localization.id,
-        SaSkymapTile.tile.contains(SaTarget.healpix)
-    )
-
-    # execute the query
-    with Session(sa_engine) as session:
-        dist, dist_err = session.execute(
-            query
-        ).fetchall()[0]
-
+    dist, dist_err = _distance_at_healpix(nonlocalized_event_name, target_id)
+        
     # now crossmatch this distance to the host galaxy dataframe
     _lumdist = np.linspace(0, 10_000, 10_000)
     test_pdf = norm.pdf(_lumdist, loc=dist, scale=dist_err)
