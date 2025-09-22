@@ -20,7 +20,10 @@ from .vet import (
 from .vet_phot import (
     compute_peak_lum,
     estimate_max_find_decay_rate,
-    standardize_filter_names
+    standardize_filter_names,
+    _get_post_disc_phot,
+    _get_pre_disc_phot,
+    get_predetection_stats
 )
 from trove_mpc import Transient
 
@@ -37,85 +40,12 @@ logger = logging.getLogger(__name__)
 PARAM_RANGES = dict(
     lum_max = [0*u.erg/u.s, 1e43*u.erg/u.s],
     peak_time = [0, 4],
-    decay_rate = [-np.inf, -0.1] 
+    decay_rate = [-np.inf, -0.1],
+    max_predets = 3
 )
 FILTER_PRIORITY_ORDER = ["r", "g", "V", "R", "G"]
 PHOT_SCORE_MIN = 0.1
-
-def _get_phot(target_id:int, nonlocalized_event:NonLocalizedEvent) -> pd.DataFrame:
-    """
-    Get the photometry for this target_id and parse into a dataframe for further analysis
-    """
-    target = Target.objects.filter(id=target_id)[0]
-
-    # get the photometry
-    phot = list(ReducedDatum.objects.filter(target=target, data_type="photometry"))
-        
-    
-    # clean up the photometry
-    fordf = dict(
-        telescope = [],
-        mjd = [],
-        mag = [],
-        magerr = [],
-        upperlimit = [],
-        filter = [],
-    )
-
-    if len(phot) == 0:
-        # just return an empty dataframe
-        return pd.DataFrame(fordf)
-
-    for p in phot:
-        if hasattr(p, "source_name"):
-            fordf["telescope"].append(p.source_name)
-        elif "telescope" in p.value:
-            fordf["telescope"].append(p.value["telescope"])
-        else:
-            fordf["telescope"].append("unknown")
-
-        if not hasattr(p, "timestamp"): continue
-        fordf["mjd"].append(Time(p.timestamp).mjd)
-
-        if "filter" not in p.value: continue
-        fordf["filter"].append(p.value["filter"])
-        
-        if "magnitude" in p.value:
-            fordf["mag"].append(p.value["magnitude"])
-            fordf["upperlimit"].append(False)
-            if "error" in p.value:
-                fordf["magerr"].append(p.value["error"])
-            else:
-                fordf["magerr"].append(0)
-        elif "limit" in p.value:
-            fordf["upperlimit"].append(True)
-            fordf["mag"].append(p.value["limit"])
-            fordf["magerr"].append(np.nan)
-        else:
-            continue
-
-    fordf["filter"] = standardize_filter_names(fordf["filter"])
-    
-    photdf = pd.DataFrame(fordf)
-    
-    # clean out the 0's in the magerr column because it breaks the fitting
-    # np.log(10) / (3 * 2.5) is the constant 3 sigma uncertainty so let's assume this
-    # as a worst case scenario
-    photdf["magerr"] = photdf.magerr.replace(0, np.log(10) / (3 * 2.5))
-
-    # compute the days since the nonlocalized event passed in
-    # get the GW event discovery date
-    gw_disc_date = Time(
-        EventSequence.objects.filter(
-            nonlocalizedevent_id=nonlocalized_event.id
-        ).last().details["time"]
-    ).mjd
-    
-    # add a column to the dataframe
-    photdf["dt"] = photdf.mjd - gw_disc_date
-    phot_post_disc = photdf[photdf.dt >= 0]
-    
-    return phot_post_disc
+PREDETECTION_SNR_THRESHOLD = 5 # require a S/N of 5 for a predetection to be considered real
 
 def _score_phot(allphot, target, nonlocalized_event, filt=None):
     phot = allphot[~allphot.upperlimit]
@@ -166,7 +96,7 @@ def _score_phot(allphot, target, nonlocalized_event, filt=None):
             phot_score *= PHOT_SCORE_MIN
 
         return phot_score, lum, max_time, decay_rate, _model, _best_fit_params
-            
+    
     return phot_score, lum, None, None, None, None
 
 def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None):
@@ -246,7 +176,7 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None):
         host_score = 1
 
     # Photometry scoring
-    allphot = _get_phot(target_id=target_id, nonlocalized_event=nonlocalized_event)
+    allphot = _get_post_disc_phot(target_id=target_id, nonlocalized_event=nonlocalized_event)
     phot_score, lum, max_time, decay_rate, _, _ = _score_phot(
         allphot=allphot,
         target = target,
@@ -259,8 +189,22 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None):
         update_score_factor(event_candidate, "phot_peak_time", max_time)
     if decay_rate is not None:
         update_score_factor(event_candidate, "phot_decay_rate", decay_rate)
-            
+
+    # check for *reliable* predetections
+    prephot = _get_pre_disc_phot(target.id, nonlocalized_event)
+    predet_score = 1
+    if len(prephot):
+        n_predets, _ = get_predetection_stats(
+            prephot.mjd.values,
+            prephot.magerr.values,
+            window_size=5, # +/-5 day window size
+            det_snr_thresh=PREDETECTION_SNR_THRESHOLD
+        )
+        if any(v >= PARAM_RANGES["max_predets"] for v in n_predets):
+            predet_score = PHOT_SCORE_MIN
+            update_score_factor(event_candidate, "predetection_score", predet_score)
+
     # compute the overall score
-    overall_score = skymap_score*ps_score*mpc_score*host_score*phot_score
+    overall_score = skymap_score*ps_score*mpc_score*host_score*phot_score*predet_score
     update_event_candidate_score(event_candidate, int(overall_score*100))
 

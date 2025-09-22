@@ -70,7 +70,7 @@ class AsymmetricGaussian(rv_continuous):
 
         return minus_dist.tolist()+plus_dist.tolist()
 
-def _localization_from_name(nonlocalized_event_name):
+def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
     """Find the most recenet LocalizationEvent object from the nonlocalized event name
     """
     # first find the localization to use
@@ -87,15 +87,15 @@ def _localization_from_name(nonlocalized_event_name):
     for loc in all_localizations:
         curr_loc_time = Time(localization.date, format="datetime")
         test_loc_time = Time(loc.date, format="datetime")
-        if test_loc_time > curr_loc_time:
+        if test_loc_time > curr_loc_time and test_loc_time <= max_time:
             localization = loc
 
     return localization
 
-def _distance_at_healpix(nonlocalized_event_name, target_id):
+def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()):
     """Computes the GW distance at the target_id healpix location"""
 
-    localization = _localization_from_name(nonlocalized_event_name)
+    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
     # find the distance at the healpix
     query = sa.select(
         SaSkymapTile.distance_mean,
@@ -314,11 +314,12 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
 def host_distance_match(
         host_df:pd.DataFrame,
         target_id:int,
-        nonlocalized_event_name:str
+        nonlocalized_event_name:str,
+        max_time:Time=Time.now()
 ):
 
     # find the distance at the healpix
-    dist, dist_err = _distance_at_healpix(nonlocalized_event_name, target_id)
+    dist, dist_err = _distance_at_healpix(nonlocalized_event_name, target_id, max_time=max_time)
         
     # now crossmatch this distance to the host galaxy dataframe
     _lumdist = np.linspace(0, 10_000, 10_000)

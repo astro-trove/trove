@@ -12,6 +12,10 @@ from scipy.optimize import curve_fit
 
 from lightcurve_fitting.lightcurve import LC
 
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
+from tom_dataproducts.models import ReducedDatum
+from trove_targets.models import Target
+
 def _powerlaw(x, a, y0):
     """
     Powerlaw that returns a logarithmic y value
@@ -32,6 +36,99 @@ def _ssr(model_y, data_y):
 def _flux_to_lum(flux, lumdist):
     """convert flux to lum. Everything should be astropy quantities"""
     return 4 * np.pi * lumdist**2 * flux
+
+def _get_phot(target_id:int, nonlocalized_event:NonLocalizedEvent) -> pd.DataFrame:
+    """
+    Get the photometry for this target_id and parse into a dataframe for further analysis
+    """
+    target = Target.objects.filter(id=target_id)[0]
+
+    # get the photometry
+    phot = list(ReducedDatum.objects.filter(target=target, data_type="photometry"))
+        
+    
+    # clean up the photometry
+    fordf = dict(
+        telescope = [],
+        mjd = [],
+        mag = [],
+        magerr = [],
+        upperlimit = [],
+        filter = [],
+    )
+
+    if len(phot) == 0:
+        # just return an empty dataframe
+        return pd.DataFrame(fordf)
+
+    for p in phot:
+        if hasattr(p, "source_name"):
+            fordf["telescope"].append(p.source_name)
+        elif "telescope" in p.value:
+            fordf["telescope"].append(p.value["telescope"])
+        else:
+            fordf["telescope"].append("unknown")
+
+        if not hasattr(p, "timestamp"): continue
+        fordf["mjd"].append(Time(p.timestamp).mjd)
+
+        if "filter" not in p.value: continue
+        fordf["filter"].append(p.value["filter"])
+        
+        if "magnitude" in p.value:
+            fordf["mag"].append(p.value["magnitude"])
+            fordf["upperlimit"].append(False)
+            if "error" in p.value:
+                fordf["magerr"].append(p.value["error"])
+            else:
+                fordf["magerr"].append(0)
+        elif "limit" in p.value:
+            fordf["upperlimit"].append(True)
+            fordf["mag"].append(p.value["limit"])
+            fordf["magerr"].append(np.nan)
+        else:
+            continue
+
+    fordf["filter"] = standardize_filter_names(fordf["filter"])
+    
+    photdf = pd.DataFrame(fordf)
+    
+    # clean out the 0's in the magerr column because it breaks the fitting
+    # 2.5 / (3 * log(10)) is the constant 3 sigma uncertainty so let's assume this
+    # as a worst case scenario
+    photdf["magerr"] = photdf.magerr.replace(0, 2.5 / (3 * np.log(10)))
+
+    # compute the days since the nonlocalized event passed in
+    # get the GW event discovery date
+    gw_disc_date = Time(
+        EventSequence.objects.filter(
+            nonlocalizedevent_id=nonlocalized_event.id
+        ).last().details["time"]
+    ).mjd
+    
+    # add a column to the dataframe
+    photdf["dt"] = photdf.mjd - gw_disc_date
+
+    return photdf
+
+def _get_post_disc_phot(
+        target_id:int,
+        nonlocalized_event:NonLocalizedEvent
+) -> pd.DataFrame:
+    photdf = _get_phot(target_id, nonlocalized_event)
+    phot_post_disc = photdf[photdf.dt >= 0]
+    return phot_post_disc
+    
+def _get_pre_disc_phot(
+        target_id:int,
+        nonlocalized_event:NonLocalizedEvent
+) -> pd.DataFrame:
+    photdf = _get_phot(target_id, nonlocalized_event)
+    phot_pre_disc = photdf[photdf.dt < 0]
+    return phot_pre_disc
+
+def _get_window_stats(min_idx, max_idx, isdet):
+    return int(sum(isdet[min_idx:max_idx])), int(len(isdet[min_idx:max_idx]))
 
 def standardize_filter_names(
         filters:list[str],
@@ -220,4 +317,52 @@ def compute_peak_lum(
     # then we need to multiply be the effective frequency of the filter
     nu_lummax = (filtermax.freq_eff * lummax).to("erg/s")
     return nu_lummax
+
+def get_predetection_stats(
+        mjd:list[float],
+        magerr:list[float],
+        det_snr_thresh:int=5,
+        window_size:int=5
+) -> tuple[list[int],list[int]]:
+    """
+    Uses a sliding window to find all predetections within window_size and
+    returns 1) a list of the number of predetections and 2) a list of the number
+    of observations within that window
+
+    Parameters
+    ----------
+    mjd: list[float]
+        A list of the MJDs of the observations
+    magerr: list[bool]
+        A list the same length as mjd with the uncertainty on the magnitude. We use
+        this with `det_snr_thresh` to determine if the observation is a detection
+    det_thresh: int
+        The required signal to noise ratio for a point to be considered a detection 
+    window_size: int
+        The window size in days. Default is 5.
+
+    Returns
+    -------
+    Two lists: 1) the number of predetections in each window and 2) the number of
+    observations in each window
+    """
+
+    # derive an array of if the observation is a detection
+    isdet = ~np.isnan(magerr) * (magerr < 2.5 / (det_snr_thresh*np.log(10)))
     
+    # sort both arrays according to the MJD
+    sorted_idx = np.argsort(mjd)
+    times = mjd[sorted_idx]
+    isdet = isdet[sorted_idx]
+
+    # now iterate from 0+window_size to end-window_size
+    res = [
+        _get_window_stats(
+            np.where(times==times[i-window_size])[0][0],
+            np.where(times==times[i+window_size])[0][0],
+            isdet
+        ) for i in range(0+window_size, len(isdet)-window_size, 1)
+    ]
+    
+    # now we can transpose the result and return
+    return tuple(zip(*res))
