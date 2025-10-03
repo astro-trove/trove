@@ -68,8 +68,10 @@ class AsymmetricGaussian(rv_continuous):
             -((x[where_plus] - mean[where_plus]) / unc_plus[where_plus])**2 / 2
         ) # Right side Gaussian-like
 
-        return minus_dist.tolist()+plus_dist.tolist()
-
+        non_normalized = np.array(minus_dist.tolist()+plus_dist.tolist())
+        norm_factor = trapezoid(non_normalized) # integrate over the non normalized PDF
+        return non_normalized/norm_factor
+        
 def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
     """Find the most recenet LocalizationEvent object from the nonlocalized event name
     """
@@ -82,13 +84,16 @@ def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
         nonlocalizedevent_id=localization_queryset.id
     )
 
+    all_localizations_sorted = sorted(all_localizations, key=lambda x : x.date)
+
     # now choose the most recent localization
-    localization = all_localizations[0]
-    for loc in all_localizations:
-        curr_loc_time = Time(localization.date, format="datetime")
-        test_loc_time = Time(loc.date, format="datetime")
-        if test_loc_time > curr_loc_time and test_loc_time <= max_time:
-            localization = loc
+    localization = all_localizations_sorted[0]
+    if len(all_localizations_sorted) > 1:
+        for loc in all_localizations_sorted[1:]:
+            curr_loc_time = Time(localization.date, format="datetime")
+            test_loc_time = Time(loc.date, format="datetime")
+            if test_loc_time > curr_loc_time and test_loc_time <= max_time:
+                localization = loc
 
     return localization
 
@@ -177,11 +182,13 @@ def _save_host_galaxy_df(df, target):
 def skymap_association(
         nonlocalized_event_name:str,
         target_id:int,
+        max_time = Time.now(),
         prob:float=0.95
 ) -> float:
 
     # grab the EventLocalization object for nonlocalized_event_name
-    localization = _localization_from_name(nonlocalized_event_name)
+    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
+    print(f"Localization Used: {localization} ({localization.date}; {max_time})")
 
     # find the healpix where this target is located
     target_hpx_subq = sa.select(
@@ -333,8 +340,12 @@ def host_distance_match(
         ) for _,row in host_df.iterrows() 
     ])
     joint_prob = host_pdfs*test_pdf
-
-    host_df["dist_norm_joint_prob"] = trapezoid(joint_prob, axis=1)
+    
+    # finally, compute the Bhattacharyya coefficient for the overlap of these
+    # two distributions. https://en.wikipedia.org/wiki/Bhattacharyya_distance
+    # This coefficient is non-parametric which is good for our Asymmetric Gaussian
+    # Original paper: http://www.jstor.org/stable/25047806
+    host_df["dist_norm_joint_prob"] = trapezoid(np.sqrt(joint_prob), axis=1)
     return host_df
 
 def point_source_association(target_id:int, radius:float=2):
