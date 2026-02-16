@@ -13,9 +13,11 @@ This should also be called before any photometry vetting in the NLE-related
 vetting modules. That way we can reduce the code duplication between them!
 """
 
+
 import logging
 import io
 from astropy.time import Time
+import numpy as np
 import pandas as pd
 
 from trove_targets.models import Target
@@ -76,11 +78,26 @@ def vet_basic(
             data_type="photometry",
             value__magnitude__isnull=False
         )
-        if phot.exists():
+        # get photometry, throwing out limiting mags, phot with no error, and phot with SNR < 5
+        phot = ReducedDatum.objects.filter(
+            target_id=target_id,
+            data_type="photometry",
+            value__magnitude__isnull=False,
+            value__error__isnull=False,
+            value__error__lte=2.5/np.log(10)/5
+        )
+        # if more than (5-sigma) 1 detection, likely not a MPC object
+        if phot.exists() and len(phot) > 1:
+            logger.warn("This candidate has more than 1 >5-sigma detection, "+
+                        "skipping MPC!")
+            mpc_match = None
+        # if only 1 detection, run MPC match
+        elif phot.exists() and len(phot) == 1:
             latest_det = phot.latest()
             date = Time(latest_det.timestamp).mjd
             t = Transient(target.ra, target.dec)
             mpc_match = t.minor_planet_match(date)
+        # no detections --> can't do MPC match
         else:
             logger.warn("This candidate has no photometry, skipping MPC!")
             mpc_match = None
