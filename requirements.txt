@@ -1,3 +1,4 @@
+setuptools==81.0.0 # force v81 due to multiple dependents on pkg_resources (lates version of setuptools deprecates pkg_resources). Once dependents catch up this can be removed.
 astroplan
 astropy
 astroquery
