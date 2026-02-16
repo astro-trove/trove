@@ -73,11 +73,6 @@ def vet_basic(
         
     ## run the minor planet checker
     if overwrite or not te.filter(key="mpc_match_name").exists():
-        phot = ReducedDatum.objects.filter(
-            target_id=target_id,
-            data_type="photometry",
-            value__magnitude__isnull=False
-        )
         # get photometry, throwing out limiting mags, phot with no error, and phot with SNR < 5
         phot = ReducedDatum.objects.filter(
             target_id=target_id,
