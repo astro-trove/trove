@@ -4,7 +4,7 @@ their resemblance to kilonovae-in-supernovae.
 """
 import logging
 from typing import Optional
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from astropy import units as u
 import pandas as pd
 import numpy as np
@@ -31,6 +31,7 @@ from trove_targets.models import Target
 from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import (
     EventCandidate,
+    EventLocalization,
     NonLocalizedEvent,
     EventSequence
 )
@@ -63,7 +64,16 @@ def vet_kn_in_sn(target_id:int, nonlocalized_event_name:Optional[str]=None,
     target = Target.objects.get(id=target_id)
     
     ## check skymap association
-    skymap_score = skymap_association(nonlocalized_event_name, target_id)
+    # first, get the time
+    if np.isfinite(param_ranges["t_post"]):
+        locs = EventLocalization.objects.filter(nonlocalizedevent_id=nonlocalized_event.id)
+        nle_time = locs[0].date
+        max_time = Time(nle_time) + TimeDelta(param_ranges["t_post"]*u.day)
+    else: # just use current time
+        max_time = Time.now()
+    # then, get the score
+    skymap_score = skymap_association(nonlocalized_event_name, target_id,
+                                      max_time=max_time)
     update_score_factor(event_candidate, "skymap_score", skymap_score)
     if skymap_score < 1e-2:
         return 
