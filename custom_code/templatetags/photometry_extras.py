@@ -234,7 +234,10 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     fig = go.Figure(data=plot_data, layout=layout)
 
     for candidate in target.eventcandidate_set.all():
-        t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+        if not candidate.nonlocalizedevent.sequences.last().details['time'][-1] in ("z", "Z"):
+            t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time']+"Z", '%Y-%m-%dT%H:%M:%S.%f%z')
+        else:
+            t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
         fig.add_vline(t0.timestamp() * 1000., annotation_text=candidate.nonlocalizedevent.event_id)
 
     return {
