@@ -445,7 +445,7 @@ def find_public_phot(
         if last_atlas_point.timestamp < now - timedelta(days=forced_phot_tol):
             # then we should only query ATLAS for this target for forced photometry
             # since the last point we have
-            days_ago = (last_atlas_point.timestamp - now).days
+            days_ago = (now - last_atlas_point.timestamp).days
             query_atlas = days_ago > 3 # otherwise ATLAS probably won't have anything new
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
