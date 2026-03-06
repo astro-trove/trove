@@ -31,7 +31,6 @@ from trove_targets.models import Target
 from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import (
     EventCandidate,
-    EventLocalization,
     NonLocalizedEvent,
     EventSequence
 )
