@@ -64,14 +64,12 @@ def vet_super_kn(target_id:int, nonlocalized_event_name:Optional[str]=None,
     target = Target.objects.get(id=target_id)
     
     ## check skymap association
-    # first, get the time
     if np.isfinite(param_ranges["t_post"]):
-        locs = EventLocalization.objects.filter(nonlocalizedevent_id=nonlocalized_event.id)
-        nle_time = locs[0].date
-        max_time = Time(nle_time) + TimeDelta(param_ranges["t_post"]*u.day)
+        gw_disc_date = EventSequence.objects.filter( # GW discovery time
+            nonlocalizedevent_id=nonlocalized_event.id).last().details["time"]
+        max_time = Time(gw_disc_date) + TimeDelta(param_ranges["t_post"]*u.day)
     else: # just use current time
         max_time = Time.now()
-    # then, get the score
     skymap_score = skymap_association(nonlocalized_event_name, target_id,
                                       max_time=max_time)
     update_score_factor(event_candidate, "skymap_score", skymap_score)
