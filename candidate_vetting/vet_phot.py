@@ -525,7 +525,9 @@ def _score_phot(allphot, target, nonlocalized_event,
         
         # check if these are within the appropriate ranges
         if max_time < param_ranges["peak_time"][0] or max_time > param_ranges["peak_time"][1]:
-            phot_score *= PHOT_SCORE_MIN
+            # this is to make sure we don't bias the score if there are no observations in the peak_time time range
+            if phot.dt.min() < param_ranges["peak_time"][1]: 
+                phot_score *= PHOT_SCORE_MIN
         
         if decay_rate < param_ranges["decay_rate"][0] or decay_rate > param_ranges["decay_rate"][1]:
             phot_score *= PHOT_SCORE_MIN
