@@ -510,7 +510,7 @@ def _score_phot(allphot, target, nonlocalized_event,
     # then we can only do the next stuff if there is more than one photometry point
     # at this filter
     # has to be at least 2 points before max_decay_fit_time, to fit the powerlaw
-    if len(phot[phot.dt < param_ranges["max_decay_fit_time"]]) > 1:         
+    if len(phot[phot.dt < param_ranges["max_decay_fit_time"]]) > 1:
         # find the maximum and decay rate
         try:
             _model,_best_fit_params,max_time,decay_rate = estimate_max_find_decay_rate(
@@ -526,7 +526,9 @@ def _score_phot(allphot, target, nonlocalized_event,
         # check if these are within the appropriate ranges
         if max_time < param_ranges["peak_time"][0] or max_time > param_ranges["peak_time"][1]:
             # this is to make sure we don't bias the score if there are no observations in the peak_time time range
-            if phot.dt.min() < param_ranges["peak_time"][1]: 
+            if phot.dt.min() > param_ranges["peak_time"][1]: 
+                max_time = None
+            else:
                 phot_score *= PHOT_SCORE_MIN
         
         if decay_rate < param_ranges["decay_rate"][0] or decay_rate > param_ranges["decay_rate"][1]:
