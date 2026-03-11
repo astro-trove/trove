@@ -20,8 +20,10 @@ class TestAsymmetricGaussian:
         x = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
         mean = np.array([1.0] * 5)
         unc = np.array([0.5] * 5)
+        integ_a = np.array([-5.0] * 5)
+        integ_b = np.array([5.0] * 5)
         
-        pdf_vals = ag._pdf(x, mean, unc, unc)
+        pdf_vals = ag._pdf(x, mean, unc, unc, integ_a, integ_b)
         norm_vals = norm.pdf(x, loc=1.0, scale=0.5)
         
         assert len(pdf_vals) == len(x)
@@ -35,8 +37,10 @@ class TestAsymmetricGaussian:
         mean = np.array([1.0])
         unc_minus = np.array([0.3])
         unc_plus = np.array([0.5])
+        integ_a = np.array([-5.0])
+        integ_b = np.array([5.0])
         
-        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus)
+        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
         assert len(pdf_val) == 1
         assert pdf_val[0] > 0
 
@@ -49,8 +53,10 @@ class TestAsymmetricGaussian:
         mean = np.array([1.0])
         unc_minus = np.array([0.3])
         unc_plus = np.array([0.5])
+        integ_a = np.array([-5.0])
+        integ_b = np.array([5.0])
         
-        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus)
+        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
         assert len(pdf_val) == 1
         assert pdf_val[0] > 0
 
@@ -63,8 +69,10 @@ class TestAsymmetricGaussian:
         mean = np.array([1.0, 1.0])
         unc_minus = np.array([0.3, 0.3])
         unc_plus = np.array([0.5, 0.5])
+        integ_a = np.array([-5.0, -5.0])
+        integ_b = np.array([5.0, 5.0])
         
-        pdf_vals = ag._pdf(x, mean, unc_minus, unc_plus)
+        pdf_vals = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
         assert len(pdf_vals) == 2
         assert all(p > 0 for p in pdf_vals)
 
@@ -143,6 +151,7 @@ class TestStaticCatalogStandardization:
             'd_l': [200.0],
             'd_l_err': [20.0],
             'b': [18.5],
+            'dist_flag': [2],
         })
         
         result = cat.to_standardized_catalog(df)
@@ -185,7 +194,7 @@ class TestStaticCatalogStandardization:
             'dec': [30.0],
             'd': [50.0],
             'd_lo68': [45.0],
-            'd_up68': [55.0],
+            'd_hi68': [55.0],
             'e_d': [5.0],
             'r': [14.5],
             'objname': ['NGC1234'],

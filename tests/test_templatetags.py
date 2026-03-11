@@ -251,7 +251,7 @@ class TestTargetExtras:
         result = split_name('AT2024abc')
         assert result['prefix'] == 'AT'
         assert result['basename'] == '2024abc'
-        assert result['has_tns_prefix'] is True
+        assert result['tns_objname'] == '2024abc'
 
     def test_split_name_sn_prefix(self):
         """Test split_name with SN prefix."""
@@ -259,7 +259,7 @@ class TestTargetExtras:
         result = split_name('SN2024xyz')
         assert result['prefix'] == 'SN'
         assert result['basename'] == '2024xyz'
-        assert result['has_tns_prefix'] is True
+        assert result['tns_objname'] == '2024xyz'
 
     def test_split_name_no_prefix(self):
         """Test split_name without recognized prefix."""
@@ -267,7 +267,7 @@ class TestTargetExtras:
         result = split_name('ZTF24aabbcc')
         assert result['prefix'] == 'ZTF'
         assert result['basename'] == '24aabbcc'
-        assert result['has_tns_prefix'] is False
+        assert result['tns_objname'] is None
 
     def test_split_name_numbers_only(self):
         """Test split_name with numbers only."""
