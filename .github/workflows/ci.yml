@@ -90,18 +90,18 @@ jobs:
         run: |
           python manage.py check
 
-      - name: Patch problematic tom_targets migration
+      - name: Patch problematic upstream migrations
         run: |
-          # The tom_targets.0025 migration has a bug - it doesn't declare dependencies
-          # on guardian or the custom target app. Replace it with a no-op for fresh DBs.
+          # Patch migrations with bugs that prevent CI from running on fresh SQLite DBs
           python << 'PATCH_SCRIPT'
           import os
           import site
           
-          for sp in site.getsitepackages():
-              migration_path = os.path.join(sp, 'tom_targets', 'migrations', '0025_auto_20250206_2017.py')
-              if os.path.exists(migration_path):
-                  patched_content = '''# Patched for CI - original migration has missing dependencies
+          patches = [
+              # tom_targets.0025 has missing dependencies on guardian/custom target app
+              {
+                  'path': ('tom_targets', 'migrations', '0025_auto_20250206_2017.py'),
+                  'content': '''# Patched for CI - original migration has missing dependencies
           from django.db import migrations
           
           class Migration(migrations.Migration):
@@ -110,10 +110,30 @@ jobs:
               ]
               operations = []  # No-op for fresh databases
           '''
-                  with open(migration_path, 'w') as f:
-                      f.write(patched_content)
-                  print(f'Patched {migration_path}')
-                  break
+              },
+              # tom_nonlocalizedevents.0016 has SQLite compatibility issue (None vs NULL)
+              {
+                  'path': ('tom_nonlocalizedevents', 'migrations', '0016_externalcoincidence_alter_eventsequence_options_and_more.py'),
+                  'content': '''# Patched for CI - original migration has SQLite compatibility issues
+          from django.db import migrations
+          
+          class Migration(migrations.Migration):
+              dependencies = [
+                  ('tom_nonlocalizedevents', '0015_eventsequence_and_more'),
+              ]
+              operations = []  # No-op for fresh databases
+          '''
+              },
+          ]
+          
+          for patch in patches:
+              for sp in site.getsitepackages():
+                  migration_path = os.path.join(sp, *patch['path'])
+                  if os.path.exists(migration_path):
+                      with open(migration_path, 'w') as f:
+                          f.write(patch['content'])
+                      print(f'Patched {migration_path}')
+                      break
           PATCH_SCRIPT
 
       - name: Run database migrations
