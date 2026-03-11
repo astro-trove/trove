@@ -399,7 +399,8 @@ class Ps1PointSource(Ps1):
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
         return query_set.filter(
-            ps_score__gt = PS1_POINT_SOURCE_THRESHOLD
+            ps_score__gt = PS1_POINT_SOURCE_THRESHOLD,
+            prob_galaxy__lt = 0.7
         )
     
 class RomaBzcat(StaticCatalog):
