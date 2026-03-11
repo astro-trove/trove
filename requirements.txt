@@ -10,7 +10,6 @@ django-tasks
 dustmaps
 healpix-alchemy
 healpy
-lightcurve-fitting
 ligo.skymap
 matplotlib
 numpy

@@ -10,4 +10,5 @@ venv/
 candidate_vetting/vetting_app/vetting_app/settings_local.py
 MPCORB.csv
 .venv_readme_test/
+.venv_test/
 test.py
