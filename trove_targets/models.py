@@ -6,7 +6,7 @@ from django.conf import settings
 
 
 class Target(BaseTarget):
-    classification = models.CharField(null=True, blank=True)
+    classification = models.CharField(max_length=255, null=True, blank=True)
     redshift = models.FloatField(null=True, blank=True)
     mwebv = models.FloatField(verbose_name='Milky Way E(B-V)', null=True, blank=True)
     healpix = models.BigIntegerField()

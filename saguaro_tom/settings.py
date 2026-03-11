@@ -118,16 +118,29 @@ TASKS = {
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('POSTGRES_DB', POSTGRES_DB),
-        'USER': os.getenv('POSTGRES_USER', POSTGRES_USER),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', POSTGRES_PASSWORD),
-        'HOST': os.getenv('POSTGRES_HOST', POSTGRES_HOST),
-        'PORT': os.getenv('POSTGRES_PORT', int(POSTGRES_PORT)),
+_db_name = os.getenv('POSTGRES_DB', POSTGRES_DB)
+if _db_name:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql_psycopg2',
+            'NAME': _db_name,
+            'USER': os.getenv('POSTGRES_USER', POSTGRES_USER),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', POSTGRES_PASSWORD),
+            'HOST': os.getenv('POSTGRES_HOST', POSTGRES_HOST),
+            'PORT': os.getenv('POSTGRES_PORT', int(POSTGRES_PORT)),
+        }
     }
-}
+else:
+    # SQLite fallback for local dev when Postgres is not configured
+    _sqlite_path = os.path.join(BASE_DIR, 'db.sqlite3')
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': _sqlite_path,
+        }
+    }
+    # tom_nonlocalizedevents builds its engine from DATABASES; use env so it gets SQLite too
+    os.environ.setdefault('SA_DB_CONNECTION_URL', 'sqlite:///' + _sqlite_path)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
@@ -369,7 +382,7 @@ TOM_API_URL = os.getenv('TOM_API_URL', os.path.join(ALLOWED_HOST, FORCE_SCRIPT_N
 HERMES_API_URL = os.getenv('HERMES_API_URL', 'https://hermes.lco.global')
 CREDIBLE_REGION_PROBABILITIES = '[0.25, 0.5, 0.75, 0.9, 0.95]'
 
-TARGET_MODEL_CLASS = 'trove_targets.models.Target'
+TARGET_MODEL_CLASS = os.getenv('TARGET_MODEL_CLASS', 'trove_targets.models.Target')
 
 # Choose a consistent cosmology
 COSMO = FlatLambdaCDM(
@@ -378,19 +391,23 @@ COSMO = FlatLambdaCDM(
     Om0 = 0.3
 )
 
-# dust maps for Milky Way extinction
-os.environ['DUSTMAPS_CONFIG_FNAME'] = os.path.join(BASE_DIR, '.dustmapsrc')
-with warnings.catch_warnings(action='ignore'):
-    from dustmaps import sfd
+# dust maps for Milky Way extinction (optional for local dev if download fails)
+def _dust_map_noop(*args):
+    return 0.0
 
 try:
-    sfd_query = sfd.SFDQuery()
-except FileNotFoundError:
-    sfd.fetch()
-    sfd_query = sfd.SFDQuery()
+    os.environ['DUSTMAPS_CONFIG_FNAME'] = os.path.join(BASE_DIR, '.dustmapsrc')
+    with warnings.catch_warnings(action='ignore'):
+        from dustmaps import sfd
+    try:
+        sfd_query = sfd.SFDQuery()
+    except FileNotFoundError:
+        sfd.fetch()
+        sfd_query = sfd.SFDQuery()
 
-def sf11(*args):
-    return 0.86 * sfd_query(*args)
-
-DUST_MAP = sf11
+    def sf11(*args):
+        return 0.86 * sfd_query(*args)
+    DUST_MAP = sf11
+except Exception:
+    DUST_MAP = _dust_map_noop
 COMMENTS_ENABLED = False
