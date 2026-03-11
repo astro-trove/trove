@@ -143,7 +143,7 @@ class TestStaticCatalogStandardization:
         
         cat = GladePlus()
         df = pd.DataFrame({
-            'sdss': ['SDSS12345'],
+            'gn': ['GLADE12345'],
             'ra': [150.0],
             'dec': [30.0],
             'z_helio': [0.05],
@@ -198,6 +198,7 @@ class TestStaticCatalogStandardization:
             'e_d': [5.0],
             'r': [14.5],
             'objname': ['NGC1234'],
+            'dmethod': ['S'],
         })
         
         result = cat.to_standardized_catalog(df)
