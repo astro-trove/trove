@@ -1,0 +1,33 @@
+astroplan
+astropy
+astroquery
+django
+django-crispy-forms
+django-extensions
+django-filter
+django-guardian
+django-tasks
+dustmaps
+healpix-alchemy
+healpy
+ligo.skymap
+matplotlib
+numpy
+tomtoolkit==2.24.5
+tom-alertstreams
+tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
+plotly
+psycopg2-binary
+python-dateutil
+requests
+slack-sdk
+specutils
+SQLAlchemy
+whitenoise
+trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
+
+[dev]
+pytest
+pytest-django
+black
+ruff
