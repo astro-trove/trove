@@ -12,8 +12,6 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
-from lightcurve_fitting.lightcurve import LC
-
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
 from trove_targets.models import Target
@@ -302,6 +300,38 @@ def estimate_max_find_decay_rate(
     
     return model, best_fit_params, max_time, decay_rate
     
+FILTER_EFF_FREQ = {
+    'u': 8.468e14 * u.Hz,
+    'g': 6.289e14 * u.Hz,
+    'r': 4.832e14 * u.Hz,
+    'i': 3.948e14 * u.Hz,
+    'z': 3.343e14 * u.Hz,
+    'y': 3.043e14 * u.Hz,
+    'U': 8.468e14 * u.Hz,
+    'B': 6.810e14 * u.Hz,
+    'V': 5.483e14 * u.Hz,
+    'R': 4.610e14 * u.Hz,
+    'I': 3.807e14 * u.Hz,
+    'G': 5.5e14 * u.Hz,
+    'c': 5.4e14 * u.Hz,
+    'o': 4.8e14 * u.Hz,
+}
+
+def _mag_to_flux(mag, magerr=None):
+    """
+    Convert AB magnitude to flux in W/m^2/Hz.
+    
+    For AB magnitudes: flux (Jy) = 10^((8.9 - mag) / 2.5)
+    1 Jy = 1e-26 W/m^2/Hz
+    """
+    flux_jy = 10**((8.9 - mag) / 2.5)
+    flux = flux_jy * 1e-26
+    
+    if magerr is not None:
+        dflux = np.abs(flux * magerr * np.log(10) / 2.5)
+        return flux, dflux
+    return flux
+
 def compute_peak_lum(
         mag:Iterable[float],
         magerr:Iterable[float],
@@ -332,27 +362,25 @@ def compute_peak_lum(
     -------
     The peak luminosity (nu L_nu) in erg/s
     """
-
-    lc = LC([mag, magerr, filters], names=['mag', 'dmag', 'filter'])
-    lc.calcFlux()
-
-    if len(lc) == 0:
-        return None # we don't want to change the score if there isn't photometry to do this
+    mag = np.asarray(mag)
+    magerr = np.asarray(magerr)
     
-    # find the max of the light curve
-    fluxmax_idx = np.argmax(lc["flux"])
-    fluxmax = lc["flux"][fluxmax_idx]
+    if len(mag) == 0:
+        return None
+    
+    flux, dflux = _mag_to_flux(mag, magerr)
+    
+    fluxmax_idx = np.argmax(flux)
+    fluxmax = flux[fluxmax_idx]
     if consider_err:
-        # turn the flux max into the 3 sigma upper error
-        fluxmax += 3*lc["dflux"][fluxmax_idx]
-    filtermax = lc["filter"][fluxmax_idx]
+        fluxmax += 3 * dflux[fluxmax_idx]
+    filtermax = filters[fluxmax_idx]
     
-    # now convert that flux to a luminosity
-    fluxmax = fluxmax*u.Unit("W/m^2/Hz")
+    fluxmax = fluxmax * u.Unit("W/m^2/Hz")
     lummax = _flux_to_lum(fluxmax, lumdist).to("erg/s/Hz")
 
-    # then we need to multiply be the effective frequency of the filter
-    nu_lummax = (filtermax.freq_eff * lummax).to("erg/s")
+    freq_eff = FILTER_EFF_FREQ.get(filtermax, 5.0e14 * u.Hz)
+    nu_lummax = (freq_eff * lummax).to("erg/s")
     return nu_lummax
 
 def get_predetection_stats(

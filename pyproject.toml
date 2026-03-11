@@ -51,6 +51,7 @@ dependencies = [
     "psycopg2-binary",
     "python-dateutil",
     "requests",
+    "scipy",
     "slack-sdk",
     "specutils",
     "SQLAlchemy",
