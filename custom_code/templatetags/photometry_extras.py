@@ -8,13 +8,34 @@ from tom_dataproducts.models import ReducedDatum
 import numpy as np
 from datetime import datetime
 import re
-from matplotlib.colors import to_hex
-from lightcurve_fitting.filters import filtdict
 
 register = template.Library()
 
-# any marker colors or shapes that we want to keep static across all pages
-COLOR_MAP = {name: to_hex(fltr.linecolor) for name, fltr in filtdict.items()}
+# Filter color map for photometry plotting
+# Colors chosen to match standard astronomical conventions
+COLOR_MAP = {
+    'u': '#7f00ff',  # violet
+    'U': '#7f00ff',
+    'B': '#0000ff',  # blue
+    'g': '#00ff00',  # green
+    'V': '#008000',  # dark green
+    'r': '#ff0000',  # red
+    'R': '#ff0000',
+    'i': '#8b0000',  # dark red
+    'I': '#8b0000',
+    'z': '#4a0000',  # very dark red
+    'y': '#2a0000',  # near-infrared
+    'Y': '#2a0000',
+    'J': '#1a0000',
+    'H': '#0a0000',
+    'K': '#050000',
+    'c': '#00ffff',  # ATLAS cyan
+    'o': '#ffa500',  # ATLAS orange
+    'G': '#00ff00',  # Gaia G-band
+    'w': '#808080',  # Pan-STARRS w (wide)
+    'Clear': '#808080',
+    'clear': '#808080',
+}
 MARKER_MAP = {
     'limit': 50,  # arrow-bar-down
     'ATLAS': 2,  # diamond
