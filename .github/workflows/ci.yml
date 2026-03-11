@@ -124,6 +124,19 @@ jobs:
               operations = []  # No-op for fresh databases
           '''
               },
+              # tom_nonlocalizedevents.0017 depends on fields from 0016 which we skipped
+              {
+                  'path': ('tom_nonlocalizedevents', 'migrations', '0017_alter_eventsequence_external_coincidence_and_more.py'),
+                  'content': '''# Patched for CI - depends on 0016 which was patched
+          from django.db import migrations
+          
+          class Migration(migrations.Migration):
+              dependencies = [
+                  ('tom_nonlocalizedevents', '0016_externalcoincidence_alter_eventsequence_options_and_more'),
+              ]
+              operations = []  # No-op for fresh databases
+          '''
+              },
           ]
           
           for patch in patches:
