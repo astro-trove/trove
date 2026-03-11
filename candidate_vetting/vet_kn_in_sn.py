@@ -4,7 +4,7 @@ their resemblance to kilonovae-in-supernovae.
 """
 import logging
 from typing import Optional
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from astropy import units as u
 import pandas as pd
 import numpy as np
@@ -63,7 +63,14 @@ def vet_kn_in_sn(target_id:int, nonlocalized_event_name:Optional[str]=None,
     target = Target.objects.get(id=target_id)
     
     ## check skymap association
-    skymap_score = skymap_association(nonlocalized_event_name, target_id)
+    if np.isfinite(param_ranges["t_post"]):
+        gw_disc_date = EventSequence.objects.filter( # GW discovery time
+            nonlocalizedevent_id=nonlocalized_event.id).last().details["time"]
+        max_time = Time(gw_disc_date) + TimeDelta(param_ranges["t_post"]*u.day)
+    else: # just use current time
+        max_time = Time.now()
+    skymap_score = skymap_association(nonlocalized_event_name, target_id,
+                                      max_time=max_time)
     update_score_factor(event_candidate, "skymap_score", skymap_score)
     if skymap_score < 1e-2:
         return 
