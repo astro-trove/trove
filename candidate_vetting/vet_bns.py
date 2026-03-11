@@ -115,7 +115,7 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None,
         target=target,
         nonlocalized_event=nonlocalized_event,
         param_ranges=param_ranges,
-        filt=["g", "r", "i", "o", "c"] # use the common optical filters
+        filt=["g", "r", "i", "z", "F129", "F158", "o", "c"] # common optical filters + some Roman filters + ATLAS o,c
     )
     if lum is not None:
         update_score_factor(event_candidate, "phot_peak_lum", lum.value)
