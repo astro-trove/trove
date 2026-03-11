@@ -1,17 +1,5 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-.. Created on Fri Mar  6 10:54:59 2026
-.. @author: Nicholas Vieira
-.. @associate_nle_eventcandidates_tpost.py
-
-"""
-from tqdm import tqdm 
-
 import numpy as np
-
 from datetime import datetime, timedelta
-
 import logging
 
 from django.core.management.base import BaseCommand
@@ -22,8 +10,6 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent
 from trove_targets.models import Target
 from custom_code.healpix_utils import create_candidates_from_targets
 from candidate_vetting.vet_basic import vet_basic
-
-
 
 # from astropy.coordinates import SkyCoord
 # from healpix_alchemy.constants import HPX
@@ -62,7 +48,7 @@ class Command(BaseCommand):
 
         # loop through targets, associate with NLE if within localization region
         new_candidates = []
-        for target in tqdm(targets):
+        for target in targets:
             logger.info(f'\nChecking target {target.name}...')
             # if first detection less than t_post after NLE discovery date, 
             # attempt to turn it into an event candidate associated with NLE
