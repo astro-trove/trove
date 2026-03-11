@@ -165,15 +165,46 @@ jobs:
         env:
           POSTGRES_DB: ""
         run: |
-          timeout 10 python manage.py runserver 0.0.0.0:8000 &
+          # Start the server in background
+          python manage.py runserver 0.0.0.0:8000 &
           SERVER_PID=$!
-          sleep 5
           
-          # Check if server is responding
-          curl -f http://localhost:8000/ || curl -f http://localhost:8000/accounts/login/ || true
+          # Wait for server to be ready with retry loop
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          SERVER_READY=false
+          
+          echo "Waiting for Django server to start (PID: $SERVER_PID)..."
+          
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            
+            # Check if server process is still running
+            if ! kill -0 $SERVER_PID 2>/dev/null; then
+              echo "Server process died unexpectedly"
+              exit 1
+            fi
+            
+            # Try to connect
+            if curl -sf http://localhost:8000/accounts/login/ -o /dev/null 2>/dev/null; then
+              SERVER_READY=true
+              echo "Server is ready after $ATTEMPT attempts"
+              break
+            fi
+            
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS - waiting..."
+            sleep 1
+          done
           
           # Cleanup
           kill $SERVER_PID 2>/dev/null || true
+          
+          if [ "$SERVER_READY" = true ]; then
+            echo "Django server validation PASSED"
+          else
+            echo "Django server failed to respond after $MAX_ATTEMPTS seconds"
+            exit 1
+          fi
 
       - name: Run test suite
         env:
