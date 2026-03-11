@@ -25,7 +25,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--nle-id', help='ID of nonlocalized event',
-                            type=str, default="20113") # 20113 is S251112cm
+                            type=str)
         parser.add_argument('--t-post', help='Associate transients whose first detection was within this '
                                              'many days of the nonlocalized event',
                             type=float, default=10.)
@@ -33,7 +33,7 @@ class Command(BaseCommand):
                             type=float, default=0.95)
         parser.add_argument('--snr-min', help='Transients first detection must have SNR greater than or equal to this value')
 
-    def handle(self, nle_id="201113", t_post=10., prob=0.95, snr_min=5, **kwargs):
+    def handle(self, nle_id, t_post=10., prob=0.95, snr_min=5, **kwargs):
         
         # get the specific nle
         nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
@@ -41,7 +41,6 @@ class Command(BaseCommand):
         nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
         
         # get all targets created after the NLE time
-        # print(seq.details["time"])
         targets = Target.objects.filter(
             created__gte=seq.details['time'],
             created__lte=(nle_time + timedelta(days=t_post)).strftime('%Y-%m-%dT%H:%M:%S.%f%z')).order_by('name')
