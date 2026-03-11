@@ -9,8 +9,8 @@
     <dd class="col-sm-9">
         {{ target_name }}
         {% with target_name|split_name as name %}
-        {% if name.has_tns_prefix %}
-            <a href="https://www.wis-tns.org/object/{{ name.basename }}" target="_blank"><img src="https://www.wis-tns.org/sites/default/files/favicon.png" alt="TNS" title="TNS" class="icon" /></a>
+        {% if name.tns_objname %}
+            <a href="https://www.wis-tns.org/object/{{ name.tns_objname }}" target="_blank"><img src="https://www.wis-tns.org/sites/default/files/favicon.png" alt="TNS" title="TNS" class="icon" /></a>
         {% elif name.prefix == "ZTF" %}
             <a href="https://alerce.online/object/{{ target_name }}" target="_blank"><img src="https://alerce.online/favicon.ico" alt="ALeRCE" title="ALeRCE" class="icon" /></a>
             <a href="https://antares.noirlab.edu/loci/lookup/{{ target_name }}" target="_blank"><img src="https://antares.noirlab.edu/favicon.ico" alt="ANTARES" title="ANTARES" class="icon" /></a>
@@ -62,11 +62,4 @@
   <dd class="col-sm-6">{{ value }}</dd>
 {% endfor %}
 </dl>
-{% get_candidate_event_score target.id as scores %}
-<h4>Scores:</h4>
-<dl class="row">
-  {% for nonlocalized_name, score in scores.items %}
-  <dd class="col-sm-6">{{ nonlocalized_name }}</dd>
-  <dd class="col-sm-6">{{ score }}</dd>
-  {% endfor %}
 <h4>Photometry:</h4>

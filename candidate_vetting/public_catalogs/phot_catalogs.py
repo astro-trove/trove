@@ -2,20 +2,34 @@
 Code to query dynamically updating photometry catalogs
 """
 import csv
+import email
+import glob
+import imaplib
+import json
+import logging
 import math
 import os
+import random
 import re
-import sys
+import string
+import subprocess
 import time
+from collections import OrderedDict
+from datetime import datetime
 from operator import itemgetter
 
 import numpy as np
+import pandas as pd
 import requests
-from astropy.time import Time
+from astropy import units
+from astropy.coordinates import SkyCoord
+from astropy.time import Time, TimezoneInfo
 from django.conf import settings
+from django.db.models import F, FloatField, ExpressionWrapper
+from django.db.models.functions import Sqrt
 
 from .catalog import PhotCatalog
-from .util import _QUERY_METHOD_DOCSTRING, RADIUS_ARCSEC
+from .util import _QUERY_METHOD_DOCSTRING, RADIUS_ARCSEC, create_phot
 
 
 def _rolling_window_sigma_clip(array, clipping_sigma=2.2, window_size=11):
@@ -70,6 +84,166 @@ def _rolling_window_sigma_clip(array, clipping_sigma=2.2, window_size=11):
     return mask
 
 
+
+from trove_targets.models import Target
+
+logger = logging.getLogger(__file__)
+
+class TNS_Phot(PhotCatalog):
+    """Query the TNS for the photometry they have available
+    """
+
+    def query(
+            self,
+            target:Target,
+            timelimit:int = 10
+    ):
+        f"""Query the TNS for photometry they have available on this event
+
+        Parameters
+        ----------
+        target : Target
+            The target object to query TNS for. Usually don't include the prefix (AT, SN, TDE, etc.) except
+            in the case of FRBs where the "FRB" prefix is necessary
+        timelimit : int
+            This is how long in seconds we are willing to wait for TNS to stop
+            throttling our queries. Default is 10
+        
+        Returns
+        -------
+        True if we found more photometry and updated it, False if not
+        """
+
+        # get the tns base name
+        # this will strip any letter prefix before the year
+        tns_name = re.sub("^\D*", "", target.name)
+        
+        # parse some of the necessary info from settings.py
+        BOT_ID = settings.BROKERS["TNS"]["bot_id"]
+        BOT_NAME = settings.BROKERS["TNS"]["bot_name"]
+        API_KEY = settings.TNS_API_KEY
+
+        get_obj = [
+            ("objname", tns_name),
+            ("objid", ""),
+            ("photometry", "1"),
+            ("spectra", "0")
+        ]
+        
+        # setup the query TNS for the photometry
+        TNS="www.wis-tns.org"
+        url_tns_api="https://"+TNS+"/api/get"
+        get_url = url_tns_api + "/object"
+        tns_marker = self._set_bot_tns_marker(BOT_ID, BOT_NAME)
+        headers = {'User-Agent': tns_marker}
+        json_file = OrderedDict(get_obj)
+        get_data = {'api_key': API_KEY, 'data': json.dumps(json_file)}
+
+        requests_kwargs = dict(
+            headers = headers,
+            data = get_data
+        )
+
+        logger.info(f"Posting the following request to {get_url}:\n{requests_kwargs}")
+        response, time_to_reset = self._post_to_tns(
+            get_url,
+            requests_kwargs,
+            timelimit
+        )
+
+        if response is None or response.status_code != 200:
+            return False
+        
+        try:
+            data = response.json()['data']
+        except Exception as exc:
+            logger.exception(f"Retrieving the TNS data failed with {exc}")
+            return False
+        
+        return self._add_phot(target, data)        
+
+    def _add_phot(self, target, tns_reply):
+        """
+        Add the data from the TNS response to the target 
+        """
+        
+        # first check if we need to update the coordinates of this target
+        tns_ra = float(f'{tns_reply["radeg"]:.14g}')
+        tns_dec = float(f'{tns_reply["decdeg"]:.14g}')
+        if target.ra != tns_ra or target.dec != tns_dec:
+            target.ra = tns_ra
+            target.dec = tns_dec
+            target.save()
+            logger.info(f'Updated coordinates to {target.ra:.6f}, {target.dec:.6f} based on TNS')
+
+        # now we can ingest any new photometry
+        n_new_phot = 0
+        for candidate in tns_reply.get('photometry', []):
+            jd = Time(candidate['jd'], format='jd', scale='utc')
+            value = {'filter': candidate['filters']['name']}
+            if candidate['flux']:  # detection
+                value['magnitude'] = float(candidate['flux'])
+            else:
+                value['limit'] = float(candidate['limflux'])
+            if candidate['fluxerr']:  # not empty or zero
+                value['error'] = float(candidate['fluxerr'])
+            created = create_phot(
+                target = target,
+                time = jd.to_datetime(timezone=TimezoneInfo()),
+                fluxdict = value,
+                source = candidate['telescope']['name'] + ' (TNS)'
+            )
+
+            n_new_phot += created
+        if n_new_phot:
+            logger.info(f'Added {n_new_phot:d} photometry points from the TNS')
+
+        return bool(n_new_phot)
+                
+    def _post_to_tns(self, get_url, requests_kwargs, timelimit):
+
+        # actually do the query and simulatanesouly
+        # check the response to make sure it isn't throttling our API usage
+        while True:
+
+            response = requests.post(get_url, **requests_kwargs)
+            try:
+                logger.info(f"The TNS server responded with\n{response.json()}")
+            except:
+                logger.info(f"The TNS server responded with a response that can not be parsed as a JSON:\n{response}")
+
+            if response.status_code != 200:
+                return response, -99 # I'm just setting the time_to_reset to -99 so other code doesn't break
+
+            remaining_str = response.headers.get('x-rate-limit-remaining', -99)
+            time_to_reset = int(response.headers.get('x-rate-limit-reset', -99))  # in seconds
+
+            if remaining_str == 'Exceeded':
+                # we already exceeded the rate limit
+                return None, time_to_reset
+
+            remaining = int(remaining_str)
+
+            if remaining < 0 or time_to_reset < 0:
+                return response, time_to_reset
+
+            if remaining == 0 and time_to_reset < timelimit:
+                # we have no remaining API queries :(
+                # but we don't have very long to wait!
+                time.sleep(time_to_reset)
+
+            elif remaining == 0 and time_to_reset > timelimit:
+                # we are out of API queries :(
+                # and it is gonna take to long to wait :((
+                return None, time_to_reset
+
+            else:
+                return response, time_to_reset
+
+    def _set_bot_tns_marker(self, BOT_ID: str = None, BOT_NAME: str = None):
+        tns_marker = 'tns_marker{"tns_id": "' + str(BOT_ID) + '", "type": "bot", "name": "' + BOT_NAME + '"}'
+        return tns_marker
+
 class ASASSN_SkyPatrol(PhotCatalog):
     """ASASSN SkyPatrol forced photometry service.
     
@@ -121,11 +295,10 @@ class ASASSN_SkyPatrol(PhotCatalog):
 
 class ATLAS_Forced_Phot(PhotCatalog):
     """ATLAS Forced photometry server."""
-
+    
     def query(
             self,
-            ra: float,
-            dec: float,
+            target: Target,
             radius: float = RADIUS_ARCSEC,
             days_ago: float = 200.,
             token: str = None
@@ -134,6 +307,8 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         {_QUERY_METHOD_DOCSTRING}
         """
+        ra, dec = target.ra, target.dec
+        
         BASEURL = "https://fallingstar-data.com/forcedphot"
 
         if token is None:
@@ -211,19 +386,54 @@ class ATLAS_Forced_Phot(PhotCatalog):
             textdata = s.get(result_url, headers=headers).text
 
         atlas_phot = self._ATLAS_stack(textdata)
-        return atlas_phot
 
-    def _ATLAS_stack(self, textdata):
+        return self._add_phot(target, atlas_phot)
+
+    def _add_phot(self, target, data, signal_to_noise_cutoff = 3.0):        
+
+        n_new_phot = 0
+        for datum in data:
+            time = Time(datum['mjd'], format='mjd')
+            utc = TimezoneInfo(utc_offset=0*units.hour)
+            time.format = 'datetime'
+            value = {
+                'filter': str(datum['F']),
+                'telescope': 'ATLAS',
+            }
+            # If the signal is in the noise, calculate the non-detection limit from the reported flux uncertainty.
+            # see https://fallingstar-data.com/forcedphot/resultdesc/
+            signal_to_noise = datum['uJy'] / datum['duJy']
+            if signal_to_noise <= signal_to_noise_cutoff:
+                value['limit'] = 23.9 - 2.5 * np.log10(signal_to_noise_cutoff * datum['duJy'])
+            else:
+                value['magnitude'] = 23.9 - 2.5 * np.log10(datum['uJy'])
+                value['error'] = 2.5 / np.log(10.) / signal_to_noise
+
+            created = create_phot(
+                target = target,
+                time = time.to_datetime(timezone=utc),
+                fluxdict = value,
+                source = "ATLAS"
+            )
+
+            n_new_phot += created
+        if n_new_phot:
+            logger.info(f'Added {n_new_phot:d} photometry points from ATLAS forced photometry')
+
+        return bool(n_new_phot)
+            
+        
+    def _ATLAS_stack(self, filecontent):
         """
         Stack ATLAS photometry data.
         
         Adapted from David Young's plot_atlas_fp.py
         https://github.com/thespacedoctor/plot-results-from-atlas-force-photometry-service
         """
-        if not textdata or not textdata.strip():
+        if not filecontent or not filecontent.strip():
             return []
             
-        epochs = self._ATLAS_read_and_sigma_clip_data(textdata, clipping_sigma=2.2)
+        epochs = self._ATLAS_read_and_sigma_clip_data(filecontent, clipping_sigma=2.2)
 
         magnitudes = {
             'c': {'mjds': [], 'mags': [], 'magErrs': [], 'lim5sig': []},
@@ -322,19 +532,18 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
             for k, v in distinct_mjds.items():
                 mean_mjd = sum(v["mjds"]) / len(v["mjds"])
-                summed_magnitudes[fil]["mjds"].append(mean_mjd)
-                
                 mean_flux = sum(v["mags"]) / len(v["mags"])
-                summed_magnitudes[fil]["mags"].append(mean_flux)
-                
                 sum_of_squares = sum(x ** 2 for x in v["magErrs"])
                 comb_error = math.sqrt(sum_of_squares) / len(v["magErrs"])
-                summed_magnitudes[fil]["magErrs"].append(comb_error)
                 
                 comb_5sig_limit = 23.9 - 2.5 * math.log10(5. * comb_error) if comb_error > 0 else 99.0
-                summed_magnitudes[fil]["lim5sig"].append(comb_5sig_limit)
                 
                 n = len(v["mjds"])
+                
+                summed_magnitudes[fil]["mjds"].append(mean_mjd)
+                summed_magnitudes[fil]["mags"].append(mean_flux)
+                summed_magnitudes[fil]["magErrs"].append(comb_error)
+                summed_magnitudes[fil]["lim5sig"].append(comb_5sig_limit)
                 summed_magnitudes[fil]["n"].append(n)
                 
                 all_data.append({
@@ -350,16 +559,323 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
 
 class ZTF_Forced_Phot(PhotCatalog):
-    """ZTF Forced photometry server (not yet implemented)."""
+    """ZTF Forced photometry server.
+    
+    Most of this code was yoinked from Dave Coulter's YSE PZ code:
+    https://github.com/davecoulter/YSE_PZ/blob/58f3e6a1622ec5755e5322aee2d00f3941510749/YSE_App/data_ingest/ZTF_Forced_Phot.py
+    """
 
+    def __init__(self):
+
+        self._generic_ztfuser = "ztffps"
+        self._generic_ztfinfo = "dontgocrazy!"
+        
+        self._ztffp_email_address = settings.ZTF_INFO.get("email_address")
+        self._ztffp_email_password = settings.ZTF_INFO.get("email_password")
+        self._ztffp_email_server = settings.ZTF_INFO.get("email_server")
+        self._ztffp_user_address = settings.ZTF_INFO.get("user_address")
+        self._ztffp_user_password = settings.ZTF_INFO.get("user_password")
+        
+        super().__init__("ZTF Forced Photometry")
+        
     def query(
             self,
-            ra: float,
-            dec: float,
-            radius: float = RADIUS_ARCSEC
+            target: Target,
+            radius: float = RADIUS_ARCSEC,
+            days_ago: float = 200,
+            wait_for_results: bool = False,
+            max_wait_time: int = 24*60*60,
+            dt_wait_time: int = 5*60,
     ):
         f"""Query the ZTF forced photometry service.
 
         {_QUERY_METHOD_DOCSTRING}
         """
-        raise NotImplementedError("ZTF forced photometry query not yet implemented")
+        ztf_logs = self._ztf_forced_photometry(
+            target.ra,
+            target.dec,
+            days=days_ago
+        )
+
+        if not wait_for_results:
+            return
+        
+        ztf_forced_phot_file = None
+        total_time_waited = 0
+        while ztf_forced_phot_file is None:
+            ztf_forced_phot_file = self._query_ztf_email(ztf_logs)
+            time.sleep(dt_wait_time)
+            total_time_waited += dt_wait_time
+
+            if total_time_waited > max_wait_time:
+                break
+
+    def check_for_new_data(self):
+        """Check the TROVE gmail for new ZTF forced photometry, parse it, and upload it."""
+        logfiles = glob.glob(os.path.join(settings.ZTFTMPDIR, "*.txt"))
+
+        targets_finished = []
+        for logfile in logfiles:
+            result = self._query_ztf_email(logfile)
+            if result is None:
+                continue
+
+            fplc, fplog = result
+
+            ra, dec = self._read_fp_log(fplog)
+            logger.info(f"Finding TROVE Target at ra={ra} dec={dec} to add this photometry to")
+
+            targ = Target.objects.annotate(
+                onskydist=ExpressionWrapper(
+                    Sqrt((F('ra') - ra)**2 + (F('dec') - dec)**2),
+                    output_field=FloatField()
+                )
+            ).filter(
+                onskydist__lt=0.1/3600 
+            ).order_by("onskydist").first()
+            logger.info(f"Found {targ.name} at ra={ra} dec={dec}")
+            
+            phot = pd.read_csv(fplc, sep=r"\s+", comment="#")
+            phot.columns = phot.columns.str.replace(",", "")
+            
+            phot = self._filter_bad_phot(phot)
+            self._save_phot(targ, phot)
+            
+            os.remove(fplc)
+            os.remove(fplog)
+            os.remove(logfile)
+
+            logger.info(f"Finished ingesting ZTF forced photometry for {targ.name}")
+            targets_finished.append(targ.name)
+            
+        return targets_finished
+
+    def _filter_bad_phot(self, phot):
+        """Filter bad photometry based on recommendations in sec.6 of the ZTF FP docs."""
+        phot = phot[
+            (phot.infobitssci < 33554432) &
+            (phot.scisigpix <= 25) &
+            (phot.sciinpseeing <= 4)
+        ]
+
+        mask = (phot.forcediffimchisq > 0.9) & (phot.forcediffimchisq < 1.1)
+        phot.loc[mask, "forcediffimfluxunc"] = (
+            phot.loc[mask, "forcediffimfluxunc"] * np.sqrt(phot.loc[mask, "forcediffimchisq"])
+        )
+
+        return phot
+        
+    def _save_phot(self, targ, phot, snr_thresh=3, snr_limit=5):
+        """Save the photometry to target."""
+        for _, row in phot.iterrows():
+            obs_time = Time(row.jd, format="jd", scale="utc")
+
+            value = {
+                'filter': row["filter"].replace("ZTF_", ""),
+                'telescope': "ZTF"
+            }
+
+            flux = float(row.forcediffimflux)
+            flux_err = float(row.forcediffimfluxunc)
+            flux_zp = float(row.zpdiff)
+            snr = flux / flux_err
+            
+            if snr > snr_thresh:
+                value["magnitude"] = flux_zp - 2.5*np.log10(flux)
+                value["error"] = 2.5/np.log(10)/snr
+            else:
+                value["limit"] = flux_zp - 2.5*np.log10(snr_limit*flux_err)
+
+            create_phot(
+                target=targ,
+                time=obs_time.to_datetime(timezone=TimezoneInfo()),
+                fluxdict=value,
+                source="ZTF FP"
+            )
+        
+    def _query_ztf_email(self, log_file_name, source_name=None):
+        """Check the trove email address for new emails from ZTF with data products."""
+        downloaded_file_names = None
+
+        if not os.path.exists(log_file_name):
+            print(f"{log_file_name} does not exist.")
+            return
+
+        job_info = self._read_job_log(log_file_name)
+
+        try:
+            imap = imaplib.IMAP4_SSL(self._ztffp_email_server)
+            imap.login(self._ztffp_email_address, self._ztffp_email_password)
+
+            status, messages = imap.select("INBOX")
+            processing_match = False
+            for i in range(int(messages[0]), 0, -1)[0:100]:
+                if processing_match:
+                    break
+
+                res, msg = imap.fetch(str(i), "(RFC822)")
+                for response in msg:
+                    if not isinstance(response, tuple):
+                        continue
+                    
+                    msg = email.message_from_bytes(response[1])
+                    sender, encoding = email.header.decode_header(msg.get("From"))[0]
+
+                    if (
+                        isinstance(sender, bytes) or
+                        not re.search(r"ztfpo@ipac\.caltech\.edu", sender)
+                    ):
+                        continue
+                    
+                    content_type = msg.get_content_type()
+                    body = msg.get_payload(decode=True).decode()
+
+                    this_date_tuple = email.utils.parsedate_tz(msg['Date'])
+                    local_date = datetime.fromtimestamp(email.utils.mktime_tz(this_date_tuple))
+
+                    if content_type != "text/plain":
+                        continue
+
+                    processing_match = self._match_ztf_message(job_info, body, local_date)
+
+                    if not processing_match:
+                        continue
+
+                    lc_url = 'https' + (body.split('_lc.txt')[0] + '_lc.txt').split('https')[-1]
+                    log_url = 'https' + (body.split('_log.txt')[0] + '_log.txt').split('https')[-1]
+
+                    lc_initial_file_name = self._download_ztf_url(lc_url)
+                    log_initial_file_name = self._download_ztf_url(log_url)
+
+                    if source_name is None:
+                        downloaded_file_names = [lc_initial_file_name, log_initial_file_name]
+                    else:
+                        lc_final_name = source_name.replace(' ', '') + "_" + lc_initial_file_name.split('_')[-1]
+                        log_final_name = source_name.replace(' ', '') + "_" + log_initial_file_name.split('_')[-1]
+                        os.rename(lc_initial_file_name, lc_final_name)
+                        os.rename(log_initial_file_name, log_final_name)
+                        downloaded_file_names = [lc_final_name, log_final_name]
+
+            imap.close()
+            imap.logout()
+
+        except Exception as e:
+            logger.exception(e)
+
+        if downloaded_file_names is not None:
+            for file_name in downloaded_file_names:
+                logger.info(f"Downloaded: {file_name}")
+
+        return downloaded_file_names
+
+    def _ztf_forced_photometry(self, ra, decl, jdstart=None, jdend=None, days=60, send=True):
+        """Start the ZTF forced photometry job."""
+        if jdend is None:
+            jdend = Time(datetime.utcnow(), scale='utc').jd
+
+        if jdstart is None:
+            jdstart = jdend - days
+
+        if ra is None or decl is None:
+            raise RuntimeError("Missing necessary R.A. or declination.")
+
+        skycoord = SkyCoord(ra, decl, frame='icrs', unit='deg')
+        
+        jdend_str = np.format_float_positional(float(jdend), precision=6)
+        jdstart_str = np.format_float_positional(float(jdstart), precision=6)
+        ra_str = np.format_float_positional(float(skycoord.ra.deg), precision=6)
+        decl_str = np.format_float_positional(float(skycoord.dec.deg), precision=6)
+
+        log_file_name = self._random_log_file_name(log_file_dir=settings.ZTFTMPDIR)
+
+        logger.info(f"Sending ZTF request for (R.A.,Decl)=({ra},{decl})")
+
+        wget_command = (
+            f"wget --http-user={self._generic_ztfuser} --http-passwd={self._generic_ztfinfo} "
+            f"-O {log_file_name} \"https://ztfweb.ipac.caltech.edu/cgi-bin/requestForcedPhotometry.cgi?"
+            f"ra={ra_str}&dec={decl_str}&jdstart={jdstart_str}&jdend={jdend_str}&"
+            f"email={self._ztffp_user_address}&userpass={self._ztffp_user_password}\""
+        )
+        logger.info(wget_command)
+
+        if send:
+            p = subprocess.Popen(wget_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            p.communicate()
+
+        os.chmod(log_file_name, 0o0777)
+        return log_file_name
+
+    def _random_log_file_name(self, log_file_dir='/tmp'):
+        """Generate a random log file name."""
+        log_file_name = None
+        while log_file_name is None or os.path.exists(log_file_name):
+            random_str = ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(10))
+            log_file_name = f"{log_file_dir}/ztffp_{random_str}.txt"
+        return log_file_name
+
+    def _download_ztf_url(self, url):
+        """Download a file from ZTF URL."""
+        wget_command = (
+            f"wget --http-user={self._generic_ztfuser} --http-password={self._generic_ztfinfo} "
+            f"-O {url.split('/')[-1]} \"{url}\""
+        )
+
+        logger.info("Downloading file...")
+        logger.info(f'\t{wget_command}')
+
+        p = subprocess.Popen(wget_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        p.communicate()
+
+        return url.split('/')[-1]
+
+    def _match_ztf_message(self, job_info, message_body, message_time_epoch):
+        """Match ZTF email message to job info."""
+        match = False
+        message_lines = message_body.splitlines()
+
+        for line in message_lines:
+            if re.search("reqid", line):
+                inputs = line.split('(')[-1]
+                
+                test_ra = inputs.split('ra=')[-1].split(',')[0]
+                test_decl = inputs.split('dec=')[-1].split(')')[0]
+                if re.search('minJD', line) and re.search('maxJD', line):
+                    test_minjd = inputs.split('minJD=')[-1].split(',')[0]
+                    test_maxjd = inputs.split('maxJD=')[-1].split(',')[0]
+                else:
+                    test_minjd = inputs.split('startJD=')[-1].split(',')[0]
+                    test_maxjd = inputs.split('endJD=')[-1].split(',')[0]
+
+                if (
+                    np.format_float_positional(float(test_ra), precision=6, pad_right=6).replace(' ', '0') == job_info['ra'].to_list()[0] and
+                    np.format_float_positional(float(test_decl), precision=6, pad_right=6).replace(' ', '0') == job_info['dec'].to_list()[0] and
+                    np.format_float_positional(float(test_minjd), precision=6, pad_right=6).replace(' ', '0') == job_info['jdstart'].to_list()[0] and
+                    np.format_float_positional(float(test_maxjd), precision=6, pad_right=6).replace(' ', '0') == job_info['jdend'].to_list()[0]
+                ):
+                    match = True
+
+        return match
+
+    def _read_job_log(self, file_name):
+        """Read ZTF job log file."""
+        job_info = pd.read_html(file_name)[0]
+        job_info['ra'] = np.format_float_positional(float(job_info['ra'].to_list()[0]), precision=6, pad_right=6).replace(' ', '0')
+        job_info['dec'] = np.format_float_positional(float(job_info['dec'].to_list()[0]), precision=6, pad_right=6).replace(' ', '0')
+        job_info['jdstart'] = np.format_float_positional(float(job_info['jdstart'].to_list()[0]), precision=6, pad_right=6).replace(' ', '0')
+        job_info['jdend'] = np.format_float_positional(float(job_info['jdend'].to_list()[0]), precision=6, pad_right=6).replace(' ', '0')
+        job_info['isostart'] = Time(float(job_info['jdstart'].to_list()[0]), format='jd', scale='utc').iso
+        job_info['isoend'] = Time(float(job_info['jdend'].to_list()[0]), format='jd', scale='utc').iso
+        job_info['ctime'] = os.path.getctime(file_name) - time.localtime().tm_gmtoff
+        job_info['cdatetime'] = datetime.fromtimestamp(os.path.getctime(file_name))
+
+        return job_info
+
+    def _read_fp_log(self, filename):
+        """Read forced photometry log file."""
+        with open(filename, "r") as f:
+            loglines = f.readlines()
+
+        ra = float(loglines[6].replace("fph_ra = ", "").replace("degrees", "").strip())
+        dec = float(loglines[7].replace("fph_dec = ", "").replace("degrees", "").strip())
+
+        return ra, dec

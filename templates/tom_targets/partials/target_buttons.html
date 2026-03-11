@@ -1,6 +1,6 @@
 {% load targets_extras target_extras %}
 {% with target.name|split_name as name %}
-{% if name.has_tns_prefix %}
+{% if name.tns_objname %}
     <a href="{% url 'custom_code:classify' pk=target.id %}" title="Classify target on TNS" class="btn btn-secondary">Classify</a>
 {% else %}
     <a href="{% url 'custom_code:report' pk=target.id %}" title="Report target to TNS" class="btn btn-secondary">Report</a>
@@ -11,5 +11,6 @@
     <a href="{% url 'tom_targets:share' pk=target.id %}" title="Share target" class="btn btn-info">Share</a>
 {% endif %}
 <a href="{% url 'tom_targets:delete' pk=target.id %}" title="Delete target" class="btn btn-danger">Delete</a>
+<a href="{% url 'candidate_vetting:checknewphot' pk=target.id %}" title="Check for new data" class="btn btn-warning">Update Lightcurve</a>
 
 {% get_buttons target %}

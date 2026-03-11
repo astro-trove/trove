@@ -8,6 +8,7 @@
       <th scope="col">Off.  <br/> (")</th>
       <th scope="col">Dist. <br/> (Mpc)</th>
       <th scope="col">Redshift</th>
+      <th scope="col">Distance Type</th>
       <th scope="col">Mag.  <br/> (AB)</th>
       <th scope="col">Source</th>
     </tr>
@@ -35,20 +36,23 @@
       {% if galaxy.z and galaxy.z|floatformat != 'nan'%}
         {% if galaxy.zErr|islist %}
           <td> {{ galaxy.z|floatformat:2 }}<span class="supsubz"><sup>+{{ galaxy.zErr.1|floatformat:2 }}</sup><sub>-{{ galaxy.zErr.0|floatformat:2 }}</sub></span> </td>
+          <td> {{ galaxy.z_type }} </td>
 	{% else %}
 	  {% if galaxy.zErr|floatformat == 'nan' %}
 	    <td> {{ galaxy.z|floatformat:2 }} (no err.) </td>
 	  {% else %}
             <td> {{ galaxy.z|floatformat:2 }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr|floatformat:2 }} </td>
 	  {% endif %}
+	  <td> {{ galaxy.z_type }} </td>
 	{% endif %}
       {% else %}
+        <td> </td>
         <td> </td>
       {% endif %}
       <td><i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{{ galaxy.Mags|floatformat:1 }}</td>
       <td>{{ galaxy.Source }}</td>
     </tr>
   {% empty %}
-    <tr><td colspan=9>No host galaxies stored</td></tr>
+    <tr><td colspan=9>No viable host galaxies stored</td></tr>
   {% endfor %}
 </table>

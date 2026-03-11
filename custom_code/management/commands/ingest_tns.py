@@ -2,41 +2,28 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import connection
 from trove_targets.models import Target
-from custom_code.healpix_utils import create_candidates_from_targets
+from tom_targets.models import BaseTarget
 from custom_code.alertstream_handlers import pick_slack_channel, send_slack, vet_or_post_error
 from custom_code.templatetags.skymap_extras import get_preferred_localization
-from tom_nonlocalizedevents.models import NonLocalizedEvent
 from datetime import datetime, timedelta, timezone
-from slack_sdk import WebClient
+from custom_code.templatetags.target_extras import split_name
+#from slack_sdk import WebClient
+import numpy as np
 import json
 import logging
+
+from astropy.coordinates import SkyCoord
+from healpix_alchemy.constants import HPX
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
-slack_ep = WebClient(settings.SLACK_TOKEN_EP)
-
-
-def get_active_nonlocalizedevents(t0=None, lookback_days=3., test=False):
-    """
-    Returns a queryset containing "active" NonLocalizedEvents, significant events that happened less than
-    `lookback_days` before `t0` and have not been retracted. Use `test=True` to query mock events instead of real ones.
-    """
-    if t0 is None:
-        t0 = datetime.now(tz=timezone.utc)
-    lookback_window_nle = (t0 - timedelta(days=lookback_days)).isoformat()
-    active_nles = NonLocalizedEvent.objects.filter(sequences__details__time__gte=lookback_window_nle, state='ACTIVE')
-    active_nles = active_nles.exclude(sequences__details__significant=False)
-    if test:
-        active_nles = active_nles.filter(event_id__startswith='MS')
-    else:
-        active_nles = active_nles.exclude(event_id__startswith='MS')
-    return active_nles.distinct()
-
-
+#slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
+#slack_tns50 = WebClient(settings.SLACK_TOKEN_TNS50)
+#slack_ep = WebClient(settings.SLACK_TOKEN_EP)
+        
 class Command(BaseCommand):
 
     help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
@@ -50,18 +37,23 @@ class Command(BaseCommand):
 
     def handle(self, lookback_days_nle=7., lookback_days_obs=3., **kwargs):
         
-        updated_targets_coords = Target.objects.raw(
-            """
-            --STEP 0: update coordinates and prefix of existing targets with TNS names
-            UPDATE tom_targets_basetarget AS tt
-            SET name=CONCAT(tns.name_prefix, tns.name), ra=tns.ra, dec=tns.declination, modified=NOW()
-            FROM tns_q3c as tns
-            WHERE REGEXP_REPLACE(tt.name, '^[^0-9]*', '')=tns.name
-            AND (q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
-                 OR tt.name != CONCAT(tns.name_prefix, tns.name))
-            RETURNING tt.*;
-            """
-        )
+        with connection.cursor() as cursor:
+             cursor.execute("""
+                 --STEP 0: update coordinates and prefix of existing targets with TNS names
+                 UPDATE tom_targets_basetarget AS tt
+                 SET name = CONCAT(tns.name_prefix, tns.name),
+                     ra = tns.ra,
+                     dec = tns.declination,
+                     modified = NOW()
+                 FROM tns_q3c AS tns
+                 WHERE REGEXP_REPLACE(tt.name, '^[^0-9]*', '') = tns.name
+                   AND (q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
+                        OR tt.name != CONCAT(tns.name_prefix, tns.name))
+                 RETURNING tt.id;
+             """)
+             updated_ids = [row[0] for row in cursor.fetchall()]
+             updated_targets_coords = Target.objects.filter(id__in = updated_ids)
+        
         logger.info(f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS.")
 
         logger.info('Crossmatching TNS with targets table. This will take several minutes.')
@@ -96,16 +88,20 @@ class Command(BaseCommand):
                 """
             )
 
-        updated_targets = Target.objects.raw(
-            """
-            --STEP 2: update existing non-TNS targets within 2" of a TNS transient to have the TNS name and coordinates
-            UPDATE tom_targets_basetarget AS tt
-            SET name=tm.tns_name, ra=tm.ra, dec=tm.dec, modified=NOW()
-            FROM top_tns_matches AS tm
-            WHERE tt.name=tm.name AND (tm.name != tm.tns_name OR sep > 0)
-            RETURNING tt.*;
-            """
-        )
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                --STEP 2: update existing non-TNS targets within 2" of a TNS transient to have the TNS name and coordinates
+                UPDATE tom_targets_basetarget AS tt
+                SET name=tm.tns_name, ra=tm.ra, dec=tm.dec, modified=NOW()
+                FROM top_tns_matches AS tm
+                WHERE tt.name=tm.name AND (tm.name != tm.tns_name OR sep > 0)
+                RETURNING tt.id;
+                """
+            )
+            updated_ids = [row[0] for row in cursor.fetchall()]
+            updated_targets = Target.objects.filter(id__in = updated_ids)
+            
         logger.info(f"Updated {len(updated_targets):d} targets to match the TNS.")
 
         with connection.cursor() as cursor:
@@ -166,85 +162,94 @@ class Command(BaseCommand):
                 """
             )
 
-        deleted_targets = Target.objects.raw(
-            """
-            DELETE FROM tom_targets_basetarget
-            WHERE id IN (
+        with connection.cursor() as cursor:
+             cursor.execute(
+                """
                 SELECT old_id FROM targets_to_merge
-            )
-            RETURNING *;
-            """
-        )
+                """
+             )
+             ids_to_delete = [row[0] for row in cursor.fetchall()]
+
+        deleted_targets = Target.objects.filter(id__in = ids_to_delete)
+        deleted_targets.delete()
+             
         logger.info(f"Merged {len(deleted_targets):d} targets into TNS targets.")
         for target in deleted_targets:
             logger.info(f" - deleted target {target.name} during merge")
 
-        new_targets = Target.objects.raw(
-            """
-            --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
-            INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
-            SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, ''
-            FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate of AT2016jlf in the TNS
-            ON CONFLICT (name) DO NOTHING
-            RETURNING *;
-            """
-        )
+        with connection.cursor() as cursor:
+             cursor.execute(
+                """
+                --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
+                INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
+                SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, ''
+                FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate of AT2016jlf in the TNS
+                ON CONFLICT (name) DO NOTHING
+                RETURNING id;
+                """
+             )
+
+             new_target_ids = [row[0] for row in cursor.fetchall()]
+             new_targets = Target.objects.filter(id__in = new_target_ids)
+             
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
-        for targets in [new_targets, updated_targets]:
-            for target in targets:
-                vet_or_post_error(target, slack_tns, channel='alerts-tns')
+        # update the Trove Target table with redshift and classification info from TNS
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                -- Step 5: Update the trove_targets_target table with redshift and classifications from TNS
+                UPDATE trove_targets_target AS tt
+                  SET redshift = tns.redshift,
+                      classification = tns.objtype
+                  FROM tns_q3c AS tns
+                  INNER JOIN tom_targets_basetarget AS bt
+                  ON tns.name = REGEXP_REPLACE(bt.name, '^[^0-9]*', '')
+                  WHERE bt.id = tt.basetarget_ptr_id AND (
+                      tt.redshift IS NULL OR
+                      tt.redshift = 'nan'
+                  )
+                RETURNING tt.basetarget_ptr_id;
+                """
+            )
+            
+            update_target_ids = [row[0] for row in cursor.fetchall()]
+        logger.info(f"Updated {len(update_target_ids):d} targets with classifications and/or redshifts from the TNS.")
 
-                # check if any of the possible host galaxies are within 40 Mpc
-                target_extra = target.targetextra_set.filter(key='Host Galaxies').first()
-                if target_extra is None:
-                    continue
-                for galaxy in json.loads(target_extra.value):
-                    if galaxy['Source'] in ['GLADE', 'GWGC', 'HECATE'] and galaxy['Dist'] <= 40.:  # catalogs that have dist
-                        slack_alert = (f'<{settings.TARGET_LINKS[0][0]}|{target.name}> is {galaxy["Offset"]:.1f}" from '
-                                       f'galaxy {galaxy["ID"]} at {galaxy["Dist"]:.1f} Mpc.').format(target=target)
-                        break
-                else:
-                    continue
+            
+        # Finally, we need to insert these into the Trove Target table rather than
+        # just the TOM BaseTarget table
 
-                # if there was nearby host galaxy found, check the last nondetection
-                photometry = target.reduceddatum_set.filter(data_type='photometry')
-                first_det = photometry.filter(value__magnitude__isnull=False).order_by('timestamp').first()
-                last_nondet = photometry.filter(value__magnitude__isnull=True,
-                                                timestamp__lt=first_det.timestamp).order_by('timestamp').last()
-                if first_det and last_nondet:
-                    time_lnondet = (first_det.timestamp - last_nondet.timestamp).total_seconds() / 3600.
-                    dmag_lnondet = (last_nondet.value['limit'] - first_det.value['magnitude']) / (time_lnondet / 24.)
-                    slack_alert += (f' The last nondetection was {time_lnondet:.1f} hours before detection,'
-                                    f' during which time it rose >{dmag_lnondet:.1f} mag/day.')
-                else:
-                    slack_alert += ' No nondetection was reported.'
-                slack_tns.chat_postMessage(channel='alerts-tns', text=slack_alert)
+        # these missing_targets should be the ones that are added to the BaseTarget
+        # table but not the Trove Targets table
+        # note that we will recompute the healpix, etc. below. These are just
+        # temporary placeholders        
+        missing_targets = BaseTarget.objects.filter(target__isnull = True)
+        logger.info(f"Adding {len(missing_targets):d} from basetarget table to trove target table")
+        for basetarget in missing_targets:            
+            # create the target with the basetarget ptr
+            coord = SkyCoord(basetarget.ra, basetarget.dec, unit="deg")
+            with connection.cursor() as cursor:
+                cursor.execute(f"""
+                INSERT INTO trove_targets_target (
+                    basetarget_ptr_id,
+                    healpix
+                )
+                VALUES (
+                    {basetarget.id},
+                    {HPX.skycoord_to_healpix(coord)}
+                )
+                """)
 
-        for target in updated_targets_coords:
-            vet_or_post_error(target, slack_tns, channel='alerts-tns')
+            trove_target = Target.objects.filter(
+                basetarget_ptr_id = basetarget.id
+            ).first()
 
-        # automatically associate with nonlocalized events
-        for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
-            seq = nle.sequences.last()
-            localization = get_preferred_localization(nle)
-            nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
-            target_ids = []
-            for targets in [new_targets, updated_targets, updated_targets_coords]:
-                for target in targets:
-                    first_det = target.reduceddatum_set.filter(data_type='photometry', value__magnitude__isnull=False
-                                                               ).order_by('timestamp').first()
-                    if first_det and nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
-                        target_ids.append(target.id)
-            candidates = create_candidates_from_targets(seq, target_ids=target_ids)
-            for candidate in candidates:
-                credible_region = candidate.credibleregions.get(localization=localization).smallest_percent
-                format_kwargs = {'nle': nle, 'target': candidate.target, 'credible_region': credible_region}
-                slack_alert = ('<{target_link}|{{target.name}}> falls in the {{credible_region:d}}% '
-                               'localization region of <{nle_link}|{{nle.event_id}}>')
-                if nle.event_type == nle.NonLocalizedEventType.GRAVITATIONAL_WAVE:
-                    send_slack(slack_alert, format_kwargs, *pick_slack_channel(seq))
-                elif nle.event_type == nle.NonLocalizedEventType.UNKNOWN:
-                    body = slack_alert.format(nle_link=settings.NLE_LINKS[0][0],
-                                              target_link=settings.TARGET_LINKS[0][0])
-                    slack_ep.chat_postMessage(channel='alerts-ep', text=body.format(**format_kwargs))
+            # then vet this target
+            vet_or_post_error(
+                trove_target,
+                #slack_tns,
+                #channel='alerts-tns',
+                lookback_days_nle=lookback_days_nle,
+                lookback_days_obs=lookback_days_obs
+            )
