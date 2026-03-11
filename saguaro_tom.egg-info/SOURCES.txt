@@ -76,4 +76,5 @@ trove_targets/migrations/0002_target_classification_target_mwebv_target_redshift
 trove_targets/migrations/__init__.py
 trove_targets/migrations/__pycache__/0001_initial.cpython-311.pyc
 trove_targets/migrations/__pycache__/0002_target_classification_target_mwebv_target_redshift.cpython-311.pyc
+trove_targets/migrations/__pycache__/0003_fix_tom_targets_migration.cpython-311.pyc
 trove_targets/migrations/__pycache__/__init__.cpython-311.pyc
