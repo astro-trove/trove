@@ -1,0 +1,11 @@
+# Conda environment for TROVE / SAGUARO TOM
+# Python 3.10, 3.11, or 3.12 required (tom-nonlocalizedevents does not support 3.9 or 3.13+)
+name: trove
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+    - -r requirements.txt
