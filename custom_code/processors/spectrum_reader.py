@@ -8,7 +8,7 @@ import json
 import os
 import re
 import warnings
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import numpy as np
 from astropy import units as u
@@ -282,7 +282,10 @@ def readspec(
     filename: str,
     verbose: bool = False,
     return_header: bool = False
-) -> Tuple[np.ndarray, np.ndarray, Optional[Time], str, str, ...]:
+) -> Union[
+    Tuple[np.ndarray, np.ndarray, Optional[Time], str, str],
+    Tuple[np.ndarray, np.ndarray, Optional[Time], str, str, dict]
+]:
     """
     Read a spectrum from a FITS, ASCII, or JSON file.
     
