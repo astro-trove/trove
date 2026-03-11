@@ -1,4 +1,4 @@
-setuptools==81.0.0 # force v81 due to multiple dependents on pkg_resources (lates version of setuptools deprecates pkg_resources). Once dependents catch up this can be removed.
+setuptools==81.0.0 # force v81 due to multiple dependents on pkg_resources (latest version of setuptools deprecates pkg_resources). Once dependents catch up this can be removed.
 astroplan
 astropy
 astroquery
@@ -15,12 +15,11 @@ healpy
 ligo.skymap
 matplotlib
 numpy
+pandas
 tomtoolkit==2.24.5
 tom-alertstreams
 tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
 tom-registration
-tom-swift==0.2.0
-paramiko
 plotly
 psycopg2-binary
 python-dateutil
@@ -30,5 +29,3 @@ specutils
 SQLAlchemy
 whitenoise
 trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
-fundamentals
-skypatrol
