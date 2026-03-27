@@ -12,7 +12,7 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import redirect
 
 from trove_targets.models import Target
-from .forms import VettingChoiceForm 
+from .forms import VettingChoiceForm, RedshiftUpdateForm 
 from candidate_vetting.vet_bns import vet_bns
 from candidate_vetting.vet_kn_in_sn import vet_kn_in_sn
 from candidate_vetting.vet_super_kn import vet_super_kn
@@ -126,3 +126,44 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
         """
         referer = self.request.META.get('HTTP_REFERER', '/')
         return referer
+
+
+# class TargetRedshiftUpdateFormView(FormView):
+class TargetRedshiftUpdateView(FormView):
+    template_name = "candidate_vetting/update_redshift_form.html"
+    form_class = RedshiftUpdateForm
+
+    def get(self, request, *args, **kwargs):
+        referer = request.META.get("HTTP_REFERER")
+        if referer:
+            self.request.session['nle_id'] = urlparse(referer).query
+        return super().get(request, *args, **kwargs)
+    
+    def form_valid(self, form):
+        pk = self.kwargs['pk']
+        host_galaxy = form.cleaned_data["host_galaxy"]
+        z = form.cleaned_data["z"]
+        z_err = form.cleaned_data["z_err"]
+
+        # update the target redshift
+        print(f"host_galaxy = {host_galaxy}")
+        print(f"z = {z}")
+        print(f"z_err = {z_err}")
+        target = Target.objects.get(id=pk)
+        target.redshift = z
+        target.save()
+
+        # generate the base url        
+        base_url = reverse(
+            'targets:detail',
+            kwargs=dict(pk=pk)
+        )
+        
+        # then also preserve the query parameters
+        query_str = self.request.session.pop('nle_id', '')
+        print("QUERY STRING:", query_str)
+        if query_str:
+            base_url += f"?{query_str}"
+        print(base_url)
+                    
+        return redirect(base_url)
