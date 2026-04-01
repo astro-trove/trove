@@ -1,6 +1,8 @@
 """
 Page views for candidate vetting
 """
+import numpy as np
+
 from urllib.parse import urlparse, parse_qs
 
 from django.contrib import messages
@@ -23,6 +25,8 @@ from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
 import requests
 
 from .config import FORM_CHOICE_FUNC_MAP
+
+from custom_code.templatetags.target_list_extras import galaxy_table
 
 class TargetVettingFormView(FormView):
     template_name = "candidate_vetting/vetting_form.html"
@@ -128,11 +132,22 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
         return referer
 
 
-# class TargetRedshiftUpdateFormView(FormView):
-class TargetRedshiftUpdateView(FormView):
+class TargetRedshiftUpdateFormView(FormView):
     template_name = "candidate_vetting/update_redshift_form.html"
     form_class = RedshiftUpdateForm
-
+    
+    # overriding the get_form function
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        # get target, potential host galaxies, their IDs, and provenance (source)
+        target = Target.objects.get(id=self.kwargs["pk"])
+        galaxies = galaxy_table(target)["galaxies"]
+        galaxy_choices_ids = [(g['ID'], g['ID']) for g in galaxies]
+        galaxy_choices_sources = [(gs, gs) for gs in np.unique([g["Source"] for g in galaxies])]
+        form.fields["host_galaxy_id"].choices = galaxy_choices_ids
+        form.fields["host_galaxy_source"].choices = galaxy_choices_sources
+        return form
+    
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
         if referer:
@@ -140,15 +155,16 @@ class TargetRedshiftUpdateView(FormView):
         return super().get(request, *args, **kwargs)
     
     def form_valid(self, form):
-        pk = self.kwargs['pk']
-        host_galaxy = form.cleaned_data["host_galaxy"]
+        host_galaxy_id = form.cleaned_data["host_galaxy_id"]
+        host_galaxy_source = form.cleaned_data["host_galaxy_source"]
         z = form.cleaned_data["z"]
         z_err = form.cleaned_data["z_err"]
 
         # update the target redshift
-        print(f"host_galaxy = {host_galaxy}")
+        print(f"\nhost_galaxy = {host_galaxy_id}\t{host_galaxy_source}")
         print(f"z = {z}")
         print(f"z_err = {z_err}")
+        pk = self.kwargs['pk']
         target = Target.objects.get(id=pk)
         target.redshift = z
         target.save()
@@ -164,6 +180,5 @@ class TargetRedshiftUpdateView(FormView):
         print("QUERY STRING:", query_str)
         if query_str:
             base_url += f"?{query_str}"
-        print(base_url)
                     
         return redirect(base_url)

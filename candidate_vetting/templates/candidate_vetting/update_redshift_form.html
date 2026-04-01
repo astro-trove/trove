@@ -103,11 +103,13 @@
 
 <div class="container d-flex justify-content-center">
     <div class="update-redshift-card">
-        <h2>Update Target Redshift</h2>
+        <h2>Update a Potential Host Galaxy Redshift</h2>
+        <h5>Make sure to identify the ID and source of the galaxy in the Host Galaxies table on the target's page.</h5>
+        <br>
         <div class="d-grid">
             <form action="" method="post">  
                 {% csrf_token %}  
-                {{ form|crispy }}
+                {{ form }}
                 <button type="submit" class="btn btn-primary btn-redshift">
                     Submit
                 </button>       

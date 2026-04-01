@@ -3,8 +3,7 @@ from django.urls import path
 from .views import (TargetVettingView, 
                     TargetVettingFormView, 
                     TargetFPView,
-                    # TargetRedshiftUpdateFormView,
-                    TargetRedshiftUpdateView)
+                    TargetRedshiftUpdateFormView)
 
 from tom_common.api_router import SharedAPIRootRouter
 
@@ -16,5 +15,5 @@ urlpatterns = [
     path('targets/<int:pk>/vet/<vetting_mode>/', TargetVettingView.as_view(), name='vet'),
     path('targets/<int:pk>/vetchoice/', TargetVettingFormView.as_view(), name='vet_form'),
     path('targets/<int:pk>/checknewphot/', TargetFPView.as_view(), name='checknewphot'),
-    path('targets/<int:pk>/updatez/', TargetRedshiftUpdateView.as_view(), name='updatez')
+    path('targets/<int:pk>/updatez/', TargetRedshiftUpdateFormView.as_view(), name='updatez')
 ]

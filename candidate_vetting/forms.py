@@ -7,6 +7,10 @@ from django.forms import (
 )
 from .config import VETTING_FORM_CHOICES
 
+from trove_targets.models import Target
+
+from custom_code.templatetags.target_list_extras import galaxy_table
+
 class VettingChoiceForm(Form):
     vetting_method = ChoiceField(
         choices = VETTING_FORM_CHOICES,
@@ -14,10 +18,17 @@ class VettingChoiceForm(Form):
     )
     
 class RedshiftUpdateForm(Form):
-    host_galaxy = ChoiceField(
-        choices = VETTING_FORM_CHOICES,
+    
+    host_galaxy_id = ChoiceField(
+        choices = [],
         widget = Select(),
-        label="Host Galaxy"
+        label="Host Galaxy ID"
     )
+    host_galaxy_source = ChoiceField(
+        choices = [],
+        widget = Select(),
+        label="Host Galaxy Source"
+    )
+
     z = FloatField(label="Redshift")
     z_err = FloatField(label="Redshift uncertainty")
