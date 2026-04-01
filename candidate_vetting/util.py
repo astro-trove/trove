@@ -47,18 +47,31 @@ VAL_NOT_SCORE_KEYS = {
 
 # these should now be stored in a TargetExtra object so the score needs to be
 # accessed differently
-TARGETEXTRA_KEYS = [
+TARGETEXTRA_KEYS = {
     "ps_score",
     "mpc_match_name",
     "mpc_match_sep",
     "mpc_match_date",
-]
+}
 MPC_KEYS = [
     "mpc_match_name",
     "mpc_match_sep",
     "mpc_match_date",
 ]
 
+def _check_phot_val(val, param_ranges, param_range_key):
+    val_max = max(param_ranges[param_range_key])
+    val_min = min(param_ranges[param_range_key])
+    if isinstance(val_min, Quantity):
+        val_min = val_min.value
+    if isinstance(val_max, Quantity):
+        val_max = val_max.value
+        
+    if val < val_min or val > val_max:
+        # multiply photometry score by PHOT_SCORE_MIN
+        return PHOT_SCORE_MIN
+    return 1
+        
 def get_event_candidate_scores(event_candidates, 
                                dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
                                subscore_names=SUBSCORE_NAMES):
@@ -66,74 +79,84 @@ def get_event_candidate_scores(event_candidates,
 
     event_candidates should be a django queryset of EventCandidate objects
     """ 
-
     val_not_score_keys = VAL_NOT_SCORE_KEYS
+    exclude_keys = set(val_not_score_keys.keys()) | TARGETEXTRA_KEYS
+    
+    # only evaluate this once since it is time consuming
+    event_candidates_list = list(event_candidates)
+    
+    # Batch load all related data at once
+    target_ids = [ec.target_id for ec in event_candidates_list]
+    
+    # Prefetch TargetExtra for all targets at once
+    target_extras_by_id = {}
+    for te in TargetExtra.objects.filter(target_id__in=target_ids):
+        if te.target_id not in target_extras_by_id:
+            target_extras_by_id[te.target_id] = {}
+        target_extras_by_id[te.target_id][te.key] = te.value
+    
+    # Prefetch all ScoreFactor objects at once
+    score_factors = ScoreFactor.objects.filter(
+        event_candidate__in=event_candidates_list,
+        key__in=subscore_names
+    ).annotate(value_float=Cast("value", FloatField()))
 
+    # Group score factors by event candidate
+    score_factors_by_ec = {}
+    for sf in score_factors:
+        ec_id = sf.event_candidate_id
+        if ec_id not in score_factors_by_ec:
+            score_factors_by_ec[ec_id] = {}
+        score_factors_by_ec[ec_id][sf.key] = sf.value_float
+    
     ecs_out = []
-    for ec in event_candidates:
+    for ec in event_candidates_list:
         # set ec.score to be a dictionary mapping transient : score
         ec.score = {}
+
+        # get all 'subscores' (sometimes actually calculated values)
+        # for object; need to re-do this per transient because of step 
+        # below where we exclude certain scores from the queryset
+        sf_dict = score_factors_by_ec[ec.id]
         
+        # Extract values that need special handling
+        val_dict = {
+            subscore_key: sf_dict[subscore_key]
+            for subscore_key, param_range_key in val_not_score_keys.items()
+            if subscore_key in sf_dict
+        }
+        
+        # now get all the scores stored in TargetExtra objects
+        te = target_extras_by_id[ec.target_id]
+        ps_score = 1
+        if "ps_score" in te:
+            ps_score = float(te["ps_score"])
+            
+        mpc_score = 1
+        if "mpc_match_name" in te:
+            mpc_score = int(te["mpc_match_name"] == str(None))
+
+        # remove keys we don't want and calculate a base subscore
+        subscore_no_phot = math.prod([
+            sf_dict[key]
+            for key in sf_dict
+            if key not in exclude_keys
+        ]) * ps_score * mpc_score
+            
         for transient in TRANSIENTS: 
             # allowed parameter ranges for given transient
             param_ranges = dict_transients_param_ranges[transient]
+
+            # compute the photometry score
+            phot_score = math.prod([
+                _check_phot_val(val_dict[subscore_key], param_ranges, param_range_key)
+                for subscore_key, param_range_key in val_not_score_keys.items()
+                if subscore_key in val_dict
+            ])
             
-            phot_score = 1 # reset to 1.0 for each transient
-            
-            # get all 'subscores' (sometimes actually calculated values)
-            # for object; need to re-do this per transient because of step 
-            # below where we exclude certain scores from the queryset
-            subscores = ScoreFactor.objects.filter(
-                event_candidate = ec,
-                key__in = subscore_names
-            ).annotate(
-                value_float = Cast("value", FloatField())
-            )
-            
-            # iterate though subscores/values which will determine subscores
-            subscore_keys = subscores.values_list("key", flat=True)
-            for subscore_key, param_range_key in val_not_score_keys.items():
-                if subscore_key in subscore_names and subscore_key in subscore_keys:
-                    val = subscores.get(
-                        key = subscore_key
-                    ).value_float
-                    # check if within limits
-                    val_max = max(param_ranges[param_range_key])
-                    val_min = min(param_ranges[param_range_key])
-                    if isinstance(val_min, Quantity):
-                        val_min = val_min.value
-                    if isinstance(val_max, Quantity):
-                        val_max = val_max.value
-                    
-                    if val < val_min or val > val_max:
-                        # multiply photometry score by PHOT_SCORE_MIN
-                        phot_score *= PHOT_SCORE_MIN 
-                
-            subscores = subscores.exclude(
-                key__in = list(val_not_score_keys.keys()) + TARGETEXTRA_KEYS
-            ) # this removes those rows from the queryset
-            
-            # now we can compute the score just using multiplication
-            subscore_list = list(
-                subscores.values_list("value_float", flat=True)
-            )
-            subscore_list.append(phot_score)
-            
-            # now get all the scores stored in TargetExtra objects and append those
-            te = TargetExtra.objects.filter(target_id = ec.target.id)
-            ps_score_qs = te.filter(key="ps_score")
-            if ps_score_qs.exists():
-                ps_score = float(ps_score_qs.first().value)
-                subscore_list.append(ps_score)
-                
-            mpc_match_name = te.filter(key="mpc_match_name")
-            if mpc_match_name.exists():
-                mpc_score = int(mpc_match_name.first().value == str(None))
-                subscore_list.append(mpc_score)
-                
             # save the score to a temporary field (dictionary) in the 
             # EventCandidate object
-            ec.score[transient] = math.prod(subscore_list) # multiply the subscores
+            ec.score[transient] = subscore_no_phot * phot_score # multiply the subscores
         ecs_out.append(ec)
     
     # sort by kilonova score, for now
