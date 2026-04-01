@@ -6,7 +6,8 @@
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
 from django.db import models
-from tom_nonlocalizedevents.models import EventCandidate
+from django.contrib.postgres.fields import ArrayField
+from tom_nonlocalizedevents.models import EventCandidate, Target
 
 class AsassnQ3C(models.Model):
     aid = models.AutoField(primary_key=True)
@@ -1207,3 +1208,76 @@ class ScoreFactor(models.Model):
 
     class Meta:
         unique_together = ("event_candidate", "key")
+
+
+class GladePlusTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")
+
+class GwgcTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")
+
+class HecateTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")
+
+class DesiDr1TargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")
+
+class NedLvsTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")
+
+class LsDr10TargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")
+
+class Ps1GalaxyTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")
+
+class Sdss12PhotozTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
+    key = models.CharField(max_length=200)
+    value = ArrayField(models.CharField(max_length=200), blank=True)
+
+    class Meta:
+        unique_together = ("target", "key")

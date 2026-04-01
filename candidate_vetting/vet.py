@@ -60,6 +60,16 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     TwoMass,
     DesiDr1
 )
+from candidate_vetting.models import (
+    GladePlusTargetMatch,
+    GwgcTargetMatch,
+    HecateTargetMatch,
+    LsDr10TargetMatch,
+    Ps1GalaxyTargetMatch,
+    Sdss12PhotozTargetMatch,
+    NedLvsTargetMatch,
+    DesiDr1TargetMatch
+)
 
 HOST_DF_COLMAP = {
     "name":"ID",
@@ -104,7 +114,20 @@ GALAXY_CATALOGS = [
 ]
 
 GALAXY_CATALOG_RANKING = {c.__name__:i for i,c in enumerate(GALAXY_CATALOGS)}
+
+
+GALAXY_TARGETMATCHES = [
+    GladePlusTargetMatch,
+    GwgcTargetMatch,
+    HecateTargetMatch,
+    DesiDr1TargetMatch,
+    NedLvsTargetMatch,
+    LsDr10TargetMatch,
+    Ps1GalaxyTargetMatch,
+    Sdss12PhotozTargetMatch]
+GALAXY_TARGETMATCH_DICT = dict(zip([g.__name__ for g in GALAXY_CATALOGS], GALAXY_TARGETMATCHES))
     
+
 class AsymmetricGaussian(rv_continuous):
     """
     Custom Asymmetric Gaussian distribution for uneven uncertainties
@@ -417,6 +440,13 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         # now save the cleaned dataset
         df["catalog"] = cat.__class__.__name__
         res.append(df)
+        
+        # save to <catalog>TargetMatch: 
+        GALAXY_TARGETMATCH_DICT[cat.__class__.__name__].objects.update_or_create(
+            target = target,
+            key = "galaxy_match_ids",
+            value = list(df["name"].values)
+        )
         
     df = pd.concat(res).reset_index(drop=True)
 
