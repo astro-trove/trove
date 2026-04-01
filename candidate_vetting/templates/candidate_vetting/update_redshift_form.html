@@ -1,5 +1,6 @@
 {% extends 'tom_targets/partials/base.html' %}
 {% load crispy_forms_tags comments bootstrap4 %}
+{% load target_list_extras %}
 
 {% block content %}
 <style>
@@ -14,10 +15,10 @@
         font-family: sans-serif;
     }
 
-    /* 2. The Card: High contrast Dark Mode */
+    /* 2. The Card */
     .update-redshift-card {
-        /* Deep dark background so white text stands out perfectly */
-        background: rgba(20, 20, 25, 0.95); 
+        /* White background, black text */
+        background: white; 
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
         
@@ -26,34 +27,34 @@
         border-radius: 12px;
         padding: 40px;
         width: 100%;
-        max-width: 450px;
+        max-width: 850px;
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-        color: #FFFFFF; /* Pure white text for headers */
+        color: black; /* Pure white text for headers */
     }
 
     .update-redshift-card h2 {
         font-weight: 700;
         margin-bottom: 25px;
         text-align: center;
-        color: #fff;
+        color: black;
     }
 
-    /* 3. Form Labels: High contrast light gray/white */
+    /* 3. Form Labels */
     .update-redshift-card label {
-        color: #e0e0e0 !important; 
+        color: black !important; 
         font-weight: 600;
         font-size: 0.95rem;
         margin-bottom: 8px;
         display: block;
     }
 
-    /* 4. Inputs: Pure black background with white text and bright borders */
+    /* 4. Inputs: Pure white background with black text and bright borders */
     .update-redshift-card input, 
     .update-redshift-card select, 
     .update-redshift-card textarea {
-        background: #000 !important; 
+        background: white !important; 
         border: 2px solid #444 !important; /* Thicker, darker border */
-        color: #fff !important; 
+        color: black !important; 
         border-radius: 8px !important;
         padding: 10px !important;
         width: 100%;
@@ -102,9 +103,15 @@
 </style>
 
 <div class="container d-flex justify-content-center">
+
     <div class="update-redshift-card">
         <h2>Update a Potential Host Galaxy Redshift</h2>
-        <h5>Make sure to identify the ID and source of the galaxy in the Host Galaxies table on the target's page.</h5>
+        <div class="col-md-8">
+          <details>
+            <summary><h4 style="display:inline-block">Host Galaxies</h4></summary>
+            {% galaxy_table form.target %}
+          </details>
+        </div>
         <br>
         <div class="d-grid">
             <form action="" method="post">  

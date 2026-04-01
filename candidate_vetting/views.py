@@ -141,6 +141,7 @@ class TargetRedshiftUpdateFormView(FormView):
         form = super().get_form(*args, **kwargs)
         # get target, potential host galaxies, their IDs, and provenance (source)
         target = Target.objects.get(id=self.kwargs["pk"])
+        form.target = target
         galaxies = galaxy_table(target)["galaxies"]
         galaxy_choices_ids = [(g['ID'], g['ID']) for g in galaxies]
         galaxy_choices_sources = [(gs, gs) for gs in np.unique([g["Source"] for g in galaxies])]
