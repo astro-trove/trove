@@ -903,6 +903,7 @@ class ZtfVarstarQ3C(models.Model):
         db_table = 'ztf_varstar_q3c'
 
 class TwomassQ3C(models.Model):
+    tid = models.AutoField(primary_key=True)
     ra = models.FloatField(blank=True, null=True)
     decl = models.FloatField(blank=True, null=True)
     err_maj = models.FloatField(blank=True, null=True)
@@ -969,6 +970,7 @@ class TwomassQ3C(models.Model):
         db_table = 'twomass_q3c'
 
 class NedlvsQ3C(models.Model):
+    nid = models.AutoField(primary_key=True)
     objname = models.TextField(blank=True, null=True)
     ra = models.FloatField(blank=True, null=True)
     dec = models.FloatField(blank=True, null=True)
@@ -1050,6 +1052,7 @@ class NedlvsQ3C(models.Model):
         db_table = 'nedlvs_q3c'
 
 class DesiDr1Q3C(models.Model):
+    did = models.AutoField(primary_key=True)
     targetid = models.BigIntegerField(blank=True, null=True)
     survey = models.TextField(blank=True, null=True)
     program = models.TextField(blank=True, null=True)
@@ -1199,7 +1202,9 @@ class DesiDr1Q3C(models.Model):
     class Meta:
         managed = False
         db_table = 'desi_dr1_q3c'
-        
+
+
+## ScoreFactor: subscores (e.g., 'skymap_score') which are used to compute overall score
 class ScoreFactor(models.Model):
     id = models.AutoField(primary_key=True)
     event_candidate = models.ForeignKey(EventCandidate, on_delete=models.CASCADE)
@@ -1210,74 +1215,75 @@ class ScoreFactor(models.Model):
         unique_together = ("event_candidate", "key")
 
 
+## <catalogname>TargetMatch: tables for storing target : host galaxy associations
 class GladePlusTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(GladePlusQ3C, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
 
 class GwgcTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(GwgcQ3C, blank=False, null=False, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
 
 class HecateTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(HecateQ3C, blank=False, null=False, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
 
 class DesiDr1TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(DesiDr1Q3C, blank=False, null=False, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
 
 class NedLvsTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(NedlvsQ3C, blank=False, null=False, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
 
 class LsDr10TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(LsDr10Q3C, blank=False, null=False, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
 
 class Ps1GalaxyTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(Ps1Q3C, blank=False, null=False, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
 
 class Sdss12PhotozTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
-    target = models.ForeignKey(Target, on_delete=models.CASCADE, default=None)
-    key = models.CharField(max_length=200)
-    value = ArrayField(models.CharField(max_length=200), blank=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.ForeignKey(Sdss12PhotozQ3C, blank=False, null=False, on_delete=models.CASCADE)
+    pcc = models.FloatField(blank=False, null=False)
 
     class Meta:
-        unique_together = ("target", "key")
+        unique_together = ("target", "host_galaxy")
