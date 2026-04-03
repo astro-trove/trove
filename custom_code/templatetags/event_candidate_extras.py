@@ -9,7 +9,8 @@ from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from candidate_vetting.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
-    get_target_score as _get_target_score
+    get_target_score as _get_target_score,
+    TARGETEXTRA_KEYS
 )
 
 register = template.Library()
