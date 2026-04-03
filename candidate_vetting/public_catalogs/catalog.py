@@ -77,6 +77,7 @@ class StaticCatalog(Catalog):
         self.catalog_type = "static"
 
         self.colnames = {
+            "trove_uniq",
             "name",
             "ra",
             "dec",

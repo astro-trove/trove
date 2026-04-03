@@ -58,6 +58,7 @@ class DesiDr1(StaticCatalog):
         )
 
         self.colmap = {
+            "did":"trove_uniq",
             "desiname":"name",
             "z":"z",
             "zerr":"z_err",
@@ -83,6 +84,7 @@ class DesiDr1(StaticCatalog):
 class NedLvs(StaticCatalog):
     catalog_model = NedlvsQ3C
     colmap = {
+        "nid":"trove_uniq",
         "objname":"name",
         "z":"z",
         "z_unc":"z_err", 
@@ -143,6 +145,7 @@ class DesiSpec(StaticCatalog):
         )
 
         self.colmap = {
+            "did":"trove_uniq",
             "targetid":"name",
             "z":"z",
             "zerr":"z_err",
@@ -174,6 +177,7 @@ class Gaiadr3Variable(StaticCatalog):
 class GladePlus(StaticCatalog):
     catalog_model = GladePlusQ3C
     colmap = {
+        "gid":"trove_uniq",
         "gn":"name",
         "z_helio":"z",
         "z_err":"z_err", 
@@ -209,6 +213,7 @@ class GladePlus(StaticCatalog):
 class Gwgc(StaticCatalog):
     catalog_model = GwgcQ3C
     colmap = {
+        "gid":"trove_uniq",
         "name":"name",
         "dist":"lumdist", # Mpc
         "e_dist":"lumdist_err", # Mpc
@@ -227,6 +232,7 @@ class Gwgc(StaticCatalog):
 class Hecate(StaticCatalog):
     catalog_model = HecateQ3C
     colmap = {
+        "hid":"trove_uniq",
         "objname":"name",
         "d":"lumdist", # Mpc
         "e_d":"lumdist_err", # Mpc
@@ -269,6 +275,7 @@ class LsDr10(StaticCatalog):
         )
 
         self.colmap = {
+            "lid":"trove_uniq",
             "objid":"name",
             "ra":"ra",
             "declination":"dec",
@@ -366,6 +373,7 @@ class Milliquas(StaticCatalog):
 class Ps1(StaticCatalog):
     catalog_model = Ps1Q3C
     colmap = {
+        "pid":"trove_uniq",
         "objname":"name",
         "ra":"ra",
         "dec":"dec",
@@ -409,6 +417,7 @@ class RomaBzcat(StaticCatalog):
 class Sdss12Photoz(StaticCatalog):
     catalog_model = Sdss12PhotozQ3C
     colmap = {
+        "sid":"trove_uniq",
         "sdssid":"name",
         "ra":"ra",
         "dec":"dec",
