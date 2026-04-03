@@ -22,7 +22,7 @@ class RedshiftUpdateForm(Form):
     host_galaxy_id = ChoiceField(
         choices = [],
         widget = Select(),
-        label="Host Galaxy ID"
+        label="Host Galaxy Name"
     )
     host_galaxy_source = ChoiceField(
         choices = [],
