@@ -418,14 +418,15 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         catname = cat.__class__.__name__
         print(f"Querying {cat}...")
         query_set = cat.query(ra, dec, radius=radius)
+        
+        # first, delete any matches in <catalog>TargetMatch
+        matches = GALAXY_TARGETMATCH_DICT[catname].objects.filter(
+            target=target)
+        if matches.count():
+            matches.delete()
 
         # if no queries are returned we can skip this catalog
         if query_set.count() == 0: 
-            # but first, delete any matches in <catalog>TargetMatch
-            matches = GALAXY_TARGETMATCH_DICT[catname].objects.filter(
-                target=target)
-            if matches.count():
-                matches.delete()
             continue
 
         # convert to a dataframe and standardize the column names

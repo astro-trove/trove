@@ -58,7 +58,7 @@ class DesiDr1(StaticCatalog):
         )
 
         self.colmap = {
-            "did":"trove_uniq",
+            "id":"trove_uniq",
             "desiname":"name",
             "z":"z",
             "zerr":"z_err",
@@ -84,7 +84,7 @@ class DesiDr1(StaticCatalog):
 class NedLvs(StaticCatalog):
     catalog_model = NedlvsQ3C
     colmap = {
-        "nid":"trove_uniq",
+        "id":"trove_uniq",
         "objname":"name",
         "z":"z",
         "z_unc":"z_err", 
