@@ -50,13 +50,30 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
 
     *Example*:
     - Simple
-    http://localhost:8000/api/score/S251112cm
+    ```
+    curl -X 'GET' \
+    'http:/localhost:8000/api/score/GW190814' \
+    -H 'accept: */*' \
+    -u <username>:<password>
+    ```
 
-    - With optional paramters
-    http://localhost:8000/api/score/S251112cm?candidate_names="S251112cm_X78,AT2025adht"
+    - With optional paramaters
+    
+    ```
+    curl -X 'GET' \
+    'http://localhost:8000/api/score/S251112cm?candidate_names=S251112cm_X78,AT2025adht' \
+    -H 'accept: */*' \
+    -u <username>:<password>
+    ```
 
     - For just one event
-    http://localhost:8000/api/score/S251112cm?candidate_names=S251112cm_X78
+    ```
+    curl -X 'GET' \
+    'http://localhost:8000/api/score/S251112cm?candidate_names=S251112cm_X78' \
+    -H 'accept: */*' \
+    -u <username>:<password>
+    ```
+
     """
     
     # get the event candidates associated with this NLE
@@ -88,9 +105,19 @@ def get_scores_from_cone_search(request, nle_name:str, ra:float, dec:float, radi
     and (4) "score" (a dictionary of the scores, with keys for the type of scoring algorithm used).
 
     *Example*:
-    Navigate to http://localhost:8000/api/score/S251112cm/cone_search?ra=147.47566&dec=0.616566666667
-
-    Or, to provide a search radius, http://localhost:8000/api/score/S251112cm/cone_search?ra=147.475&dec=0.6165&radius=10
+    ```
+    curl -X 'GET' \
+    'http://localhost:8000/api/score/S251112cm/cone_search?ra=147.47566&dec=0.616566666' \
+    -H 'accept: */*' \
+    -u <username>:<password>
+    ```
+    Or, to provide a search radius
+    ```
+    curl -X 'GET' \
+    'http://localhost:8000/api/score/S251112cm/cone_search?ra=147.475&dec=0.6165&radius=10' \
+    -H 'accept: */*' \
+    -u <username>:<password>
+    ```
     """
     
     # convert the radius to degrees
