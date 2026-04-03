@@ -72,6 +72,7 @@ from candidate_vetting.models import (
 )
 
 HOST_DF_COLMAP = {
+    "trove_uniq":"troveID",
     "name":"ID",
     "pcc":"PCC",
     "offset":"Offset",
@@ -260,6 +261,7 @@ def _save_host_galaxy_df(df, target):
     
     newdf = df[
         [
+            "trove_uniq",
             "name",
             "pcc",
             "offset",
@@ -413,20 +415,27 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
     res = []
     for catalog in GALAXY_CATALOGS:
         cat = catalog()
+        catname = cat.__class__.__name__
         print(f"Querying {cat}...")
         query_set = cat.query(ra, dec, radius=radius)
-            
+
         # if no queries are returned we can skip this catalog
-        if query_set.count() == 0: continue
+        if query_set.count() == 0: 
+            # but first, delete any matches in <catalog>TargetMatch
+            matches = GALAXY_TARGETMATCH_DICT[catname].objects.filter(
+                target=target)
+            if matches.count():
+                matches.delete()
+            continue
 
         # convert to a dataframe and standardize the column names
         df = pd.DataFrame(
             list(
                 query_set.values()
             )
-        ) 
+        )
         df = cat.to_standardized_catalog(df)
-
+        
         # some extra cleaning before continuing
         if "z" in df:
             # we only need to do this if the redshift is in the dataframe
@@ -436,31 +445,41 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         df = df.dropna(
             subset=["default_mag", "ra", "dec", "lumdist", "lumdist_err"]
         ) # drop rows without the information we need
+        df["trove_uniq"] = df["trove_uniq"].astype(int) # set to an int
+        
+        # calculate Pcc, filter out anything <= pcc_threshold
+        catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
+        seps = coord.separation(catalog_coord).arcsec
+        df["offset"] = seps
+        df["pcc"] = pcc(df["default_mag"], seps)
+        df = df[df.pcc <= pcc_threshold]
                 
         # now save the cleaned dataset
-        df["catalog"] = cat.__class__.__name__
+        df["catalog"] = catname
         res.append(df)
         
-        # save to <catalog>TargetMatch: 
-        GALAXY_TARGETMATCH_DICT[cat.__class__.__name__].objects.update_or_create(
-            target = target,
-            key = "galaxy_match_ids",
-            value = list(df["name"].values)
-        )
+        # # save new matches to <catalog>TargetMatch
+        # TODO: update to do bulk creation and updating (faster)
+        for i in range(len(df["name"].values)):
+            GALAXY_TARGETMATCH_DICT[catname].objects.update_or_create(
+                target = target,
+                host_galaxy = list(df["trove_uniq"].values)[i],
+                pcc = list(df["pcc"].values)[i]
+            )
         
     df = pd.concat(res).reset_index(drop=True)
 
-    # calculate Pcc
-    catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
-    seps = coord.separation(catalog_coord).arcsec
-    df["offset"] = seps
-    df["pcc"] = pcc(df["default_mag"], seps)
+    # # calculate Pcc
+    # catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
+    # seps = coord.separation(catalog_coord).arcsec
+    # df["offset"] = seps
+    # df["pcc"] = pcc(df["default_mag"], seps)
 
-    # TODO: We will need to put some deduplication code for the galaxy dataframe
-    #       here at some point. For now it seems to work without it though!
+    # # TODO: We will need to put some deduplication code for the galaxy dataframe
+    # #       here at some point. For now it seems to work without it though!
 
-    # Finally, filter out anything <= pcc_threshold and sort inversely by pcc
-    ret_df = df[df.pcc <= pcc_threshold].sort_values("pcc", ascending=True)
+    # sort inversely by pcc
+    ret_df = df.sort_values("pcc", ascending=True)
     
     end = time.time()
     print(ret_df)
