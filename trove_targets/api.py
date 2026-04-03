@@ -75,10 +75,12 @@ def upload_target(request, payload: List[UploadTargetSchema]):
 
     *Example:*
 
+    DON'T FORGET to change <username> and <password> to your username and password! 
+    
     To upload a target without photometry
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '[
+    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json' -u <username>:<password>  -d '[
       {
         "name": "test",
         "ra": 0,
@@ -90,7 +92,7 @@ def upload_target(request, payload: List[UploadTargetSchema]):
     To upload a target with photometry:
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '[
+    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -u <username>:<password>  -d '[
       {
         "name": "test",
         "ra": 0,
@@ -117,7 +119,7 @@ def upload_target(request, payload: List[UploadTargetSchema]):
     To upload a new photometry point to an existing target 
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'   -d '[
+    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -u <username>:<password>  -d '[
       {
         "name": "test",
         "ra": 0,
