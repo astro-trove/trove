@@ -465,8 +465,8 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         df["catalog"] = catname
         res.append(df)
         
-        # # save new matches to <catalog>TargetMatch
-        # TODO: update to do bulk creation and updating (faster)
+        # save new matches to <catalog>TargetMatch
+        # TODO: update to do bulk creation and updating (faster)--this is SUPER SLOW right now
         for i in range(len(df["name"].values)):
             GALAXY_TARGETMATCH_DICT[catname].objects.update_or_create(
                 target = target,
@@ -476,14 +476,8 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         
     df = pd.concat(res).reset_index(drop=True)
 
-    # # calculate Pcc
-    # catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
-    # seps = coord.separation(catalog_coord).arcsec
-    # df["offset"] = seps
-    # df["pcc"] = pcc(df["default_mag"], seps)
-
-    # # TODO: We will need to put some deduplication code for the galaxy dataframe
-    # #       here at some point. For now it seems to work without it though!
+    # TODO: We will need to put some deduplication code for the galaxy dataframe
+    #       here at some point. For now it seems to work without it though!
 
     # sort inversely by pcc
     ret_df = df.sort_values("pcc", ascending=True)
