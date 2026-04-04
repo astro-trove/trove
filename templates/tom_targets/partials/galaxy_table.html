@@ -2,7 +2,7 @@
 
 <table class="galaxies table table-hover">
     <tr>
-      <th scope="col">ID</th>
+      <th scope="col"></th>
       <th scope="col">Name</th>
       <th scope="col"><i>P</i><sub>cc</sub></th>
       <th scope="col">Off.  <br/> (")</th>
@@ -11,6 +11,7 @@
       <th scope="col">Distance Type</th>
       <th scope="col">Mag.  <br/> (AB)</th>
       <th scope="col">Source</th>
+      <th scope="col">Submitter [Original Source]</th>
     </tr>
   {% for galaxy in galaxies %}
     <tr>
@@ -51,6 +52,7 @@
       {% endif %}
       <td><i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{{ galaxy.Mags|floatformat:1 }}</td>
       <td>{{ galaxy.Source }}</td>
+      <td>{{ galaxy.Submitter }}</td>
     </tr>
   {% empty %}
     <tr><td colspan=9>No viable host galaxies stored</td></tr>
