@@ -3,6 +3,7 @@ Page views for candidate vetting
 """
 import numpy as np
 
+import requests
 from urllib.parse import urlparse, parse_qs
 
 from django.contrib import messages
@@ -14,21 +15,21 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import redirect
 
 from trove_targets.models import Target
-from .forms import VettingChoiceForm, RedshiftUpdateForm 
-from candidate_vetting.vet_bns import vet_bns
-from candidate_vetting.vet_kn_in_sn import vet_kn_in_sn
-from candidate_vetting.vet_super_kn import vet_super_kn
-from candidate_vetting.vet_basic import vet_basic
-from candidate_vetting.vet_phot import find_public_phot
-from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
-from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
+from .forms import VettingChoiceForm, RedshiftUpdateForm
+from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
+ 
+# from .vet_bns import vet_bns
+# from .vet_kn_in_sn import vet_kn_in_sn
+# from .vet_super_kn import vet_super_kn
+from .vet_basic import vet_basic
+from .vet_phot import find_public_phot
+from .public_catalogs.phot_catalogs import ZTF_Forced_Phot
+from .public_catalogs.dynamic_catalogs import UserGalaxy
 
-import requests
-
-from .config import FORM_CHOICE_FUNC_MAP
-from .models import UserGalaxyQ3C
-
+from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
+
 
 class TargetVettingFormView(FormView):
     template_name = "candidate_vetting/vetting_form.html"
@@ -37,6 +38,25 @@ class TargetVettingFormView(FormView):
     # TODO: Only give the user the form if there is a non-localized event associated
     #       with this target. If there isn't, this should just redirect to the basic
     #       target vetting!
+    
+    # overriding the get_form function
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        
+        # if NLE was provided by referer, use it to choose what vetting is allowed
+        try: 
+            nle_name = self.request.session["nle_id"].split("=")[-1]
+            nle = NonLocalizedEvent.objects.filter(event_id=nle_name).first()
+        except IndexError:
+            nle = None
+        if nle: 
+            nle_eventseq = EventLocalization.objects.filter(
+                nonlocalizedevent_id=nle.id).first().sequences
+            nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
+            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
+        else:
+            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
+        return form
 
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
@@ -62,7 +82,6 @@ class TargetVettingFormView(FormView):
         print("QUERY STRING:", query_str)
         if query_str:
             base_url += f"?{query_str}"
-                    
         return redirect(base_url)
     
 class TargetVettingView(LoginRequiredMixin, RedirectView):

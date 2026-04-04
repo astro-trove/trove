@@ -15,18 +15,19 @@ from custom_code.templatetags.target_list_extras import galaxy_table
 class VettingChoiceForm(Form):
     vetting_method = ChoiceField(
         choices = VETTING_FORM_CHOICES,
-        widget = RadioSelect()
+        widget = Select(),
+        label = "Vetting Method"
     )
     
 class RedshiftUpdateForm(Form):
     
     host_galaxy_id = ChoiceField(
-        choices = [],
+        choices = [], # these are specified in the view
         widget = Select(),
         label="Host Galaxy Name"
     )
     host_galaxy_source = ChoiceField(
-        choices = [],
+        choices = [], # these are specified in the view
         widget = Select(),
         label="Host Galaxy Source"
     )
