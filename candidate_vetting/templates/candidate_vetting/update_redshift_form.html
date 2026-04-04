@@ -118,8 +118,11 @@
                 {% csrf_token %}  
                 {{ form }}
                 <button type="submit" class="btn btn-primary btn-redshift">
-                    Submit
-                </button>       
+                    Update Selected Galaxy Redshift
+                </button>
+                <a href="{{ request.META.HTTP_REFERER }}" class="text-center mt-3 text-black-50 text-decoration-none small">
+                    Cancel and Return
+                </a>       
             </form>
         </div>
     </div>
