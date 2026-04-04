@@ -5,6 +5,7 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
+
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from tom_nonlocalizedevents.models import EventCandidate, Target
@@ -1199,6 +1200,33 @@ class DesiDr1Q3C(models.Model):
     class Meta:
         managed = False
         db_table = 'desi_dr1_q3c'
+        
+
+## catalog of user-provided host galaxies
+class UserGalaxyQ3C(models.Model):
+    id = models.AutoField(primary_key=True)
+    objname = models.TextField(blank=True, null=True)
+    ra = models.FloatField(blank=True, null=True)
+    dec = models.FloatField(blank=True, null=True)
+    z = models.FloatField(blank=True, null=True)
+    z_err = models.FloatField(blank=True, null=True)
+    z_pos_err = models.FloatField(blank=True, null=True)
+    z_neg_err = models.FloatField(blank=True, null=True)
+    z_type = models.TextField(blank=True, null=True)
+    lumdist = models.FloatField(blank=True, null=True)
+    lumdist_err = models.FloatField(blank=True, null=True)
+    lumdist_pos_err = models.FloatField(blank=True, null=True)
+    lumdist_neg_err = models.FloatField(blank=True, null=True)
+    default_mag = models.FloatField(blank=True, null=True)
+    source = models.TextField(blank=True, null=True) 
+    submitter = models.TextField(blank=True, null=True) # submitter and original source
+    og_id = models.BigIntegerField(blank=True, null=True)
+    
+    # managed = True (default, specified here for clarity) 
+    # --> allow Django to modify this table
+    class Meta: 
+        managed = True 
+        db_table = 'usergalaxy_q3c'
 
 
 ## ScoreFactor: subscores (e.g., 'skymap_score') which are used to compute overall score
@@ -1277,6 +1305,15 @@ class Ps1GalaxyTargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
 
 class Sdss12PhotozTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+
+class UserGalaxyTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
     host_galaxy = models.BigIntegerField(blank=False, null=False)
