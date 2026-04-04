@@ -60,6 +60,7 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     TwoMass,
     DesiDr1
 )
+from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
 from candidate_vetting.models import (
     GladePlusTargetMatch,
     GwgcTargetMatch,
@@ -68,7 +69,8 @@ from candidate_vetting.models import (
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch,
     NedLvsTargetMatch,
-    DesiDr1TargetMatch
+    DesiDr1TargetMatch,
+    UserGalaxyTargetMatch
 )
 
 HOST_DF_COLMAP = {
@@ -84,7 +86,8 @@ HOST_DF_COLMAP = {
     "z_err":"zErr",
     "z_type":"z_type",
     "default_mag":"Mags",
-    "catalog":"Source"
+    "catalog":"Source",
+    "submitter":"Submitter"
 }
 HOST_DF_COLMAP_INVERSE = {v:k for k,v in HOST_DF_COLMAP.items()}
 
@@ -106,6 +109,7 @@ GALAXY_CATALOGS = [
     GladePlus,
     Gwgc,
     Hecate,
+    UserGalaxy,
     DesiDr1,
     # DesiSpec, # this duplicates with DESI DR1 (which also includes the EDR data)
     NedLvs,
@@ -121,6 +125,7 @@ GALAXY_TARGETMATCHES = [
     GladePlusTargetMatch,
     GwgcTargetMatch,
     HecateTargetMatch,
+    UserGalaxyTargetMatch,
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
     LsDr10TargetMatch,
@@ -271,7 +276,8 @@ def _save_host_galaxy_df(df, target):
             "z",
             "z_type",
             "default_mag",
-            "catalog"
+            "catalog",
+            "submitter"
         ]
     ]
     newdf["z_err"] = [
