@@ -21,10 +21,12 @@ from candidate_vetting.vet_super_kn import vet_super_kn
 from candidate_vetting.vet_basic import vet_basic
 from candidate_vetting.vet_phot import find_public_phot
 from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
+from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
 
 import requests
 
 from .config import FORM_CHOICE_FUNC_MAP
+from .models import UserGalaxyQ3C
 
 from custom_code.templatetags.target_list_extras import galaxy_table
 
@@ -135,7 +137,7 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
 class TargetRedshiftUpdateFormView(FormView):
     template_name = "candidate_vetting/update_redshift_form.html"
     form_class = RedshiftUpdateForm
-    
+        
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
@@ -160,15 +162,18 @@ class TargetRedshiftUpdateFormView(FormView):
         host_galaxy_source = form.cleaned_data["host_galaxy_source"]
         z = form.cleaned_data["z"]
         z_err = form.cleaned_data["z_err"]
+        submitter = form.cleaned_data["submitter"]
 
-        # update the target redshift
+        # add new entry to user-defined galaxy catalog
         print(f"\nhost_galaxy = {host_galaxy_id}\t{host_galaxy_source}")
         print(f"z = {z}")
         print(f"z_err = {z_err}")
         pk = self.kwargs['pk']
         target = Target.objects.get(id=pk)
-        target.redshift = z
-        target.save()
+        galaxies = galaxy_table(target)["galaxies"]
+        UserGalaxy()._add_galaxy(target, galaxies, z, z_err, 
+                                 host_galaxy_id, host_galaxy_source, 
+                                 submitter)
 
         # generate the base url        
         base_url = reverse(

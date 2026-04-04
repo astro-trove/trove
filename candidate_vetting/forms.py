@@ -2,6 +2,7 @@ from django.forms import (
     Form,
     ChoiceField,
     FloatField,
+    CharField,
     RadioSelect,
     Select
 )
@@ -32,3 +33,5 @@ class RedshiftUpdateForm(Form):
 
     z = FloatField(label="Redshift")
     z_err = FloatField(label="Redshift uncertainty")
+    
+    submitter = CharField(label="Submitter")
