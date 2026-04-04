@@ -597,20 +597,26 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         return trapezoid(
             np.sqrt(targ_pdf*nle_pdf),
             x=_lumdist
-        )
+        ), None # None because there is no host name
 
     # then use the redshift independent measurements of distances
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
     if len(ind_distance_hosts):
-        return ind_distance_hosts.dist_norm_joint_prob.max()
+        max_score = ind_distance_hosts.dist_norm_joint_prob.max()
+        max_score_host_name = ind_distance_hosts.iloc[ind_distance_hosts[["dist_norm_joint_prob"]].idxmax()]["name"]
+        return max_score, max_score_host_name.values[0]
 
     # then use the specz hosts
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
     if len(specz_hosts):
-        return specz_hosts.dist_norm_joint_prob.max()
+        max_score = specz_hosts.dist_norm_joint_prob.max()
+        max_score_host_name = specz_hosts.iloc[specz_hosts[["dist_norm_joint_prob"]].idxmax()]["name"]
+        return max_score, max_score_host_name.values[0]
 
     # then if we don't know the spec-z or have an independent distance measure use the photo-z's
-    return host_df.dist_norm_joint_prob.max()
+    max_score = host_df.dist_norm_joint_prob.max()
+    max_score_host_name = host_df.iloc[host_df[["dist_norm_joint_prob"]].idxmax()]["name"]
+    return max_score, max_score_host_name.values[0]
 
 def get_eventcandidate_default_distance(target_id:int, nonlocalized_event_name:str):
 
