@@ -81,9 +81,11 @@ def vet_super_kn(target_id:int, nonlocalized_event_name:Optional[str]=None,
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
         # use target redshift, so no need to compute distance scores for galaxies
-        host_score = get_distance_score(host_df, target_id, 
+        # host_name will be None
+        host_score, host_name = get_distance_score(host_df, target_id, 
                                         nonlocalized_event_name)
         update_score_factor(event_candidate, "host_distance_score", host_score)
+        update_score_factor(event_candidate, "host_name", host_name)
         
     elif len(host_df) != 0:
         # then run the distance comparison for each of these hosts
@@ -93,17 +95,19 @@ def vet_super_kn(target_id:int, nonlocalized_event_name:Optional[str]=None,
             nonlocalized_event_name
         )
 
-        # choose the maximum score out of the top 10 best hosts
-        host_score = get_distance_score(host_df, target_id, nonlocalized_event_name)
+        # choose the maximum score
+        host_score, host_name = get_distance_score(host_df, target_id, nonlocalized_event_name)
         update_score_factor(event_candidate, "host_distance_score", host_score)
+        update_score_factor(event_candidate, "host_name", host_name)
 
     else:
         # if no target redshift is known and no hosts are found, we don't want 
         # to bias the final score (host may just be too far)
         host_score = 1
         
-        # and we should also clear out any existing scores for it
+        # and we should also clear out any existing scores / host names for it
         delete_score_factor(event_candidate, "host_distance_score")
+        update_score_factor(event_candidate, "host_name", host_name)
 
     ## AGN scoring
     if len(agn_df) != 0:
