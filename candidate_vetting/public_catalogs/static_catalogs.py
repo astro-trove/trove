@@ -79,6 +79,7 @@ class DesiDr1(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err 
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
+        df["submitter"] = [""]*len(df)
         return df
     
 class NedLvs(StaticCatalog):
@@ -123,6 +124,8 @@ class NedLvs(StaticCatalog):
         df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
+        
+        df["submitter"] = [""]*len(df)
 
         return df
     
@@ -166,6 +169,7 @@ class DesiSpec(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err 
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
+        df["submitter"] = [""]*len(df)
         return df    
         
 class FermiLat(StaticCatalog):
@@ -207,7 +211,8 @@ class GladePlus(StaticCatalog):
         )
         df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
         df["lumdist_neg_err"] = df.lumdist_err
-        df["lumdist_pos_err"] = df.lumdist_err        
+        df["lumdist_pos_err"] = df.lumdist_err   
+        df["submitter"] = [""]*len(df)
         return df
 
 class Gwgc(StaticCatalog):
@@ -227,6 +232,7 @@ class Gwgc(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z/z ind."
+        df["submitter"] = [""]*len(df)
         return df
     
 class Hecate(StaticCatalog):
@@ -257,6 +263,8 @@ class Hecate(StaticCatalog):
             lambda row : "z ind." if row.dmethod == "N" else "spec-z",
             axis=1
         )
+        
+        df["submitter"] = [""]*len(df)
         
         df = self._standardize_df(df)
         
@@ -300,6 +308,7 @@ class LsDr10(StaticCatalog):
         df["lumdist_neg_err"] = cosmo.luminosity_distance(df.z_neg_err).to(u.Mpc).value
         df["lumdist_pos_err"] = cosmo.luminosity_distance(df.z_pos_err).to(u.Mpc).value
         df["z_type"] = "photo-z"
+        df["submitter"] = [""]*len(df)
         return df
 
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
@@ -368,6 +377,7 @@ class Milliquas(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
+        df["submitter"] = [""]*len(df)
         return df
         
 class Ps1(StaticCatalog):
@@ -392,6 +402,7 @@ class Ps1(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "photo-z"
+        df["submitter"] = [""]*len(df)
         return df
 
 class Ps1Galaxy(Ps1):
@@ -435,4 +446,5 @@ class Sdss12Photoz(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "photo-z"
+        df["submitter"] = [""]*len(df)
         return df
