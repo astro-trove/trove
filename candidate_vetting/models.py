@@ -1249,6 +1249,7 @@ class GladePlusTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "glade_plus_targetmatch"
 
 class GwgcTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1258,6 +1259,7 @@ class GwgcTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "gwgc_targetmatch"
 
 class HecateTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1267,6 +1269,7 @@ class HecateTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "hecate_targetmatch"
 
 class DesiDr1TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1276,6 +1279,7 @@ class DesiDr1TargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "desi_dr1_targetmatch"
 
 class NedLvsTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1285,6 +1289,7 @@ class NedLvsTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "nedlvs_targetmatch"
 
 class LsDr10TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1294,6 +1299,7 @@ class LsDr10TargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "ls_dr10_targetmatch"
 
 class Ps1GalaxyTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1303,6 +1309,7 @@ class Ps1GalaxyTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "ps1_targetmatch"
 
 class Sdss12PhotozTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1312,6 +1319,7 @@ class Sdss12PhotozTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "sdss12photoz_targetmatch"
 
 class UserGalaxyTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1321,3 +1329,4 @@ class UserGalaxyTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
+        db_table = "usergalaxy_targetmatch"
