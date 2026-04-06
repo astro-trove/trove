@@ -43,6 +43,9 @@ from tom_nonlocalizedevents.healpix_utils import (
     uniq_to_bigintrange,
     update_all_credible_region_percents_for_candidates
 )
+
+from candidate_vetting.tasks import async_vet
+
 from candidate_vetting.public_catalogs.static_catalogs import (
     DesiSpec,
     GladePlus,
@@ -811,3 +814,16 @@ def agn_distance_match(
         axis=1
     )
     return agn_df
+
+
+def vet_all_async(
+        eventcandidates, 
+        nle, 
+        vetting_mode
+) -> None:
+    """Asychronously vet according to vetting mode"""
+    ## TODO: Start separate tasks for each individual event candidate?            
+    async_vet.enqueue(
+            target_ids=[ec.target_id for ec in eventcandidates],
+            nle_event_id=nle.event_id, 
+            vetting_mode=vetting_mode)
