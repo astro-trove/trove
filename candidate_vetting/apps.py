@@ -5,7 +5,7 @@ class CustomCodeConfig(AppConfig):
     name = 'candidate_vetting'
     def target_detail_buttons(self):
         return {
-            'namespace': 'candidate_vetting:vet',
+            'namespace': 'candidate_vetting:vet_form',
             'title': 'Run kilonova candidate vetting',
             'class': "btn btn-pink",
             'text': 'Vet'

@@ -11,7 +11,9 @@ class EventCandidateListView(FilterView):
     """
     model = EventCandidate
     template_name = 'trove_nonlocalizedevents/candidate_list.html'
-    paginate_by = 100
+    # We need to skip pagination for ordering, if we ever have more
+    # candidates than this we have an issue...
+    paginate_by = 100_000_000 
 
     def get_queryset(self):
         """
@@ -22,6 +24,4 @@ class EventCandidateListView(FilterView):
         """
         return super().get_queryset().filter(
             target__in=targets_for_user(self.request.user, Target.objects.all(), 'view_target')
-        ).order_by(
-            "-priority" # this sorts the table by the priority in descending order
         )

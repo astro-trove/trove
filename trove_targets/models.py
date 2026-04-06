@@ -13,7 +13,13 @@ class Target(BaseTarget):
     healpix.hidden = True
 
     def save(self, *args, **kwargs):
-        coord = SkyCoord(self.ra, self.dec, unit='deg')
+        ra = self.ra if self.ra is not None else self.basetarget_ptr.ra
+        dec = self.dec if self.dec is not None else self.basetarget_ptr.dec
+        try:
+            coord = SkyCoord(ra, dec, unit='deg')
+        except:
+            import pdb; pdb.set_trace()
+        
         self.galactic_lng = coord.galactic.l.deg
         self.galactic_lat = coord.galactic.b.deg
         self.healpix = HPX.skycoord_to_healpix(coord)

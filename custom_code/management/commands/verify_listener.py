@@ -4,11 +4,11 @@ from django.conf import settings
 from datetime import datetime
 import requests
 import logging
-from slack_sdk import WebClient
+#from slack_sdk import WebClient
 
 
 logger = logging.getLogger(__name__)
-slack_client = WebClient(settings.SLACK_TOKENS_GW[0])
+#slack_client = WebClient(settings.SLACK_TOKENS_GW[0])
 
 
 class Command(BaseCommand):
@@ -32,4 +32,4 @@ class Command(BaseCommand):
             message = (f'The last GW alert for <https://gracedb.ligo.org/superevents/{latest_event}/|{latest_event}> '
                        f'was not received')
             logger.warning(message)
-            slack_client.chat_postMessage(channel='alerts-ns', text=message)
+            #slack_client.chat_postMessage(channel='alerts-ns', text=message)
