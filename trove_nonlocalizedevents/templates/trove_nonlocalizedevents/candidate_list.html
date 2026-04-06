@@ -1,5 +1,5 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras %}
+{% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
 {% block title %}Candidates{% endblock %}
 {% block content %}
 {% if request.GET.nonlocalizedevent %}
@@ -11,19 +11,22 @@
 {% endif %}
 <div class="row">
   <div class="col-md-10">
-  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  {% bootstrap_pagination page_obj extra=request.GET.urlencode %} 
     <table class="table table-sm table-hover">
       <thead>
         <tr>
-          <th>Target</th>
+	  <th>Rank</th>
+	  <th>Target</th>
           <th>Event</th>
-          <th>Score (out of 100)</th>
+          <th>Score</th>
         </tr>
       </thead>
       <tbody>
-        {% for candidate in object_list %}
+	{% get_event_candidate_scores object_list as candidates_to_display %}
+	{% for candidate in candidates_to_display %}
         <tr>
-          <td>
+	  <td>{{forloop.counter}}</td>
+	  <td>
             {% if candidate.target is not None %}
               <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
             {% else %}
@@ -31,7 +34,11 @@
             {% endif %}
           </td>
           <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
-          <td>{{ candidate.priority }}</td>
+          <td>
+            {% for transient, score in candidate.score.items %}
+            {{ transient }} {{score|floatformat:2}}<br>
+            {% endfor %}
+          </td>
         </tr>
         {% empty %}
         <tr>

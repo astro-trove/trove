@@ -85,9 +85,10 @@ def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
 
         logger.info(f'Linked {len(new_candidates)} new candidates to event {eventsequence.nonlocalizedevent.event_id}')
 
-        localizations = eventsequence.nonlocalizedevent.localizations.all()
-        for localization in localizations:
-            update_all_credible_region_percents_for_candidates(localization, [cand.id for cand in new_candidates])
+        if len(new_candidates): # only do this (time-consuming) step if any new candidates were linked
+            localizations = eventsequence.nonlocalizedevent.localizations.all()
+            for localization in localizations:
+                update_all_credible_region_percents_for_candidates(localization, [cand.id for cand in new_candidates])
 
         return new_candidates
 

@@ -1,9 +1,10 @@
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from django.contrib.auth.models import Group
+from django.contrib.sites.models import Site
 from django.conf import settings
 from email.mime.text import MIMEText
-from slack_sdk import WebClient
+#from slack_sdk import WebClient
 import smtplib
 import logging
 from tom_dataproducts.tasks import atlas_query
@@ -83,23 +84,28 @@ ALERT_TEXT = [  # index = number of localizations available
     ALERT_LINKS,
 ]
 
-slack_ep = WebClient(settings.SLACK_TOKEN_EP)
-slack_gw = [WebClient(token) for token in settings.SLACK_TOKENS_GW]
+#slack_ep = WebClient(settings.SLACK_TOKEN_EP)
+#slack_gw = [WebClient(token) for token in settings.SLACK_TOKENS_GW]
 
 
-def vet_or_post_error(target, slack_client, channel):
+def vet_or_post_error(
+        target,
+        #slack_client,
+        #channel,
+        **kwargs
+):
     try:
         target.save()  # to do coordinate conversions
-        _, tns_query_status = target_post_save(target, created=True)
+        _, tns_query_status = target_post_save(target, created=True, **kwargs)
         if tns_query_status is not None:
             logger.warning(tns_query_status)
-            slack_client.chat_postMessage(channel=channel, text=tns_query_status)
+            #slack_client.chat_postMessage(channel=channel, text=tns_query_status)
             mjd_now = Time.now().mjd
             atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
 
     except Exception as e:
         logger.error(''.join(traceback.format_exception(e)))
-        slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
+        #slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
 
 
 def send_slack(body, format_kwargs, is_test_alert=False, is_significant=True, is_burst=False, has_ns=True,
@@ -130,7 +136,7 @@ def send_email(subject, body, is_test_alert=False):
     """This doesn't currently work"""
     msg = MIMEText(body)
     msg['Subject'] = subject
-    msg['From'] = settings.ALERT_EMAIL_FROM
+    msg['From'] = settings.SERVER_EMAIL
     group = Group.objects.get(name='Test Email Alerts') if is_test_alert else Group.objects.get(name='Email Alerts')
     msg['To'] = ','.join([u.email.split(',')[0] for u in group.user_set.all()])
     if not msg['To']:
@@ -193,7 +199,7 @@ def prepare_and_send_alerts(nle, seq):
                 localizations.append(seq.localization)
             if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
                 localizations.append(seq.external_coincidence.localization)
-        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        #is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         format_kwargs = {
             'nle': nle,
             'seq': seq,
@@ -237,8 +243,8 @@ def prepare_and_send_alerts(nle, seq):
         at = 'here' if nle.state == 'RETRACTED' else 'channel'
     else:
         at = None
-    send_slack(alert_text, format_kwargs,
-               is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns, at=at)
+    #send_slack(alert_text, format_kwargs,
+    #           is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns, at=at)
     return localizations
 
 
@@ -330,11 +336,13 @@ def handle_einstein_probe_alert(message, metadata):
     ep_name = alert['id'][0]
     t_ep = Target.objects.create(name=ep_name, type='SIDEREAL', ra=ep_ra, dec=ep_dec, permissions='PUBLIC')
     EventCandidate.objects.create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
-    vet_or_post_error(t_ep, slack_ep, channel='alerts-ep')
-    alert_text = ALERT_TEXT_EP.format(nle_link=settings.NLE_LINKS[0][0], target_link=settings.TARGET_LINKS[0][0]
+    vet_or_post_error(t_ep)
+    query = {'localization_event': nonlocalizedevent.event_id, 'localization_prob': 95, 'localization_dt': 3}
+    survey_obs_link = f"https://{Site.objects.get_current().domain}{reverse('surveys:observations')}?{urllib.parse.urlencode(query)}"
+    alert_text = ALERT_TEXT_EP.format(survey_obs_link=survey_obs_link, target_link=settings.TARGET_LINKS[0][0]
                                      ).format(target=t_ep)
     logger.info(f'Sending EP alert: {alert_text}')
-    slack_ep.chat_postMessage(channel='alerts-ep', text=alert_text)
+    #slack_ep.chat_postMessage(channel='alerts-ep', text=alert_text)
 
     logger.info(f'Finished processing alert for {nonlocalizedevent.event_id}')
 

@@ -7,29 +7,45 @@ from plotly import colors
 from tom_dataproducts.models import ReducedDatum
 import numpy as np
 from datetime import datetime
+import re
+from matplotlib.colors import to_hex
+from lightcurve_fitting.filters import filtdict
 
 register = template.Library()
 
-COLOR_MAP = {
-    'g': 'green',
-    'r': 'red',
-    'i': 'black',
-    'c': 'dodgerblue',
-    'o': 'orange',
-    'orange': 'orange',
-    'G': 'darkseagreen',
-    'cyan': 'dodgerblue'
-}
+# any marker colors or shapes that we want to keep static across all pages
+COLOR_MAP = {name: to_hex(fltr.linecolor) for name, fltr in filtdict.items()}
 MARKER_MAP = {
     'limit': 50,  # arrow-bar-down
     'ATLAS': 2,  # diamond
     'MARS': 1,  # square
     'SAGUARO pipeline': 0,  # circle
     'ZTF': 1,  # square
+    'P48': 1,  # square
 }
+
+# other marker colors and shapes for sources not listed above
 OTHER_MARKERS = list(range(33))  # all filled markers in Plotly
 OTHER_MARKERS.remove(6)  # do not use triangle-down, too close to arrow-bar-down
 OTHER_COLORS = colors.qualitative.Plotly  # default Plotly color sequence
+
+
+def get_marker_for_photometry_point(label, marker_map, others):
+    """
+    Get marker properties (color or shape) from a dictionary `marker_map` after parsing the photometry `label`.
+    If there is no matching label in the dictionary, pick the next item in `others`.
+    """
+    base_label = re.sub(' \(.*\)', '', re.sub('[-_].*', '', label))
+    if label in marker_map:
+        return marker_map[label]
+    elif base_label in marker_map:
+        return marker_map[base_label]
+    else:
+        for marker in others:
+            if marker not in marker_map.values():
+                marker_map[base_label] = marker
+                print(marker_map)
+                return marker
 
 
 @register.inclusion_tag('tom_dataproducts/partials/recent_photometry.html', takes_context=True)
@@ -115,25 +131,20 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
 
     plot_data = []
     all_ydata = []
+    color_map = COLOR_MAP.copy()
+    marker_map = MARKER_MAP.copy()
+    other_colors = OTHER_COLORS.copy()
+    other_markers = OTHER_MARKERS.copy()
     for source_name, source_values in detections.items():
+        marker_symbol = get_marker_for_photometry_point(source_name, marker_map, other_markers)
         for filter_name, filter_values in source_values.items():
-            # get unique color and marker for this data series
-            if filter_name not in COLOR_MAP:
-                for new_color in OTHER_COLORS:
-                    if new_color not in COLOR_MAP.values():
-                        COLOR_MAP[filter_name] = new_color
-                        break
-            if source_name not in MARKER_MAP:
-                for new_marker in OTHER_MARKERS:
-                    if new_marker not in MARKER_MAP.values():
-                        MARKER_MAP[source_name] = new_marker
-                        break
+            marker_color = get_marker_for_photometry_point(filter_name, color_map, other_colors)
             series = go.Scatter(
                 x=filter_values['time'],
                 y=filter_values['magnitude'],
                 mode='markers',
-                marker_color=COLOR_MAP.get(filter_name),
-                marker_symbol=MARKER_MAP.get(source_name),
+                marker_color=marker_color,
+                marker_symbol=marker_symbol,
                 name=f'{source_name} {filter_name}',
                 error_y=dict(
                     type='data',
@@ -149,18 +160,13 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
             all_ydata.append(mags - errs)
     for source_name, source_values in limits.items():
         for filter_name, filter_values in source_values.items():
-            # get unique color for this data series
-            if filter_name not in COLOR_MAP:
-                for new_color in OTHER_COLORS:
-                    if new_color not in COLOR_MAP.values():
-                        COLOR_MAP[filter_name] = new_color
-                        break
+            marker_color = get_marker_for_photometry_point(filter_name, color_map, other_colors)
             series = go.Scatter(
                 x=filter_values['time'],
                 y=filter_values['limit'],
                 mode='markers',
                 opacity=0.5,
-                marker_color=COLOR_MAP.get(filter_name),
+                marker_color=marker_color,
                 marker_symbol=MARKER_MAP['limit'],
                 name=f'{source_name} {filter_name} limits',
             )
@@ -228,7 +234,10 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
     fig = go.Figure(data=plot_data, layout=layout)
 
     for candidate in target.eventcandidate_set.all():
-        t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
+        if not candidate.nonlocalizedevent.sequences.last().details['time'][-1] in ("z", "Z"):
+            t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time']+"Z", '%Y-%m-%dT%H:%M:%S.%f%z')
+        else:
+            t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
         fig.add_vline(t0.timestamp() * 1000., annotation_text=candidate.nonlocalizedevent.event_id)
 
     return {

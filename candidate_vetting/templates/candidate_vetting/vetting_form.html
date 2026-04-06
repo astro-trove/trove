@@ -1,0 +1,124 @@
+{% extends 'tom_targets/partials/base.html' %}
+{% load crispy_forms_tags comments bootstrap4 %}
+
+{% block content %}
+<style>
+    /* 1. Background styling - Using your blurred image logic from before */
+    body {
+        background-color: white; 
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        font-family: sans-serif;
+    }
+
+    /* 2. The Card: High contrast Dark Mode */
+    .vetting-card {
+        /* Deep dark background so white text stands out perfectly */
+        background: rgba(20, 20, 25, 0.95); 
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        
+        /* Thin, bright border to define the card against the black BG */
+        border: 1px solid rgba(255, 255, 255, 0.2); 
+        border-radius: 12px;
+        padding: 40px;
+        width: 100%;
+        max-width: 450px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        color: #FFFFFF; /* Pure white text for headers */
+    }
+
+    .vetting-card h2 {
+        font-weight: 700;
+        margin-bottom: 25px;
+        text-align: center;
+        color: #fff;
+    }
+
+    /* 3. Form Labels: High contrast light gray/white */
+    .vetting-card label {
+        color: #e0e0e0 !important; 
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+        display: block;
+    }
+
+    /* 4. Inputs: Pure black background with white text and bright borders */
+    .vetting-card input, 
+    .vetting-card select, 
+    .vetting-card textarea {
+        background: #000 !important; 
+        border: 2px solid #444 !important; /* Thicker, darker border */
+        color: #fff !important; 
+        border-radius: 8px !important;
+        padding: 10px !important;
+        width: 100%;
+    }
+
+    /* Highlight inputs when clicked */
+    .vetting-card input:focus, 
+    .vetting-card select:focus {
+        border-color: #e91e63 !important; /* Pink glow on focus */
+        outline: none;
+    }
+
+    /* 5. The "Submit" Button: Vivid Pink */
+    .btn-vet {
+        background: pink !important; 
+        color: black !important;
+        border: none;
+        padding: 14px;
+        border-radius: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.2s ease-in-out;
+        margin-top: 20px;
+        width: 100%;
+    }
+
+    .btn-vet:hover {
+        background: #ff4081 !important;
+        transform: scale(1.02);
+        box-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
+    }
+
+    /* Cancel Link */
+    .cancel-link {
+        display: block;
+        text-align: center;
+        margin-top: 20px;
+        color: #aaa;
+        text-decoration: none;
+        font-size: 0.85rem;
+    }
+    .cancel-link:hover {
+        color: #fff;
+    }
+</style>
+
+<div class="container d-flex justify-content-center">
+    <div class="vetting-card">
+        <h2>Target Vetting Submission Page</h2>
+        
+        <form action="" method="post">
+            {% csrf_token %}
+          
+            {{ form|crispy }}
+            
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-vet">
+                    Execute Vetting Sequence
+                </button>
+                <a href="{{ request.META.HTTP_REFERER }}" class="text-center mt-3 text-white-50 text-decoration-none small">
+                    Cancel and Return
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
