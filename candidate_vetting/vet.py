@@ -432,8 +432,7 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
             matches.delete()
 
         # if no queries are returned we can skip this catalog
-        if query_set.count() == 0: 
-            continue
+        if query_set.count() == 0: continue
 
         # convert to a dataframe and standardize the column names
         df = pd.DataFrame(
@@ -466,13 +465,12 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         res.append(df)
         
         # save new matches to <catalog>TargetMatch
-        # TODO: update to do bulk creation and updating (faster)--this is SUPER SLOW right now
-        for i in range(len(df["name"].values)):
-            GALAXY_TARGETMATCH_DICT[catname].objects.update_or_create(
-                target = target,
-                host_galaxy = list(df["trove_uniq"].values)[i],
-                pcc = list(df["pcc"].values)[i]
-            )
+        GALAXY_TARGETMATCH_DICT[catname].objects.bulk_create(
+            [GALAXY_TARGETMATCH_DICT[catname](target = target,
+                                              host_galaxy = val.trove_uniq,
+                                              pcc = val.pcc) for 
+              idx, val in df.iterrows()]
+        )
         
     df = pd.concat(res).reset_index(drop=True)
 

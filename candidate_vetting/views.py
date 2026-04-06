@@ -15,13 +15,16 @@ from django.urls import reverse_lazy, reverse
 from django.shortcuts import redirect
 
 from trove_targets.models import Target
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
+from tom_nonlocalizedevents.models import (EventCandidate, 
+                                           NonLocalizedEvent, 
+                                           EventLocalization)
 from .forms import VettingChoiceForm, RedshiftUpdateForm
 from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
  
 # from .vet_bns import vet_bns
 # from .vet_kn_in_sn import vet_kn_in_sn
 # from .vet_super_kn import vet_super_kn
+from .vet import vet_all_async
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .public_catalogs.phot_catalogs import ZTF_Forced_Phot
@@ -86,7 +89,7 @@ class TargetVettingFormView(FormView):
     
 class TargetVettingView(LoginRequiredMixin, RedirectView):
     """
-    View that runs or reruns the kilonova candidate vetting code and stores the results
+    View that runs or reruns the candidate vetting code and stores the results
     """
     def get(self, request, *args, **kwargs):
         """
@@ -207,3 +210,69 @@ class TargetRedshiftUpdateFormView(FormView):
             base_url += f"?{query_str}"
                     
         return redirect(base_url)
+    
+class TargetVettingAllFormView(FormView):
+    template_name = "candidate_vetting/vetting_form.html"
+    form_class = VettingChoiceForm
+    
+    # overriding the get_form function
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        nle_id = self.request.session["nle_id"].split("=")[-1]
+        nle_eventseq = EventLocalization.objects.filter(
+            nonlocalizedevent_id=nle_id).first().sequences
+        nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
+        form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
+        return form
+
+    def get(self, request, *args, **kwargs):
+        referer = request.META.get("HTTP_REFERER")
+        if referer:
+            self.request.session['nle_id'] = urlparse(referer).query
+        return super().get(request, *args, **kwargs)
+    
+    def form_valid(self, form):
+        pk = self.kwargs["pk"]
+        vetting_mode = form.cleaned_data["vetting_method"]
+        
+        # generate the base url
+        base_url = reverse(
+            'candidate_vetting:vet_all',
+            kwargs=dict(
+                pk=pk,
+                vetting_mode=vetting_mode
+            )
+        )
+
+        # then also preserve the query parameters
+        query_str = self.request.session.pop('nle_id', '')
+        print("QUERY STRING:", query_str)
+        if query_str:
+            base_url += f"?{query_str}"
+        return redirect(base_url)
+    
+class TargetVettingAllView(LoginRequiredMixin, RedirectView):
+    """
+    View that runs or reruns the candidate vetting code and stores the results, 
+    for all candidates
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view. Calls the vetting 
+        code for different transients.
+        """
+        pk = kwargs["pk"]
+        vetting_mode = kwargs.get("vetting_mode", "basic")
+
+        # get the nonlocalized event
+        nle = NonLocalizedEvent.objects.filter(id=pk)[0]
+        
+        # get all of the event candidates
+        ecs = EventCandidate.objects.filter(nonlocalizedevent_id = nle.id
+                                            ).order_by('target__name')
+
+        # then run the vetting, asynchronously
+        messages.info(request, f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate.")
+        vet_all_async(ecs, nle, vetting_mode)
+        
+        return redirect(f"/eventcandidates/?nonlocalizedevent={nle.id}") # this redirects back to the NLE page

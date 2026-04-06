@@ -3,18 +3,13 @@ from django.forms import (
     ChoiceField,
     FloatField,
     CharField,
-    RadioSelect,
+    # RadioSelect,
     Select
 )
-from .config import VETTING_FORM_CHOICES
-
-from trove_targets.models import Target
-
-from custom_code.templatetags.target_list_extras import galaxy_table
 
 class VettingChoiceForm(Form):
     vetting_method = ChoiceField(
-        choices = VETTING_FORM_CHOICES,
+        choices = [], # these are specified in the view
         widget = Select(),
         label = "Vetting Method"
     )
