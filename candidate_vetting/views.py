@@ -272,7 +272,7 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
                                             ).order_by('target__name')
 
         # then run the vetting, asynchronously
-        messages.info(request, f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate.")
+        messages.info(request, f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate; check back later.")
         vet_all_async(ecs, nle, vetting_mode)
         
         return redirect(f"/eventcandidates/?nonlocalizedevent={nle.id}") # this redirects back to the NLE page
