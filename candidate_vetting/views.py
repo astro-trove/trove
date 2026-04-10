@@ -56,7 +56,10 @@ class TargetVettingFormView(FormView):
             nle_eventseq = EventLocalization.objects.filter(
                 nonlocalizedevent_id=nle.id).first().sequences
             nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
-            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
+            try:
+                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
+            except KeyError:
+                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""] # allow all types of vetting if most likely class not recognized
         else:
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
         return form
@@ -196,6 +199,8 @@ class TargetRedshiftUpdateFormView(FormView):
         UserGalaxy()._add_galaxy(target, galaxies, z, z_err, 
                                  host_galaxy_id, host_galaxy_source, 
                                  submitter)
+        
+        # re-run host association, vetting
 
         # generate the base url        
         base_url = reverse(
