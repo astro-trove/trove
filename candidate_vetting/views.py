@@ -222,7 +222,10 @@ class TargetVettingAllFormView(FormView):
         nle_eventseq = EventLocalization.objects.filter(
             nonlocalizedevent_id=nle_id).first().sequences
         nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
-        form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
+        try:
+            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
+        except KeyError:
+            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""] # allow all types of vetting if most likely class not recognized
         return form
 
     def get(self, request, *args, **kwargs):
