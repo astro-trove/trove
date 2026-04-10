@@ -8,7 +8,7 @@ from django.conf import settings
 from .public_catalogs.phot_catalogs import ATLAS_Forced_Phot
 from trove_targets.models import Target
 
-@task(queue_name="atlas_query", priority=settings.PRIORITY_MID)
+@task(queue_name="atlas_fphot", priority=settings.PRIORITY_MID)
 def async_atlas_query(
         target_id:int,
         *args, **kwargs
