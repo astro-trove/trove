@@ -24,7 +24,7 @@ from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
 # from .vet_bns import vet_bns
 # from .vet_kn_in_sn import vet_kn_in_sn
 # from .vet_super_kn import vet_super_kn
-from .vet import vet_all_async
+from .vet import host_association, vet_all_async
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .public_catalogs.phot_catalogs import ZTF_Forced_Phot
@@ -48,10 +48,13 @@ class TargetVettingFormView(FormView):
         
         # if NLE was provided by referer, use it to choose what vetting is allowed
         try: 
-            nle_name = self.request.session["nle_id"].split("=")[-1]
-            nle = NonLocalizedEvent.objects.filter(event_id=nle_name).first()
+            nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+            nle = NonLocalizedEvent.objects.filter(event_id=nle_name_or_id)[0]
         except IndexError:
-            nle = None
+            try: 
+                nle = NonLocalizedEvent.objects.filter(id=int(nle_name_or_id))[0]
+            except IndexError:
+                nle = None
         if nle: 
             nle_eventseq = EventLocalization.objects.filter(
                 nonlocalizedevent_id=nle.id).first().sequences
@@ -166,6 +169,8 @@ class TargetRedshiftUpdateFormView(FormView):
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
+        # set a default z_err
+        form.fields['z_err'].initial = 0.001
         # get target, potential host galaxies, their IDs, and provenance (source)
         target = Target.objects.get(id=self.kwargs["pk"])
         form.target = target
@@ -187,6 +192,8 @@ class TargetRedshiftUpdateFormView(FormView):
         host_galaxy_source = form.cleaned_data["host_galaxy_source"]
         z = form.cleaned_data["z"]
         z_err = form.cleaned_data["z_err"]
+        if not z_err: # in case user accidentally deleted it 
+            z_err = form.fields["z_err"].initial
         submitter = form.cleaned_data["submitter"]
 
         # add new entry to user-defined galaxy catalog
@@ -200,7 +207,37 @@ class TargetRedshiftUpdateFormView(FormView):
                                  host_galaxy_id, host_galaxy_source, 
                                  submitter)
         
-        # re-run host association, vetting
+        # re-run host association
+        host_association(target_id=pk, radius=5*60)
+        
+        # re-run vetting if NLE was provided by referer
+        try:
+            nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+            nle = NonLocalizedEvent.objects.filter(event_id=nle_name_or_id)[0]
+        except IndexError:
+            try: 
+                nle = NonLocalizedEvent.objects.filter(id=nle_name_or_id)[0]
+            except IndexError:
+                nle = None
+        
+        if nle: 
+            nle_eventseq = EventLocalization.objects.filter(
+                nonlocalizedevent_id=nle.id).first().sequences
+            nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
+            try:
+                vetting_choices = VETTING_FORM_CHOICES[nle_most_likely_class]
+            except KeyError:
+                vetting_choices = VETTING_FORM_CHOICES[""] # allow all types of vetting if most likely class not recognized
+            
+            vetting_modes = [v for v, _ in vetting_choices]
+            vetting_modes.remove("basic") # no need to re-run basic vetting
+            for vm in vetting_modes:
+                FORM_CHOICE_FUNC_MAP[vm](target_id=pk, 
+                                         nonlocalized_event_name=nle.event_id)
+            messages.info(self.request, 
+                          "Added a new host galaxy redshift, re-ran host association, and "+
+                          f"re-performed vetting in {', '.join(vetting_modes)} vetting modes.")
+
 
         # generate the base url        
         base_url = reverse(

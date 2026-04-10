@@ -28,6 +28,6 @@ class RedshiftUpdateForm(Form):
     )
 
     z = FloatField(label="Redshift")
-    z_err = FloatField(label="Redshift uncertainty", default=0.001)
+    z_err = FloatField(label="Redshift uncertainty [default 0.001]", required=False)
     
     submitter = CharField(label="Submitter")
