@@ -105,6 +105,7 @@ def vet_super_kn(target_id:int, nonlocalized_event_name:Optional[str]=None,
         
         # and we should also clear out any existing scores / host names for it
         delete_score_factor(event_candidate, "host_distance_score")
+        delete_score_factor(event_candidate, "host_name")
 
     ## AGN scoring
     if len(agn_df) != 0:
