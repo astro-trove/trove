@@ -822,8 +822,8 @@ def vet_all_async(
         vetting_mode
 ) -> None:
     """Asychronously vet according to vetting mode"""
-    ## TODO: Start separate tasks for each individual event candidate?            
-    async_vet.enqueue(
-            target_ids=[ec.target_id for ec in eventcandidates],
-            nle_event_id=nle.event_id, 
-            vetting_mode=vetting_mode)
+    for ec in eventcandidates:         
+        async_vet.enqueue(
+                target_ids=[ec.target_id],
+                nle_event_id=nle.event_id, 
+                vetting_mode=vetting_mode)

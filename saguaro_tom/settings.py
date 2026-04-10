@@ -407,3 +407,8 @@ TOM_REGISTRATION = {
 
 # for ZTF forced photometry, we need to save the logs to a temporary directory
 ZTFTMPDIR = os.path.join(os.getcwd(), "ztf-forced-phot-logs")
+
+# set some priority level variables for queue prioritization
+PRIORITY_HIGH = 100
+PRIORITY_MID = 10
+PRIORITY_LOW = 0
