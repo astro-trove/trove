@@ -65,7 +65,7 @@ class UserGalaxy(StaticCatalog):
             z_err=z_err, # same for z_err, z_pos_err, z_neg_err
             z_pos_err=z_err, 
             z_neg_err=z_err,
-            z_type="spec-z",
+            z_type="user spec-z",
             default_mag=galaxies[idx]["Mags"],
             source=host_galaxy_source,
             submitter=submitter, # record submitter and original catalog
