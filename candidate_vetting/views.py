@@ -3,15 +3,14 @@ Page views for candidate vetting
 """
 import numpy as np
 
-import requests
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
 from django.http import HttpResponseRedirect
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse
 from django.shortcuts import redirect
 
 from trove_targets.models import Target
@@ -21,9 +20,6 @@ from tom_nonlocalizedevents.models import (EventCandidate,
 from .forms import VettingChoiceForm, RedshiftUpdateForm
 from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
  
-# from .vet_bns import vet_bns
-# from .vet_kn_in_sn import vet_kn_in_sn
-# from .vet_super_kn import vet_super_kn
 from .vet import host_association, vet_all_async
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
@@ -208,7 +204,7 @@ class TargetRedshiftUpdateFormView(FormView):
                                  submitter)
         
         # re-run host association
-        host_association(target_id=pk, radius=5*60)
+        host_association(target_id=pk)
         
         # re-run vetting if NLE was provided by referer
         try:
