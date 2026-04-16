@@ -38,7 +38,7 @@ class UserGalaxy(StaticCatalog):
         df["lumdist_err"] = cosmo.luminosity_distance(df.z_err).to(u.Mpc).value
         df["lumdist_neg_err"] = cosmo.luminosity_distance(df.z_neg_err).to(u.Mpc).value
         df["lumdist_pos_err"] = cosmo.luminosity_distance(df.z_pos_err).to(u.Mpc).value
-        df["z_type"] = "spec-z"
+        df["z_type"] = "user spec-z"
         return df
 
 
