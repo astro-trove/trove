@@ -232,7 +232,7 @@ class TargetRedshiftUpdateFormView(FormView):
                                          nonlocalized_event_name=nle.event_id)
             messages.info(self.request, 
                           "Added a new host galaxy redshift, re-ran host association, and "+
-                          f"re-performed vetting in {', '.join(vetting_modes)} vetting modes.")
+                          f"re-performed vetting in {', '.join(vetting_modes)} vetting mode(s).")
 
 
         # generate the base url        
