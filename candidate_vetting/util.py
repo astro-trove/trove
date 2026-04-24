@@ -86,7 +86,7 @@ def get_event_candidate_scores(event_candidates,
     event_candidates should be a django queryset of EventCandidate objects
     """ 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
-    exclude_keys = set(val_not_score_keys.keys()) | TARGETEXTRA_KEYS
+    exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
          
     # which transient types to consider?
     ### TODO: Right now, just does KN unless SSM; change this for BBH events
