@@ -7,7 +7,7 @@ import io
 import numpy as np
 import pandas as pd
 from scipy.stats import norm, rv_continuous
-from scipy.integrate import trapezoid, quad
+from scipy.integrate import trapezoid
 
 from astropy.utils.introspection import minversion
 if minversion(np, "2.0.0"):
@@ -32,19 +32,22 @@ from tom_targets.models import TargetExtra
 from .models import ScoreFactor
 from custom_code.healpix_utils import SaTarget
 from tom_nonlocalizedevents.models import (
-    EventCandidate,
+    # EventCandidate,
     EventLocalization,
-    SkymapTile,
+    # SkymapTile,
     NonLocalizedEvent
 )
 from tom_nonlocalizedevents.healpix_utils import (
     sa_engine,
     SaSkymapTile,
-    uniq_to_bigintrange,
-    update_all_credible_region_percents_for_candidates
+    # uniq_to_bigintrange,
+    # update_all_credible_region_percents_for_candidates
 )
+
+from candidate_vetting.tasks import async_vet
+
 from candidate_vetting.public_catalogs.static_catalogs import (
-    DesiSpec,
+    # DesiSpec,
     GladePlus,
     Gwgc,
     Hecate,
@@ -57,11 +60,24 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     Ps1PointSource,
     Milliquas,
     NedLvs,
-    TwoMass,
+    # TwoMass,
     DesiDr1
+)
+from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
+from candidate_vetting.models import (
+    GladePlusTargetMatch,
+    GwgcTargetMatch,
+    HecateTargetMatch,
+    LsDr10TargetMatch,
+    Ps1GalaxyTargetMatch,
+    Sdss12PhotozTargetMatch,
+    NedLvsTargetMatch,
+    DesiDr1TargetMatch,
+    UserGalaxyTargetMatch
 )
 
 HOST_DF_COLMAP = {
+    "trove_uniq":"troveID",
     "name":"ID",
     "pcc":"PCC",
     "offset":"Offset",
@@ -73,9 +89,15 @@ HOST_DF_COLMAP = {
     "z_err":"zErr",
     "z_type":"z_type",
     "default_mag":"Mags",
-    "catalog":"Source"
+    "catalog":"Source",
+    "submitter":"Submitter"
 }
 HOST_DF_COLMAP_INVERSE = {v:k for k,v in HOST_DF_COLMAP.items()}
+
+# Host, point source, and AGN association radii
+HOST_ASSOC_RADIUS = 5*60 # 5 arcmin = 300 arcsec, as used in Franz+25 and Vieira+26
+PS_ASSOC_RADIUS = 2 # 2 arcsec, as used in Franz+25 and Vieira+26
+AGN_ASSOC_RADIUS = 2 # 2 arcsec, as used in Franz+25 and Vieira+26
 
 # After we order the dataframe by the Pcc score, remove any host matches with a greater
 # Pcc score than this
@@ -92,6 +114,7 @@ D_LIM_UPPER = 1e4  # 10,000 Mpc
 #    catalog is preferred over a general redshift catalog
 # 2) Does this catalog have spec-z's or photo-z's? A spec-z catalog is preferred.
 GALAXY_CATALOGS = [
+    UserGalaxy,
     GladePlus,
     Gwgc,
     Hecate,
@@ -104,7 +127,21 @@ GALAXY_CATALOGS = [
 ]
 
 GALAXY_CATALOG_RANKING = {c.__name__:i for i,c in enumerate(GALAXY_CATALOGS)}
+
+
+GALAXY_TARGETMATCHES = [
+    UserGalaxyTargetMatch,
+    GladePlusTargetMatch,
+    GwgcTargetMatch,
+    HecateTargetMatch,
+    DesiDr1TargetMatch,
+    NedLvsTargetMatch,
+    LsDr10TargetMatch,
+    Ps1GalaxyTargetMatch,
+    Sdss12PhotozTargetMatch]
+GALAXY_TARGETMATCH_DICT = dict(zip([g.__name__ for g in GALAXY_CATALOGS], GALAXY_TARGETMATCHES))
     
+
 class AsymmetricGaussian(rv_continuous):
     """
     Custom Asymmetric Gaussian distribution for uneven uncertainties
@@ -165,6 +202,21 @@ def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
                 localization = loc
 
     return localization
+
+def localization_sequence_from_name(nonlocalized_event_name):
+
+    nle = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
+
+    seqs = nle.sequences.all()
+
+    latest_seq = seqs[0]
+    for seq in seqs:
+        curr_latest_time = Time(latest_seq.details["time"])
+        test_latest_time = Time(seq.details["time"])
+        if test_latest_time > curr_latest_time:
+            latest_seq = seq
+    
+    return seq
 
 def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()):
     """Computes the GW distance at the target_id healpix location"""
@@ -237,6 +289,7 @@ def _save_host_galaxy_df(df, target):
     
     newdf = df[
         [
+            "trove_uniq",
             "name",
             "pcc",
             "offset",
@@ -246,7 +299,8 @@ def _save_host_galaxy_df(df, target):
             "z",
             "z_type",
             "default_mag",
-            "catalog"
+            "catalog",
+            "submitter"
         ]
     ]
     newdf["z_err"] = [
@@ -377,7 +431,8 @@ def pcc(r:list[float], m:list[float]):
 
     return prob
         
-def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
+def host_association(target_id:int, radius:float=HOST_ASSOC_RADIUS, 
+                     pcc_threshold:float=PCC_THRESHOLD):
     """
     Find all of the potential hosts associated with this target
     """
@@ -390,9 +445,16 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
     res = []
     for catalog in GALAXY_CATALOGS:
         cat = catalog()
+        catname = cat.__class__.__name__
         print(f"Querying {cat}...")
         query_set = cat.query(ra, dec, radius=radius)
-            
+        
+        # first, delete any matches in <catalog>TargetMatch
+        matches = GALAXY_TARGETMATCH_DICT[catname].objects.filter(
+            target=target)
+        if matches.count():
+            matches.delete()
+
         # if no queries are returned we can skip this catalog
         if query_set.count() == 0: continue
 
@@ -401,9 +463,9 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
             list(
                 query_set.values()
             )
-        ) 
+        )
         df = cat.to_standardized_catalog(df)
-
+        
         # some extra cleaning before continuing
         if "z" in df:
             # we only need to do this if the redshift is in the dataframe
@@ -413,24 +475,34 @@ def host_association(target_id:int, radius=50, pcc_threshold=PCC_THRESHOLD):
         df = df.dropna(
             subset=["default_mag", "ra", "dec", "lumdist", "lumdist_err"]
         ) # drop rows without the information we need
+        df["trove_uniq"] = df["trove_uniq"].astype(int) # set to an int
+        
+        # calculate Pcc, filter out anything <= pcc_threshold
+        catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
+        seps = coord.separation(catalog_coord).arcsec
+        df["offset"] = seps
+        df["pcc"] = pcc(df["default_mag"], seps)
+        df = df[df.pcc <= pcc_threshold]
                 
         # now save the cleaned dataset
-        df["catalog"] = cat.__class__.__name__
+        df["catalog"] = catname
         res.append(df)
         
+        # save new matches to <catalog>TargetMatch
+        GALAXY_TARGETMATCH_DICT[catname].objects.bulk_create(
+            [GALAXY_TARGETMATCH_DICT[catname](target = target,
+                                              host_galaxy = val.trove_uniq,
+                                              pcc = val.pcc) for 
+              idx, val in df.iterrows()]
+        )
+        
     df = pd.concat(res).reset_index(drop=True)
-
-    # calculate Pcc
-    catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
-    seps = coord.separation(catalog_coord).arcsec
-    df["offset"] = seps
-    df["pcc"] = pcc(df["default_mag"], seps)
 
     # TODO: We will need to put some deduplication code for the galaxy dataframe
     #       here at some point. For now it seems to work without it though!
 
-    # Finally, filter out anything <= pcc_threshold and sort inversely by pcc
-    ret_df = df[df.pcc <= pcc_threshold].sort_values("pcc", ascending=True)
+    # sort inversely by pcc
+    ret_df = df.sort_values("pcc", ascending=True)
     
     end = time.time()
     print(ret_df)
@@ -541,20 +613,33 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         return trapezoid(
             np.sqrt(targ_pdf*nle_pdf),
             x=_lumdist
-        )
+        ), None # None because there is no host name
+
+    # then use the redshift of user-uploaded host galaxies
+    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
+    if len(userz_distance_hosts):
+        max_score = userz_distance_hosts.dist_norm_joint_prob.max()
+        max_score_host_name = userz_distance_hosts.iloc[userz_distance_hosts["dist_norm_joint_prob"].idxmax()]["name"]
+        return max_score, max_score_host_name
 
     # then use the redshift independent measurements of distances
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
     if len(ind_distance_hosts):
-        return ind_distance_hosts.dist_norm_joint_prob.max()
+        max_score = ind_distance_hosts.dist_norm_joint_prob.max()
+        max_score_host_name = ind_distance_hosts.iloc[ind_distance_hosts["dist_norm_joint_prob"].idxmax()]["name"]
+        return max_score, max_score_host_name
 
     # then use the specz hosts
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
     if len(specz_hosts):
-        return specz_hosts.dist_norm_joint_prob.max()
+        max_score = specz_hosts.dist_norm_joint_prob.max()
+        max_score_host_name = specz_hosts.iloc[specz_hosts["dist_norm_joint_prob"].idxmax()]["name"]
+        return max_score, max_score_host_name
 
     # then if we don't know the spec-z or have an independent distance measure use the photo-z's
-    return host_df.dist_norm_joint_prob.max()
+    max_score = host_df.dist_norm_joint_prob.max()
+    max_score_host_name = host_df.iloc[host_df["dist_norm_joint_prob"].idxmax()]["name"]
+    return max_score, max_score_host_name
 
 def get_eventcandidate_default_distance(target_id:int, nonlocalized_event_name:str):
 
@@ -586,10 +671,15 @@ def get_eventcandidate_default_distance(target_id:int, nonlocalized_event_name:s
 
     # because we already sorted the dataframe by our "preferred" catalogs, we can
     # just always take the distances from the first row and return them
-    # so let's start with z independent measures of the distance
+    # start with user-provided host spec z's
+    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
-    if len(ind_distance_hosts):
+    if len(userz_distance_hosts):
+        to_ret = userz_distance_hosts.iloc[0]
+    
+    # then z-indep host distances
+    elif len(ind_distance_hosts):
         to_ret = ind_distance_hosts.iloc[0]
         
     # then spec-z's
@@ -602,7 +692,7 @@ def get_eventcandidate_default_distance(target_id:int, nonlocalized_event_name:s
     
     return to_ret.Dist, to_ret.DistErr
 
-def point_source_association(target_id:int, radius:float=2):
+def point_source_association(target_id:int, radius:float=PS_ASSOC_RADIUS):
 
     target = Target.objects.get(id=target_id)
     ra, dec = target.ra, target.dec
@@ -632,7 +722,7 @@ def point_source_association(target_id:int, radius:float=2):
 
     return 1
 
-def agn_association_2d(target_id:int, radius:float=2):
+def agn_association_2d(target_id:int, radius:float=AGN_ASSOC_RADIUS):
     """
     This searches the AGN catalogs for a match for this target
     """
@@ -757,3 +847,16 @@ def agn_distance_match(
         axis=1
     )
     return agn_df
+
+
+def vet_all_async(
+        eventcandidates, 
+        nle, 
+        vetting_mode
+) -> None:
+    """Asychronously vet according to vetting mode"""
+    for ec in eventcandidates:         
+        async_vet.enqueue(
+                target_ids=[ec.target_id],
+                nle_event_id=nle.event_id, 
+                vetting_mode=vetting_mode)

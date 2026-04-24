@@ -15,10 +15,8 @@ vetting modules. That way we can reduce the code duplication between them!
 
 
 import logging
-import io
 from astropy.time import Time
 import numpy as np
-import pandas as pd
 
 from trove_targets.models import Target
 from tom_dataproducts.models import ReducedDatum
@@ -28,8 +26,7 @@ from .vet import (
     point_source_association,
     host_association,
     agn_association_2d,
-    save_score_to_targetextra,
-    HOST_DF_COLMAP_INVERSE
+    save_score_to_targetextra
 )
 from .vet_phot import find_public_phot
 
@@ -66,10 +63,7 @@ def vet_basic(
         save_score_to_targetextra(target, "ps_score", ps_score)
 
     ## search for an AGN associated with the target
-    agn_df = agn_association_2d(
-        target_id, 
-        radius=2 # 2 arcseconds
-    )
+    agn_df = agn_association_2d(target_id)
         
     ## run the minor planet checker
     if overwrite or not te.filter(key="mpc_match_name").exists():
@@ -114,10 +108,7 @@ def vet_basic(
             )
             
     ## do the Pcc analysis and find a host
-    host_df = host_association(
-        target_id,
-        radius = 5*60
-    )
+    host_df = host_association(target_id)
      
     ## return both agn_df and host_df       
     return host_df, agn_df

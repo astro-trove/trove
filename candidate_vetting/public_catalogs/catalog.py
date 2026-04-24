@@ -77,6 +77,7 @@ class StaticCatalog(Catalog):
         self.catalog_type = "static"
 
         self.colnames = {
+            "trove_uniq",
             "name",
             "ra",
             "dec",
@@ -89,7 +90,8 @@ class StaticCatalog(Catalog):
             "lumdist_neg_err",
             "lumdist_pos_err",
             "z_type",
-            "default_mag"
+            "default_mag",
+            "submitter"
         }
         
         super().__init__(self.__class__.__name__, verbose=verbose)        

@@ -2,15 +2,22 @@
 Some common functions used in multiple places throughout the app
 """
 
+from collections import OrderedDict
 import math
 from astropy.units import Quantity
 from django.db.models import FloatField
 from django.db.models.functions import Cast
-from tom_nonlocalizedevents.models import NonLocalizedEvent
+from tom_nonlocalizedevents.models import (EventCandidate, 
+                                           EventLocalization,
+                                           NonLocalizedEvent
+                                           )
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from candidate_vetting.models import ScoreFactor
 
+from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+
+from candidate_vetting.vet import localization_sequence_from_name
 from candidate_vetting.vet_phot import PHOT_SCORE_MIN
 from candidate_vetting.vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from candidate_vetting.vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
@@ -47,12 +54,12 @@ VAL_NOT_SCORE_KEYS = {
 
 # these should now be stored in a TargetExtra object so the score needs to be
 # accessed differently
-TARGETEXTRA_KEYS = {
+TARGETEXTRA_KEYS = [
     "ps_score",
     "mpc_match_name",
     "mpc_match_sep",
     "mpc_match_date",
-}
+]
 MPC_KEYS = [
     "mpc_match_name",
     "mpc_match_sep",
@@ -80,7 +87,17 @@ def get_event_candidate_scores(event_candidates,
     event_candidates should be a django queryset of EventCandidate objects
     """ 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
-    exclude_keys = set(val_not_score_keys.keys()) | TARGETEXTRA_KEYS
+    exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
+         
+    # which transient types to consider?
+    ### TODO: Right now, just does KN unless SSM; change this for BBH events
+    nle_eventseq = localization_sequence_from_name(event_candidate.nonlocalizedevent__event_id)
+    most_likely_class = get_most_likely_class(nle_eventseq.details)
+    
+    if most_likely_class == "SSM":
+        transients = TRANSIENTS
+    else:
+        transients = ["KN"]
     
     # only evaluate this once since it is time consuming
     event_candidates_list = list(event_candidates)
@@ -143,7 +160,7 @@ def get_event_candidate_scores(event_candidates,
             if key not in exclude_keys
         ]) * ps_score * mpc_score
             
-        for transient in TRANSIENTS: 
+        for transient in transients: 
             # allowed parameter ranges for given transient
             param_ranges = dict_transients_param_ranges[transient]
 
@@ -160,7 +177,9 @@ def get_event_candidate_scores(event_candidates,
         ecs_out.append(ec)
     
     # sort by kilonova score, for now
+    ## TODO: generalize this
     return sorted(ecs_out, reverse=True, key = lambda x : x.score["KN"])
+
 
 def get_target_score(target_id):
 

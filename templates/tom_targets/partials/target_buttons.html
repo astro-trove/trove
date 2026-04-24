@@ -12,5 +12,6 @@
 {% endif %}
 <a href="{% url 'tom_targets:delete' pk=target.id %}" title="Delete target" class="btn btn-danger">Delete</a>
 <a href="{% url 'candidate_vetting:checknewphot' pk=target.id %}" title="Check for new data" class="btn btn-warning">Update Lightcurve</a>
+<a href="{% url 'candidate_vetting:updatez' pk=target.id %}" title="Update a potential host galaxy's redshift" class="btn btn-success">Update Host z</a>
 
 {% get_buttons target %}
