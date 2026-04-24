@@ -203,6 +203,21 @@ def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
 
     return localization
 
+def localization_sequence_from_name(nonlocalized_event_name):
+
+    nle = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
+
+    seqs = nle.sequences.all()
+
+    latest_seq = seqs[0]
+    for seq in seqs:
+        curr_latest_time = Time(latest_seq.details["time"])
+        test_latest_time = Time(seq.details["time"])
+        if test_latest_time > curr_latest_time:
+            latest_seq = seq
+    
+    return seq
+
 def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()):
     """Computes the GW distance at the target_id healpix location"""
 

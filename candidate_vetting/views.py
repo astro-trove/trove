@@ -19,8 +19,8 @@ from tom_nonlocalizedevents.models import (EventCandidate,
                                            EventLocalization)
 from .forms import VettingChoiceForm, RedshiftUpdateForm
 from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
- 
-from .vet import host_association, vet_all_async
+
+from .vet import host_association, vet_all_async, localization_sequence_from_name
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .public_catalogs.phot_catalogs import ZTF_Forced_Phot
@@ -53,9 +53,8 @@ class TargetVettingFormView(FormView):
                 nle = None
 
         if nle: 
-            nle_eventseq = EventLocalization.objects.filter(
-                nonlocalizedevent_id=nle.id).first().sequences
-            nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
+            nle_eventseq = localization_sequence_from_name(nle.event_id)
+            nle_most_likely_class = get_most_likely_class(nle_eventseq.details) # most likely class for the NLE
             try:
                 form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
             except KeyError:
@@ -220,9 +219,8 @@ class TargetRedshiftUpdateFormView(FormView):
                 nle = None
         
         if nle: 
-            nle_eventseq = EventLocalization.objects.filter(
-                nonlocalizedevent_id=nle.id).first().sequences
-            nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
+            nle_eventseq = localization_sequence_from_name(nle.event_id)
+            nle_most_likely_class = get_most_likely_class(nle_eventseq.details) # most likely class for the NLE
             try:
                 vetting_choices = VETTING_FORM_CHOICES[nle_most_likely_class]
             except KeyError:
@@ -260,9 +258,8 @@ class TargetVettingAllFormView(FormView):
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
         nle_id = self.request.session["nle_id"].split("=")[-1]
-        nle_eventseq = EventLocalization.objects.filter(
-            nonlocalizedevent_id=nle_id).first().sequences
-        nle_most_likely_class = get_most_likely_class(nle_eventseq.first().details) # most likely class for the NLE
+        nle_eventseq = localization_sequence_from_name(NonLocalizedEvent.objects.get(id=nle_id))
+        nle_most_likely_class = get_most_likely_class(nle_eventseq.details) # most likely class for the NLE
         try:
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[nle_most_likely_class]
         except KeyError:

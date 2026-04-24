@@ -17,6 +17,7 @@ from candidate_vetting.models import ScoreFactor
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 
+from candidate_vetting.vet import localization_sequence_from_name
 from candidate_vetting.vet_phot import PHOT_SCORE_MIN
 from candidate_vetting.vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from candidate_vetting.vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
@@ -90,9 +91,8 @@ def get_event_candidate_scores(event_candidates,
          
     # which transient types to consider?
     ### TODO: Right now, just does KN unless SSM; change this for BBH events
-    nle_eventseq = EventLocalization.objects.filter(
-        nonlocalizedevent_id=event_candidates[0].nonlocalizedevent_id).first().sequences
-    most_likely_class = get_most_likely_class(nle_eventseq.first().details)
+    nle_eventseq = localization_sequence_from_name(event_candidate.nonlocalizedevent__event_id)
+    most_likely_class = get_most_likely_class(nle_eventseq.details)
     
     if most_likely_class == "SSM":
         transients = TRANSIENTS
