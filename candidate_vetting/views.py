@@ -43,14 +43,15 @@ class TargetVettingFormView(FormView):
         form = super().get_form(*args, **kwargs)
         
         # if NLE was provided by referer, use it to choose what vetting is allowed
-        try: 
-            nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
-            nle = NonLocalizedEvent.objects.filter(event_id=nle_name_or_id)[0]
-        except IndexError:
-            try: 
-                nle = NonLocalizedEvent.objects.filter(id=int(nle_name_or_id))[0]
-            except IndexError:
+        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+        if nle_name_or_id.isdigit():
+            nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
+        else:
+            try:
+                nle = NonLocalizedEvent.objects.get(event_id=nle_name_or_id)
+            except NonLocalizedEvent.DoesNotExist:
                 nle = None
+
         if nle: 
             nle_eventseq = EventLocalization.objects.filter(
                 nonlocalizedevent_id=nle.id).first().sequences
