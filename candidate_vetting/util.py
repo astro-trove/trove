@@ -88,20 +88,20 @@ def get_event_candidate_scores(event_candidates,
     """ 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
-         
+
+    # only evaluate this once since it is time consuming
+    event_candidates_list = list(event_candidates)
+    
     # which transient types to consider?
     ### TODO: Right now, just does KN unless SSM; change this for BBH events
-    nle_eventseq = localization_sequence_from_name(event_candidate.nonlocalizedevent__event_id)
+    nle_eventseq = localization_sequence_from_name(event_candidates_list[0].nonlocalizedevent.event_id)
     most_likely_class = get_most_likely_class(nle_eventseq.details)
     
     if most_likely_class == "SSM":
         transients = TRANSIENTS
     else:
         transients = ["KN"]
-    
-    # only evaluate this once since it is time consuming
-    event_candidates_list = list(event_candidates)
-    
+        
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
     
