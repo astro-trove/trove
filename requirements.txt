@@ -8,6 +8,7 @@ django-extensions
 django-filter
 django-guardian
 django-tasks
+django-ninja
 dustmaps
 fitsio
 healpix-alchemy

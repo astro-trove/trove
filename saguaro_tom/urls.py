@@ -14,10 +14,12 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import path, include
+from .api import api
 
 urlpatterns = [
     path('', include('custom_code.urls')),
     path('', include('tom_common.urls')),
     path('', include('candidate_vetting.urls')),
     path('nonlocalizedevents/', include('tom_nonlocalizedevents.urls', namespace='nonlocalizedevents')),
+    path("api/", api.urls),
 ]
