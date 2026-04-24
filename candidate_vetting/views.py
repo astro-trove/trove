@@ -107,9 +107,6 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         
         # get the nonlocalized event name from the referer
         nonlocalized_event_name = request.GET.get("nonlocalizedevent")
-        import pdb; pdb.set_trace()
-        print(request)
-        print(request.GET)
         
         # then run the vetting
         vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
