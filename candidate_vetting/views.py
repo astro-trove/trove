@@ -119,7 +119,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             reverse(
                 "targets:detail",
                 kwargs=dict(pk=target_pk)
-            )
+            ) + f"?nonlocalizedevent={nonlocalized_event_name}"
         ) # this redirects back to the original target page
         
 class TargetFPView(LoginRequiredMixin, RedirectView):

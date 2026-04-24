@@ -52,6 +52,8 @@ PARAM_RANGES = dict(
 def vet_super_kn(target_id:int, nonlocalized_event_name:Optional[str]=None,
                  param_ranges:dict=PARAM_RANGES):
 
+    logger.info("Running SuperKN vetting")
+    
     # get the correct EventCandidate object for this target_id and nonlocalized event
     nonlocalized_event = NonLocalizedEvent.objects.get(
         event_id=nonlocalized_event_name
