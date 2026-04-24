@@ -2,7 +2,7 @@ from django.apps import AppConfig
 
 class TroveAppConfig(AppConfig):
 
-    name = 'trove'
+    name = 'custom_code'
     
     def nav_items(self):
         """
