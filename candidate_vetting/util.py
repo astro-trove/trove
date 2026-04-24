@@ -53,12 +53,12 @@ VAL_NOT_SCORE_KEYS = {
 
 # these should now be stored in a TargetExtra object so the score needs to be
 # accessed differently
-TARGETEXTRA_KEYS = {
+TARGETEXTRA_KEYS = [
     "ps_score",
     "mpc_match_name",
     "mpc_match_sep",
     "mpc_match_date",
-}
+]
 MPC_KEYS = [
     "mpc_match_name",
     "mpc_match_sep",

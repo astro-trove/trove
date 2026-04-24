@@ -87,7 +87,9 @@ class TargetVettingFormView(FormView):
         query_str = self.request.session.pop('nle_id', '')
         print("QUERY STRING:", query_str)
         if query_str:
+            print(base_url)
             base_url += f"?{query_str}"
+            print(base_url)
         return redirect(base_url)
     
 class TargetVettingView(LoginRequiredMixin, RedirectView):
@@ -102,10 +104,13 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         target_pk = kwargs['pk']
         target = Target.objects.get(pk=target_pk)
         vetting_mode = kwargs.get("vetting_mode", "basic")
-
+        
         # get the nonlocalized event name from the referer
         nonlocalized_event_name = request.GET.get("nonlocalizedevent")
-
+        import pdb; pdb.set_trace()
+        print(request)
+        print(request.GET)
+        
         # then run the vetting
         vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
         if vetting_mode == "basic" or nonlocalized_event_name is None:
