@@ -111,15 +111,22 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
         if vetting_mode == "basic" or nonlocalized_event_name is None:
             vet_basic(target.id)
+            messages.info(request, "Ran basic vetting. If you expected non-localized event (NLE)-dependent "+
+                          "vetting, ensure an NLE is specified in the URL.")
         else:
             vetting_func(target.id, nonlocalized_event_name)
-        
-        return redirect(
-            reverse(
+            messages.info(request, f"Ran vetting in {vetting_mode} mode.")
+            
+        if nonlocalized_event_name:
+            toreverse = reverse(
                 "targets:detail",
                 kwargs=dict(pk=target_pk)
-            ) + f"?nonlocalizedevent={nonlocalized_event_name}"
-        ) # this redirects back to the original target page
+                ) + f"?nonlocalizedevent={nonlocalized_event_name}"
+        
+        else: 
+            toreverse = reverse("targets:detail", kwargs=dict(pk=target_pk))
+        
+        return redirect(toreverse) # this redirects back to the original target page
         
 class TargetFPView(LoginRequiredMixin, RedirectView):
     """
@@ -209,13 +216,13 @@ class TargetRedshiftUpdateFormView(FormView):
         host_association(target_id=pk)
         
         # re-run vetting if NLE was provided by referer
-        try:
-            nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
-            nle = NonLocalizedEvent.objects.filter(event_id=nle_name_or_id)[0]
-        except IndexError:
-            try: 
-                nle = NonLocalizedEvent.objects.filter(id=nle_name_or_id)[0]
-            except IndexError:
+        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+        if nle_name_or_id.isdigit():
+            nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
+        else:
+            try:
+                nle = NonLocalizedEvent.objects.get(event_id=nle_name_or_id)
+            except NonLocalizedEvent.DoesNotExist:
                 nle = None
         
         if nle: 
@@ -234,6 +241,10 @@ class TargetRedshiftUpdateFormView(FormView):
             messages.info(self.request, 
                           "Added a new host galaxy redshift, re-ran host association, and "+
                           f"re-performed vetting in {', '.join(vetting_modes)} vetting mode(s).")
+        else: 
+            messages.info(self.request,
+                          "Added a new host galaxy redshift and re-ran host association. "+
+                          "Did NOT re-run vetting as a nonlocalized event (NLE) was not provided in the URL.")
 
 
         # generate the base url        
