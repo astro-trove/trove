@@ -312,9 +312,39 @@ FILTER_EFF_FREQ = {
     'V': 5.483e14 * u.Hz,
     'R': 4.610e14 * u.Hz,
     'I': 3.807e14 * u.Hz,
-    'G': 5.5e14 * u.Hz,
-    'c': 5.4e14 * u.Hz,
-    'o': 4.8e14 * u.Hz,
+    'c': 5.4e14 * u.Hz, # ATLAS cyan
+    'o': 4.8e14 * u.Hz, # ATLAS orange
+    'G': 5.5e14 * u.Hz, # Gaia G-band
+    'w': 5.208e14 * u.Hz, # Pan-STARRS w (wide)
+    'F070W': 4.310e14 * u.Hz, # JWST
+    'F090W': 3.362e14 * u.Hz,
+    'F115W': 2.629e14 * u.Hz,
+    'F150W': 2.019e14 * u.Hz,
+    'F182M': 1.631e14 * u.Hz,
+    'F200W': 1.526e14 * u.Hz,
+    'F250M': 1.199e14 * u.Hz,
+    'F277W': 1.101e14 * u.Hz,
+    'F300M': 1.006e14 * u.Hz,
+    'F335M': 0.894e14 * u.Hz,
+    'F356W': 0.850e14 * u.Hz,
+    'F360M': 0.829e14 * u.Hz,
+    'F444W': 0.690e14 * u.Hz,
+    'F560W': 0.537e14 * u.Hz,
+    'F770W': 0.399e14 * u.Hz,
+    'F1000W': 0.303e14 * u.Hz,
+    'F1130W': 0.265e14 * u.Hz,
+    'F1280W': 0.236e14 * u.Hz,
+    'F1500W': 0.201e14 * u.Hz,
+    'F1800W': 0.168e14 * u.Hz,
+    'F2100W': 0.146e14 * u.Hz,
+    'F2550W': 0.119e14 * u.Hz,
+    'F062': 4.962e14 * u.Hz, # Roman
+    'F087': 3.494e14 * u.Hz,
+    'F106': 2.876e14 * u.Hz,
+    'F129': 2.355e14 * u.Hz,
+    'F146': 2.355e14 * u.Hz,
+    'F158': 1.929e14 * u.Hz,
+    'F213': 1.421e14 * u.Hz,
 }
 
 def _mag_to_flux(mag, magerr=None):

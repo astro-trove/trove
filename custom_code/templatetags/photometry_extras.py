@@ -35,6 +35,37 @@ COLOR_MAP = {
     'w': '#808080',  # Pan-STARRS w (wide)
     'Clear': '#808080',
     'clear': '#808080',
+    'L': 'r',
+    'F070W': 'C7', # JWST
+    'F090W': 'C0',
+    'F115W': 'C8',
+    'F150W': 'C1',
+    'F182M': 'tomato',
+    'F200W': 'C2',
+    'F250M': 'chocolate',
+    'F277W': 'C3',
+    'F300M': 'maroon',
+    'F335M': 'salmon',
+    'F356W': 'C4',
+    'F360M': 'crimson',
+    'F444W': 'C5',
+    'F560W': 'C9',
+    'F770W': 'C6',
+    'F1000W': 'C7',
+    'F1130W': 'C0',
+    'F1280W': 'C8',
+    'F1500W': 'C1',
+    'F1800W': 'C9',
+    'F2100W': 'C2',
+    'F2550W': 'C3',
+    'F062': 'k', # Roman
+    'F087': 'k',
+    'F106': 'k',
+    'F129': 'k',
+    'F146': 'k',
+    'F158': 'k',
+    'F184': 'k',
+    'F213': 'k',
 }
 MARKER_MAP = {
     'limit': 50,  # arrow-bar-down
