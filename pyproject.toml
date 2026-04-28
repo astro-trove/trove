@@ -34,6 +34,7 @@ dependencies = [
     "django-extensions",
     "django-filter",
     "django-guardian",
+    "django-ninja",
     "django-tasks",
     "dustmaps",
     "fitsio",
