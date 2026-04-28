@@ -35,7 +35,7 @@ COLOR_MAP = {
     'w': '#808080',  # Pan-STARRS w (wide)
     'Clear': '#808080',
     'clear': '#808080',
-    'L': 'r',
+    'L': '#808080',
     'F070W': 'C7', # JWST
     'F090W': 'C0',
     'F115W': 'C8',
@@ -58,14 +58,14 @@ COLOR_MAP = {
     'F1800W': 'C9',
     'F2100W': 'C2',
     'F2550W': 'C3',
-    'F062': 'k', # Roman
-    'F087': 'k',
-    'F106': 'k',
-    'F129': 'k',
-    'F146': 'k',
-    'F158': 'k',
-    'F184': 'k',
-    'F213': 'k',
+    'F062': '#332288', # Roman; colors = David Nichols' Tol palette https://davidmathlogic.com/colorblind/
+    'F087': '#117733',
+    'F106': '#44AA99',
+    'F129': '#88CCEE',
+    'F146': '#DDCC77',
+    'F158': '#CC6677',
+    'F184': '#AA4499',
+    'F213': '#882255',
 }
 MARKER_MAP = {
     'limit': 50,  # arrow-bar-down
