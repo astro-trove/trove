@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     'candidate_vetting',
     'trove_targets',
     'trove_nonlocalizedevents',
+    'dal',
+    'dal_select2'
 ]
 
 SITE_ID=1
