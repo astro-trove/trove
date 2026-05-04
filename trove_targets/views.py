@@ -2,12 +2,13 @@ import logging
 
 from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView
+from django.conf import settings
 from dal import autocomplete
 
 from tom_common.hooks import run_hook
 
 from tom_targets.views import TargetCreateView
-from tom_targets.models import Target
+from tom_targets.models import BaseTarget, Target
 from tom_targets.forms import TargetForm, SiderealTargetCreateForm
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
@@ -15,6 +16,12 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from .forms import TargetNLEForm, CustomSiderealTargetCreateForm
 
 logger = logging.getLogger(__name__)
+
+PERMISSIONS_MAP = {
+    "PUBLIC": BaseTarget.Permissions.PUBLIC,
+    "PRIVATE": BaseTarget.Permissions.PRIVATE,
+    "OPEN": BaseTarget.Permissions.OPEN
+}
 
 class NLEAutocompleteView(autocomplete.Select2QuerySetView):
 
@@ -83,6 +90,12 @@ class CustomTargetCreateView(TargetCreateView):
 
         # Give the user access to the target they created
         self.object.give_user_access(self.request.user)
+
+        # then also set the global permission group of the object to the default
+        # TODO: If we ever change the permissions functionality and allow users to set
+        #       permissions on upload, we need to change this!
+        self.object.permissions = PERMISSIONS_MAP[settings.TARGET_DEFAULT_PERMISSION]
+        self.object.save()
 
         # Run the target post save hook
         logger.info('Target post save hook: %s created: %s', target, True)

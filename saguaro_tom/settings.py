@@ -301,6 +301,10 @@ AUTH_STRATEGY = 'READ_ONLY'
 # `ObservationRecord`, `DataProduct`, and `ReducedDatum` objects.
 TARGET_PERMISSIONS_ONLY = True
 
+# Default permission for newly created targets. Values can be 'PRIVATE', 'PUBLIC', or 'OPEN'
+# Any new target created will be public (visible by anyone signed in)
+TARGET_DEFAULT_PERMISSION = 'PUBLIC'
+
 # URLs that should be allowed access even with AUTH_STRATEGY = LOCKED
 # for example: OPEN_URLS = ['/', '/about']
 OPEN_URLS = ['/accounts/register/']
