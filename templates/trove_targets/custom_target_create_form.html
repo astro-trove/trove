@@ -18,36 +18,6 @@
 {% bootstrap_form_errors form %}
 <form method="post" class="form">
 {% csrf_token %}
-{% bootstrap_field form.type %}
-
-{% comment %}
-
-<div class="form-row">
-    <div class="col">
-        {% bootstrap_field form.name size="large" show_help=False %}
-    </div>
-</div>
-
-<div class="row" x-data="{open: false}">
-    <div class="col mb-2">
-        <span @click="open = ! open" class="text-primary pointer" x-text="open ? '▾ Aliases' : '▸ Aliases'"></span>
-        <div x-show="open" class="border p-3 bg-light" x-transition>
-            {% bootstrap_formset_errors names_form %}
-            {% bootstrap_formset names_form %}
-        </div>
-    </div>
-</div>
-<div class="row" x-data="{open: false}">
-    <div class="col mb-2">
-        <span @click="open = ! open" class="text-primary pointer" x-text="open ? '▾ Tags' : '▸ Tags'"></span>
-        <div x-show="open" class="border p-3 bg-light" x-transition>
-            {% bootstrap_formset_errors extra_form %}
-            {% bootstrap_formset extra_form %}
-        </div>
-    </div>
-</div>
-{% endcomment %}
-
 {% bootstrap_field form.name %}
 {% bootstrap_field form.ra %}
 {% bootstrap_field form.dec %}
@@ -56,10 +26,12 @@
 {% bootstrap_field form.distance_err %}
 {% bootstrap_field form.classification %}
 {% bootstrap_field form.redshift %}
-{% bootstrap_field form.type hidden=True %}  {# you probably want type hidden #}
+{% bootstrap_field form.type hidden=True %}
 
-{# crispy form #}
+{% bootstrap_form_errors target_nle_form %}
+{% bootstrap_form target_nle_form %}
 
+{% comment %}
 <div class="row" x-data="{open: false}">
     <div class="col mb-2">
         <span @click="open = ! open" class="text-primary pointer" x-text="open ? '▾ Aliases' : '▸ Aliases'"></span>
@@ -69,43 +41,14 @@
         </div>
     </div>
 </div>
-
-
-{% comment %}
-<h4>Permissions</h4>
-<div class="row mb-3" x-data="{permission: '{{ form.permissions.value }}' }">
-    <div class="col-md-6">
-        <select x-model="permission" name="permissions" class="form-control" id="id_permissions">
-          <option value="OPEN">Open</option>
-          <option value="PUBLIC">Public</option>
-          <option value="PRIVATE">Private</option>
-        </select>
-        <div class="form-text text-muted">
-          <small>Open: Targets will be visible to all users, even if not logged-in.<br/>
-          Public: Targets will be visible to all logged in users.<br/>
-          Private: Targets will be visible only to members of the selected groups.</small>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div x-show="permission == 'PRIVATE'" x-transition>
-            <span>Target will only be visibile to members of these groups:</span>
-            {% bootstrap_field form.groups show_label=False %}
-            {% if not request.user.groups.exists %}
-                <p class="text-muted">No groups have been created.<br/>
-                  <a href="{% url 'group-create' %}">Create groups.</a>
-                </p>
-            {% endif %}
-        </div>
-    </div>
-</div>
 {% endcomment %}
 
 {% if not object %}
   <button type="submit" formaction="{% url 'targets:create' %}" class="btn btn-primary">Submit</button>
-  {% else %}
+{% else %}
   <button type="submit" formaction="{% url 'targets:update' pk=object.id %}" class="btn btn-primary">Save</button>
   <a href="{% url 'targets:detail' pk=object.id %}" class="btn btn-primary" title="Back">Back</a>
-  {% endif %}
+{% endif %}
 </form>
 
 {{ target_nle_form.media }}
