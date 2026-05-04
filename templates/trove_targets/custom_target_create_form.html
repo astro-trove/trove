@@ -1,5 +1,6 @@
 {% extends 'tom_common/base.html' %}
 {% load bootstrap4 targets_extras crispy_forms_tags %}
+
 {% block title %}New Target{% endblock %}
 {% block content %}
 {% if not object %}
@@ -18,24 +19,15 @@
 <form method="post" class="form">
 {% csrf_token %}
 {% bootstrap_field form.type %}
+
+{% comment %}
+
 <div class="form-row">
     <div class="col">
         {% bootstrap_field form.name size="large" show_help=False %}
     </div>
 </div>
 
-<div class="row" x-data="{open: false}">
-    <div class="col mb-2">
-        <span @click="open = ! open" class="text-primary pointer" x-text="open ? '▾ Aliases' : '▸ Aliases'"></span>
-        <div x-show="open" class="border p-3 bg-light" x-transition>
-	    {% bootstrap_form_errors target_nle_form %}
-            {% bootstrap_form target_nle_form %}
-        </div>
-    </div>
-</div>
-
-
-{% comment %}
 <div class="row" x-data="{open: false}">
     <div class="col mb-2">
         <span @click="open = ! open" class="text-primary pointer" x-text="open ? '▾ Aliases' : '▸ Aliases'"></span>
@@ -56,7 +48,24 @@
 </div>
 {% endcomment %}
 
-{% crispy form %}
+{% bootstrap_field form.name %}
+{% bootstrap_field form.ra %}
+{% bootstrap_field form.dec %}
+{% bootstrap_field form.epoch %}
+{% bootstrap_field form.type hidden=True %}  {# you probably want type hidden #}
+
+{# crispy form #}
+
+<div class="row" x-data="{open: false}">
+    <div class="col mb-2">
+        <span @click="open = ! open" class="text-primary pointer" x-text="open ? '▾ Aliases' : '▸ Aliases'"></span>
+        <div x-show="open" class="border p-3 bg-light" x-transition>
+	    {% bootstrap_form_errors target_nle_form %}
+            {% bootstrap_form target_nle_form %}
+        </div>
+    </div>
+</div>
+
 
 {% comment %}
 <h4>Permissions</h4>

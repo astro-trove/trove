@@ -1,6 +1,11 @@
 from django import forms
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+from tom_targets.forms import TargetForm, SiderealTargetCreateForm
+#from tom_targets.models import Target
+from trove_targets.models import Target
+from tom_targets.base_models import REQUIRED_SIDEREAL_FIELDS
+
 from dal import autocomplete
 
 class TargetNLEForm(forms.Form):
@@ -16,3 +21,15 @@ class TargetNLEForm(forms.Form):
             }
         )
     )
+    
+class CustomSiderealTargetCreateForm(SiderealTargetCreateForm):
+
+    def __init__(self, *args, **kwargs):
+        super(TargetForm, self).__init__(*args, **kwargs)
+        for field in REQUIRED_SIDEREAL_FIELDS:
+            self.fields[field].required = True
+
+    
+    class Meta(SiderealTargetCreateForm.Meta):
+        fields = ['name', 'ra', 'dec', 'epoch', 'distance', 'distance_err', 'type',
+                  'parallax', 'classification', 'redshift']
