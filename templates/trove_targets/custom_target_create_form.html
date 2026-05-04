@@ -4,7 +4,7 @@
 {% block title %}New Target{% endblock %}
 {% block content %}
 {% if not object %}
-  <h3>Create a Target TEST</h3>
+  <h3>Create a Target</h3>
   <ul class="nav nav-tabs mb-2">
     {% for k, v in type_choices %}
       <li class="nav-item">
@@ -52,6 +52,10 @@
 {% bootstrap_field form.ra %}
 {% bootstrap_field form.dec %}
 {% bootstrap_field form.epoch %}
+{% bootstrap_field form.distance %}
+{% bootstrap_field form.distance_err %}
+{% bootstrap_field form.classification %}
+{% bootstrap_field form.redshift %}
 {% bootstrap_field form.type hidden=True %}  {# you probably want type hidden #}
 
 {# crispy form #}
