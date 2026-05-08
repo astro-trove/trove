@@ -50,7 +50,7 @@ def mock_nonlocalized_event():
     nle = MagicMock()
     nle.id = 1
     nle.event_id = 'S240101abc'
-    nle.event_type = 'GRAVITATIONAL_WAVE'
+    nle.event_type = 'GW'
     nle.state = 'ACTIVE'
     return nle
 
@@ -62,6 +62,8 @@ def mock_sequence():
     seq.sequence_id = 1
     seq.details = {
         'group': 'CBC',
+        'search':'AllSky',
+        'pipeline':'gstlal',
         'significant': True,
         'time': '2024-01-01T00:00:00.000000+00:00',
         'far': 1e-10,
@@ -128,5 +130,5 @@ def sample_host_galaxy_df():
         'default_mag': [18.0, 19.0, 17.5],
         'offset': [2.5, 5.0, 1.0],
         'pcc': [0.1, 0.2, 0.05],
-        'catalog': ['GladePlus', 'GladePlus', 'Hecate']
+        'catalog': ['GladePlus', 'DesiDr1', 'Hecate']
     })
