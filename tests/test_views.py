@@ -29,23 +29,23 @@ class TestNonLocalizedEventViews:
 
     def test_gw_queryset_filter(self):
         """Test GW list view filters for gravitational waves."""
-        event_type = 'GRAVITATIONAL_WAVE'
-        assert event_type == 'GRAVITATIONAL_WAVE'
+        event_type = 'GW'
+        assert event_type == 'GW'
 
     def test_grb_queryset_filter(self):
         """Test GRB list view filters for gamma ray bursts."""
-        event_type = 'GAMMA_RAY_BURST'
-        assert event_type == 'GAMMA_RAY_BURST'
+        event_type = 'GRB'
+        assert event_type == 'GRB'
 
     def test_neutrino_queryset_filter(self):
         """Test neutrino list view filters for neutrinos."""
-        event_type = 'NEUTRINO'
-        assert event_type == 'NEUTRINO'
+        event_type = 'NU'
+        assert event_type == 'NU'
 
     def test_unknown_queryset_filter(self):
         """Test unknown list view filters for unknown events."""
-        event_type = 'UNKNOWN'
-        assert event_type == 'UNKNOWN'
+        event_type = 'UNK'
+        assert event_type == 'UNK'
 
 
 class TestEventCandidateCreateView:

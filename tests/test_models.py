@@ -178,10 +178,10 @@ class TestNonLocalizedEvent:
     def test_event_type_choices(self):
         """Test valid event type choices."""
         event_types = [
-            'GRAVITATIONAL_WAVE',
-            'GAMMA_RAY_BURST',
-            'NEUTRINO',
-            'UNKNOWN'
+            'GW',
+            'GRB',
+            'NU',
+            'UNK'
         ]
         
         for et in event_types:
