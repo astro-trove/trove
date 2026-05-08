@@ -27,6 +27,7 @@ Requires-Dist: django-crispy-forms
 Requires-Dist: django-extensions
 Requires-Dist: django-filter
 Requires-Dist: django-guardian
+Requires-Dist: django-ninja
 Requires-Dist: django-tasks
 Requires-Dist: dustmaps
 Requires-Dist: healpix-alchemy
