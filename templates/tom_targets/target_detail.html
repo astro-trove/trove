@@ -41,15 +41,14 @@
       {% get_spectroscopy_data object %}
     </details>
 
-      {% if comments_are_enabled %}
-      <hr/>
-      <h5>Comments</h5>
-          {% render_comment_list for object %}
-          {% url 'targets:detail' object.id as next %}
-          {% if user.is_authenticated %}
-            {% render_comment_form for object %}
-          {% endif %}
-      {% endif %}
+    <hr/>
+    <details>
+        <summary><h4 style="display:inline-block">Comments</h4></summary>
+            {% render_comment_list for object %}
+            {% url 'targets:detail' object.id as next %}
+            {% if user.is_authenticated %}
+              {% render_comment_form for object %}
+            {% endif %}
   </div>
 </div>
 {% endblock %}
