@@ -95,8 +95,6 @@ def get_event_candidate_scores(
     event_candidates should be a django queryset of EventCandidate objects
     """
 
-    print(f"Prefetching all event candidate queries", time.time())
-
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
 
@@ -138,7 +136,6 @@ def get_event_candidate_scores(
             score_factors_by_ec[ec_id] = {}
         score_factors_by_ec[ec_id][sf.key] = sf.value_float
 
-    print(f"Computing the score for all the event candidates")
     ecs_out = []
     for ec in event_candidates_list:
         # set ec.score to be a dictionary mapping transient : score
