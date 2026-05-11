@@ -356,5 +356,3 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"
         )  # this redirects back to the NLE page
-
-class 
