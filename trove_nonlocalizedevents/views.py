@@ -3,6 +3,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.shortcuts import redirect
 from django.urls import reverse
+from django.http import JsonResponse
 from trove_targets.models import Target
 from tom_targets.permissions import targets_for_user
 from tom_nonlocalizedevents.models import EventCandidate
@@ -109,3 +110,28 @@ class EventCandidateAutocompleteView(autocomplete.Select2QuerySetView):
             qs = qs.filter(target__name__icontains=self.q)
 
         return qs
+
+
+def generate_report(request):
+    nle_id = request.GET.get("nonlocalizedevent")
+    try:
+        ncands = int(request.GET.get("n", 10))
+    except ValueError:
+        ncands = 10  # this means the user didn't pass an integer to the n param
+
+    candidates = EventCandidate.objects.filter(
+        nonlocalizedevent_id=nle_id
+    ).select_related("target", "nonlocalizedevent")
+
+    candidates = list(get_event_candidate_scores(candidates))  # [:ncands]
+
+    lines = [f"Event: {nle_id}", "=" * 40, ""]
+    for i, ec in enumerate(candidates, 1):
+        if i > ncands:
+            break
+        lines.append(f"{i}. {ec.target.name}")
+        lines.append(f"   Score: {ec.score}")
+        lines.append(f"   Event: {ec.nonlocalizedevent.event_id}")
+        lines.append("")
+
+    return JsonResponse({"text": "\n".join(lines)})

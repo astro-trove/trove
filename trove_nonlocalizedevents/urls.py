@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import EventCandidateAutocompleteView
+from .views import EventCandidateAutocompleteView, generate_report
 
 app_name = "trove_nonlocalizedevents"
 
@@ -9,5 +9,5 @@ urlpatterns = [
         EventCandidateAutocompleteView.as_view(),
         name="eventcandidate-autocomplete",
     ),
-    # ... other urls
+    path("generate-report/", generate_report, name="generate-report"),
 ]
