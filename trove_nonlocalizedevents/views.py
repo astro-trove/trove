@@ -1,10 +1,16 @@
 from django_filters.views import FilterView
 from django.core.cache import cache
 from django.core.paginator import Paginator
+from django.shortcuts import redirect
+from django.urls import reverse
 from trove_targets.models import Target
 from tom_targets.permissions import targets_for_user
 from tom_nonlocalizedevents.models import EventCandidate
 from candidate_vetting.util import get_event_candidate_scores
+
+from .forms import EventCandidateSearchForm
+
+from dal import autocomplete
 
 
 class EventCandidateListView(FilterView):
@@ -34,6 +40,7 @@ class EventCandidateListView(FilterView):
                     self.request.user, Target.objects.all(), "view_target"
                 )
             )
+            .select_related("target", "nonlocalizedevent")
         )
 
         # Filter by nonlocalizedevent if provided in URL
@@ -52,10 +59,9 @@ class EventCandidateListView(FilterView):
 
         # Check cache first
         scored_candidates = cache.get(cache_key)
-
         if scored_candidates is None:
             # Not in cache—score all candidates
-            all_candidates = self.get_queryset()
+            all_candidates = self.filterset.qs
             scored_candidates = get_event_candidate_scores(all_candidates)
             # Cache for 5 minutes
             cache.set(cache_key, scored_candidates, 60 * 5)
@@ -68,4 +74,38 @@ class EventCandidateListView(FilterView):
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
 
+        nle_id = self.request.GET.get("nonlocalizedevent")
+        context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
+
         return context
+
+    def get(self, request, *args, **kwargs):
+        print(f"DEBUG: request.GET={request.GET}")
+        candidate_id = request.GET.get("target_name")
+        print(f"DEBUG: candidate_id={candidate_id}")
+        if candidate_id:
+            try:
+                candidate = EventCandidate.objects.select_related(
+                    "target", "nonlocalizedevent"
+                ).get(pk=candidate_id)
+                return redirect(
+                    reverse("targets:detail", args=[candidate.target.id])
+                    + f"?nonlocalizedevent={candidate.nonlocalizedevent.event_id}"
+                )
+            except (EventCandidate.DoesNotExist, ValueError):
+                pass
+        return super().get(request, *args, **kwargs)
+
+
+class EventCandidateAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        nle_id = self.request.GET.get("nonlocalizedevent")
+        qs = EventCandidate.objects.all()
+        if nle_id:
+            qs = qs.filter(nonlocalizedevent_id=nle_id)
+
+        if self.q:
+            # Simple case-insensitive search on the name field
+            qs = qs.filter(target__name__icontains=self.q)
+
+        return qs

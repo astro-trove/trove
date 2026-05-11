@@ -24,6 +24,8 @@ from candidate_vetting.vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from candidate_vetting.vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from candidate_vetting.vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 
+import time
+
 # map imported parameter ranges to transients
 TRANSIENTS = ["KN", "KN-in-SN", "super-KN"]
 DICT_TRANSIENTS_PARAM_RANGES = {
@@ -92,6 +94,9 @@ def get_event_candidate_scores(
 
     event_candidates should be a django queryset of EventCandidate objects
     """
+
+    print(f"Prefetching all event candidate queries", time.time())
+
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
 
@@ -133,6 +138,7 @@ def get_event_candidate_scores(
             score_factors_by_ec[ec_id] = {}
         score_factors_by_ec[ec_id][sf.key] = sf.value_float
 
+    print(f"Computing the score for all the event candidates")
     ecs_out = []
     for ec in event_candidates_list:
         # set ec.score to be a dictionary mapping transient : score
@@ -141,13 +147,7 @@ def get_event_candidate_scores(
         # get all 'subscores' (sometimes actually calculated values)
         # for object; need to re-do this per transient because of step
         # below where we exclude certain scores from the queryset
-        try:
-            sf_dict = score_factors_by_ec[ec.id]
-        except KeyError:
-            # this means no score factors have been computed for this event candidate
-            # this is an edge case, but we should still handle it so the page finishes
-            # loading for the user!
-            sf_dict = {}
+        sf_dict = score_factors_by_ec.get(ec.id, {})
 
         # Extract values that need special handling
         val_dict = {
@@ -157,7 +157,7 @@ def get_event_candidate_scores(
         }
 
         # now get all the scores stored in TargetExtra objects
-        te = target_extras_by_id[ec.target_id]
+        te = target_extras_by_id.get(ec.target_id, {})
         ps_score = 1
         if "ps_score" in te:
             ps_score = float(te["ps_score"])
@@ -194,6 +194,8 @@ def get_event_candidate_scores(
                 subscore_no_phot * phot_score
             )  # multiply the subscores
         ecs_out.append(ec)
+
+    print("Finished computing the scores, sorting and returning...", time.time())
 
     # sort by kilonova score, for now
     ## TODO: generalize this

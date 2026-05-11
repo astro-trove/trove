@@ -1,3 +1,17 @@
+<style>
+  .select2-container {
+    width: 100% !important;
+  }
+  .select2-selection {
+    height: auto !important;
+    min-height: 38px;
+    padding: 4px 8px;
+  }
+  .select2-selection__rendered {
+    line-height: 28px !important;
+  }
+</style>
+
 {% extends 'tom_common/base.html' %}
 {% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
 {% block title %}Candidates{% endblock %}
@@ -8,9 +22,25 @@
 <a href="{% url 'candidate_vetting:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
 <br></br>
 <div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
+<br><br>
 {% else %}
 <h1>Candidates</h1>
 {% endif %}
+
+<div class="row">
+  <form action="" method="get" class="form">
+    {% bootstrap_form eventcandidate_filter_form %}
+    {% buttons %}
+      <button type="submit" class="btn btn-primary">
+	Filter
+      </button>
+      <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" class="btn btn-secondary" title="Reset">Reset</a>
+    {% endbuttons %}
+  </form>
+</div>
+
+<br><br>
+
 <div class="row">
   <div class="col-md-10">
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %} 
@@ -36,7 +66,7 @@
           </td>
           <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
           <td>
-            {% for transient, score in candidate.score.items %}
+	    {% for transient, score in candidate.score.items %}
             {{ transient }} {{score|floatformat:2}}<br>
             {% endfor %}
           </td>
@@ -56,16 +86,8 @@
     </table>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
   </div>
-  <div class="col-md-2">
-    <form action="" method="get" class="form">
-        {% crispy filter.form %}
-      {% buttons %}
-        <button type="submit" class="btn btn-primary">
-          Filter
-        </button>
-        <a href="{% url 'custom_code:event-candidates' %}" class="btn btn-secondary" title="Reset">Reset</a>
-      {% endbuttons %}
-    </form>
-  </div>
 </div>
+
+{{ eventcandidate_filter_form.media }}
+
 {% endblock %}
