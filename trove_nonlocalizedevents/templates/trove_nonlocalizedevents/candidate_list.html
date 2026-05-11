@@ -17,17 +17,16 @@
     <table class="table table-sm table-hover">
       <thead>
         <tr>
-        	  <th>Rank</th>
-        	  <th>Target</th>
+          <th>Rank</th>
+          <th>Target</th>
           <th>Event</th>
           <th>Score</th>
         </tr>
       </thead>
       <tbody>
-	{% get_event_candidate_scores object_list as candidates_to_display %}
-	{% for candidate in candidates_to_display %}
+	{% for candidate in page_obj.object_list %}
         <tr>
-	  <td>{{forloop.counter}}</td>
+	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
 	  <td>
             {% if candidate.target is not None %}
               <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
