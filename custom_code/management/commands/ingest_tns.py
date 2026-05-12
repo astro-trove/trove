@@ -11,6 +11,7 @@ from custom_code.alertstream_handlers import (
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from datetime import datetime, timedelta, timezone
 from custom_code.templatetags.target_extras import split_name
+from candidate_vetting.models import TnsQ3C
 
 # from slack_sdk import WebClient
 import logging
@@ -288,6 +289,7 @@ class Command(BaseCommand):
         )
         tns_names = [q.name_prefix + q.name for q in list(recent_tns_transients)]
         targets_to_vet = Target.objects.filter(name__in=tns_names)
+        print(f"Vetting {len(tns_names)} targets from TNS, this might take a bit...")
         for trove_target in targets_to_vet:
             vet_or_post_error(
                 trove_target,
