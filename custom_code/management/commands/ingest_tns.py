@@ -3,42 +3,76 @@ from django.conf import settings
 from django.db import connection
 from trove_targets.models import Target
 from tom_targets.models import BaseTarget
-from custom_code.alertstream_handlers import pick_slack_channel, send_slack, vet_or_post_error
+from custom_code.alertstream_handlers import (
+    pick_slack_channel,
+    send_slack,
+    vet_or_post_error,
+)
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from datetime import datetime, timedelta, timezone
 from custom_code.templatetags.target_extras import split_name
-#from slack_sdk import WebClient
-import numpy as np
-import json
+
+# from slack_sdk import WebClient
 import logging
 
 from astropy.coordinates import SkyCoord
 from healpix_alchemy.constants import HPX
 
 logger = logging.getLogger(__name__)
-new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
+new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-#slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
-#slack_tns50 = WebClient(settings.SLACK_TOKEN_TNS50)
-#slack_ep = WebClient(settings.SLACK_TOKEN_EP)
-        
-class Command(BaseCommand):
+# slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
+# slack_tns50 = WebClient(settings.SLACK_TOKEN_TNS50)
+# slack_ep = WebClient(settings.SLACK_TOKEN_EP)
 
-    help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
+
+class Command(BaseCommand):
+    help = "Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)"
 
     def add_arguments(self, parser):
-        parser.add_argument('--lookback-days-nle', help='Nonlocalized events are considered active for this many days',
-                            type=float, default=7.)
-        parser.add_argument('--lookback-days-obs', help='Associate transients whose first detection was within this '
-                                                        'many days of the nonlocalized event',
-                            type=float, default=3.)
+        parser.add_argument(
+            "--lookback-days-nle",
+            help="Nonlocalized events are considered active for this many days",
+            type=float,
+            default=7.0,
+        )
+        parser.add_argument(
+            "--first-det-max",
+            help="Associate transients whose first detection was within this "
+            "many days of the nonlocalized event",
+            type=float,
+            default=10,
+        )
+        parser.add_argument(
+            "--first-det-min",
+            help="The minimum time since the NLE discovery for a first detection"
+            " to be considered. A negative number (-1 is the default) will"
+            " consider events with a first det. that many days before the NLE discovery.",
+            type=float,
+            default=-1,
+        )
 
-    def handle(self, lookback_days_nle=7., lookback_days_obs=3., **kwargs):
-        
+        parser.add_argument(
+            "--vetting_horizon",
+            help="Any targets with a TNS discovery date of now - vetting_horizon days "
+            "will be re-vet, including grabbing new photometry. The default is 2 weeks.",
+            type=float,
+            default=14,
+        )
+
+    def handle(
+        self,
+        lookback_days_nle=7.0,
+        first_det_max=10,
+        first_det_min=-1,
+        vetting_horizon=14,
+        **kwargs,
+    ):
+
         with connection.cursor() as cursor:
-             cursor.execute("""
+            cursor.execute("""
                  --STEP 0: update coordinates and prefix of existing targets with TNS names
                  UPDATE tom_targets_basetarget AS tt
                  SET name = CONCAT(tns.name_prefix, tns.name),
@@ -51,12 +85,16 @@ class Command(BaseCommand):
                         OR tt.name != CONCAT(tns.name_prefix, tns.name))
                  RETURNING tt.id;
              """)
-             updated_ids = [row[0] for row in cursor.fetchall()]
-             updated_targets_coords = Target.objects.filter(id__in = updated_ids)
-        
-        logger.info(f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS.")
+            updated_ids = [row[0] for row in cursor.fetchall()]
+            updated_targets_coords = Target.objects.filter(id__in=updated_ids)
 
-        logger.info('Crossmatching TNS with targets table. This will take several minutes.')
+        logger.info(
+            f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS."
+        )
+
+        logger.info(
+            "Crossmatching TNS with targets table. This will take several minutes."
+        )
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -100,8 +138,8 @@ class Command(BaseCommand):
                 """
             )
             updated_ids = [row[0] for row in cursor.fetchall()]
-            updated_targets = Target.objects.filter(id__in = updated_ids)
-            
+            updated_targets = Target.objects.filter(id__in=updated_ids)
+
         logger.info(f"Updated {len(updated_targets):d} targets to match the TNS.")
 
         with connection.cursor() as cursor:
@@ -163,22 +201,22 @@ class Command(BaseCommand):
             )
 
         with connection.cursor() as cursor:
-             cursor.execute(
+            cursor.execute(
                 """
                 SELECT old_id FROM targets_to_merge
                 """
-             )
-             ids_to_delete = [row[0] for row in cursor.fetchall()]
+            )
+            ids_to_delete = [row[0] for row in cursor.fetchall()]
 
-        deleted_targets = Target.objects.filter(id__in = ids_to_delete)
+        deleted_targets = Target.objects.filter(id__in=ids_to_delete)
         deleted_targets.delete()
-             
+
         logger.info(f"Merged {len(deleted_targets):d} targets into TNS targets.")
         for target in deleted_targets:
             logger.info(f" - deleted target {target.name} during merge")
 
         with connection.cursor() as cursor:
-             cursor.execute(
+            cursor.execute(
                 """
                 --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
                 INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
@@ -187,11 +225,11 @@ class Command(BaseCommand):
                 ON CONFLICT (name) DO NOTHING
                 RETURNING id;
                 """
-             )
+            )
 
-             new_target_ids = [row[0] for row in cursor.fetchall()]
-             new_targets = Target.objects.filter(id__in = new_target_ids)
-             
+            new_target_ids = [row[0] for row in cursor.fetchall()]
+            new_targets = Target.objects.filter(id__in=new_target_ids)
+
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
         # update the Trove Target table with redshift and classification info from TNS
@@ -212,21 +250,24 @@ class Command(BaseCommand):
                 RETURNING tt.basetarget_ptr_id;
                 """
             )
-            
-            update_target_ids = [row[0] for row in cursor.fetchall()]
-        logger.info(f"Updated {len(update_target_ids):d} targets with classifications and/or redshifts from the TNS.")
 
-            
+            update_target_ids = [row[0] for row in cursor.fetchall()]
+        logger.info(
+            f"Updated {len(update_target_ids):d} targets with classifications and/or redshifts from the TNS."
+        )
+
         # Finally, we need to insert these into the Trove Target table rather than
         # just the TOM BaseTarget table
 
         # these missing_targets should be the ones that are added to the BaseTarget
         # table but not the Trove Targets table
         # note that we will recompute the healpix, etc. below. These are just
-        # temporary placeholders        
-        missing_targets = BaseTarget.objects.filter(target__isnull = True)
-        logger.info(f"Adding {len(missing_targets):d} from basetarget table to trove target table")
-        for basetarget in missing_targets:            
+        # temporary placeholders
+        missing_targets = BaseTarget.objects.filter(target__isnull=True)
+        logger.info(
+            f"Adding {len(missing_targets):d} from basetarget table to trove target table"
+        )
+        for basetarget in missing_targets:
             # create the target with the basetarget ptr
             coord = SkyCoord(basetarget.ra, basetarget.dec, unit="deg")
             with connection.cursor() as cursor:
@@ -241,15 +282,18 @@ class Command(BaseCommand):
                 )
                 """)
 
-            trove_target = Target.objects.filter(
-                basetarget_ptr_id = basetarget.id
-            ).first()
-
-            # then vet this target
+        # now we need to vet all targets from the past vetting_horizon days
+        recent_tns_transients = TnsQ3C.objects.filter(
+            discoverydate__gte=datetime.now() - timedelta(days=vetting_horizon)
+        )
+        tns_names = [q.name_prefix + q.name for q in list(recent_tns_transients)]
+        targets_to_vet = Target.objects.filter(name__in=tns_names)
+        for trove_target in targets_to_vet:
             vet_or_post_error(
                 trove_target,
-                #slack_tns,
-                #channel='alerts-tns',
+                # slack_tns,
+                # channel='alerts-tns',
                 lookback_days_nle=lookback_days_nle,
-                lookback_days_obs=lookback_days_obs
+                first_det_max=first_det_max,
+                first_det_min=first_det_min,
             )

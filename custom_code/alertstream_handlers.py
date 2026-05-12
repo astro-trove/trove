@@ -100,8 +100,9 @@ def vet_or_post_error(
         if tns_query_status is not None:
             logger.warning(tns_query_status)
             #slack_client.chat_postMessage(channel=channel, text=tns_query_status)
-            mjd_now = Time.now().mjd
-            atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
+
+        mjd_now = Time.now().mjd
+        atlas_query.enqueue(mjd_now - 20., mjd_now, target.id, 'atlas_photometry')
 
     except Exception as e:
         logger.error(''.join(traceback.format_exception(e)))

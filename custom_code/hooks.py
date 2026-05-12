@@ -83,7 +83,7 @@ def get_active_nonlocalizedevents(t0=None, lookback_days=3., test=False):
         active_nles = active_nles.exclude(event_id__startswith='MS')
     return active_nles.distinct()
     
-def associate_nle_with_target(target:Target, lookback_days_nle, lookback_days_obs):
+def associate_nle_with_target(target:Target, lookback_days_nle, first_det_min, first_det_max):
     # automatically associate with nonlocalized events
     new_candidates = []
     for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
@@ -91,16 +91,25 @@ def associate_nle_with_target(target:Target, lookback_days_nle, lookback_days_ob
         localization = get_preferred_localization(nle)
         nle_time = datetime.strptime(seq.details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
         target_ids = []
-        first_det = target.reduceddatum_set.filter(data_type='photometry', value__magnitude__isnull=False
-                                                   ).order_by('timestamp').first()
-        if first_det and nle_time < first_det.timestamp < nle_time + timedelta(days=lookback_days_obs):
+        first_det = target.reduceddatum_set.filter(
+            data_type='photometry',
+            value__magnitude__isnull=False
+        ).order_by('timestamp').first()
+
+        
+        
+        if (
+                first_det and
+                nle_time + timedelta(days=first_det_min) < first_det.timestamp and
+                first_det.timestamp < nle_time + timedelta(days=first_det_max)
+        ):
             target_ids.append(target.id)
         
         new_candidates += create_candidates_from_targets(seq, target_ids=target_ids)
 
     return new_candidates
     
-def target_post_save(target, created=True, lookback_days_nle=7, lookback_days_obs=7):
+def target_post_save(target, created=True, lookback_days_nle=7, first_det_min=-1, first_det_max=10):
     """This hook runs following update of a target."""
     logger.info('Target post save hook: %s created: %s', target, created)
 
@@ -124,7 +133,8 @@ def target_post_save(target, created=True, lookback_days_nle=7, lookback_days_ob
         new_candidates = associate_nle_with_target(
             target,
             lookback_days_nle=lookback_days_nle,
-            lookback_days_obs=lookback_days_obs
+            first_det_min=first_det_min,
+            first_det_max=first_det_max
         )
         
         # TODO: add a check for the type of non-localized event
