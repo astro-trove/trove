@@ -1,3 +1,6 @@
+import time
+import numpy as np
+
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import connection
@@ -56,11 +59,19 @@ class Command(BaseCommand):
         )
 
         parser.add_argument(
-            "--vetting_horizon",
+            "--vetting-start-time",
+            help="The start time for vetting, we will vet everything from this time - "
+            "vetting_lookback_horizon to this time",
+            type=datetime,
+            default=datetime.now(),
+        )
+
+        parser.add_argument(
+            "--vetting-lookback-horizon",
             help="Any targets with a TNS discovery date of now - vetting_horizon days "
             "will be re-vet, including grabbing new photometry. The default is 2 weeks.",
             type=float,
-            default=14,
+            default=7,
         )
 
     def handle(
@@ -68,7 +79,8 @@ class Command(BaseCommand):
         lookback_days_nle=7.0,
         first_det_max=10,
         first_det_min=-1,
-        vetting_horizon=14,
+        vetting_start_time=datetime.now(),
+        vetting_lookback_horizon=7,
         **kwargs,
     ):
 
@@ -252,9 +264,9 @@ class Command(BaseCommand):
                 """
             )
 
-            update_target_ids = [row[0] for row in cursor.fetchall()]
+            updated_target_ids = [row[0] for row in cursor.fetchall()]
         logger.info(
-            f"Updated {len(update_target_ids):d} targets with classifications and/or redshifts from the TNS."
+            f"Updated {len(updated_target_ids):d} targets with classifications and/or redshifts from the TNS."
         )
 
         # Finally, we need to insert these into the Trove Target table rather than
@@ -285,12 +297,18 @@ class Command(BaseCommand):
 
         # now we need to vet all targets from the past vetting_horizon days
         recent_tns_transients = TnsQ3C.objects.filter(
-            discoverydate__gte=datetime.now() - timedelta(days=vetting_horizon)
+            discoverydate__gte=datetime.now()
+            - timedelta(days=vetting_lookback_horizon),
+            discoverydate__lte=vetting_start_time,
         )
         tns_names = [q.name_prefix + q.name for q in list(recent_tns_transients)]
         targets_to_vet = Target.objects.filter(name__in=tns_names)
-        print(f"Vetting {len(tns_names)} targets from TNS, this might take a bit...")
-        for trove_target in targets_to_vet:
+        logger.info(
+            f"Vetting {len(tns_names)} targets from TNS, this might take a bit..."
+        )
+        vetting_start = time.time()
+        for ii, trove_target in enumerate(targets_to_vet):
+            single_vetting_start = time.time()
             vet_or_post_error(
                 trove_target,
                 # slack_tns,
@@ -298,4 +316,21 @@ class Command(BaseCommand):
                 lookback_days_nle=lookback_days_nle,
                 first_det_max=first_det_max,
                 first_det_min=first_det_min,
+                # then only vet if there is new photometry and no updates to this target
+                skip_vet_if_no_new_phot=(
+                    trove_target.basetarget_ptr_id
+                    not in updated_target_ids + new_target_ids
+                ),
             )
+            single_vetting_time = time.time() - single_vetting_start
+            logger.info("##########################################################")
+            logger.info(
+                f"({ii + 1}/{len(tns_names)}) Vetting {trove_target.name} took {single_vetting_time:.2f}s"
+            )
+            logger.info("##########################################################")
+
+        total_vetting_time = time.time() - vetting_start
+        logger.info(
+            f"Vetting took {total_vetting_time / 60:.2f}m with an average of "
+            + f"{total_vetting_time / len(tns_names):.2f}s per target"
+        )
