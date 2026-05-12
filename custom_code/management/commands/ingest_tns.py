@@ -321,11 +321,13 @@ class Command(BaseCommand):
                     trove_target.basetarget_ptr_id
                     not in updated_target_ids + new_target_ids
                 ),
+                use_async_mpc=True,
             )
             single_vetting_time = time.time() - single_vetting_start
             logger.info("##########################################################")
             logger.info(
-                f"({ii + 1}/{len(tns_names)}) Vetting {trove_target.name} took {single_vetting_time:.2f}s"
+                f"[{ii + 1}/{len(tns_names)}] Vetting {trove_target.name} took {single_vetting_time:.2f}s. "
+                + f"So far, vetting of TNS transients has taken {(time.time() - vetting_start) / 60:.2f}m"
             )
             logger.info("##########################################################")
 

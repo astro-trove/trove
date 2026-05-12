@@ -129,6 +129,7 @@ def target_post_save(
     first_det_min=-1,
     first_det_max=10,
     skip_vet_if_no_new_phot=False,
+    **kwargs,
 ):
     """This hook runs following update of a target."""
     logger.info("Target post save hook: %s created: %s", target, created)
@@ -149,7 +150,7 @@ def target_post_save(
                 messages.append(f"MW E(B-V) set to {mwebv:.4f}")
 
         # do the "basic" vetting (PS, MPC, Host association)
-        vet_basic(target.id)
+        vet_basic(target.id, **kwargs)
 
         # then check if this target is associated with any NLEs
         new_candidates = associate_nle_with_target(
@@ -168,7 +169,7 @@ def target_post_save(
                 vet_super_kn(cand.target.id, cand.nonlocalizedevent.event_id)
         else:
             messages.append(
-                "Could not run vetting on this target because there are no non-localized events associated with it!"
+                "Did not run NLE vetting on this target because there are no NLEs associated with it!"
             )
 
     redshift = target.targetextra_set.filter(key="Redshift")

@@ -23,7 +23,8 @@ from tom_nonlocalizedevents.models import (
 from .forms import VettingChoiceForm, RedshiftUpdateForm
 from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
 
-from .vet import host_association, vet_all_async, localization_sequence_from_name
+from .vet import host_association, localization_sequence_from_name
+from .tasks import vet_all_async
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .public_catalogs.phot_catalogs import ZTF_Forced_Phot
