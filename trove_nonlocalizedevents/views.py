@@ -58,6 +58,11 @@ class EventCandidateListView(FilterView):
         if nonlocalizedevent_id:
             qs = qs.filter(nonlocalizedevent_id=nonlocalizedevent_id)
 
+        # Filter by target name if provided
+        target_name = self.request.GET.get("target__name")
+        if target_name:
+            qs = qs.filter(target__name__icontains=target_name)
+
         return qs
 
     def get_context_data(self, **kwargs):
@@ -106,20 +111,6 @@ class EventCandidateListView(FilterView):
             except (EventCandidate.DoesNotExist, ValueError):
                 pass
         return super().get(request, *args, **kwargs)
-
-
-class EventCandidateAutocompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        nle_id = self.request.GET.get("nonlocalizedevent")
-        qs = EventCandidate.objects.all()
-        if nle_id:
-            qs = qs.filter(nonlocalizedevent_id=nle_id)
-
-        if self.q:
-            # Simple case-insensitive search on the name field
-            qs = qs.filter(target__name__icontains=self.q)
-
-        return qs
 
 
 class EventCandidateCreateFromNLEView(LoginRequiredMixin, View):
