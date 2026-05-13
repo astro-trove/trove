@@ -5,6 +5,9 @@ from django.core.paginator import Paginator
 from django.shortcuts import redirect
 from django.urls import reverse
 from django.http import JsonResponse
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic.base import View
+
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
@@ -15,7 +18,7 @@ from tom_dataproducts.models import ReducedDatum
 
 from astropy.coordinates import SkyCoord
 
-from .forms import EventCandidateSearchForm
+from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
 
 from dal import autocomplete
 
@@ -83,6 +86,7 @@ class EventCandidateListView(FilterView):
 
         nle_id = self.request.GET.get("nonlocalizedevent")
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
+        context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
 
         return context
 
@@ -116,6 +120,35 @@ class EventCandidateAutocompleteView(autocomplete.Select2QuerySetView):
             qs = qs.filter(target__name__icontains=self.q)
 
         return qs
+
+
+class EventCandidateCreateFromNLEView(LoginRequiredMixin, View):
+    """
+    Handles the form submission and redirects to EventCandidateCreateView
+    """
+
+    def post(self, request, *args, **kwargs):
+        form = CreateEventCandidateFromNLEForm(request.POST)
+
+        if form.is_valid():
+            target_id = (
+                Target.objects.filter(name=form.cleaned_data["target_name_to_link"])
+                .first()
+                .id
+            )
+            event_id = NonLocalizedEvent.objects.get(
+                id=request.GET.get("nonlocalizedevent")
+            ).event_id
+
+            # Redirect to the create-candidate view
+            return redirect(
+                "custom_code:create-candidate",
+                event_id=event_id,
+                target_id=target_id,
+            )
+
+        # If form is invalid, redirect back or re-render
+        return redirect(request.META.get("HTTP_REFERER", "/"))
 
 
 def generate_report(request):

@@ -2,6 +2,7 @@ from django import forms
 from django.urls import reverse
 
 from tom_nonlocalizedevents.models import EventCandidate
+from trove_targets.models import Target
 
 from dal import autocomplete
 
@@ -29,3 +30,18 @@ class EventCandidateSearchForm(forms.Form):
             self.fields["target_name"].queryset = EventCandidate.objects.filter(
                 nonlocalizedevent_id=nle_id
             )
+
+
+class CreateEventCandidateFromNLEForm(forms.Form):
+    target_name_to_link = forms.ModelChoiceField(
+        queryset=Target.objects.all(),  # start with none
+        label="Search for a target to link to this non-localized event:",
+        required=True,
+        widget=autocomplete.ModelSelect2(
+            url="trove_targets:target-autocomplete",
+            attrs={
+                "data-placeholder": "Start typing to search...",
+                "data-minimum-input-length": 1,
+            },
+        ),
+    )

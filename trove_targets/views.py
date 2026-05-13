@@ -20,24 +20,33 @@ logger = logging.getLogger(__name__)
 PERMISSIONS_MAP = {
     "PUBLIC": BaseTarget.Permissions.PUBLIC,
     "PRIVATE": BaseTarget.Permissions.PRIVATE,
-    "OPEN": BaseTarget.Permissions.OPEN
+    "OPEN": BaseTarget.Permissions.OPEN,
 }
 
-class NLEAutocompleteView(autocomplete.Select2QuerySetView):
 
+class NLEAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = NonLocalizedEvent.objects.all()
 
-        print(f"DEBUG: self.q = {self.q}")
-        print(f"DEBUG: queryset count = {qs.count()}")
         if self.q:
             # Simple case-insensitive search on the name field
             qs = qs.filter(event_id__icontains=self.q)
-        
+
         return qs
 
+
+class TargetAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Target.objects.all()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+
+        return qs
+
+
 class CustomTargetCreateView(TargetCreateView):
-    template_name = 'trove_targets/custom_target_create_form.html'
+    template_name = "trove_targets/custom_target_create_form.html"
 
     def get_context_data(self, **kwargs):
         """
@@ -51,19 +60,19 @@ class CustomTargetCreateView(TargetCreateView):
         :rtype: dict
         """
         context = super(CustomTargetCreateView, self).get_context_data(**kwargs)
-        context['type_choices'] = [("SIDEREAL", "Sidereal")] #Target.TARGET_TYPES
-        #context['names_form'] = TargetNamesFormset(initial=[{'name': new_name}
+        context["type_choices"] = [("SIDEREAL", "Sidereal")]  # Target.TARGET_TYPES
+        # context['names_form'] = TargetNamesFormset(initial=[{'name': new_name}
         #                                                    for new_name
         #                                                    in self.request.GET.get('names', '').split(',')])
-        #context['extra_form'] = TargetExtraFormset()
+        # context['extra_form'] = TargetExtraFormset()
 
-        context['target_nle_form'] = TargetNLEForm()
-        
+        context["target_nle_form"] = TargetNLEForm()
+
         return context
 
     def form_valid(self, form):
 
-        # do the normal form_valid from the TOMToolkit TargetCreateView 
+        # do the normal form_valid from the TOMToolkit TargetCreateView
         super(TargetCreateView, self).form_valid(form)
 
         # then also associate this target with the chosen NLE
@@ -72,11 +81,13 @@ class CustomTargetCreateView(TargetCreateView):
         target = self.object
 
         # Get the selected NLE from the POST data
-        nle_id = self.request.POST.get('nle_select')
+        nle_id = self.request.POST.get("nle_select")
 
         if nle_id:
             try:
-                logger.info("Creating an EventCandidate from the user specific target and NLE")
+                logger.info(
+                    "Creating an EventCandidate from the user specific target and NLE"
+                )
                 ec, created = EventCandidate.objects.get_or_create(
                     target=target,
                     nonlocalizedevent=NonLocalizedEvent.objects.get(id=nle_id),
@@ -98,9 +109,9 @@ class CustomTargetCreateView(TargetCreateView):
         self.object.save()
 
         # Run the target post save hook
-        logger.info('Target post save hook: %s created: %s', target, True)
-        run_hook('target_post_save', target=target, created=True)
-        
+        logger.info("Target post save hook: %s created: %s", target, True)
+        run_hook("target_post_save", target=target, created=True)
+
         return redirect(self.get_success_url())
 
     def get_form_class(self):
@@ -108,6 +119,6 @@ class CustomTargetCreateView(TargetCreateView):
         print("ORIGINAL FORM CLASS:", form_class)
         if issubclass(form_class, SiderealTargetCreateForm):
             form_class = CustomSiderealTargetCreateForm
-            
+
         print("Returning", form_class, form_class._meta.fields)
         return form_class

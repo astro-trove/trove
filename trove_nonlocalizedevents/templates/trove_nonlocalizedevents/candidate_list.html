@@ -58,18 +58,31 @@
 </div>
 
 <div class="row">
-  <form action="" method="get" class="form">
-    {% bootstrap_form eventcandidate_filter_form %}
-    {% buttons %}
+  <div class="col">
+    <form action="" method="get" class="form">
+      {% bootstrap_form eventcandidate_filter_form %}
+      {% buttons %}
       <button type="submit" class="btn btn-primary">
 	Filter
       </button>
       <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" class="btn btn-secondary" title="Reset">Reset</a>
-    {% endbuttons %}
-  </form>
+      {% endbuttons %}
+    </form>
+  </div>
+  <div class="col">
+    <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form">
+      {% csrf_token %}
+      {% bootstrap_form eventcandidate_create_form %}
+      {% buttons %}
+      <button type="submit" class="btn btn-primary">
+	Link Target
+      </button>
+      {% endbuttons %}
+    </form>
+  </div>
 </div>
 
-<br><br>
+<br>
 
 <div class="row">
   <div class="col-md-10">
