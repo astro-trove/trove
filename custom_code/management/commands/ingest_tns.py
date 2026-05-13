@@ -69,9 +69,10 @@ class Command(BaseCommand):
         parser.add_argument(
             "--vetting-lookback-horizon",
             help="Any targets with a TNS discovery date of now - vetting_horizon days "
-            "will be re-vet, including grabbing new photometry. The default is 2 weeks.",
+            "will be re-vet, including grabbing new photometry. The default is None "
+            "which just vets new transients from TNS",
             type=float,
-            default=7,
+            default=None,
         )
 
     def handle(
@@ -80,7 +81,7 @@ class Command(BaseCommand):
         first_det_max=10,
         first_det_min=-1,
         vetting_start_time=datetime.now(),
-        vetting_lookback_horizon=7,
+        vetting_lookback_horizon=None,
         **kwargs,
     ):
 
@@ -234,7 +235,11 @@ class Command(BaseCommand):
                 --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
                 INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
                 SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, ''
-                FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate of AT2016jlf in the TNS
+                FROM tns_q3c
+                WHERE name_prefix != 'FRB' AND
+                      name != '2023hzc' AND -- this is a duplicate of AT2016jlf in the TNS
+                      CONCAT(name_prefix, name) NOT IN (SELECT name FROM tom_targets_basetarget)
+                
                 ON CONFLICT (name) DO NOTHING
                 RETURNING id;
                 """
@@ -250,16 +255,21 @@ class Command(BaseCommand):
             cursor.execute(
                 """
                 -- Step 5: Update the trove_targets_target table with redshift and classifications from TNS
-                UPDATE trove_targets_target AS tt
-                  SET redshift = tns.redshift,
-                      classification = tns.objtype
-                  FROM tns_q3c AS tns
+                WITH mismatched_targets AS (
+                  SELECT DISTINCT tt.basetarget_ptr_id, tns.redshift, tns.objtype
+                  FROM trove_targets_target AS tt
                   INNER JOIN tom_targets_basetarget AS bt
-                  ON tns.name = REGEXP_REPLACE(bt.name, '^[^0-9]*', '')
-                  WHERE bt.id = tt.basetarget_ptr_id AND (
-                      tt.redshift IS NULL OR
-                      tt.redshift = 'nan'
-                  )
+                    ON bt.id = tt.basetarget_ptr_id
+                  INNER JOIN tns_q3c AS tns
+                    ON tns.name = REGEXP_REPLACE(bt.name, '^[^0-9]*', '')
+                  WHERE tt.redshift IS DISTINCT FROM tns.redshift
+                    OR tt.classification IS DISTINCT FROM tns.objtype
+                )
+                UPDATE trove_targets_target AS tt
+                SET redshift = mt.redshift,
+                    classification = mt.objtype
+                FROM mismatched_targets AS mt
+                WHERE tt.basetarget_ptr_id = mt.basetarget_ptr_id
                 RETURNING tt.basetarget_ptr_id;
                 """
             )
@@ -277,6 +287,7 @@ class Command(BaseCommand):
         # note that we will recompute the healpix, etc. below. These are just
         # temporary placeholders
         missing_targets = BaseTarget.objects.filter(target__isnull=True)
+        missing_target_ids = [t.id for t in missing_targets]
         logger.info(
             f"Adding {len(missing_targets):d} from basetarget table to trove target table"
         )
@@ -296,16 +307,24 @@ class Command(BaseCommand):
                 """)
 
         # now we need to vet all targets from the past vetting_horizon days
-        recent_tns_transients = TnsQ3C.objects.filter(
-            discoverydate__gte=datetime.now()
-            - timedelta(days=vetting_lookback_horizon),
-            discoverydate__lte=vetting_start_time,
+        new_or_updated = list(
+            # the set here just takes the unique set of these lists to make sure we
+            # don't vet more than necessary
+            set(updated_target_ids + new_target_ids + missing_target_ids)
         )
-        tns_names = [q.name_prefix + q.name for q in list(recent_tns_transients)]
-        targets_to_vet = Target.objects.filter(name__in=tns_names)
-        logger.info(
-            f"Vetting {len(tns_names)} targets from TNS, this might take a bit..."
-        )
+        if vetting_lookback_horizon is not None:
+            recent_tns_transients = TnsQ3C.objects.filter(
+                discoverydate__gte=datetime.now()
+                - timedelta(days=vetting_lookback_horizon),
+                discoverydate__lte=vetting_start_time,
+            )
+            tns_names = [q.name_prefix + q.name for q in list(recent_tns_transients)]
+            targets_to_vet = Target.objects.filter(name__in=tns_names)
+        else:
+            targets_to_vet = Target.objects.filter(basetarget_ptr_id__in=new_or_updated)
+
+        nvet = targets_to_vet.count()
+        logger.info(f"Vetting {nvet} targets from TNS, this might take a bit...")
         vetting_start = time.time()
         for ii, trove_target in enumerate(targets_to_vet):
             single_vetting_start = time.time()
@@ -318,15 +337,14 @@ class Command(BaseCommand):
                 first_det_min=first_det_min,
                 # then only vet if there is new photometry and no updates to this target
                 skip_vet_if_no_new_phot=(
-                    trove_target.basetarget_ptr_id
-                    not in updated_target_ids + new_target_ids
+                    trove_target.basetarget_ptr_id not in new_or_updated
                 ),
                 use_async_mpc=True,
             )
             single_vetting_time = time.time() - single_vetting_start
             logger.info("##########################################################")
             logger.info(
-                f"[{ii + 1}/{len(tns_names)}] Vetting {trove_target.name} took {single_vetting_time:.2f}s. "
+                f"[{ii + 1}/{nvet}] Vetting {trove_target.name} took {single_vetting_time:.2f}s. "
                 + f"So far, vetting of TNS transients has taken {(time.time() - vetting_start) / 60:.2f}m"
             )
             logger.info("##########################################################")
@@ -334,5 +352,5 @@ class Command(BaseCommand):
         total_vetting_time = time.time() - vetting_start
         logger.info(
             f"Vetting took {total_vetting_time / 60:.2f}m with an average of "
-            + f"{total_vetting_time / len(tns_names):.2f}s per target"
+            + f"{total_vetting_time / nvet:.2f}s per target"
         )
