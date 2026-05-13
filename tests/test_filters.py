@@ -68,38 +68,15 @@ class TestLocalizationField:
             
             assert result == []
 
+class TestLocalizationFilterMethods:
+    """Tests for LocalizationFilter methods."""
+    ### TODO
+    ### test that the LocalizationFilter.filter() method behaves as expected
 
 class TestNonLocalizedEventFilterMethods:
     """Tests for NonLocalizedEventFilter static methods."""
-
-    def test_last_sequence_filter_far_conversion(self):
-        """Test that FAR values are correctly converted from yr to 1/Hz."""
-        far_yr = 1.0
-        expected_hz = 3.168808781402895e-08 / far_yr
-        
-        name_parts = ['details', 'far', 'lte']
-        if name_parts[-2] == 'far':
-            converted = 3.168808781402895e-08 / float(far_yr)
-        
-        assert abs(converted - expected_hz) < 1e-15
-
-    def test_last_sequence_filter_percent_conversion(self):
-        """Test that percentage values are correctly converted to decimal."""
-        percent_value = 50.0
-        expected_decimal = 0.50
-        
-        converted = 0.01 * float(percent_value)
-        
-        assert converted == expected_decimal
-
-    def test_far_conversion_formula(self):
-        """Test the FAR Hz to yr conversion constant."""
-        seconds_per_year = 365.25 * 24 * 3600
-        expected_constant = 1 / seconds_per_year
-        actual_constant = 3.168808781402895e-08
-        
-        assert abs(actual_constant - expected_constant) < 1e-15
-
+    ### TODO
+    ### test that the NonlocalizedEventFilter.last_sequence_filter() static method behaves as expected
 
 class TestAlertStreamHandlers:
     """Tests for alert stream handler functions."""
