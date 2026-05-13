@@ -468,11 +468,6 @@ def host_association(
         df = cat.to_standardized_catalog(df)
 
         # some extra cleaning before continuing
-        if "z" in df:
-            # we only need to do this if the redshift is in the dataframe
-            # if it isn't then that's fine because it means the catalog we are using
-            # had a derived distance in it already!
-            df = df[df.z > 0.02]  # otherwise it probably isn't a real redshift
         df = df.dropna(
             subset=["default_mag", "ra", "dec", "lumdist", "lumdist_err"]
         )  # drop rows without the information we need
