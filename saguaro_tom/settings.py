@@ -26,12 +26,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
-ALLOWED_HOSTS = [ALLOWED_HOST, 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = [ALLOWED_HOST, "localhost", "127.0.0.1"]
 
 
 # Application definition
 
-TOM_NAME = 'TROVE'
+TOM_NAME = "TROVE"
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -72,50 +72,50 @@ INSTALLED_APPS = [
     'dal_select2'
 ]
 
-SITE_ID=1
+SITE_ID = 1
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'tom_common.middleware.Raise403Middleware',
-    'tom_common.middleware.ExternalServiceMiddleware',
-    'tom_common.middleware.AuthStrategyMiddleware',
-    'tom_registration.middleware.RedirectAuthenticatedUsersFromRegisterMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "tom_common.middleware.Raise403Middleware",
+    "tom_common.middleware.ExternalServiceMiddleware",
+    "tom_common.middleware.AuthStrategyMiddleware",
+    "tom_registration.middleware.RedirectAuthenticatedUsersFromRegisterMiddleware",
 ]
 
-ROOT_URLCONF = 'saguaro_tom.urls'
+ROOT_URLCONF = "saguaro_tom.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [os.path.join(BASE_DIR, "templates")],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_TEMPLATE_PACK = "bootstrap4"
 
-WSGI_APPLICATION = 'saguaro_tom.wsgi.application'
+WSGI_APPLICATION = "saguaro_tom.wsgi.application"
 
 TASKS = {
     "default": {
         "BACKEND": "django_tasks.backends.database.DatabaseBackend",
-        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_all"]
+        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_all"],
     }
 }
 
@@ -123,51 +123,51 @@ TASKS = {
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': os.getenv('POSTGRES_DB', POSTGRES_DB),
-        'USER': os.getenv('POSTGRES_USER', POSTGRES_USER),
-        'PASSWORD': os.getenv('POSTGRES_PASSWORD', POSTGRES_PASSWORD),
-        'HOST': os.getenv('POSTGRES_HOST', POSTGRES_HOST),
-        'PORT': os.getenv('POSTGRES_PORT', int(POSTGRES_PORT)),
+    "default": {
+        "ENGINE": "django.db.backends.postgresql_psycopg2",
+        "NAME": os.getenv("POSTGRES_DB", POSTGRES_DB),
+        "USER": os.getenv("POSTGRES_USER", POSTGRES_USER),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
+        "HOST": os.getenv("POSTGRES_HOST", POSTGRES_HOST),
+        "PORT": os.getenv("POSTGRES_PORT", int(POSTGRES_PORT)),
     }
 }
 
-DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
-LOGIN_URL = FORCE_SCRIPT_NAME + '/accounts/login/'
-LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + '/'
-LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + '/'
+LOGIN_URL = FORCE_SCRIPT_NAME + "/accounts/login/"
+LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + "/"
+LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + "/"
 
 AUTHENTICATION_BACKENDS = (
-    'django.contrib.auth.backends.AllowAllUsersModelBackend',
-    'guardian.backends.ObjectPermissionBackend',
+    "django.contrib.auth.backends.AllowAllUsersModelBackend",
+    "guardian.backends.ObjectPermissionBackend",
 )
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -175,104 +175,101 @@ USE_L10N = False
 
 USE_TZ = True
 
-DATETIME_FORMAT = 'Y-m-d H:i:s'
-DATE_FORMAT = 'Y-m-d'
+DATETIME_FORMAT = "Y-m-d H:i:s"
+DATE_FORMAT = "Y-m-d"
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
-WHITENOISE_STATIC_PREFIX = '/static/'  # TODO: delete this when whitenoise Issue #271 is resolved
-STATIC_URL = FORCE_SCRIPT_NAME + '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, '_static')
-STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-MEDIA_ROOT = os.path.join(BASE_DIR, 'data')
-MEDIA_URL = FORCE_SCRIPT_NAME + '/data/'
+WHITENOISE_STATIC_PREFIX = (
+    "/static/"  # TODO: delete this when whitenoise Issue #271 is resolved
+)
+STATIC_URL = FORCE_SCRIPT_NAME + "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "_static")
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
+MEDIA_ROOT = os.path.join(BASE_DIR, "data")
+MEDIA_URL = FORCE_SCRIPT_NAME + "/data/"
 
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
         }
     },
-    'loggers': {
-        '': {
-            'handlers': ['console'],
-            'level': 'INFO'
-        }
-    }
+    "loggers": {"": {"handlers": ["console"], "level": "INFO"}},
 }
 
 # Caching
 # https://docs.djangoproject.com/en/dev/topics/cache/#filesystem-caching
 
 CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
-        'LOCATION': tempfile.gettempdir()
+    "default": {
+        "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
+        "LOCATION": tempfile.gettempdir(),
     }
 }
 
 # TOM Specific configuration
-TARGET_TYPE = 'SIDEREAL'
+TARGET_TYPE = "SIDEREAL"
 
 FACILITIES = {}
 
 SINGLE_TARGET_DATA_SERVICES = {
-    'ATLAS': {
-        'class': 'custom_code.atlas.CustomAtlasForcedPhotometryService',
-        'url': "https://fallingstar-data.com/forcedphot",
-        'api_key': os.getenv('ATLAS_FORCED_PHOTOMETRY_API_KEY', ATLAS_API_KEY)
+    "ATLAS": {
+        "class": "custom_code.atlas.CustomAtlasForcedPhotometryService",
+        "url": "https://fallingstar-data.com/forcedphot",
+        "api_key": os.getenv("ATLAS_FORCED_PHOTOMETRY_API_KEY", ATLAS_API_KEY),
     },
 }
 
 # Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
 # longer be valid, and may cause issues unless the offending records are modified.
 DATA_PRODUCT_TYPES = {
-    'photometry': ('photometry', 'Photometry'),
-    'fits_file': ('fits_file', 'FITS File'),
-    'spectroscopy': ('spectroscopy', 'Spectroscopy'),
-    'image_file': ('image_file', 'Image File'),
-    'atlas_photometry': ('atlas_photometry', 'ATLAS Photometry'),
+    "photometry": ("photometry", "Photometry"),
+    "fits_file": ("fits_file", "FITS File"),
+    "spectroscopy": ("spectroscopy", "Spectroscopy"),
+    "image_file": ("image_file", "Image File"),
+    "atlas_photometry": ("atlas_photometry", "ATLAS Photometry"),
 }
 
 DATA_PROCESSORS = {
-    'photometry': 'tom_dataproducts.processors.photometry_processor.PhotometryProcessor',
-    'spectroscopy': 'custom_code.processors.spectroscopy_processor.SpectroscopyProcessor',
+    "photometry": "tom_dataproducts.processors.photometry_processor.PhotometryProcessor",
+    "spectroscopy": "custom_code.processors.spectroscopy_processor.SpectroscopyProcessor",
     # TODO: custom processor for ATLAS forced photometry
 }
 
 TOM_ALERT_CLASSES = [
-    'tom_alerts.brokers.alerce.ALeRCEBroker',
-    'tom_alerts.brokers.antares.ANTARESBroker',
-    'tom_alerts.brokers.gaia.GaiaBroker',
-    'tom_alerts.brokers.hermes.HermesBroker',
-    'tom_alerts.brokers.lasair.LasairBroker',
-    'tom_alerts.brokers.scout.ScoutBroker',
-    'tom_alerts.brokers.tns.TNSBroker',
-    'tom_alerts.brokers.fink.FinkBroker',
+    "tom_alerts.brokers.alerce.ALeRCEBroker",
+    "tom_alerts.brokers.antares.ANTARESBroker",
+    "tom_alerts.brokers.gaia.GaiaBroker",
+    "tom_alerts.brokers.hermes.HermesBroker",
+    "tom_alerts.brokers.lasair.LasairBroker",
+    "tom_alerts.brokers.scout.ScoutBroker",
+    "tom_alerts.brokers.tns.TNSBroker",
+    "tom_alerts.brokers.fink.FinkBroker",
 ]
 
 BROKERS = {
-    'TNS': {
-        'api_key': TNS_API_KEY,
-        'bot_id': '197798',
-        'bot_name': 'TROVE_Bot1',
+    "TNS": {
+        "api_key": TNS_API_KEY,
+        "bot_id": "197798",
+        "bot_name": "TROVE_Bot1",
     }
 }
 
 TOM_HARVESTER_CLASSES = [
-    'tom_catalogs.harvesters.simbad.SimbadHarvester',
-    'tom_catalogs.harvesters.ned.NEDHarvester',
-    'tom_catalogs.harvesters.jplhorizons.JPLHorizonsHarvester',
-    'tom_catalogs.harvesters.tns.TNSHarvester',
+    "tom_catalogs.harvesters.simbad.SimbadHarvester",
+    "tom_catalogs.harvesters.ned.NEDHarvester",
+    "tom_catalogs.harvesters.jplhorizons.JPLHorizonsHarvester",
+    "tom_catalogs.harvesters.tns.TNSHarvester",
 ]
 
 HARVESTERS = {
-    'TNS': {
-        'api_key': TNS_API_KEY,
+    "TNS": {
+        "api_key": TNS_API_KEY,
     }
 }
 
@@ -286,14 +283,14 @@ HARVESTERS = {
 #     {'name': 'dicovery_date', 'type': 'datetime'}
 # ]
 EXTRA_FIELDS = [
-    {'name': 'Classification', 'type': 'string'},
-    {'name': 'Redshift', 'type': 'number'},
-    {'name': 'MW E(B-V)', 'type': 'number'},
+    {"name": "Classification", "type": "string"},
+    {"name": "Redshift", "type": "number"},
+    {"name": "MW E(B-V)", "type": "number"},
 ]
 
 # Authentication strategy can either be LOCKED (required login for all views)
 # or READ_ONLY (read only access to views)
-AUTH_STRATEGY = 'READ_ONLY'
+AUTH_STRATEGY = "READ_ONLY"
 
 # Row-level data permissions restrict users from viewing certain objects unless they are a member of the group to which
 # the object belongs. Setting this value to True will allow all `ObservationRecord`, `DataProduct`, and `ReducedDatum`
@@ -307,22 +304,22 @@ TARGET_DEFAULT_PERMISSION = 'PUBLIC'
 
 # URLs that should be allowed access even with AUTH_STRATEGY = LOCKED
 # for example: OPEN_URLS = ['/', '/about']
-OPEN_URLS = ['/accounts/register/']
+OPEN_URLS = ["/accounts/register/"]
 
 HOOKS = {
-    'target_post_save': 'custom_code.hooks.target_post_save',
-    'observation_change_state': 'tom_common.hooks.observation_change_state',
-    'data_product_post_upload': 'tom_dataproducts.hooks.data_product_post_upload',
-    'data_product_post_save': 'tom_dataproducts.hooks.data_product_post_save',
-    'multiple_data_products_post_save': 'tom_dataproducts.hooks.multiple_data_products_post_save',
+    "target_post_save": "custom_code.hooks.target_post_save",
+    "observation_change_state": "tom_common.hooks.observation_change_state",
+    "data_product_post_upload": "tom_dataproducts.hooks.data_product_post_upload",
+    "data_product_post_save": "tom_dataproducts.hooks.data_product_post_save",
+    "multiple_data_products_post_save": "tom_dataproducts.hooks.multiple_data_products_post_save",
 }
 
 DATA_SHARING = {
-    'tom-demo': {
-        'DISPLAY_NAME': os.getenv('TOM_DEMO_DISPLAY_NAME', 'TOM Demo'),
-        'BASE_URL': os.getenv('TOM_DEMO_BASE_URL', 'https://tom-demo.lco.global/'),
-        'USERNAME': os.getenv('TOM_DEMO_USERNAME', 'guest'),
-        'PASSWORD': os.getenv('TOM_DEMO_PASSWORD', 'guest'),
+    "tom-demo": {
+        "DISPLAY_NAME": os.getenv("TOM_DEMO_DISPLAY_NAME", "TOM Demo"),
+        "BASE_URL": os.getenv("TOM_DEMO_BASE_URL", "https://tom-demo.lco.global/"),
+        "USERNAME": os.getenv("TOM_DEMO_USERNAME", "guest"),
+        "PASSWORD": os.getenv("TOM_DEMO_PASSWORD", "guest"),
     },
 }
 
@@ -336,59 +333,55 @@ HINTS_ENABLED = True
 HINT_LEVEL = 20
 
 REST_FRAMEWORK = {
-    'DEFAULT_PERMISSION_CLASSES': [
-    ],
-    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.LimitOffsetPagination',
-    'PAGE_SIZE': 100
+    "DEFAULT_PERMISSION_CLASSES": [],
+    "TEST_REQUEST_DEFAULT_FORMAT": "json",
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": 100,
 }
 
 ALERT_STREAMS = [
     {
-        'ACTIVE': True,
-        'NAME': 'tom_alertstreams.alertstreams.hopskotch.HopskotchAlertStream',
-        'OPTIONS': {
-            'URL': 'kafka://kafka.scimma.org/',
-            'GROUP_ID': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME)
-                        + '-' + os.getenv('HOPSKOTCH_GROUP_ID', HOPSKOTCH_GROUP_ID),
-            'USERNAME': os.getenv('SCIMMA_AUTH_USERNAME', SCIMMA_AUTH_USERNAME),
-            'PASSWORD': os.getenv('SCIMMA_AUTH_PASSWORD', SCIMMA_AUTH_PASSWORD),
-            'TOPIC_HANDLERS': {
-                'gcn.notices.einstein_probe.wxt.alert': 'custom_code.alertstream_handlers.handle_einstein_probe_alert',
-                'igwn.gwalert': 'custom_code.alertstream_handlers.handle_message_and_send_alerts',
-                'icecube.HE-tracks': 'tom_alertstreams.alertstreams.hopskotch.alert_logger',
+        "ACTIVE": True,
+        "NAME": "tom_alertstreams.alertstreams.hopskotch.HopskotchAlertStream",
+        "OPTIONS": {
+            "URL": "kafka://kafka.scimma.org/",
+            "GROUP_ID": os.getenv("SCIMMA_AUTH_USERNAME", SCIMMA_AUTH_USERNAME)
+            + "-"
+            + os.getenv("HOPSKOTCH_GROUP_ID", HOPSKOTCH_GROUP_ID),
+            "USERNAME": os.getenv("SCIMMA_AUTH_USERNAME", SCIMMA_AUTH_USERNAME),
+            "PASSWORD": os.getenv("SCIMMA_AUTH_PASSWORD", SCIMMA_AUTH_PASSWORD),
+            "TOPIC_HANDLERS": {
+                "gcn.notices.einstein_probe.wxt.alert": "custom_code.alertstream_handlers.handle_einstein_probe_alert",
+                "igwn.gwalert": "custom_code.alertstream_handlers.handle_message_and_send_alerts",
+                "icecube.HE-tracks": "tom_alertstreams.alertstreams.hopskotch.alert_logger",
             },
         },
     },
 ]
 
-VUE_FRONTEND_DIR_TOM_NONLOCAL = os.path.join(STATIC_ROOT, 'tom_nonlocalizedevents/vue')
+VUE_FRONTEND_DIR_TOM_NONLOCAL = os.path.join(STATIC_ROOT, "tom_nonlocalizedevents/vue")
 WEBPACK_LOADER = {
-    'TOM_NONLOCALIZEDEVENTS': {
-        'CACHE': not DEBUG,
-        'BUNDLE_DIR_NAME': 'tom_nonlocalizedevents/vue/',  # must end with slash
-        'STATS_FILE': os.path.join(VUE_FRONTEND_DIR_TOM_NONLOCAL, 'webpack-stats.json'),
-        'POLL_INTERVAL': 0.1,
-        'TIMEOUT': None,
-        'IGNORE': [r'.+\.hot-update.js', r'.+\.map']
+    "TOM_NONLOCALIZEDEVENTS": {
+        "CACHE": not DEBUG,
+        "BUNDLE_DIR_NAME": "tom_nonlocalizedevents/vue/",  # must end with slash
+        "STATS_FILE": os.path.join(VUE_FRONTEND_DIR_TOM_NONLOCAL, "webpack-stats.json"),
+        "POLL_INTERVAL": 0.1,
+        "TIMEOUT": None,
+        "IGNORE": [r".+\.hot-update.js", r".+\.map"],
     }
 }
-TOM_API_URL = os.getenv('TOM_API_URL', os.path.join(ALLOWED_HOST, FORCE_SCRIPT_NAME))
-HERMES_API_URL = os.getenv('HERMES_API_URL', 'https://hermes.lco.global')
-CREDIBLE_REGION_PROBABILITIES = '[0.25, 0.5, 0.75, 0.9, 0.95]'
+TOM_API_URL = os.getenv("TOM_API_URL", os.path.join(ALLOWED_HOST, FORCE_SCRIPT_NAME))
+HERMES_API_URL = os.getenv("HERMES_API_URL", "https://hermes.lco.global")
+CREDIBLE_REGION_PROBABILITIES = "[0.25, 0.5, 0.75, 0.9, 0.95]"
 
-TARGET_MODEL_CLASS = 'trove_targets.models.Target'
+TARGET_MODEL_CLASS = "trove_targets.models.Target"
 
 # Choose a consistent cosmology
-COSMO = FlatLambdaCDM(
-    H0 = 69.6 * _u.km / _u.s / _u.Mpc,
-    Tcmb0 = 2.725 * _u.K,
-    Om0 = 0.3
-)
+COSMO = FlatLambdaCDM(H0=69.6 * _u.km / _u.s / _u.Mpc, Tcmb0=2.725 * _u.K, Om0=0.3)
 
 # dust maps for Milky Way extinction
-os.environ['DUSTMAPS_CONFIG_FNAME'] = os.path.join(BASE_DIR, '.dustmapsrc')
-with warnings.catch_warnings(action='ignore'):
+os.environ["DUSTMAPS_CONFIG_FNAME"] = os.path.join(BASE_DIR, ".dustmapsrc")
+with warnings.catch_warnings(action="ignore"):
     from dustmaps import sfd
 
 try:
@@ -397,18 +390,20 @@ except FileNotFoundError:
     sfd.fetch()
     sfd_query = sfd.SFDQuery()
 
+
 def sf11(*args):
     return 0.86 * sfd_query(*args)
+
 
 DUST_MAP = sf11
 COMMENTS_ENABLED = False
 
 TOM_REGISTRATION = {
-    'REGISTRATION_AUTHENTICATION_BACKEND': 'django.contrib.auth.backends.AllowAllUsersModelBackend',
-    'REGISTRATION_REDIRECT_PATTERN': 'home',
-    'REGISTRATION_STRATEGY': 'approval_required',
-    'SEND_APPROVAL_EMAILS': True,
-    'APPROVAL_SUBJECT': f'Congratulations!! Welcome to {TOM_NAME}!',
+    "REGISTRATION_AUTHENTICATION_BACKEND": "django.contrib.auth.backends.AllowAllUsersModelBackend",
+    "REGISTRATION_REDIRECT_PATTERN": "home",
+    "REGISTRATION_STRATEGY": "approval_required",
+    "SEND_APPROVAL_EMAILS": True,
+    "APPROVAL_SUBJECT": f"Congratulations!! Welcome to {TOM_NAME}!",
 }
 
 # for ZTF forced photometry, we need to save the logs to a temporary directory

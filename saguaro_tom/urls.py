@@ -13,14 +13,22 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
+
 from django.urls import path, include
 from .api import api
 
 urlpatterns = [
-    path('', include('custom_code.urls')),
+    path("", include("custom_code.urls")),
     path("targets/", include("trove_targets.urls", namespace="trove_targets")),
-    path('', include('tom_common.urls')),
-    path('', include('candidate_vetting.urls')),
-    path('nonlocalizedevents/', include('tom_nonlocalizedevents.urls', namespace='nonlocalizedevents')),
+    path("", include("tom_common.urls")),
+    path("", include("candidate_vetting.urls")),
+    path(
+        "trove_nonlocalizedevents/",
+        include("trove_nonlocalizedevents.urls", namespace="trove_nonlocalizedevents"),
+    ),
+    path(
+        "nonlocalizedevents/",
+        include("tom_nonlocalizedevents.urls", namespace="nonlocalizedevents"),
+    ),
     path("api/", api.urls),
 ]
