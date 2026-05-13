@@ -34,3 +34,4 @@ whitenoise
 trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
 fundamentals
 skypatrol
+django-autocomplete-light

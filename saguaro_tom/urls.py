@@ -19,6 +19,7 @@ from .api import api
 
 urlpatterns = [
     path("", include("custom_code.urls")),
+    path("targets/", include("trove_targets.urls", namespace="trove_targets")),
     path("", include("tom_common.urls")),
     path("", include("candidate_vetting.urls")),
     path(

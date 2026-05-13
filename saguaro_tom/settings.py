@@ -34,42 +34,42 @@ ALLOWED_HOSTS = [ALLOWED_HOST, "localhost", "127.0.0.1"]
 TOM_NAME = "TROVE"
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "whitenoise.runserver_nostatic",
-    "django.contrib.staticfiles",
-    "django.contrib.sites",
-    "django_extensions",
-    "guardian",
-    "tom_common",
-    "django_comments",
-    "bootstrap4",
-    "crispy_forms",
-    "crispy_bootstrap4",
-    "rest_framework",
-    "rest_framework.authtoken",
-    "django_filters",
-    "django_gravatar",
-    "tom_targets",
-    "tom_alerts",
-    "tom_catalogs",
-    "tom_observations",
-    "tom_dataproducts",
-    "tom_alertstreams",
-    "tom_nonlocalizedevents",
-    "tom_registration",
-    "webpack_loader",
-    "custom_code",
-    "django_tasks",
-    "django_tasks.backends.database",
-    "candidate_vetting",
-    "trove_targets",
-    "trove_nonlocalizedevents",
-    "dal",
-    "dal_select2",
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'whitenoise.runserver_nostatic',
+    'django.contrib.staticfiles',
+    'django.contrib.sites',
+    'django_extensions',
+    'guardian',
+    'tom_common',
+    'django_comments',
+    'bootstrap4',
+    'crispy_forms',
+    'crispy_bootstrap4',
+    'rest_framework',
+    'rest_framework.authtoken',
+    'django_filters',
+    'django_gravatar',
+    'tom_targets',
+    'tom_alerts',
+    'tom_catalogs',
+    'tom_observations',
+    'tom_dataproducts',
+    'tom_alertstreams',
+    'tom_nonlocalizedevents',
+    'tom_registration',
+    'webpack_loader',
+    'custom_code',
+    'django_tasks',
+    'django_tasks.backends.database',
+    'candidate_vetting',
+    'trove_targets',
+    'trove_nonlocalizedevents',
+    'dal',
+    'dal_select2'
 ]
 
 SITE_ID = 1
@@ -297,6 +297,10 @@ AUTH_STRATEGY = "READ_ONLY"
 # objects to be seen by everyone. Setting it to False will allow users to specify which groups can access
 # `ObservationRecord`, `DataProduct`, and `ReducedDatum` objects.
 TARGET_PERMISSIONS_ONLY = True
+
+# Default permission for newly created targets. Values can be 'PRIVATE', 'PUBLIC', or 'OPEN'
+# Any new target created will be public (visible by anyone signed in)
+TARGET_DEFAULT_PERMISSION = 'PUBLIC'
 
 # URLs that should be allowed access even with AUTH_STRATEGY = LOCKED
 # for example: OPEN_URLS = ['/', '/about']

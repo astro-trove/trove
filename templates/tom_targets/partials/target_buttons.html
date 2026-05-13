@@ -1,16 +1,26 @@
 {% load targets_extras target_extras %}
 {% with target.name|split_name as name %}
+
 {% if name.tns_objname %}
-    <a href="{% url 'custom_code:classify' pk=target.id %}" title="Classify target on TNS" class="btn btn-secondary">Classify</a>
+<a href="{% url 'custom_code:classify' pk=target.id %}" title="Classify target on TNS" class="btn btn-secondary">Classify</a>
+{% comment %}
 {% else %}
-    <a href="{% url 'custom_code:report' pk=target.id %}" title="Report target to TNS" class="btn btn-secondary">Report</a>
+    {% if request.user.is_superuser %}
+        <a href="{% url 'custom_code:report' pk=target.id %}" title="Report target to TNS" class="btn btn-secondary">Report</a>
+	{% endif %}
+{% endcomment %}
 {% endif %}
 {% endwith %}
+
 <a href="{% url 'tom_targets:update' pk=target.id %}" title="Edit target details" class="btn btn-primary">Edit</a>
-{% if sharing %}
+
+{% comment %}
     <a href="{% url 'tom_targets:share' pk=target.id %}" title="Share target" class="btn btn-info">Share</a>
-{% endif %}
-<a href="{% url 'tom_targets:delete' pk=target.id %}" title="Delete target" class="btn btn-danger">Delete</a>
+{% endcomment %}
+
+{# if request.user.is_superuser #}
+    <a href="{% url 'tom_targets:delete' pk=target.id %}" title="Delete target" class="btn btn-danger">Delete</a>
+{# endif #}
 <a href="{% url 'candidate_vetting:checknewphot' pk=target.id %}" title="Check for new data" class="btn btn-warning">Update Lightcurve</a>
 <a href="{% url 'candidate_vetting:updatez' pk=target.id %}" title="Update a potential host galaxy's redshift" class="btn btn-success">Update Host z</a>
 
