@@ -94,9 +94,9 @@ class TestAlertStreamHandlers:
             'classification': {'BNS': 0.8, 'NSBH': 0.1}
         }
         
-        is_test, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         
-        assert is_test is True
+        assert is_test_alert is True
 
     def test_pick_slack_channel_real_alert(self):
         """Test pick_slack_channel for real alerts."""
@@ -111,9 +111,9 @@ class TestAlertStreamHandlers:
             'classification': {'BNS': 0.8, 'NSBH': 0.1}
         }
         
-        is_test, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         
-        assert is_test is False
+        assert is_test_alert is False
 
     def test_pick_slack_channel_subthreshold(self):
         """Test pick_slack_channel for subthreshold alerts."""
@@ -128,7 +128,7 @@ class TestAlertStreamHandlers:
             'classification': {'BNS': 0.3, 'NSBH': 0.1}
         }
         
-        is_test, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         
         assert is_significant is False
 
@@ -145,7 +145,7 @@ class TestAlertStreamHandlers:
             'classification': {}
         }
         
-        is_test, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         
         assert is_burst is True
 
@@ -162,7 +162,7 @@ class TestAlertStreamHandlers:
             'classification': {'BBH': 0.9, 'BNS': 0.0, 'NSBH': 0.0}
         }
         
-        is_test, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         
         assert has_ns is True
 
@@ -179,7 +179,7 @@ class TestAlertStreamHandlers:
             'classification': {'BNS': 0.8, 'NSBH': 0.0, 'BBH': 0.1}
         }
         
-        is_test, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         
         assert has_ns is True
 
