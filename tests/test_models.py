@@ -5,7 +5,6 @@ These test the models in trove_targets/models.py and candidate_vetting/models.py
 """
 import pytest
 import numpy as np
-from unittest.mock import MagicMock, patch
 from decimal import Decimal
 
 
@@ -25,11 +24,6 @@ class TestTargetModel:
         
         assert isinstance(healpix, (int, np.integer))
         assert healpix >= 0
-
-    def test_mwebv_calculation(self):
-        """Test Milky Way E(B-V) calculation logic."""
-        mwebv = 0.05
-        assert mwebv >= 0
 
     def test_distance_modulus_calculation(self):
         """Test distance modulus calculation."""
