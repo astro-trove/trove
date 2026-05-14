@@ -193,11 +193,11 @@ class TestReadAsciiSpectrum:
     def test_parse_header_comments(self):
         """Test parsing header comments from ASCII file."""
         sample_content = """# TELESCOP = Keck
-# DATE-OBS = 2024-01-15
-4000.0 1.5e-15
-4500.0 2.0e-15
-5000.0 1.8e-15
-"""
+                            # DATE-OBS = 2024-01-15
+                            4000.0 1.5e-15
+                            4500.0 2.0e-15
+                            5000.0 1.8e-15
+                            """
         from custom_code.processors.spectrum_reader import _read_ascii_spectrum
         
         with patch('astropy.io.ascii.read') as mock_read:
