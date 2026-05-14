@@ -1,7 +1,7 @@
 """
-Unit tests for the spectrum_reader and spectrum_processor modules.
+Unit tests for the spectrum_reader and spectroscopy_processor modules.
 
-Tests the replacement for lightcurve_fitting.speccal.readspec.
+spectrum_reader is the replacement for lightcurve_fitting.speccal.readspec.
 """
 import pytest
 import numpy as np
