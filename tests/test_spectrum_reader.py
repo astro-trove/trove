@@ -1,5 +1,5 @@
 """
-Unit tests for the spectrum_reader module.
+Unit tests for the spectrum_reader and spectrum_processor modules.
 
 Tests the replacement for lightcurve_fitting.speccal.readspec.
 """
@@ -9,6 +9,29 @@ from unittest.mock import MagicMock, patch, mock_open
 from datetime import datetime
 import json
 
+class TestSpectroscopyProcessor:
+    """Tests for FiniteSpectrumSerializer in spectroscopy processor."""
+
+    def test_serialize_basic_spectrum(self):
+        """Test serialization of a basic spectrum."""
+        from custom_code.processors.spectroscopy_processor import FiniteSpectrumSerializer
+        import numpy as np
+        
+        serializer = FiniteSpectrumSerializer()
+        
+        mock_spectrum = MagicMock()
+        flux_arr = np.array([1.0, 1.5, 1.2, 0.8])
+        wl_arr = np.array([4000., 5000., 6000., 7000.])
+        mock_spectrum.flux.value = flux_arr
+        mock_spectrum.wavelength.value = wl_arr
+        mock_spectrum.flux.unit.to_string.return_value = 'erg / (Angstrom cm2 s)'
+        mock_spectrum.wavelength.unit.to_string.return_value = 'Angstrom'
+        
+        result = serializer.serialize(mock_spectrum)
+        
+        assert result is not None
+        assert 'flux' in result
+        assert 'wavelength' in result
 
 class TestConvertSpectrumUnits:
     """Tests for _convert_spectrum_units function."""

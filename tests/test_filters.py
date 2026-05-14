@@ -3,10 +3,7 @@ Unit tests for form fields, filters, and widgets.
 
 These test the pure logic functions in custom_code/filters.py and related modules.
 """
-import pytest
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timedelta, timezone
-
 
 class TestLocalizationWidget:
     """Tests for LocalizationWidget in custom_code/filters.py"""
@@ -77,6 +74,29 @@ class TestNonLocalizedEventFilterMethods:
     """Tests for NonLocalizedEventFilter static methods."""
     ### TODO
     ### test that the NonlocalizedEventFilter.last_sequence_filter() static method behaves as expected
+
+class TestCredibleRegionProbabilities:
+    """Tests for credible region probability configuration."""
+
+    def test_credible_region_choices_format(self):
+        """Test that credible region choices are correctly formatted."""
+        from custom_code.filters import CREDIBLE_REGION_CHOICES
+        
+        for value, label in CREDIBLE_REGION_CHOICES:
+            assert isinstance(value, int)
+            assert isinstance(label, str)
+            assert '%' in label
+
+    def test_probability_to_percent_conversion(self):
+        """Test conversion of probability to percentage."""
+        probabilities = [0.5, 0.9, 0.95]
+        
+        for p in probabilities:
+            percent = int(100.0 * p)
+            label = f'{p:.0%}'
+            
+            assert percent == int(p * 100)
+            assert '%' in label
 
 class TestAlertStreamHandlers:
     """Tests for alert stream handler functions."""
@@ -216,6 +236,7 @@ class TestAtlasQueryForm:
         if form.is_valid():
             cleaned = form.clean()
             assert 'min_date_mjd' in cleaned or cleaned is not None
+            assert 'max_date_mjd' in cleaned or cleaned is not None
 
     def test_form_layout(self):
         """Test form layout method returns expected structure."""
@@ -227,50 +248,3 @@ class TestAtlasQueryForm:
         assert layout is not None
 
 
-class TestSpectroscopyProcessor:
-    """Tests for FiniteSpectrumSerializer in spectroscopy processor."""
-
-    def test_serialize_basic_spectrum(self):
-        """Test serialization of a basic spectrum."""
-        from custom_code.processors.spectroscopy_processor import FiniteSpectrumSerializer
-        import numpy as np
-        
-        serializer = FiniteSpectrumSerializer()
-        
-        mock_spectrum = MagicMock()
-        flux_arr = np.array([1.0, 1.5, 1.2, 0.8])
-        wl_arr = np.array([4000., 5000., 6000., 7000.])
-        mock_spectrum.flux.value = flux_arr
-        mock_spectrum.wavelength.value = wl_arr
-        mock_spectrum.flux.unit.to_string.return_value = 'erg / (Angstrom cm2 s)'
-        mock_spectrum.wavelength.unit.to_string.return_value = 'Angstrom'
-        
-        result = serializer.serialize(mock_spectrum)
-        
-        assert result is not None
-        assert 'flux' in result
-        assert 'wavelength' in result
-
-
-class TestCredibleRegionProbabilities:
-    """Tests for credible region probability configuration."""
-
-    def test_credible_region_choices_format(self):
-        """Test that credible region choices are correctly formatted."""
-        from custom_code.filters import CREDIBLE_REGION_CHOICES
-        
-        for value, label in CREDIBLE_REGION_CHOICES:
-            assert isinstance(value, int)
-            assert isinstance(label, str)
-            assert '%' in label
-
-    def test_probability_to_percent_conversion(self):
-        """Test conversion of probability to percentage."""
-        probabilities = [0.5, 0.9, 0.95]
-        
-        for p in probabilities:
-            percent = int(100.0 * p)
-            label = f'{p:.0%}'
-            
-            assert percent == int(p * 100)
-            assert '%' in label

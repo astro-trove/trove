@@ -36,7 +36,7 @@ tests/conftest.py
 tests/test_filters.py
 tests/test_management_commands.py
 tests/test_models.py
-tests/test_spectrum_reader.py
+tests/test_spectrum_reader_processor.py
 tests/test_templatetags.py
 tests/test_vetting.py
 tests/test_views.py
