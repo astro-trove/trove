@@ -203,17 +203,17 @@ def _parse_date_from_header(hdr: dict) -> Optional[Time]:
             continue
         
         try:
-            if 'MJD' in kwd:
+            if 'MJD' in kwd: # MJD-OBS, MJD_OBS, MJD, or AVE_MJD
                 return Time(float(val), format='mjd')
-            elif 'JD' in kwd:
+            elif 'JD' in kwd: # JD only
                 jd_val = float(val)
                 if jd_val > 2400000:
                     return Time(jd_val, format='jd')
                 else:
                     return Time(jd_val + 2400000, format='jd')
-            elif 'T' in str(val):
+            elif 'T' in str(val): # DATE-AVG, UTMIDDLE, UTSHUT, DATE-OBS, DATE_BEG, OBS_DATE
                 return Time(val)
-            elif kwd == 'OBS_DATE':
+            elif kwd == 'OBS_DATE': # OBS_DATE only
                 return Time(str(val).split('+')[0])
             elif '-' in str(val):
                 for kwd2 in ['UTMIDDLE', 'EXPSTART', 'UT']:
