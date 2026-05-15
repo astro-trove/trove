@@ -15,13 +15,11 @@ from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from trove_targets.models import Target
-from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
 from astroquery.ipac.irsa.irsa_dust import IrsaDust
 from django.conf import settings
-
-COSMOLOGY = FlatLambdaCDM(H0=70., Om0=0.3)
+cosmo = settings.COSMO
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
@@ -140,7 +138,7 @@ def target_post_save(target, created=True, lookback_days_nle=7, lookback_days_ob
     redshift = target.targetextra_set.filter(key='Redshift')
     if redshift.exists() and redshift.first().float_value >= 0.02 and target.distance is None:
         messages.append(f'Updating distance of {target.name} based on redshift')
-        target.distance = settings.COSMO.luminosity_distance(target.redshift).to('Mpc').value
+        target.distance = cosmo.luminosity_distance(target.redshift).to('Mpc').value
         target.save()
 
     for message in messages:
