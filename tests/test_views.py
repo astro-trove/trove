@@ -234,22 +234,6 @@ class TestEmailIntegration:
 class TestDatabaseQueries:
     """Tests for database query construction."""
 
-    def test_cone_search_parameters(self):
-        """Test cone search parameter validation."""
-        ra = 150.0
-        dec = 30.0
-        radius = 60.0
-        
-        assert 0 <= ra <= 360
-        assert -90 <= dec <= 90
-        assert radius > 0
-
-    def test_credible_region_filter(self):
-        """Test credible region filter parameter validation."""
-        probability = 90
-        
-        assert 0 < probability <= 100
-
     def test_time_filter_construction(self):
         """Test time filter date range construction."""
         from datetime import datetime, timedelta, timezone
@@ -264,24 +248,6 @@ class TestDatabaseQueries:
 
 class TestModelValidation:
     """Tests for model field validation."""
-
-    def test_target_coordinates_range(self):
-        """Test target coordinate validation."""
-        valid_ra = [0.0, 180.0, 359.999]
-        valid_dec = [-90.0, 0.0, 90.0]
-        
-        for ra in valid_ra:
-            assert 0 <= ra < 360
-        
-        for dec in valid_dec:
-            assert -90 <= dec <= 90
-
-    def test_event_candidate_priority_range(self):
-        """Test event candidate priority score range."""
-        valid_priorities = [0.0, 0.5, 1.0]
-        
-        for p in valid_priorities:
-            assert 0 <= p <= 1
 
     def test_score_factor_key_names(self):
         """Test score factor key name conventions."""
