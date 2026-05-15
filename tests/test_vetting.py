@@ -143,7 +143,7 @@ class TestStaticCatalogStandardization:
         
         cat = DesiDr1()
         df = pd.DataFrame({
-            'targetid': [12345],
+            'desiname': "DESI123",
             'target_ra': [150.0],
             'target_dec': [30.0],
             'z': [0.1],
@@ -157,6 +157,35 @@ class TestStaticCatalogStandardization:
         assert 'ra' in result.columns
         assert 'dec' in result.columns
         assert 'z' in result.columns
+        
+    def test_ned_lvs_standrdize(self):
+        """Test NED-LVS catalog standardization."""
+        import pandas as pd
+        from candidate_vetting.public_catalogs.static_catalogs import NedLvs
+        
+        cat = NedLvs()
+        df = pd.DataFrame({
+            'objname': "NED123",
+            'ra': [150.0],
+            'dec': [30.0],
+            'z': [0.03],
+            'z_unc': [0.001],
+            'distmpc': [130],
+            'distmpc_unc': [5],
+            'm_j': [20.0]
+        })
+        
+        result = cat.to_standardized_catalog(df)
+        
+        assert 'name' in result.columns
+        assert 'ra' in result.columns
+        assert 'dec' in result.columns
+        assert 'z' in result.columns
+        assert 'z_err' in result.columns
+        assert 'lumdist' in result.columns
+        assert 'lumdist_err' in result.columns
+        assert 'default_mag' in result.columns
+
 
     def test_desi_spec_standrdize(self):
         """Test DESI spectroscopic catalog standardization."""
