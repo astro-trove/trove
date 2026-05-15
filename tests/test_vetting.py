@@ -172,6 +172,7 @@ class TestStaticCatalogStandardization:
             'z_unc': [0.001],
             'distmpc': [130],
             'distmpc_unc': [5],
+            'distmpc_method':'zIndependent',
             'm_j': [20.0]
         })
         
@@ -354,7 +355,7 @@ class TestStaticCatalogStandardization:
     
         cat = Milliquas()
         df = pd.DataFrame({
-            'sdssid': ['MQ 1234'],
+            'name': ['MQ 1234'],
             'ra': [150.0],
             'dec': [30.0],
             'z': [0.15],
@@ -368,6 +369,7 @@ class TestStaticCatalogStandardization:
         assert 'z' in result.columns
         assert 'lumdist' in result.columns
         assert 'z_type' in result.columns
+        assert 'default_mag' in result.columns
 
 
 class TestRollingWindowSigmaClip:
