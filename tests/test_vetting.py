@@ -26,7 +26,7 @@ class TestAsymmetricGaussian:
         pdf_vals = ag._pdf(x, mean, unc, unc, integ_a, integ_b)
         norm_vals = norm.pdf(x, loc=1.0, scale=0.5)
         
-        assert len(pdf_vals) == len(x)
+        assert len(pdf_vals) == len(norm_vals)
 
     def test_pdf_asymmetric_left_side(self):
         """Test AsymmetricGaussian on left side of mean."""
@@ -136,6 +136,50 @@ class TestPcc:
 class TestStaticCatalogStandardization:
     """Tests for catalog standardization functions."""
 
+    def test_desi_dr1_standrdize(self):
+        """Test DESI DR1 catalog standardization."""
+        import pandas as pd
+        from candidate_vetting.public_catalogs.static_catalogs import DesiDr1
+        
+        cat = DesiDr1()
+        df = pd.DataFrame({
+            'targetid': [12345],
+            'target_ra': [150.0],
+            'target_dec': [30.0],
+            'z': [0.1],
+            'zerr': [0.001],
+            'default_mag': [20.0]
+        })
+        
+        result = cat.to_standardized_catalog(df)
+        
+        assert 'name' in result.columns
+        assert 'ra' in result.columns
+        assert 'dec' in result.columns
+        assert 'z' in result.columns
+
+    def test_desi_spec_standrdize(self):
+        """Test DESI spectroscopic catalog standardization."""
+        import pandas as pd
+        from candidate_vetting.public_catalogs.static_catalogs import DesiSpec
+        
+        cat = DesiSpec()
+        df = pd.DataFrame({
+            'targetid': [12345],
+            'target_ra': [150.0],
+            'target_dec': [30.0],
+            'z': [0.1],
+            'zerr': [0.001],
+            'default_mag': [20.0]
+        })
+        
+        result = cat.to_standardized_catalog(df)
+        
+        assert 'name' in result.columns
+        assert 'ra' in result.columns
+        assert 'dec' in result.columns
+        assert 'z' in result.columns
+
     def test_glade_plus_standardize(self):
         """Test GladePlus catalog standardization."""
         import pandas as pd
@@ -230,8 +274,8 @@ class TestStaticCatalogStandardization:
         assert 'dec' in result.columns
         assert 'z' in result.columns
 
-    def test_sdss_photoz_standardize(self):
-        """Test SDSS photometric redshift catalog standardization."""
+    def test_sdss12_photoz_standardize(self):
+        """Test SDSS DR12 photometric redshift catalog standardization."""
         import pandas as pd
         from candidate_vetting.public_catalogs.static_catalogs import Sdss12Photoz
         
@@ -250,6 +294,51 @@ class TestStaticCatalogStandardization:
         assert 'name' in result.columns
         assert 'z' in result.columns
         assert 'lumdist' in result.columns
+    
+    def test_ls_dr10_standardize(self):
+        """Test Legacy Survey DR10 standardization."""
+        import pandas as pd
+        from candidate_vetting.public_catalogs.static_catalogs import LsDr10
+        
+        cat = LsDr10()
+        df = pd.DataFrame({
+            'objid': [12345],
+            'ra': [150.0],
+            'declination': [30.0],
+            'z_phot_mean': [0.15],
+            'z_phot_std': [0.02],
+            'z_phot_l68': [0.13],
+            'z_phot_u68': [0.17],
+            'default_mag': [19.0],
+        })
+        
+        result = cat.to_standardized_catalog(df)
+        
+        assert 'name' in result.columns
+        assert 'z' in result.columns
+        assert 'lumdist' in result.columns
+        
+    def test_milliquas_standardize(df):
+        """Test Milliquas catalog standardization."""
+        import pandas as pd
+        from candidate_vetting.public_catalogs.static_catalogs import Milliquas
+    
+        cat = Milliquas()
+        df = pd.DataFrame({
+            'sdssid': ['MQ 1234'],
+            'ra': [150.0],
+            'dec': [30.0],
+            'z': [0.15],
+            'z_err': [0.02],
+            'rmag': [19.5]
+        })
+        
+        result = cat.to_standardized_catalog(df)
+        
+        assert 'name' in result.columns
+        assert 'z' in result.columns
+        assert 'lumdist' in result.columns
+        assert 'z_type' in result.columns
 
 
 class TestRollingWindowSigmaClip:
@@ -332,56 +421,3 @@ class TestAtlasForcedPhotParsing:
         
         assert result is not None
         assert isinstance(result, list)
-
-
-class TestDesiSpecStandardize:
-    """Tests for DESI spectroscopic catalog standardization."""
-
-    def test_desi_spec_basic(self):
-        """Test DESI spectroscopic catalog standardization."""
-        import pandas as pd
-        from candidate_vetting.public_catalogs.static_catalogs import DesiSpec
-        
-        cat = DesiSpec()
-        df = pd.DataFrame({
-            'targetid': [12345],
-            'target_ra': [150.0],
-            'target_dec': [30.0],
-            'z': [0.1],
-            'zerr': [0.001],
-            'default_mag': [20.0]
-        })
-        
-        result = cat.to_standardized_catalog(df)
-        
-        assert 'name' in result.columns
-        assert 'ra' in result.columns
-        assert 'dec' in result.columns
-        assert 'z' in result.columns
-
-
-class TestLsDr10Standardize:
-    """Tests for Legacy Survey DR10 catalog standardization."""
-
-    def test_ls_dr10_basic(self):
-        """Test Legacy Survey DR10 standardization."""
-        import pandas as pd
-        from candidate_vetting.public_catalogs.static_catalogs import LsDr10
-        
-        cat = LsDr10()
-        df = pd.DataFrame({
-            'objid': [12345],
-            'ra': [150.0],
-            'declination': [30.0],
-            'z_phot_mean': [0.15],
-            'z_phot_std': [0.02],
-            'z_phot_l68': [0.13],
-            'z_phot_u68': [0.17],
-            'default_mag': [19.0],
-        })
-        
-        result = cat.to_standardized_catalog(df)
-        
-        assert 'name' in result.columns
-        assert 'z' in result.columns
-        assert 'lumdist' in result.columns
