@@ -1,7 +1,8 @@
 """
 Unit tests for Django views with mocking.
 
-These test the views in custom_code/views.py and related modules.
+These test the views in custom_code/views.py, candidate_vetting/views.py, and 
+related modules.
 """
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
@@ -26,27 +27,9 @@ class TestTargetNameSearchView:
 
 class TestNonLocalizedEventViews:
     """Tests for NonLocalizedEvent list views."""
-
-    def test_gw_queryset_filter(self):
-        """Test GW list view filters for gravitational waves."""
-        event_type = 'GW'
-        assert event_type == 'GW'
-
-    def test_grb_queryset_filter(self):
-        """Test GRB list view filters for gamma ray bursts."""
-        event_type = 'GRB'
-        assert event_type == 'GRB'
-
-    def test_neutrino_queryset_filter(self):
-        """Test neutrino list view filters for neutrinos."""
-        event_type = 'NU'
-        assert event_type == 'NU'
-
-    def test_unknown_queryset_filter(self):
-        """Test unknown list view filters for unknown events."""
-        event_type = 'UNK'
-        assert event_type == 'UNK'
-
+    ### TODO
+    ### implement actual tests
+    
 
 class TestEventCandidateCreateView:
     """Tests for EventCandidateCreateView."""
