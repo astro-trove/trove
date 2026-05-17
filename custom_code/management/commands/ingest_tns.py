@@ -38,38 +38,39 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
             "--lookback-days-nle",
-            help="Nonlocalized events are considered active for this many days",
+            help="Consider nonlocalized events active if event was at MOST this many days ago",
             type=float,
             default=7.0,
         )
         parser.add_argument(
             "--first-det-max",
-            help="Associate transients whose first detection was within this "
-            "many days of the nonlocalized event",
+            help="Associate targets whose first detection was at MOST "+
+            "first-det-max days after the nonlocalized event",
             type=float,
             default=10,
         )
         parser.add_argument(
             "--first-det-min",
-            help="The minimum time since the NLE discovery for a first detection"
-            " to be considered. A negative number (-1 is the default) will"
-            " consider events with a first det. that many days before the NLE discovery.",
+            help="Associate transients whose first detection was at "+
+            "EARLIEST abs(first-det-min) days before the nonlocalized event. "+
+            "E.g., default (-1) will consider targets with first detection "+
+            "at earliest 1 day before nonlocalized event",
             type=float,
             default=-1,
         )
 
         parser.add_argument(
             "--vetting-start-time",
-            help="The start time for vetting, we will vet everything from this time - "
-            "vetting_lookback_horizon to this time",
+            help="Start time for vetting. Vet targets in time window "+
+            "[vetting-start-time - vetting-lookback-horizon, vetting-start-time]",
             type=datetime,
             default=datetime.now(),
         )
 
         parser.add_argument(
             "--vetting-lookback-horizon",
-            help="Any targets with a TNS discovery date of now - vetting_horizon days "
-            "will be re-vet, including grabbing new photometry. The default is None "
+            help="Targets with TNS discovery date of (now - vetting-lookback-horizon) days "
+            "will be re-vet, including grabbing new photometry. Default None, "
             "which just vets new transients from TNS",
             type=float,
             default=None,
@@ -345,12 +346,12 @@ class Command(BaseCommand):
             logger.info("##########################################################")
             logger.info(
                 f"[{ii + 1}/{nvet}] Vetting {trove_target.name} took {single_vetting_time:.2f}s. "
-                + f"So far, vetting of TNS transients has taken {(time.time() - vetting_start) / 60:.2f}m"
+                + f"So far, vetting of TNS transients has taken {(time.time() - vetting_start) / 60:.2f}mins"
             )
             logger.info("##########################################################")
 
         total_vetting_time = time.time() - vetting_start
         logger.info(
-            f"Vetting took {total_vetting_time / 60:.2f}m with an average of "
+            f"Vetting took {total_vetting_time / 60:.2f}mins with an average of "
             + f"{total_vetting_time / nvet:.2f}s per target"
         )
