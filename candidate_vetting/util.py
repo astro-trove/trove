@@ -103,10 +103,13 @@ def get_event_candidate_scores(
 
     # which transient types to consider?
     ### TODO: Right now, just does KN unless SSM; change this for BBH events
-    nle_eventseq = localization_sequence_from_name(
-        event_candidates_list[0].nonlocalizedevent.event_id
-    )
-    most_likely_class = get_most_likely_class(nle_eventseq.details)
+    try:
+        nle_eventseq = localization_sequence_from_name(
+            event_candidates_list[0].nonlocalizedevent.event_id
+        )
+        most_likely_class = get_most_likely_class(nle_eventseq.details)
+    except IndexError:
+        return []
 
     if most_likely_class == "SSM":
         transients = TRANSIENTS
