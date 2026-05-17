@@ -1,16 +1,20 @@
 """
-the vet_basic function is for when there is not a NLE associated with a transient and
-simply does
+Basic vetting , possible even if no nonlocalized event associated with a 
+target. Does the following:
 0. Checks for new photometry
-1. point source association
-2. MPC crossmatching
-3. AGN crossmatching
-4. Host association
+1. AGN crossmatching
+2. Host association
+3. Point source association
+4. MPC crossmatching
 
 But without any direct scoring!
 
+Steps 3 and 4 are not carried out if no new photometry and user has said 
+not to carry out those steps in absence of new photometry.
+
 This should also be called before any photometry vetting in the NLE-related
 vetting modules. That way we can reduce the code duplication between them!
+
 """
 
 import logging
@@ -46,6 +50,9 @@ def vet_basic(
     # get the Target object associated with this target_id
     target = Target.objects.get(id=target_id)
 
+    # get the TargetExtra object associated with this target_id
+    te = TargetExtra.objects.filter(target_id=target.id)
+
     # then check for new photometry
     phot_query_start = time.time()
     created_new_phot = find_public_phot(
@@ -56,25 +63,24 @@ def vet_basic(
     )
     logger.info(f"Finding public photometry took {time.time() - phot_query_start}s")
 
-    # get the TargetExtra object associated with this target_id
-    te = TargetExtra.objects.filter(target_id=target.id)
-
+    # get associated AGN, host galaxies
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-
-        ## search for an AGN associated with the target
+        # search for an AGN associated with the target
         agn_df = agn_association_2d(target_id)
 
-        ## do the Pcc analysis and find a host
+        # do the Pcc analysis and find a host
         host_df = host_association(target_id)
 
+    # stop here and return if no further vetting needed
     if skip_vet_if_no_new_phot and not created_new_phot:
         logger.info(
-            "Skipping vetting because no new photometry and skip_vet_if_no_new_phot=True"
+            "Skipping point source and minor planet vetting because no new "+
+            "photometry and skip_vet_if_no_new_phot=True"
         )
         return host_df, agn_df
 
-    ## run the point source checker
+    # run the point source checker
     if overwrite or not te.filter(key="ps_score").exists():
         logger.info("Running Point Source Matching...")
         with warnings.catch_warnings():
@@ -82,7 +88,7 @@ def vet_basic(
             ps_score = point_source_association(target_id)
             save_score_to_targetextra(target, "ps_score", ps_score)
 
-    ## run the minor planet checker
+    # run the minor planet checker
     if overwrite or not te.filter(key="mpc_match_name").exists():
         if use_async_mpc:
             logger.info("Sending MPC to the async queue, check back later for results")
@@ -91,5 +97,5 @@ def vet_basic(
             logger.info("Running MPC in real-time, this may take a bit...")
             run_mpc(target_id)
 
-    ## return both agn_df and host_df
+    # return both agn_df and host_df
     return host_df, agn_df
