@@ -17,6 +17,7 @@ from candidate_vetting.util import get_event_candidate_scores
 from tom_dataproducts.models import ReducedDatum
 
 from astropy.coordinates import SkyCoord
+from astropy.time import Time
 
 from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
 
@@ -158,12 +159,12 @@ def generate_report(request):
     nle_name = NonLocalizedEvent.objects.get(id=nle_id)
 
     text = f"""
-We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational wave event {nle_name} using the Multi-messenger Tool for Rapid Object Vetting and Examination (TROVE). We searched within the 95th percentile localization region for candidate optical counterparts in host galaxies at the approximate luminosity distance of {nle_name}.  We further crossmatch to minor planet and point source catalogs and rule out sources that do not appear photometrically similar to kilonova light curves.  For additional details, see the vetting procedures described in N. Franz, et al., 2025, arXiv:2510.17104.
+We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational wave (GW) event {nle_name} using the Multi-messenger Tool for Rapid Object Vetting and Examination (TROVE). We searched within the 95th percentile localization region for candidate optical counterparts in host galaxies at the approximate luminosity distance of {nle_name}. We further crossmatch to minor planet, point source, and AGN catalogs and rule out sources that do not appear photometrically similar to kilonova light curves. For additional details, see the vetting procedures described in N. Franz, et al., 2025, arXiv:2510.17104.
 
-Below, we report the top {ncands} candidates that remain viable after running our vetting procedure using publicly available information on all publicly reported sources, to date, on the Transient Name Server (TNS).  We include their TNS identifier, coordinates, cumulative probability at the coordinate location in the latest LVK map, most likely host redshift, most recent magnitude, and the initial reporting group. Candidates are ranked using a scoring procedure designed to identify kilonova counterparts to GW events (N. Franz, et al., 2025, arXiv:2510.17104). The reported candidates are not clearly identified as kilonovae.
+Below, we report the top {ncands} candidates that remain viable after running our vetting procedure using publicly available information on all publicly reported sources, to date, on the Transient Name Server (TNS).  We include their TNS identifier, instrument with earliest detection, coordinates, cumulative probability at the coordinate location in the latest LVK map, most likely host redshift, joint GW luminosity distance and candidate redshift probability, most recent magnitude, epoch of that most recent magnitude, TROVE KN score. Candidates are ranked using a scoring procedure designed to identify kilonova counterparts to GW events (N. Franz, et al., 2025, arXiv:2510.17104). The reported candidates are not clearly identified as kilonovae.
 
-| Name | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most likely Host-z | Joint Distance Probability | Most recent public magnitude | TROVE Score |
-| :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
+| Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most Likely Host-z | Joint Distance Probability | Most Recent Mag | Most Recent Mag Time [MJD] | TROVE KN Score |
+| :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
 
     subscore_keys_to_report = ["skymap_score", "host_distance_score"]
 
@@ -218,37 +219,57 @@ Below, we report the top {ncands} candidates that remain viable after running ou
             import pdb
 
             pdb.set_trace()
+            
         # get photometry info
+        first_phot = ReducedDatum.objects.filter(
+            target_id=t.id, 
+            value__magnitude__isnull=False, 
+            value__error__isnull=False).first()
+        if first_phot:
+            v = first_phot.value
+            src_first = first_phot.source_name            
+            if "instrument" in v:
+                src_str_first = f"{src_first}; {v['instrument']} {v['filter']}"
+            elif "telescope" in v:
+                src_str_first = f"{src_first}; {v['telescope']} {v['filter']}"
+            else:
+                src_str_first = f"{src_first}; {v['filter']}"
+            src_str_first = src_str_first.replace(' (TNS)', '') # strip (TNS) if present
+        else:
+            src_str_first = None
+        
         latest_phot = ReducedDatum.objects.filter(target_id=t.id).latest()
         if latest_phot:
             v = latest_phot.value
-
-            src = latest_phot.source_name
+            src_latest = latest_phot.source_name
 
             if "instrument" in v:
-                src_str = f"({v['instrument']} {v['filter']}; {src})"
+                src_str_latest = f"({v['instrument']} {v['filter']}; {src_latest})"
             elif "telescope" in v:
-                src_str = f"({v['telescope']} {v['filter']}; {src})"
+                src_str_latest = f"({v['telescope']} {v['filter']}; {src_latest})"
             else:
-                src_str = f"({v['filter']}; {src})"
+                src_str_latest = f"({v['filter']}; {src_latest})"
 
-            if "magnitude" in v:
-                # detection
-                phot_str = f"{v['magnitude']:.2f} +/- {v['error']:.2f} {src_str}"
-            else:
-                # non-detection
-                phot_str = f">{v['limit']:.2f} {src_str}"
+            if "magnitude" in v: # detection
+                phot_str_latest = f"{v['magnitude']:.2f} +/- {v['error']:.2f} {src_str_latest}"
+            else: # non-detection
+                phot_str_latest = f">{v['limit']:.2f} {src_str_latest}"
+            
+            epoch_latest = Time(latest_phot.timestamp).mjd
+            epoch_str_latest = f"{float(epoch_latest):.5f}"
+            
         else:
-            phot_str = None
+            phot_str_latest = None
+            epoch_str_latest = None
         # TODO: Currently we are defaulting to reporting the KN score, this should
         #       probably be fixed once we support BBH vetting!
         lines.append(
-            f"| {t.name} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str} | {float(ec.score['KN']):.2f} |"
+            f"| {t.name} | {src_str_first} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest} | {epoch_str_latest} | {float(ec.score['KN']):.2f} |"
         )
 
     lines.append(
-        """
-We encourage additional follow up of these candidates to determine whether they remain viable counterparts to S251112cm."""
+        f"""
+We encourage additional follow up of these candidates to determine whether they remain viable counterparts to {nle_name}."""
     )
 
     return JsonResponse({"text": "\n".join(lines)})
