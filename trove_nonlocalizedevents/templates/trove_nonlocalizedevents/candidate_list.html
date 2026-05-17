@@ -26,7 +26,7 @@
   <a href="{% url 'candidate_vetting:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
   &nbsp;&nbsp;
   {% if request.user.is_superuser %}
-    <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Report</a>
+    <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
   {% endif %}
 </div>
 <br><br>
