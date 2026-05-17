@@ -256,7 +256,7 @@ def nonlocalizedevent_details(context, localization=None):
         ]
     else:
         details_to_display = []
-    print("finished loading NLE details")
+    print("Finished loading NLE details")
     return {"details": details_to_display}
 
 

@@ -13,7 +13,7 @@ register = template.Library()
     "tom_nonlocalizedevents/partials/skymap.html", takes_context=True
 )
 def skymap(context, localization):
-    print("fetching skymap")
+    print("Fetching skymap")
     # sun, moon, and candidates
     now = context["request"].GET.get("grouping_now")
     if now:
@@ -39,7 +39,7 @@ def skymap(context, localization):
     else:
         extras["credible_region"] = []
 
-    print("finished fetching skymap")
+    print("Finished fetching skymap")
 
     return extras
 
