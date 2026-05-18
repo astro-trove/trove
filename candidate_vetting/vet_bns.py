@@ -4,7 +4,7 @@ their resemblance to kilonovae.
 """
 import logging
 from typing import Optional
-from astropy.time import Time
+from astropy.time import Time, TimeDelta
 from astropy import units as u
 import pandas as pd
 import numpy as np
@@ -52,6 +52,8 @@ PARAM_RANGES = dict(
 def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None,
             param_ranges:dict=PARAM_RANGES):
 
+    logger.info("Running vet BNS")
+    
     # get the correct EventCandidate object for this target_id and nonlocalized event
     nonlocalized_event = NonLocalizedEvent.objects.get(
         event_id=nonlocalized_event_name
@@ -63,7 +65,14 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None,
     target = Target.objects.get(id=target_id)
     
     ## check skymap association
-    skymap_score = skymap_association(nonlocalized_event_name, target_id)
+    if np.isfinite(param_ranges["t_post"]):
+        gw_disc_date = EventSequence.objects.filter( # GW discovery time
+            nonlocalizedevent_id=nonlocalized_event.id).last().details["time"]
+        max_time = Time(gw_disc_date) + TimeDelta(param_ranges["t_post"]*u.day)
+    else: # just use current time
+        max_time = Time.now()
+    skymap_score = skymap_association(nonlocalized_event_name, target_id,
+                                      max_time=max_time)
     update_score_factor(event_candidate, "skymap_score", skymap_score)
     if skymap_score < 1e-2:
         return 
@@ -74,7 +83,7 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None,
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
         # use target redshift, so no need to compute distance scores for galaxies
-        host_score = get_distance_score(host_df, target_id, 
+        host_score, host_name = get_distance_score(host_df, target_id, 
                                         nonlocalized_event_name)
         update_score_factor(event_candidate, "host_distance_score", host_score)
         
@@ -86,17 +95,19 @@ def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None,
             nonlocalized_event_name
         )
 
-        # choose the maximum score out of the top 10 best hosts
-        host_score = get_distance_score(host_df, target_id, nonlocalized_event_name)
+        # choose the maximum score
+        host_score, host_name = get_distance_score(host_df, target_id, nonlocalized_event_name)
         update_score_factor(event_candidate, "host_distance_score", host_score)
+        update_score_factor(event_candidate, "host_name", host_name)
 
     else:
         # if no target redshift is known and no hosts are found, we don't want 
         # to bias the final score (host may just be too far)
         host_score = 1
         
-        # and we should also clear out any existing scores for it
+        # and we should also clear out any existing scores / host names for it
         delete_score_factor(event_candidate, "host_distance_score")
+        delete_score_factor(event_candidate, "host_name")
         
     ## AGN scoring
     if len(agn_df) != 0:

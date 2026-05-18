@@ -5,6 +5,8 @@
 {% if request.GET.nonlocalizedevent %}
 <h1>Candidates for <a href="{% url 'nonlocalizedevents:detail' request.GET.nonlocalizedevent %}" target="_blank">{{ request.GET.nonlocalizedevent|event_id_from_pk }}</a></h1>
 {% nonlocalizedevent_details %}
+<a href="{% url 'candidate_vetting:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
+<br></br>
 <div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
 {% else %}
 <h1>Candidates</h1>
@@ -15,8 +17,8 @@
     <table class="table table-sm table-hover">
       <thead>
         <tr>
-	  <th>Rank</th>
-	  <th>Target</th>
+        	  <th>Rank</th>
+        	  <th>Target</th>
           <th>Event</th>
           <th>Score</th>
         </tr>
