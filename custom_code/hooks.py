@@ -173,11 +173,7 @@ def target_post_save(
             )
 
     redshift = target.targetextra_set.filter(key="Redshift")
-    if (
-        redshift.exists()
-        and redshift.first().float_value >= 0.02
-        and target.distance is None
-    ):
+    if redshift.exists() and target.distance is None:
         messages.append(f"Updating distance of {target.name} based on redshift")
         target.distance = (
             settings.COSMO.luminosity_distance(target.redshift).to("Mpc").value
