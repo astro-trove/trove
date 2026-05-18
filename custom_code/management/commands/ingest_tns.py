@@ -33,56 +33,67 @@ for handler in logger.handlers:
 
 
 class Command(BaseCommand):
-    help = "Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)"
+    help = ("Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit). \n"+
+            "Example:\n\n"+
+            "\t--lookback-days-nle 100 --first-det-min -1 --first-det-max 10 --vetting-lookback-start 150 --vetting-lookback-end 90 "+
+            "will look for NLEs from the last 100 days, associate TNS "+
+            "transients with first detection between 1 day pre- and 10 days "+
+            "post-NLE, and vet everything between 150 and 90 days old with "+
+            "respect to current time")
+    
 
     def add_arguments(self, parser):
         parser.add_argument(
             "--lookback-days-nle",
-            help="Consider nonlocalized events active if event was at MOST this many days ago",
+            help="Consider nonlocalized events active if event at MOST "+
+            "this many days ago. POSITIVE number expected.",
             type=float,
             default=7.0,
         )
         parser.add_argument(
+            "--first-det-min",
+            help="Associate TNS targets with first detection at EARLIEST "+
+            "|first-det-min| days before nonlocalized event. NEGATIVE number "+
+            "expected. Default -1, which will consider targets with first "+
+            "detection at earliest 1 day before nonlocalized event.",
+            type=float,
+            default=-1,
+        )
+        parser.add_argument(
             "--first-det-max",
-            help="Associate targets whose first detection was at MOST "+
-            "first-det-max days after the nonlocalized event",
+            help="Associate TNS targets with first detection at LATEST "+
+            "first-det-max days after nonlocalized event. POSITIVE number "+
+            "expected.",
             type=float,
             default=10,
         )
         parser.add_argument(
-            "--first-det-min",
-            help="Associate transients whose first detection was at "+
-            "EARLIEST abs(first-det-min) days before the nonlocalized event. "+
-            "E.g., default (-1) will consider targets with first detection "+
-            "at earliest 1 day before nonlocalized event",
-            type=float,
-            default=-1,
-        )
-
-        parser.add_argument(
-            "--vetting-start-time",
-            help="Start time for vetting. Vet targets in time window "+
-            "[vetting-start-time - vetting-lookback-horizon, vetting-start-time]",
-            type=datetime,
-            default=datetime.now(),
-        )
-
-        parser.add_argument(
-            "--vetting-lookback-horizon",
-            help="Targets with TNS discovery date of (now - vetting-lookback-horizon) days "
-            "will be re-vet, including grabbing new photometry. Default None, "
-            "which just vets new transients from TNS",
+            "--vetting-lookback-start",
+            help="Re-vet TNS targets with discovery date AFTER "+
+            "(now - vetting-lookback-start) days ago. POSITIVE number "+
+            "expected, e.g., 10 will re-vet targets less than 10 days old. "+
+            "Default None, which will re-vet new TNS targets only.",
             type=float,
             default=None,
+        )
+        parser.add_argument(
+            "--vetting-lookback-end",
+            help="Re-vet TNS targets with discovery date EARLIER than "+
+            "(now - vetting-lookback-end) days ago. POSITIVE number "+
+            "expected, e.g., 5 will re-vet targets more than 5 days old. "+
+            "Default 0, which will re-vet everything up to now if and only "+
+            "if vetting-lookback-start also specified.",
+            type=float,
+            default=0,
         )
 
     def handle(
         self,
         lookback_days_nle=7.0,
-        first_det_max=10,
         first_det_min=-1,
-        vetting_start_time=datetime.now(),
-        vetting_lookback_horizon=None,
+        first_det_max=10,
+        vetting_lookback_start=None,
+        vetting_lookback_end=None,
         **kwargs,
     ):
 
@@ -307,17 +318,16 @@ class Command(BaseCommand):
                 )
                 """)
 
-        # now we need to vet all targets from the past vetting_horizon days
+        # now we need to vet all targets in user provided range
         new_or_updated = list(
             # the set here just takes the unique set of these lists to make sure we
             # don't vet more than necessary
             set(updated_target_ids + new_target_ids + missing_target_ids)
         )
-        if vetting_lookback_horizon is not None:
+        if vetting_lookback_start is not None:
             recent_tns_transients = TnsQ3C.objects.filter(
-                discoverydate__gte=datetime.now()
-                - timedelta(days=vetting_lookback_horizon),
-                discoverydate__lte=vetting_start_time,
+                discoverydate__gte = datetime.now() - timedelta(days=vetting_lookback_start),
+                discoverydate__lte = datetime.now() - timedelta(days=vetting_lookback_end)
             )
             tns_names = [q.name_prefix + q.name for q in list(recent_tns_transients)]
             targets_to_vet = Target.objects.filter(name__in=tns_names)
@@ -334,8 +344,8 @@ class Command(BaseCommand):
                 # slack_tns,
                 # channel='alerts-tns',
                 lookback_days_nle=lookback_days_nle,
-                first_det_max=first_det_max,
                 first_det_min=first_det_min,
+                first_det_max=first_det_max,
                 # then only vet if there is new photometry and no updates to this target
                 skip_vet_if_no_new_phot=(
                     trove_target.basetarget_ptr_id not in new_or_updated
