@@ -13,14 +13,17 @@ import numpy2PGSQL
 
 logger = logging.getLogger(__name__)
 
+comma_nl = ",\n"
+
 Catalogs = Enum('Catalogs', 
 [
-    ('DESIDR1',   'DESI_DR1'),
-    ('FERMILPSC', 'Fermi_LPSC'),
-    ('FERMI3FHL', 'Fermi_3FHL'),
-    ('NEDLVS',    'NEDLVS'),
-    ('TWOMASS',   'Two_MASS'),
-    ('ZTFVARSTAR','ZTF_varstar')
+    ('COSMICFLOWS4', 'COSMIC_FLOWS_4'),
+    ('DESIDR1',      'DESI_DR1'),
+    ('FERMILPSC',    'Fermi_LPSC'),
+    ('FERMI3FHL',    'Fermi_3FHL'),
+    ('NEDLVS',       'NEDLVS'),
+    ('TWOMASS',      'Two_MASS'),
+    ('ZTFVARSTAR',   'ZTF_varstar')
 ])
 
 class CatalogConfig():
@@ -69,8 +72,7 @@ class BasicAstropyConfig(CatalogConfig):
         self.ra  = "ra"
         self.dec = "dec"
 
-
-    def _tabularize(self, path):
+    def _tabularize(self, path: str):
         self.table = Table.read(path)
 
     def _clean_data(self):
@@ -101,6 +103,7 @@ class BasicAstropyConfig(CatalogConfig):
         SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
         
         SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} {self.relational_schema};"
+        
         with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
             with conn.cursor() as cur:
                 try:
@@ -173,6 +176,137 @@ class BasicAstropyConfig(CatalogConfig):
         q3c_index_table(self.dbctxt, self.ra, self.dec)
 
 
+class CSVConfig(CatalogConfig):
+    def __init__(self, dbctxt: DBctxt, path: str):
+        self.dbctxt:            DBctxt = dbctxt
+        self.path:              str    = path
+        self.relational_schema: str    = ""
+        self.data                      = None
+        self.ra  = "ra"
+        self.dec = "dec"
+        self.relational_schema = ""
+        
+        CSVConfig._tabularize(self, self.path)
+        CSVConfig._clean_data(self)
+        CSVConfig._relational_schema(self)
+
+        return
+
+    def _tabularize(self, path: str):
+        with open(path, "r") as f:
+            content = f.read()
+            content = content.split("\n")[1:-1]
+            for i, row in enumerate(content):
+                row = row.split(",")
+                content[i] = row
+        
+        self.table = content
+    
+    def _clean_data(self):
+        pass
+    
+    def _relational_schema(self):
+        return self.relational_schema
+    
+    def _create_table(self):
+        logger.info(f"Creating new table in database {self.dbctxt.POSTGRES_DB} on host {self.dbctxt.POSTGRES_HOST}.")
+
+        SQL_statement = ""
+        
+        SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
+        
+        comma_nl = ",\n"
+        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} (\n{comma_nl.join(self.relational_schema)});"
+        with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(SQL_statement)
+                    conn.commit()
+                except psycopg2.errors.DuplicateTable:
+                    raise f"Table {self.dbctxt.sql_table} already exists. Attemtping to continue with existing schema..."
+                except Exception as e: 
+                    raise e
+
+        logger.info("done creating table.")
+    
+    def _data2SQLValues(self) -> str:
+        SQL_VALUE = ""
+
+        for i, row in enumerate(self.table):
+            SQL_VALUE = "("
+            SQL_VALUE += ", ".join(row)
+            SQL_VALUE += ")"
+            self.table[i] = SQL_VALUE
+
+        return
+
+    def insert_all(self):
+        self._create_table()
+        self._data2SQLValues()
+
+        SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.table)};"
+        execute_statement(self.dbctxt, SQL_STATEMENT)
+
+        q3c_index_table(self.dbctxt, self.ra, self.dec)
+
+        return
+
+
+class CosmicFlows4Config(CSVConfig):
+    def __init__(self, dbctxt, path):
+        super().__init__(dbctxt, path)
+        self.ra  = "RAJ2000"
+        self.dec = "DEJ2000"
+        self.relational_schema = [
+            "recno bigint",
+            "Name text",
+            "RAJ2000 double precision",
+            "DEJ2000 double precision",
+            "Dist double precision",
+            "z double precision",
+            "DistMin double precision",
+            "DistMax double precision",
+            "e_Dist double precision",
+            "DistInput double precision",
+            "e_DistInput double precision",
+            "DistTmean double precision",
+            "r_DistInput double precision",
+            "Ndist double precision",
+            "R1 double precision",
+            "R2 double precision",
+            "PA double precision",
+            "r_R1 double precision",
+            "IdCat double precision",
+            "big_g_mag double precision",
+            "BPmag double precision",
+            "PM double precision",
+            "angDist double precision",
+            "rmagpsf double precision",
+            "little_g_mag double precision",
+            "rmag double precision",
+            "imag double precision",
+            "zmag double precision",
+            "W1mag double precision",
+            "W2mag double precision",
+            "dK double precision",
+            "r_gmag double precision",
+            "r_W1mag double precision",
+            "EoBmV double precision",
+            "logM double precision",
+            "fRel double precision",
+            "fracNearby double precision"
+        ]
+        self._clean_data()
+
+    def _clean_data(self):
+        for i, row in enumerate(self.table):
+            self.table[i][1] = f"\'{row[1]}\'"
+
+            for j, col in enumerate(row):
+                if (col == ""):
+                    self.table[i][j] = "NULL"
+
+
 class DESIDR1Config(BasicAstropyConfig):
     COEFF_COUNT = 10
     COEFF_INDEX = 9
@@ -196,7 +330,6 @@ class DESIDR1Config(BasicAstropyConfig):
         self.table.remove_column('COEFF')
         for i in range(DESIDR1Config.COEFF_COUNT):
             self.table.add_column(oldcol[:, i], index=DESIDR1Config.COEFF_INDEX + i, name=f"COEFF_{i:02}")
-
 
 
 class TwoMASSConfig(CatalogConfig):
@@ -297,7 +430,6 @@ class TwoMASSConfig(CatalogConfig):
         
         SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
         
-        comma_nl = ",\n"
         SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} (\n{comma_nl.join(self.relational_schema)});"
         with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
             with conn.cursor() as cur:
