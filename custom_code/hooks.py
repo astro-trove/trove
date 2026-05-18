@@ -21,8 +21,6 @@ from astropy.coordinates import SkyCoord
 from astroquery.ipac.irsa.irsa_dust import IrsaDust
 from django.conf import settings
 
-COSMOLOGY = FlatLambdaCDM(H0=70.0, Om0=0.3)
-
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
@@ -173,11 +171,7 @@ def target_post_save(
             )
 
     redshift = target.targetextra_set.filter(key="Redshift")
-    if (
-        redshift.exists()
-        and redshift.first().float_value >= 0.02
-        and target.distance is None
-    ):
+    if redshift.exists() and target.distance is None:
         messages.append(f"Updating distance of {target.name} based on redshift")
         target.distance = (
             settings.COSMO.luminosity_distance(target.redshift).to("Mpc").value
