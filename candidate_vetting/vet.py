@@ -481,7 +481,7 @@ def host_association(target_id:int, radius:float=HOST_ASSOC_RADIUS,
         catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
         seps = coord.separation(catalog_coord).arcsec
         df["offset"] = seps
-        df["pcc"] = pcc(df["default_mag"], seps)
+        df["pcc"] = pcc(seps, df["default_mag"])
         df = df[df.pcc <= pcc_threshold]
                 
         # now save the cleaned dataset
