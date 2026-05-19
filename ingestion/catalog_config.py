@@ -21,6 +21,7 @@ Catalogs = Enum('Catalogs',
     ('DESIDR1',      'DESI_DR1'),
     ('FERMILPSC',    'Fermi_LPSC'),
     ('FERMI3FHL',    'Fermi_3FHL'),
+    ('HECATE2',      'HECATE2'),
     ('NEDLVS',       'NEDLVS'),
     ('TWOMASS',      'Two_MASS'),
     ('ZTFVARSTAR',   'ZTF_varstar')
@@ -176,26 +177,20 @@ class BasicAstropyConfig(CatalogConfig):
         q3c_index_table(self.dbctxt, self.ra, self.dec)
 
 
-class CSVConfig(CatalogConfig):
-    def __init__(self, dbctxt: DBctxt, path: str):
+class PlainTextConfig(CatalogConfig):
+    def __init__(self, dbctxt: DBctxt, path: str, chunksize: int = 1000):
         self.dbctxt:            DBctxt = dbctxt
         self.path:              str    = path
         self.relational_schema: str    = ""
-        self.data                      = None
-        self.ra  = "ra"
-        self.dec = "dec"
-        self.relational_schema = ""
-        
-        CSVConfig._tabularize(self, self.path)
-        CSVConfig._clean_data(self)
-        CSVConfig._relational_schema(self)
-
-        return
+        self.table                     = None
+        self.chunksize                 = chunksize
+        self.ra                        = "ra"
+        self.dec                       = "dec"
 
     def _tabularize(self, path: str):
         with open(path, "r") as f:
             content = f.read()
-            content = content.split("\n")[1:-1]
+            content = content.split("\n")
             for i, row in enumerate(content):
                 row = row.split(",")
                 content[i] = row
@@ -238,21 +233,22 @@ class CSVConfig(CatalogConfig):
             SQL_VALUE += ")"
             self.table[i] = SQL_VALUE
 
-        return
-
     def insert_all(self):
+        self._tabularize(self.path)
+        self._clean_data()
+        self._relational_schema()
         self._create_table()
         self._data2SQLValues()
 
-        SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.table)};"
-        execute_statement(self.dbctxt, SQL_STATEMENT)
+        for i in range(len(self.table) // self.chunksize + 1):
+            logger.debug(f"Inserting chunk {i+1} of {len(self.table) // self.chunksize + 1}")
+            SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.table[(i * self.chunksize):(i + 1) * self.chunksize])};"
+            execute_statement(self.dbctxt, SQL_STATEMENT)
 
         q3c_index_table(self.dbctxt, self.ra, self.dec)
 
-        return
 
-
-class CosmicFlows4Config(CSVConfig):
+class CosmicFlows4Config(PlainTextConfig):
     def __init__(self, dbctxt, path):
         super().__init__(dbctxt, path)
         self.ra  = "RAJ2000"
@@ -277,12 +273,12 @@ class CosmicFlows4Config(CSVConfig):
             "PA double precision",
             "r_R1 double precision",
             "IdCat double precision",
-            "big_g_mag double precision",
+            "gaia_uppercase_g_mag double precision",
             "BPmag double precision",
             "PM double precision",
             "angDist double precision",
             "rmagpsf double precision",
-            "little_g_mag double precision",
+            "gmag double precision",
             "rmag double precision",
             "imag double precision",
             "zmag double precision",
@@ -291,14 +287,14 @@ class CosmicFlows4Config(CSVConfig):
             "dK double precision",
             "r_gmag double precision",
             "r_W1mag double precision",
-            "EoBmV double precision",
+            "E_BmV double precision",
             "logM double precision",
             "fRel double precision",
             "fracNearby double precision"
         ]
-        self._clean_data()
 
     def _clean_data(self):
+        self.table = self.table[1:-1]
         for i, row in enumerate(self.table):
             self.table[i][1] = f"\'{row[1]}\'"
 
@@ -306,6 +302,296 @@ class CosmicFlows4Config(CSVConfig):
                 if (col == ""):
                     self.table[i][j] = "NULL"
 
+
+class HecateV2Config(PlainTextConfig):
+    def __init__(self, dbctxt: DBctxt, path: str, chunksize: int = 1000):
+        super().__init__(dbctxt, path)
+        self.ra = "RAdeg"
+        self.dec = "DEdeg"
+        
+        self.bytes_ranges = [
+            range(1,7),
+            range(9,38),
+            range(40,58),
+            range(60,78),
+            range(80,98),
+            range(100,117),
+            range(119,128),
+            range(130,139),
+            range(141,142),
+            range(144,153),
+            range(155,164),
+            range(166,175),
+            range(177,178),
+            range(180,200),
+            range(202,211),
+            range(213,215),
+            range(217,225),
+            range(227,238),
+            range(240,252),
+            range(254,265),
+            range(267,279),
+            range(281,292),
+            range(294,304),
+            range(306,306),
+            range(308,314),
+            range(316,323),
+            range(325,330),
+            range(332,337),
+            range(339,344),
+            range(346,351),
+            range(353,357),
+            range(359,363),
+            range(365,369),
+            range(371,375),
+            range(377,388),
+            range(390,401),
+            range(403,414),
+            range(416,427),
+            range(429,429),
+            range(431,431),
+            range(433,433),
+            range(435,435),
+            range(437,447),
+            range(449,459),
+            range(461,471),
+            range(473,482),
+            range(484,488),
+            range(490,494),
+            range(496,500),
+            range(502,506),
+            range(508,520),
+            range(522,529),
+            range(531,539),
+            range(541,549),
+            range(551,560),
+            range(562,571),
+            range(573,582),
+            range(584,594),
+            range(596,607),
+            range(609,620),
+            range(622,627),
+            range(629,634),
+            range(636,641),
+            range(643,647),
+            range(649,656),
+            range(658,662),
+            range(664,664),
+            range(666,677),
+            range(679,690),
+            range(692,703),
+            range(705,716),
+            range(718,729),
+            range(731,741),
+            range(743,754),
+            range(756,767),
+            range(769,780),
+            range(782,793),
+            range(795,806),
+            range(808,819),
+            range(821,826),
+            range(828,833),
+            range(835,846),
+            range(848,859),
+            range(861,872),
+            range(874,885),
+            range(887,898),
+            range(900,911),
+            range(913,924),
+            range(926,937),
+            range(939,950),
+            range(952,963),
+            range(965,976),
+            range(978,989),
+            range(991,1002),
+            range(1004,1015),
+            range(1017,1024),
+            range(1026,1031),
+            range(1033,1038),
+            range(1040,1045),
+            range(1047,1047),
+            range(1049,1053),
+            range(1055,1060),
+            range(1062,1067),
+            range(1069,1074),
+            range(1076,1081),
+            range(1083,1088),
+            range(1090,1101),
+            range(1103,1114),
+            range(1116,1125),
+            range(1127,1135),
+            range(1137,1146),
+            range(1148,1152),
+            range(1154,1156),
+            range(1158,1166),
+            range(1168,1176),
+            range(1178,1182),
+            range(1184,1186),
+            range(1188,1212),
+            range(1214,1221),
+            range(1223,1230),
+            range(1232,1240),
+            range(1242,1250),
+            range(1252,1258),
+            range(1260,1286),
+            range(1288,1289),
+            range(1291,1293),
+            range(1295,1348)
+        ]
+
+        self.relational_schema = [
+            "PGC            int8",
+            "OBJNAME        text",
+            "ALLWISE        text",
+            "OBJID          text",
+            "SPECOBJID      text",
+            "PS2            text",
+            "RAdeg          float8",
+            "DEdeg          float8",
+            "Fastrom        int8",
+            "R1             float8",
+            "R2             float8",
+            "PA             float8",
+            "Rflag          text",
+            "ROrigin        text",
+            "T              float8",
+            "e_T            float8",
+            "Incl           float8",
+            "HRV            float8",
+            "e_HRV          float8",
+            "Vvir           float8",
+            "e_Vvir         float8",
+            "Dist           float8",
+            "e_Dist         float8",
+            "f_Dist         int8",
+            "AG             float8",
+            "AI             float8",
+            "Umagtot        float8",
+            "Bmagtot        float8",
+            "Vmagtot        float8",
+            "Imagtot        float8",
+            "e_Umagtot      float8",
+            "e_Bmagtot      float8",
+            "e_Vmagtot      float8",
+            "e_Imagtot      float8",
+            "FS12           float8",
+            "FS25           float8",
+            "FS60           float8",
+            "FS100          float8",
+            "q_FS12         int8",
+            "q_FS25         int8",
+            "q_FS60         int8",
+            "q_FS100        int8",
+            "W1mag          float8",
+            "W2mag          float8",
+            "W3mag          float8",
+            "W4mag          float8",
+            "e_W1mag        float8",
+            "e_W2mag        float8",
+            "e_W3mag        float8",
+            "e_W4mag        float8",
+            "ALLWISEap      text",
+            "q_ALLWISE      text",
+            "WF1mag         float8",
+            "WF2mag         float8",
+            "WF3mag         float8",
+            "WF4mag         float8",
+            "e_WF1mag       float8",
+            "e_WF2mag       float8",
+            "e_WF3mag       float8",
+            "e_WF4mag       float8",
+            "Jmag           float8",
+            "Hmag           float8",
+            "Kmag           float8",
+            "e_Jmag         float8",
+            "e_Hmag         float8",
+            "e_Kmag         float8",
+            "R2MASS         int8",
+            "umag           float8",
+            "gmag           float8",
+            "rmag           float8",
+            "imag           float8",
+            "zmag           float8",
+            "ymag           float8",
+            "e_umag         float8",
+            "e_gmag         float8",
+            "e_rmag         float8",
+            "e_imag         float8",
+            "e_zmag         float8",
+            "e_ymag         float8",
+            "RoptPhot       text",
+            "q_optPhot      text",
+            "FHbeta         float8",
+            "e_FHbeta       float8",
+            "FOIII5007      float8",
+            "e_FOIII5007    float8",
+            "FOI6300        float8",
+            "e_FOI6300      float8",
+            "FHalpha        float8",
+            "e_FHalpha      float8",
+            "FNII6584       float8",
+            "e_FNII6584     float8",
+            "FSII6717       float8",
+            "e_FSII6717     float8",
+            "FSII6731       float8",
+            "e_FSII6731     float8",
+            "Rspec          text",
+            "W1_W2_RF       float8",
+            "W2_W3_RF       float8",
+            "G_R_FIB_RF     float8",
+            "ActivClass     int8",
+            "RActivClass    text",
+            "SFGProb        float8",
+            "AGNProb        float8",
+            "LINERProb      float8",
+            "COMPProb       float8",
+            "PASSProb       float8",
+            "EoBmV         float8",
+            "e_EoBmV       float8",
+            "logSFRGSW      float8",
+            "logMstarGSW    float8",
+            "logSFRHEC      float8",
+            "q_logSFRHEC    text",
+            "r_logSFRHEC    text",
+            "n_logSFRHEC    text",
+            "logMstarHEC    float8",
+            "q_logMstarHEC  text",
+            "r_logMstarHEC  text",
+            "n_logMstarHEC  text",
+            "Metal          float8",
+            "n_Metal        text",
+            "logMBH         float8",
+            "r_logMBH       text",
+            "DupFlag        int8",
+            "BlendFlag      text",
+            "Star           text",
+            "WCNotes        text",
+            "Notes          text"
+        ]
+
+    def _tabularize(self, path):
+        with open(path, "r") as file:
+            self.table = file.read()
+            self.table = self.table.split("\n")
+            for i in range(len(self.table)):
+                row = []
+                for j in range(len(self.bytes_ranges)):
+                    row.append(self.table[i][(self.bytes_ranges[j].start):(self.bytes_ranges[j].stop)])
+                    
+                self.table[i] = row
+    
+    def _clean_data(self):
+        self.table = self.table[:-1]
+        for row in range(len(self.table)):
+            for col in range(len(self.table[row])):
+                self.table[row][col] = self.table[row][col].replace(" ", "")
+
+                if (self.relational_schema[col].split()[1] == "text"):
+                    self.table[row][col] = f"\'{self.table[row][col]}\'"
+
+                if (self.table[row][col] == "---" or self.table[row][col] == "--" or self.table[row][col] == "-" or self.table[row][col] == " " or self.table[row][col] == "" or self.table[row][col] == None or self.table[row][col] == "\'\'"):
+                    self.table[row][col] = "NULL"
+    
 
 class DESIDR1Config(BasicAstropyConfig):
     COEFF_COUNT = 10
