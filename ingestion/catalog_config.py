@@ -3,7 +3,7 @@ import gzip
 import os
 import logging
 
-from astropy.table import Table
+from astropy.table import Table, join
 import fitsio
 import numpy as np
 import psycopg2
@@ -22,6 +22,7 @@ Catalogs = Enum('Catalogs',
     ('FERMILPSC',    'Fermi_LPSC'),
     ('FERMI3FHL',    'Fermi_3FHL'),
     ('HECATE2',      'HECATE2'),
+    ('LSDR9',        'LS_DR9'),
     ('NEDLVS',       'NEDLVS'),
     ('TWOMASS',      'Two_MASS'),
     ('ZTFVARSTAR',   'ZTF_varstar')
@@ -57,7 +58,18 @@ class CatalogConfig():
     # "public"
     # ##########################################################################
     def insert_all(self):
-        raise NotImplementedError()
+        self._tabularize(self.path)
+        self._clean_data()
+        self._relational_schema()
+        self._create_table()
+        self._data2SQLValues()
+
+        for i in range(len(self.data) // self.chunksize + 1):
+            logger.debug(f"Inserting chunk {i+1} of {len(self.data) // self.chunksize + 1}")
+            SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.data[(i * self.chunksize) : ((i + 1) * self.chunksize)])};"
+            execute_statement(self.dbctxt, SQL_STATEMENT)
+
+        q3c_index_table(self.dbctxt, self.ra, self.dec)
 
 
 class BasicAstropyConfig(CatalogConfig):
@@ -65,32 +77,27 @@ class BasicAstropyConfig(CatalogConfig):
         super().__init__(dbctxt, path)
 
         self.chunk_rows: int = int(chunk_rows)
+        self.ra: str  = "ra"
+        self.dec: str = "dec"
 
-        BasicAstropyConfig._tabularize(self, path)
-        BasicAstropyConfig._clean_data(self)
-        BasicAstropyConfig._relational_schema(self)
-
-        self.ra  = "ra"
-        self.dec = "dec"
-
-    def _tabularize(self, path: str):
-        self.table = Table.read(path)
-
-    def _clean_data(self):
-        pass # no modifications to table are necessary
+    def _tabularize(self, path: str, format: str = None):
+        self.data = Table.read(path, format)
 
     def _relational_schema(self):
             self.relational_schema = "( "
 
             # ap_types = set() # used in devel to get src data types (in the fits file, not implementation)
-            for col_index in range(len(self.table.colnames)):
-                colname = self.table.colnames[col_index]
-                np_dtype = str(type(self.table[colname][0]))
-                ap_dtype = self.table[colname].dtype.str
-                pg_type = numpy2PGSQL.convert(ap_dtype)
+            for col_index in range(len(self.data.colnames)):
+                colname = self.data.colnames[col_index]
+                np_dtype = str(type(self.data[colname][0]))
+                ap_dtype = self.data[colname].dtype.str
+                pg_dtype = numpy2PGSQL.convert(ap_dtype)
+
+                if (len(self.data[colname].shape) > 1):
+                    pg_dtype += f"[{self.data[colname].shape[1]}]"
                 
                 # ap_types.add(ap_dtype) # used in devel to get src data types (in the fits file, not implementation)
-                self.relational_schema += f"\n{colname.ljust(20)}\t{pg_type},"
+                self.relational_schema += f"\n{colname.ljust(20)}\t{pg_dtype},"
         
             self.relational_schema = self.relational_schema[:-1] # get rid of the trailing comma bc PGSQL syntax won't ignore it
             self.relational_schema += ")"
@@ -119,21 +126,30 @@ class BasicAstropyConfig(CatalogConfig):
     def _data2SQLValues(self, rows: range) -> str:
         all_values = []
     
-        cols = range(len(self.table.columns))
+        cols = range(len(self.data.columns))
 
         for row_index in rows:
             values = "( "
+
             for col_index in cols:
-                value = str(self.table[row_index][col_index])
-                valtype = numpy2PGSQL.convert(self.table[self.table.colnames[col_index]].dtype.str)
+                value = str(self.data[row_index][col_index])
+                dtype = numpy2PGSQL.convert(self.data[self.data.colnames[col_index]].dtype.str)
 
                 # ##############################################################
                 # TODO: DRY: delegate to a fun. for cleaning
                 # ##############################################################
-                if value == "--":
-                        value = "null"
+                if (type(self.data[row_index][col_index]) is np.ma.core.MaskedConstant):
+                    value = "NULL"
 
-                if valtype == "text":
+                if (type(self.data[row_index][col_index]) is np.ndarray):
+                    value = "'{" + f'{", ".join(value.replace("[", "").replace("]", "").split())}' + "}'"
+
+                if dtype == "text":
+                    value = value.replace(" ", "")
+                    
+                    if (value == "" or value == " " or value == "-" or value == "--" or value == "---" or value == " --"):
+                        value = "NULL"
+                    
                     value = value.replace('"', '"""') # SQL escapes a quote with another quote
                     value = value.replace("'", "''")
                     values += f"\'{value}\', "
@@ -148,15 +164,18 @@ class BasicAstropyConfig(CatalogConfig):
         return all_values
     
     def insert_all(self):
+        self._tabularize(self.path)
+        self._clean_data()
+        self._relational_schema()
         self._create_table()
         
-        for i in range(0, len(self.table), self.chunk_rows):
+        for i in range(0, len(self.data), self.chunk_rows):
 
             stringified_chunk = ""
             SQL_statement = ""
-            rows = range(i, min(len(self.table), i + self.chunk_rows))
+            rows = range(i, min(len(self.data), i + self.chunk_rows))
             
-            logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.table)}.")
+            logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
             
             chunked_vals = self._data2SQLValues(rows)
 
@@ -177,15 +196,14 @@ class BasicAstropyConfig(CatalogConfig):
         q3c_index_table(self.dbctxt, self.ra, self.dec)
 
 
-class PlainTextConfig(CatalogConfig):
+class HeaderedDataConfig(CatalogConfig):
     def __init__(self, dbctxt: DBctxt, path: str, chunksize: int = 1000):
         self.dbctxt:            DBctxt = dbctxt
         self.path:              str    = path
-        self.relational_schema: str    = ""
-        self.table                     = None
-        self.chunksize                 = chunksize
-        self.ra                        = "ra"
-        self.dec                       = "dec"
+        self.relational_schema: str    = None
+        self.chunksize:         int    = chunksize
+        self.ra:                str    = "ra"
+        self.dec:               str    = "dec"
 
     def _tabularize(self, path: str):
         with open(path, "r") as f:
@@ -195,10 +213,7 @@ class PlainTextConfig(CatalogConfig):
                 row = row.split(",")
                 content[i] = row
         
-        self.table = content
-    
-    def _clean_data(self):
-        pass
+        self.data = content
     
     def _relational_schema(self):
         return self.relational_schema
@@ -227,28 +242,14 @@ class PlainTextConfig(CatalogConfig):
     def _data2SQLValues(self) -> str:
         SQL_VALUE = ""
 
-        for i, row in enumerate(self.table):
+        for i, row in enumerate(self.data):
             SQL_VALUE = "("
             SQL_VALUE += ", ".join(row)
             SQL_VALUE += ")"
-            self.table[i] = SQL_VALUE
-
-    def insert_all(self):
-        self._tabularize(self.path)
-        self._clean_data()
-        self._relational_schema()
-        self._create_table()
-        self._data2SQLValues()
-
-        for i in range(len(self.table) // self.chunksize + 1):
-            logger.debug(f"Inserting chunk {i+1} of {len(self.table) // self.chunksize + 1}")
-            SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.table[(i * self.chunksize):(i + 1) * self.chunksize])};"
-            execute_statement(self.dbctxt, SQL_STATEMENT)
-
-        q3c_index_table(self.dbctxt, self.ra, self.dec)
+            self.data[i] = SQL_VALUE
 
 
-class CosmicFlows4Config(PlainTextConfig):
+class CosmicFlows4Config(HeaderedDataConfig):
     def __init__(self, dbctxt, path):
         super().__init__(dbctxt, path)
         self.ra  = "RAJ2000"
@@ -287,23 +288,23 @@ class CosmicFlows4Config(PlainTextConfig):
             "dK double precision",
             "r_gmag double precision",
             "r_W1mag double precision",
-            "E_BmV double precision",
+            "ebv double precision",
             "logM double precision",
             "fRel double precision",
             "fracNearby double precision"
         ]
 
     def _clean_data(self):
-        self.table = self.table[1:-1]
-        for i, row in enumerate(self.table):
-            self.table[i][1] = f"\'{row[1]}\'"
+        self.data = self.data[1:-1]
+        for i, row in enumerate(self.data):
+            self.data[i][1] = f"\'{row[1]}\'"
 
             for j, col in enumerate(row):
                 if (col == ""):
-                    self.table[i][j] = "NULL"
+                    self.data[i][j] = "NULL"
 
 
-class HecateV2Config(PlainTextConfig):
+class HecateV2Config(HeaderedDataConfig):
     def __init__(self, dbctxt: DBctxt, path: str, chunksize: int = 1000):
         super().__init__(dbctxt, path)
         self.ra = "RAdeg"
@@ -546,8 +547,8 @@ class HecateV2Config(PlainTextConfig):
             "LINERProb      float8",
             "COMPProb       float8",
             "PASSProb       float8",
-            "EoBmV         float8",
-            "e_EoBmV       float8",
+            "ebv            float8",
+            "e_ebv          float8",
             "logSFRGSW      float8",
             "logMstarGSW    float8",
             "logSFRHEC      float8",
@@ -571,26 +572,26 @@ class HecateV2Config(PlainTextConfig):
 
     def _tabularize(self, path):
         with open(path, "r") as file:
-            self.table = file.read()
-            self.table = self.table.split("\n")
-            for i in range(len(self.table)):
+            self.data = file.read()
+            self.data = self.data.split("\n")
+            for i in range(len(self.data)):
                 row = []
                 for j in range(len(self.bytes_ranges)):
-                    row.append(self.table[i][(self.bytes_ranges[j].start):(self.bytes_ranges[j].stop)])
+                    row.append(self.data[i][(self.bytes_ranges[j].start):(self.bytes_ranges[j].stop)])
                     
-                self.table[i] = row
+                self.data[i] = row
     
     def _clean_data(self):
-        self.table = self.table[:-1]
-        for row in range(len(self.table)):
-            for col in range(len(self.table[row])):
-                self.table[row][col] = self.table[row][col].replace(" ", "")
+        self.data = self.data[:-1]
+        for row in range(len(self.data)):
+            for col in range(len(self.data[row])):
+                self.data[row][col] = self.data[row][col].replace(" ", "")
 
                 if (self.relational_schema[col].split()[1] == "text"):
-                    self.table[row][col] = f"\'{self.table[row][col]}\'"
+                    self.data[row][col] = f"\'{self.data[row][col]}\'"
 
-                if (self.table[row][col] == "---" or self.table[row][col] == "--" or self.table[row][col] == "-" or self.table[row][col] == " " or self.table[row][col] == "" or self.table[row][col] == None or self.table[row][col] == "\'\'"):
-                    self.table[row][col] = "NULL"
+                if (self.data[row][col] == "---" or self.data[row][col] == "--" or self.data[row][col] == "-" or self.data[row][col] == " " or self.data[row][col] == "" or self.data[row][col] == None or self.data[row][col] == "\'\'"):
+                    self.data[row][col] = "NULL"
     
 
 class DESIDR1Config(BasicAstropyConfig):
@@ -605,17 +606,64 @@ class DESIDR1Config(BasicAstropyConfig):
     def _tabularize(self, path):
         logger.debug(f"Opening data file {path}...")
         try:
-            self.table = Table(fitsio.read(path, ext=1)) # this will take a while, this is a large file
+            self.data = Table(fitsio.read(path, ext=1)) # this will take a while, this is a large file
         except Exception as e:
             logger.debug(e)
 
         logger.debug("done loading data file.")
 
     def _clean_data(self):
-        oldcol = self.table['COEFF'].data
-        self.table.remove_column('COEFF')
+        oldcol = self.data['COEFF'].data
+        self.data.remove_column('COEFF')
         for i in range(DESIDR1Config.COEFF_COUNT):
-            self.table.add_column(oldcol[:, i], index=DESIDR1Config.COEFF_INDEX + i, name=f"COEFF_{i:02}")
+            self.data.add_column(oldcol[:, i], index=DESIDR1Config.COEFF_INDEX + i, name=f"COEFF_{i:02}")
+
+
+class LSDR9Config(BasicAstropyConfig):
+    def __init__(self, dbctxt, path, chunksize = 1000):
+        super().__init__(dbctxt, path, chunksize)
+
+    def _tabularize(self, path):
+        if (os.path.isfile(path) and os.path.isfile(path.replace(".fits", "-pz.fits"))):
+            sweep = Table.read(path)
+            sweep_pz = Table.read(path.replace(".fits", "-pz.fits"))
+            self.data = join(sweep, sweep_pz)
+
+    def insert_all(self):
+        filenames = os.listdir(self.path)
+        filenames = [filename for filename in filenames if not ("-pz.fits" in filename)]
+
+        for file in filenames:
+            self._tabularize(f"{os.path.dirname(self.path)}/{file}")
+            self._clean_data()
+            self._relational_schema()
+            self._create_table()
+
+            for i in range(0, len(self.data), self.chunk_rows):
+
+                stringified_chunk = ""
+                SQL_statement = ""
+                rows = range(i, min(len(self.data), i + self.chunk_rows))
+
+                logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
+
+                chunked_vals = self._data2SQLValues(rows)
+
+                stringified_chunk = ", ".join(chunked_vals)
+
+                SQL_statement = f"INSERT INTO {self.dbctxt.sql_table} VALUES {stringified_chunk};"
+
+                # connect to db & insert
+                with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, user=self.dbctxt.POSTGRES_USER, port=self.dbctxt.POSTGRES_PORT, password=self.dbctxt.POSTGRES_PASSWORD, dbname=self.dbctxt.POSTGRES_DB) as conn:
+                    with conn.cursor() as cur:
+                        try:
+                            cur.execute(SQL_statement)
+                            conn.commit()
+                        except Exception as e:
+                            raise e
+
+        q3c_index_table(self.dbctxt, self.ra, self.dec)
+        logger.info("done.")
 
 
 class TwoMASSConfig(CatalogConfig):
