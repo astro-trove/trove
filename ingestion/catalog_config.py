@@ -620,7 +620,7 @@ class DESIDR1Config(BasicAstropyConfig):
 
 
 class LSDR9Config(BasicAstropyConfig):
-    def __init__(self, dbctxt, path, chunksize = 1000):
+    def __init__(self, dbctxt, path, chunksize = 100000):
         super().__init__(dbctxt, path, chunksize)
 
     def _tabularize(self, path):
@@ -629,15 +629,22 @@ class LSDR9Config(BasicAstropyConfig):
             sweep_pz = Table.read(path.replace(".fits", "-pz.fits"))
             self.data = join(sweep, sweep_pz)
 
+    def _clean_data(self):
+        pass
+
     def insert_all(self):
         filenames = os.listdir(self.path)
         filenames = [filename for filename in filenames if not ("-pz.fits" in filename)]
 
-        for file in filenames:
+        self._tabularize(f"{os.path.dirname(self.path)}/{filenames[0]}")
+        self._clean_data()
+        self._relational_schema()
+        self._create_table()
+
+        for file_index, file in enumerate(filenames):
             self._tabularize(f"{os.path.dirname(self.path)}/{file}")
             self._clean_data()
             self._relational_schema()
-            self._create_table()
 
             for i in range(0, len(self.data), self.chunk_rows):
 
@@ -645,7 +652,7 @@ class LSDR9Config(BasicAstropyConfig):
                 SQL_statement = ""
                 rows = range(i, min(len(self.data), i + self.chunk_rows))
 
-                logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
+                logger.info(f"File {file_index + 1} of {len(filenames)}. Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
 
                 chunked_vals = self._data2SQLValues(rows)
 
