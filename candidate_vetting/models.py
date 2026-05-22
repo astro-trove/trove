@@ -1405,6 +1405,16 @@ class Hecate1TargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "hecate1_targetmatch"
 
+class Hecate2TargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "hecate2_targetmatch"
+
 class DesiDr1TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
