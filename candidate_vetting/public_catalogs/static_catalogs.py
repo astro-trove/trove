@@ -20,6 +20,7 @@ from ..models import (
     GladePlusQ3C,
     GwgcQ3C,
     Hecate1Q3C,
+    Hecate2Q3C,
     LsDr10Q3C,
     MilliquasQ3C,
     Ps1Q3C,
@@ -259,15 +260,40 @@ class Hecate1(StaticCatalog):
             axis=1
         )
         
+        df["submitter"] = [""]*len(df)
+
+        df = self._standardize_df(df)
+
+        return df
+
+class Hecate2(StaticCatalog):
+    catalog_model = Hecate2Q3C
+    colmap = {
+        "hid":"trove_uniq",
+        "objname":"name",
+        "dist":"lumdist", # Mpc
+        "e_dist":"lumdist_err", # Mpc
+        "radeg":"ra",
+        "decdeg":"dec",
+        "rmag":"default_mag" # magnitude to use for pcc
+    }
+
+    def to_standardized_catalog(self, df):
+        df["lumdist_neg_err"] = df.lumdist_err
+        df["lumdist_pos_err"] = df.lumdist_err
+
+        self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
+        self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
+
         df["z_type"] = df.apply(
-            lambda row : "z ind." if row.dmethod == "N" else "spec-z",
+            lambda row : "z ind." if row.f_dist == 0 else "spec-z",
             axis=1
         )
         
         df["submitter"] = [""]*len(df)
-        
+
         df = self._standardize_df(df)
-        
+
         return df
     
 class LsDr10(StaticCatalog):
