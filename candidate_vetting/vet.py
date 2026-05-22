@@ -50,7 +50,7 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     # DesiSpec,
     GladePlus,
     Gwgc,
-    Hecate,
+    Hecate1,
     LsDr10,
     Ps1Galaxy,
     Sdss12Photoz,
@@ -67,7 +67,7 @@ from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
 from candidate_vetting.models import (
     GladePlusTargetMatch,
     GwgcTargetMatch,
-    HecateTargetMatch,
+    Hecate1TargetMatch,
     LsDr10TargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch,
@@ -117,7 +117,7 @@ GALAXY_CATALOGS = [
     UserGalaxy,
     GladePlus,
     Gwgc,
-    Hecate,
+    Hecate1,
     DesiDr1,
     # DesiSpec, # this duplicates with DESI DR1 (which also includes the EDR data)
     NedLvs,
@@ -133,7 +133,7 @@ GALAXY_TARGETMATCHES = [
     UserGalaxyTargetMatch,
     GladePlusTargetMatch,
     GwgcTargetMatch,
-    HecateTargetMatch,
+    Hecate1TargetMatch,
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
     LsDr10TargetMatch,
@@ -481,7 +481,7 @@ def host_association(target_id:int, radius:float=HOST_ASSOC_RADIUS,
         catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
         seps = coord.separation(catalog_coord).arcsec
         df["offset"] = seps
-        df["pcc"] = pcc(df["default_mag"], seps)
+        df["pcc"] = pcc(seps, df["default_mag"])
         df = df[df.pcc <= pcc_threshold]
                 
         # now save the cleaned dataset
