@@ -238,6 +238,7 @@ class Gwgc(StaticCatalog):
     
 class Hecate1(StaticCatalog):
     catalog_model = Hecate1Q3C
+
     colmap = {
         "hid":"trove_uniq",
         "objname":"name",
@@ -268,19 +269,22 @@ class Hecate1(StaticCatalog):
 
 class Hecate2(StaticCatalog):
     catalog_model = Hecate2Q3C
+    ra_colname = "radeg"
+    dec_colname = "dedeg"
+
     colmap = {
         "hid":"trove_uniq",
         "objname":"name",
         "dist":"lumdist", # Mpc
         "e_dist":"lumdist_err", # Mpc
         "radeg":"ra",
-        "decdeg":"dec",
+        "dedeg":"dec",
         "rmag":"default_mag" # magnitude to use for pcc
     }
 
     def to_standardized_catalog(self, df):
-        df["lumdist_neg_err"] = df.lumdist_err
-        df["lumdist_pos_err"] = df.lumdist_err
+        df["lumdist_neg_err"] = df.e_dist
+        df["lumdist_pos_err"] = df.e_dist
 
         self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
         self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
