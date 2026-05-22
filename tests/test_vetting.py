@@ -257,12 +257,12 @@ class TestStaticCatalogStandardization:
         assert 'lumdist' in result.columns
         assert 'lumdist_neg_err' in result.columns
 
-    def test_hecate_standardize(self):
-        """Test HECATE catalog standardization."""
+    def test_hecate1_standardize(self):
+        """Test HECATE1 catalog standardization."""
         import pandas as pd
-        from candidate_vetting.public_catalogs.static_catalogs import Hecate
+        from candidate_vetting.public_catalogs.static_catalogs import Hecate1
         
-        cat = Hecate()
+        cat = Hecate1()
         df = pd.DataFrame({
             'ra': [150.0],
             'dec': [30.0],

@@ -57,7 +57,7 @@ class TestQ3CModels:
             'Gaiadr3VariableQ3C',
             'GladePlusQ3C',
             'GwgcQ3C',
-            'HecateQ3C',
+            'Hecate1Q3C',
             'LsDr10Q3C',
             'MilliquasQ3C',
             'Ps1Q3C',

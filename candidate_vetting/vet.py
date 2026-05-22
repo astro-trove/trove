@@ -47,7 +47,7 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     DesiSpec,
     GladePlus,
     Gwgc,
-    Hecate,
+    Hecate1,
     LsDr10,
     Ps1Galaxy,
     Sdss12Photoz,
@@ -94,7 +94,7 @@ D_LIM_UPPER = 1e4  # 10,000 Mpc
 GALAXY_CATALOGS = [
     GladePlus,
     Gwgc,
-    Hecate,
+    Hecate1,
     DesiDr1,
     # DesiSpec, # this duplicates with DESI DR1 (which also includes the EDR data)
     NedLvs,

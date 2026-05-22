@@ -19,7 +19,7 @@ from ..models import (
     Gaiadr3VariableQ3C,
     GladePlusQ3C,
     GwgcQ3C,
-    HecateQ3C,
+    Hecate1Q3C,
     LsDr10Q3C,
     MilliquasQ3C,
     Ps1Q3C,
@@ -224,8 +224,8 @@ class Gwgc(StaticCatalog):
         df["z_type"] = "spec-z/z ind."
         return df
     
-class Hecate(StaticCatalog):
-    catalog_model = HecateQ3C
+class Hecate1(StaticCatalog):
+    catalog_model = Hecate1Q3C
     colmap = {
         "objname":"name",
         "d":"lumdist", # Mpc

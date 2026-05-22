@@ -130,5 +130,5 @@ def sample_host_galaxy_df():
         'default_mag': [18.0, 19.0, 17.5],
         'offset': [2.5, 5.0, 1.0],
         'pcc': [0.1, 0.2, 0.05],
-        'catalog': ['GladePlus', 'DesiDr1', 'Hecate']
+        'catalog': ['GladePlus', 'DesiDr1', 'Hecate1']
     })

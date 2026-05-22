@@ -425,7 +425,7 @@ class GwgcQ3C(models.Model):
         db_table = 'gwgc_q3c'
 
 
-class HecateQ3C(models.Model):
+class Hecate1Q3C(models.Model):
     hid = models.AutoField(primary_key=True)
     pgc = models.IntegerField(blank=True, null=True)
     objname = models.CharField(max_length=64, blank=True, null=True)
@@ -530,7 +530,7 @@ class HecateQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'hecate_q3c'
+        db_table = 'hecate1_q3c'
 
 
 class LsDr10Q3C(models.Model):
