@@ -1,104 +1,44 @@
-import time
-import numpy as np
-
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import connection
 from trove_targets.models import Target
 from tom_targets.models import BaseTarget
-from custom_code.alertstream_handlers import (
-    pick_slack_channel,
-    send_slack,
-    vet_or_post_error,
-)
+from custom_code.alertstream_handlers import pick_slack_channel, send_slack, vet_or_post_error
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from datetime import datetime, timedelta, timezone
 from custom_code.templatetags.target_extras import split_name
-from candidate_vetting.models import TnsQ3C
-
-# from slack_sdk import WebClient
+#from slack_sdk import WebClient
+import numpy as np
+import json
 import logging
 
 from astropy.coordinates import SkyCoord
 from healpix_alchemy.constants import HPX
 
 logger = logging.getLogger(__name__)
-new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
+new_format = logging.Formatter('[%(asctime)s] %(levelname)s : s%(message)s')
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-# slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
-# slack_tns50 = WebClient(settings.SLACK_TOKEN_TNS50)
-# slack_ep = WebClient(settings.SLACK_TOKEN_EP)
-
-
+#slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
+#slack_tns50 = WebClient(settings.SLACK_TOKEN_TNS50)
+#slack_ep = WebClient(settings.SLACK_TOKEN_EP)
+        
 class Command(BaseCommand):
-    help = ("Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit). \n"+
-            "Example:\n\n"+
-            "\t--lookback-days-nle 100 --first-det-min -1 --first-det-max 10 --vetting-lookback-start 150 --vetting-lookback-end 90 "+
-            "will look for NLEs from the last 100 days, associate TNS "+
-            "transients with first detection between 1 day pre- and 10 days "+
-            "post-NLE, and vet everything between 150 and 90 days old with "+
-            "respect to current time")
-    
+
+    help = 'Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit)'
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--lookback-days-nle",
-            help="Consider nonlocalized events active if event at MOST "+
-            "this many days ago. POSITIVE number expected.",
-            type=float,
-            default=7.0,
-        )
-        parser.add_argument(
-            "--first-det-min",
-            help="Associate TNS targets with first detection at EARLIEST "+
-            "|first-det-min| days before nonlocalized event. NEGATIVE number "+
-            "expected. Default -1, which will consider targets with first "+
-            "detection at earliest 1 day before nonlocalized event.",
-            type=float,
-            default=-1,
-        )
-        parser.add_argument(
-            "--first-det-max",
-            help="Associate TNS targets with first detection at LATEST "+
-            "first-det-max days after nonlocalized event. POSITIVE number "+
-            "expected.",
-            type=float,
-            default=10,
-        )
-        parser.add_argument(
-            "--vetting-lookback-start",
-            help="Re-vet TNS targets with discovery date AFTER "+
-            "(now - vetting-lookback-start) days ago. POSITIVE number "+
-            "expected, e.g., 10 will re-vet targets less than 10 days old. "+
-            "Default None, which will re-vet new TNS targets only.",
-            type=float,
-            default=None,
-        )
-        parser.add_argument(
-            "--vetting-lookback-end",
-            help="Re-vet TNS targets with discovery date EARLIER than "+
-            "(now - vetting-lookback-end) days ago. POSITIVE number "+
-            "expected, e.g., 5 will re-vet targets more than 5 days old. "+
-            "Default 0, which will re-vet everything up to now if and only "+
-            "if vetting-lookback-start also specified.",
-            type=float,
-            default=0,
-        )
+        parser.add_argument('--lookback-days-nle', help='Nonlocalized events are considered active for this many days',
+                            type=float, default=7.)
+        parser.add_argument('--lookback-days-obs', help='Associate transients whose first detection was within this '
+                                                        'many days of the nonlocalized event',
+                            type=float, default=3.)
 
-    def handle(
-        self,
-        lookback_days_nle=7.0,
-        first_det_min=-1,
-        first_det_max=10,
-        vetting_lookback_start=None,
-        vetting_lookback_end=None,
-        **kwargs,
-    ):
-
+    def handle(self, lookback_days_nle=7., lookback_days_obs=3., **kwargs):
+        
         with connection.cursor() as cursor:
-            cursor.execute("""
+             cursor.execute("""
                  --STEP 0: update coordinates and prefix of existing targets with TNS names
                  UPDATE tom_targets_basetarget AS tt
                  SET name = CONCAT(tns.name_prefix, tns.name),
@@ -111,16 +51,12 @@ class Command(BaseCommand):
                         OR tt.name != CONCAT(tns.name_prefix, tns.name))
                  RETURNING tt.id;
              """)
-            updated_ids = [row[0] for row in cursor.fetchall()]
-            updated_targets_coords = Target.objects.filter(id__in=updated_ids)
+             updated_ids = [row[0] for row in cursor.fetchall()]
+             updated_targets_coords = Target.objects.filter(id__in = updated_ids)
+        
+        logger.info(f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS.")
 
-        logger.info(
-            f"Updated coordinates of {len(updated_targets_coords):d} targets to match the TNS."
-        )
-
-        logger.info(
-            "Crossmatching TNS with targets table. This will take several minutes."
-        )
+        logger.info('Crossmatching TNS with targets table. This will take several minutes.')
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -164,8 +100,8 @@ class Command(BaseCommand):
                 """
             )
             updated_ids = [row[0] for row in cursor.fetchall()]
-            updated_targets = Target.objects.filter(id__in=updated_ids)
-
+            updated_targets = Target.objects.filter(id__in = updated_ids)
+            
         logger.info(f"Updated {len(updated_targets):d} targets to match the TNS.")
 
         with connection.cursor() as cursor:
@@ -227,39 +163,35 @@ class Command(BaseCommand):
             )
 
         with connection.cursor() as cursor:
-            cursor.execute(
+             cursor.execute(
                 """
                 SELECT old_id FROM targets_to_merge
                 """
-            )
-            ids_to_delete = [row[0] for row in cursor.fetchall()]
+             )
+             ids_to_delete = [row[0] for row in cursor.fetchall()]
 
-        deleted_targets = Target.objects.filter(id__in=ids_to_delete)
+        deleted_targets = Target.objects.filter(id__in = ids_to_delete)
         deleted_targets.delete()
-
+             
         logger.info(f"Merged {len(deleted_targets):d} targets into TNS targets.")
         for target in deleted_targets:
             logger.info(f" - deleted target {target.name} during merge")
 
         with connection.cursor() as cursor:
-            cursor.execute(
+             cursor.execute(
                 """
                 --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
                 INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
                 SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, ''
-                FROM tns_q3c
-                WHERE name_prefix != 'FRB' AND
-                      name != '2023hzc' AND -- this is a duplicate of AT2016jlf in the TNS
-                      CONCAT(name_prefix, name) NOT IN (SELECT name FROM tom_targets_basetarget)
-                
+                FROM tns_q3c WHERE name_prefix != 'FRB' AND name != '2023hzc' -- this is a duplicate of AT2016jlf in the TNS
                 ON CONFLICT (name) DO NOTHING
                 RETURNING id;
                 """
-            )
+             )
 
-            new_target_ids = [row[0] for row in cursor.fetchall()]
-            new_targets = Target.objects.filter(id__in=new_target_ids)
-
+             new_target_ids = [row[0] for row in cursor.fetchall()]
+             new_targets = Target.objects.filter(id__in = new_target_ids)
+             
         logger.info(f"Added {len(new_targets):d} new targets from the TNS.")
 
         # update the Trove Target table with redshift and classification info from TNS
@@ -267,43 +199,34 @@ class Command(BaseCommand):
             cursor.execute(
                 """
                 -- Step 5: Update the trove_targets_target table with redshift and classifications from TNS
-                WITH mismatched_targets AS (
-                  SELECT DISTINCT tt.basetarget_ptr_id, tns.redshift, tns.objtype
-                  FROM trove_targets_target AS tt
-                  INNER JOIN tom_targets_basetarget AS bt
-                    ON bt.id = tt.basetarget_ptr_id
-                  INNER JOIN tns_q3c AS tns
-                    ON tns.name = REGEXP_REPLACE(bt.name, '^[^0-9]*', '')
-                  WHERE tt.redshift IS DISTINCT FROM tns.redshift
-                    OR tt.classification IS DISTINCT FROM tns.objtype
-                )
                 UPDATE trove_targets_target AS tt
-                SET redshift = mt.redshift,
-                    classification = mt.objtype
-                FROM mismatched_targets AS mt
-                WHERE tt.basetarget_ptr_id = mt.basetarget_ptr_id
+                  SET redshift = tns.redshift,
+                      classification = tns.objtype
+                  FROM tns_q3c AS tns
+                  INNER JOIN tom_targets_basetarget AS bt
+                  ON tns.name = REGEXP_REPLACE(bt.name, '^[^0-9]*', '')
+                  WHERE bt.id = tt.basetarget_ptr_id AND (
+                      tt.redshift IS NULL OR
+                      tt.redshift = 'nan'
+                  )
                 RETURNING tt.basetarget_ptr_id;
                 """
             )
+            
+            update_target_ids = [row[0] for row in cursor.fetchall()]
+        logger.info(f"Updated {len(update_target_ids):d} targets with classifications and/or redshifts from the TNS.")
 
-            updated_target_ids = [row[0] for row in cursor.fetchall()]
-        logger.info(
-            f"Updated {len(updated_target_ids):d} targets with classifications and/or redshifts from the TNS."
-        )
-
+            
         # Finally, we need to insert these into the Trove Target table rather than
         # just the TOM BaseTarget table
 
         # these missing_targets should be the ones that are added to the BaseTarget
         # table but not the Trove Targets table
         # note that we will recompute the healpix, etc. below. These are just
-        # temporary placeholders
-        missing_targets = BaseTarget.objects.filter(target__isnull=True)
-        missing_target_ids = [t.id for t in missing_targets]
-        logger.info(
-            f"Adding {len(missing_targets):d} from basetarget table to trove target table"
-        )
-        for basetarget in missing_targets:
+        # temporary placeholders        
+        missing_targets = BaseTarget.objects.filter(target__isnull = True)
+        logger.info(f"Adding {len(missing_targets):d} from basetarget table to trove target table")
+        for basetarget in missing_targets:            
             # create the target with the basetarget ptr
             coord = SkyCoord(basetarget.ra, basetarget.dec, unit="deg")
             with connection.cursor() as cursor:
@@ -318,50 +241,15 @@ class Command(BaseCommand):
                 )
                 """)
 
-        # now we need to vet all targets in user provided range
-        new_or_updated = list(
-            # the set here just takes the unique set of these lists to make sure we
-            # don't vet more than necessary
-            set(updated_target_ids + new_target_ids + missing_target_ids)
-        )
-        if vetting_lookback_start is not None:
-            recent_tns_transients = TnsQ3C.objects.filter(
-                discoverydate__gte = datetime.now() - timedelta(days=vetting_lookback_start),
-                discoverydate__lte = datetime.now() - timedelta(days=vetting_lookback_end)
-            )
-            tns_names = [q.name_prefix + q.name for q in list(recent_tns_transients)]
-            targets_to_vet = Target.objects.filter(name__in=tns_names)
-        else:
-            targets_to_vet = Target.objects.filter(basetarget_ptr_id__in=new_or_updated)
+            trove_target = Target.objects.filter(
+                basetarget_ptr_id = basetarget.id
+            ).first()
 
-        nvet = targets_to_vet.count()
-        logger.info(f"Vetting {nvet} targets from TNS, this might take a bit...")
-        vetting_start = time.time()
-        for ii, trove_target in enumerate(targets_to_vet):
-            single_vetting_start = time.time()
+            # then vet this target
             vet_or_post_error(
                 trove_target,
-                # slack_tns,
-                # channel='alerts-tns',
+                #slack_tns,
+                #channel='alerts-tns',
                 lookback_days_nle=lookback_days_nle,
-                first_det_min=first_det_min,
-                first_det_max=first_det_max,
-                # then only vet if there is new photometry and no updates to this target
-                skip_vet_if_no_new_phot=(
-                    trove_target.basetarget_ptr_id not in new_or_updated
-                ),
-                use_async_mpc=True,
+                lookback_days_obs=lookback_days_obs
             )
-            single_vetting_time = time.time() - single_vetting_start
-            logger.info("##########################################################")
-            logger.info(
-                f"[{ii + 1}/{nvet}] Vetting {trove_target.name} took {single_vetting_time:.2f}s. "
-                + f"So far, vetting of TNS transients has taken {(time.time() - vetting_start) / 60:.2f}mins"
-            )
-            logger.info("##########################################################")
-
-        total_vetting_time = time.time() - vetting_start
-        logger.info(
-            f"Vetting took {total_vetting_time / 60:.2f}mins with an average of "
-            + f"{total_vetting_time / nvet:.2f}s per target"
-        )
