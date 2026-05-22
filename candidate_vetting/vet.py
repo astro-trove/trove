@@ -51,6 +51,7 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     GladePlus,
     Gwgc,
     Hecate1,
+    Hecate2,
     LsDr10,
     Ps1Galaxy,
     Sdss12Photoz,
@@ -68,6 +69,7 @@ from candidate_vetting.models import (
     GladePlusTargetMatch,
     GwgcTargetMatch,
     Hecate1TargetMatch,
+    Hecate2TargetMatch,
     LsDr10TargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch,
@@ -118,6 +120,7 @@ GALAXY_CATALOGS = [
     GladePlus,
     Gwgc,
     Hecate1,
+    # Hecate2, # TODO: commented out for now, need to compare HECATE v1 and v2
     DesiDr1,
     # DesiSpec, # this duplicates with DESI DR1 (which also includes the EDR data)
     NedLvs,
@@ -134,6 +137,7 @@ GALAXY_TARGETMATCHES = [
     GladePlusTargetMatch,
     GwgcTargetMatch,
     Hecate1TargetMatch,
+    # Hecate2TargetMatch, # TODO: commented out for now, need to compare HECATE v1 and v2
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
     LsDr10TargetMatch,
