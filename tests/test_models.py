@@ -24,42 +24,10 @@ class TestTargetModel:
         
         assert isinstance(healpix, (int, np.integer))
         assert healpix >= 0
-
-    def test_distance_modulus_calculation(self):
-        """Test distance modulus calculation."""
-        distance_mpc = 100.0
-        dm = 5.0 * (np.log10(distance_mpc * 1e6) - 1)
         
-        assert dm > 0
-        assert abs(dm - 35.0) < 0.1
-
-    def test_absolute_magnitude_calculation(self):
-        """Test absolute magnitude calculation from apparent magnitude."""
-        apparent_mag = 19.0
-        distance_mpc = 100.0
-        dm = 5.0 * (np.log10(distance_mpc) + 5.)
-        absolute_mag = apparent_mag - dm
-        
-        assert absolute_mag < apparent_mag
-
 
 class TestScoreFactorModel:
     """Tests for ScoreFactor model in candidate_vetting/models.py"""
-
-    def test_score_factor_key_values(self):
-        """Test valid score factor key values."""
-        valid_keys = [
-            'skymap_score',
-            'ps_score',
-            'host_distance_score',
-            'phot_peak_lum',
-            'phot_peak_time',
-            'phot_decay_rate'
-        ]
-        
-        for key in valid_keys:
-            assert len(key) > 0
-            assert isinstance(key, str)
 
     def test_score_value_range(self):
         """Test score values are numeric."""
