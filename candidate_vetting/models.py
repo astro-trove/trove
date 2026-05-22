@@ -536,6 +536,7 @@ class Hecate1Q3C(models.Model):
 
 
 class Hecate2Q3C(models.Model):
+    hid = models.AutoField(primary_key=True)
     pgc = models.IntegerField(blank=True, null=True)
     objname = models.CharField(max_length=64, blank=True, null=True)
     allwise = models.CharField(max_length=64, blank=True, null=True)
