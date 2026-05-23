@@ -24,7 +24,8 @@ from ..models import (
     GwgcQ3C,
     Hecate1Q3C,
     Hecate2Q3C,
-    LsDr10Q3C,
+    LsDr9NorthQ3C,
+    LsDr10SouthQ3C,
     MilliquasQ3C,
     NedlvsQ3C,
     Ps1Q3C,
@@ -277,9 +278,51 @@ class Hecate2(StaticCatalog):
         df = self._standardize_df(df)
 
         return df
+
+
+class LsDr9North(StaticCatalog):
+    catalog_model = LsDr9NorthQ3C
+    dec_colname = "dec"
+
+    def __init__(self):
+        # flux_r is in nanomaggy
+        self.catalog_model.objects = self.catalog_model.objects.filter(
+            flux_r__gt=0
+        ).annotate(
+            default_mag=22.5-2.5*_Log10('flux_r')
+        )
+
+        self.colmap = {
+            "lid":"trove_uniq",
+            "objid":"name",
+            "ra":"ra",
+            "dec":"dec",
+            "default_mag":"default_mag",
+            "z_phot_mean":"z",
+            "z_phot_std":"z_err",
+        }
+
+        # then, of course, init the super class
+        super().__init__()
+
+    def to_standardized_catalog(self, df):
+        df["z_neg_err"] = df.z_phot_mean - df.z_phot_l68
+        df["z_pos_err"] = df.z_phot_u68 - df.z_phot_mean
+
+        self.colmap["z_neg_err"] = "z_neg_err"
+        self.colmap["z_pos_err"] = "z_pos_err"
+
+        df = self._standardize_df(df)
+        df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value
+        df["lumdist_err"] = cosmo.luminosity_distance(df.z_err).to(u.Mpc).value
+        df["lumdist_neg_err"] = cosmo.luminosity_distance(df.z_neg_err).to(u.Mpc).value
+        df["lumdist_pos_err"] = cosmo.luminosity_distance(df.z_pos_err).to(u.Mpc).value
+        df["z_type"] = "photo-z"
+        df["submitter"] = ""
+        return df
     
-class LsDr10(StaticCatalog):
-    catalog_model = LsDr10Q3C
+class LsDr10South(StaticCatalog):
+    catalog_model = LsDr10SouthQ3C
     dec_colname = "declination"
     
     def __init__(self):
