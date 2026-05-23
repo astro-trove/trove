@@ -15,6 +15,7 @@ from .util import PS1_POINT_SOURCE_THRESHOLD, RADIUS_ARCSEC
 from ..models import (
     AsassnQ3C,
     DesiSpecQ3C,
+    DesiDr1Q3C,
     FermiLatQ3C,
     Gaiadr3VariableQ3C,
     GladePlusQ3C,
@@ -23,13 +24,12 @@ from ..models import (
     Hecate2Q3C,
     LsDr10Q3C,
     MilliquasQ3C,
+    NedlvsQ3C,
     Ps1Q3C,
     RomaBzcatQ3C,
     Sdss12PhotozQ3C,
-    ZtfVarstarQ3C,
     TwomassQ3C,
-    NedlvsQ3C,
-    DesiDr1Q3C
+    ZtfVarstarQ3C,
 )
 
 class _Log10(Func):
@@ -39,11 +39,6 @@ class _Log10(Func):
 class AsassnVariableStar(StaticCatalog):
     catalog_model = AsassnQ3C
 
-class TwoMass(StaticCatalog):
-    catalog_model = TwomassQ3C
-    ra_colname = "ra"
-    dec_colname = "decl"
-    
 class DesiDr1(StaticCatalog):
     catalog_model = DesiDr1Q3C
     ra_colname = "target_ra"
@@ -82,58 +77,6 @@ class DesiDr1(StaticCatalog):
         df["z_type"] = "spec-z"
         df["submitter"] = [""]*len(df)
         return df
-    
-class NedLvs(StaticCatalog):
-    catalog_model = NedlvsQ3C
-    colmap = {
-        "id":"trove_uniq",
-        "objname":"name",
-        "z":"z",
-        "z_unc":"z_err", 
-        "distmpc": "lumdist", # Mpc
-        "distmpc_unc":"lumdist_err", # Mpc
-        "ra":"ra",
-        "dec":"dec",
-        "m_j":"default_mag" # use 2MASS J for the Pcc magnitude
-    }
-
-    def to_standardized_catalog(self, df):
-        def _get_ztype(row):
-            if row.distmpc_method == "zIndependent":
-                return "z ind."
-            if row.z_tech == "SPEC":
-                return "spec-z"
-            return "photo-z"
-        
-        df["z_type"] = df.apply(_get_ztype, axis=1)
-                
-        df = self._standardize_df(df)
-
-        # some rows don't have uncertainty on redshift
-        # we can assume these are spec-z's with very small uncertainty
-        df["z_err"] = df.z_err.fillna(1e-3)
-        df["z_neg_err"] = df.z_err
-        df["z_pos_err"] = df.z_err
-        
-        lumdist_err = pd.Series(
-            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value,
-            index = df.index
-        ) 
-        # when lumdist_err is NaN is when the z_err column is also NaN
-        # so we assume an uncertainty on the distance of ~4.5 Mpc (the conversion
-        # from z_err = 1e-3 to Mpc)
-        df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
-        df["lumdist_neg_err"] = df.lumdist_err
-        df["lumdist_pos_err"] = df.lumdist_err
-        
-        df["submitter"] = [""]*len(df)
-
-        return df
-    
-class ZtfVarStar(StaticCatalog):
-    catalog_model = ZtfVarstarQ3C
-    ra_colname = "radeg"
-    dec_colname = "dedeg"
     
 class DesiSpec(StaticCatalog):
     catalog_model = DesiSpecQ3C
@@ -409,7 +352,54 @@ class Milliquas(StaticCatalog):
         df["z_type"] = "spec-z"
         df["submitter"] = [""]*len(df)
         return df
+
+class NedLvs(StaticCatalog):
+    catalog_model = NedlvsQ3C
+    colmap = {
+        "id":"trove_uniq",
+        "objname":"name",
+        "z":"z",
+        "z_unc":"z_err", 
+        "distmpc": "lumdist", # Mpc
+        "distmpc_unc":"lumdist_err", # Mpc
+        "ra":"ra",
+        "dec":"dec",
+        "m_j":"default_mag" # use 2MASS J for the Pcc magnitude
+    }
+
+    def to_standardized_catalog(self, df):
+        def _get_ztype(row):
+            if row.distmpc_method == "zIndependent":
+                return "z ind."
+            if row.z_tech == "SPEC":
+                return "spec-z"
+            return "photo-z"
         
+        df["z_type"] = df.apply(_get_ztype, axis=1)
+                
+        df = self._standardize_df(df)
+
+        # some rows don't have uncertainty on redshift
+        # we can assume these are spec-z's with very small uncertainty
+        df["z_err"] = df.z_err.fillna(1e-3)
+        df["z_neg_err"] = df.z_err
+        df["z_pos_err"] = df.z_err
+        
+        lumdist_err = pd.Series(
+            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value,
+            index = df.index
+        ) 
+        # when lumdist_err is NaN is when the z_err column is also NaN
+        # so we assume an uncertainty on the distance of ~4.5 Mpc (the conversion
+        # from z_err = 1e-3 to Mpc)
+        df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
+        df["lumdist_neg_err"] = df.lumdist_err
+        df["lumdist_pos_err"] = df.lumdist_err
+        
+        df["submitter"] = [""]*len(df)
+
+        return df
+
 class Ps1(StaticCatalog):
     catalog_model = Ps1Q3C
     colmap = {
@@ -478,3 +468,13 @@ class Sdss12Photoz(StaticCatalog):
         df["z_type"] = "photo-z"
         df["submitter"] = [""]*len(df)
         return df
+    
+class TwoMass(StaticCatalog):
+    catalog_model = TwomassQ3C
+    ra_colname = "ra"
+    dec_colname = "decl"
+    
+class ZtfVarStar(StaticCatalog):
+    catalog_model = ZtfVarstarQ3C
+    ra_colname = "radeg"
+    dec_colname = "dedeg"
