@@ -869,7 +869,7 @@ class Hecate2Q3C(models.Model):
         db_table = 'hecate2_q3c'
 
 
-class LsDr9Q3C(models.Model):
+class LsDr9NorthQ3C(models.Model):
     lid = models.BigAutoField(primary_key=True)
     release = models.SmallIntegerField(blank=True, null=True)
     brickname = models.CharField(max_length=64, blank=True, null=True)
@@ -999,10 +999,10 @@ class LsDr9Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ls_dr9_q3c'
+        db_table = 'ls_dr9_q3c' ## TODO: update table name on datatrove and here
 
 
-class LsDr10Q3C(models.Model):
+class LsDr10SouthQ3C(models.Model):
     lid = models.BigAutoField(primary_key=True)
     brickid = models.IntegerField(blank=True, null=True)
     objid = models.IntegerField(blank=True, null=True)
@@ -1058,7 +1058,7 @@ class LsDr10Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ls_dr10_q3c'
+        db_table = 'ls_dr10_q3c' ## TODO: update table name on datatrove and here
 
 
 class MilliquasQ3C(models.Model):
@@ -1620,7 +1620,7 @@ class Hecate2TargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "hecate2_targetmatch"
 
-class LsDr9TargetMatch(models.Model):
+class LsDr9NorthTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
     host_galaxy = models.BigIntegerField(blank=False, null=False)
@@ -1628,9 +1628,9 @@ class LsDr9TargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
-        db_table = "ls_dr9_targetmatch"
+        db_table = "ls_dr9_targetmatch" ## TODO: update table name on datatrove and here
 
-class LsDr10TargetMatch(models.Model):
+class LsDr10SouthTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
     host_galaxy = models.BigIntegerField(blank=False, null=False)
@@ -1638,7 +1638,7 @@ class LsDr10TargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
-        db_table = "ls_dr10_targetmatch"
+        db_table = "ls_dr10_targetmatch" ## TODO: update table name on datatrove and here
 
 class NedLvsTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
