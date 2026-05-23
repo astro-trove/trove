@@ -53,7 +53,8 @@ from candidate_vetting.public_catalogs.static_catalogs import (
     Gwgc,
     Hecate1,
     Hecate2,
-    LsDr10,
+    LsDr9North,
+    LsDr10South,
     Ps1Galaxy,
     Sdss12Photoz,
     AsassnVariableStar,
@@ -72,7 +73,8 @@ from candidate_vetting.models import (
     GwgcTargetMatch,
     Hecate1TargetMatch,
     Hecate2TargetMatch,
-    LsDr10TargetMatch,
+    LsDr9NorthTargetMatch,
+    LsDr10SouthTargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch,
     NedLvsTargetMatch,
@@ -126,7 +128,8 @@ GALAXY_CATALOGS = [
     DesiDr1,
     NedLvs,
     # Cosmicflows4, # TODO: commented out for now
-    LsDr10,
+    # LsDr9North, # TODO: commented out for now
+    LsDr10South,
     Ps1Galaxy,
     Sdss12Photoz
 ]
@@ -143,7 +146,8 @@ GALAXY_TARGETMATCHES = [
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
     # Cosmicflows4TargetMatch, # TODO: commented out for now
-    LsDr10TargetMatch,
+    # LsDr9NorthTargetMatch, # TODO: commented out for now
+    LsDr10SouthTargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch]
 GALAXY_TARGETMATCH_DICT = dict(zip([g.__name__ for g in GALAXY_CATALOGS], GALAXY_TARGETMATCHES))
