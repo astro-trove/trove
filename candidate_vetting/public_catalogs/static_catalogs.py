@@ -2,6 +2,7 @@
 Define the static catalogs for querying
 """
 from astropy import units as u
+from astropy.cosmology import z_at_value
 import pandas as pd
 import numpy as np
 
@@ -14,6 +15,7 @@ from .catalog import StaticCatalog
 from .util import PS1_POINT_SOURCE_THRESHOLD, RADIUS_ARCSEC
 from ..models import (
     AsassnQ3C,
+    Cosmicflows4Q3C,
     DesiSpecQ3C,
     DesiDr1Q3C,
     FermiLatQ3C,
@@ -38,6 +40,36 @@ class _Log10(Func):
 
 class AsassnVariableStar(StaticCatalog):
     catalog_model = AsassnQ3C
+
+class Cosmicflows4(StaticCatalog):
+    catalog_model = Cosmicflows4Q3C
+    ra_colname = "raj2000"
+    dec_colname = "dej2000"
+
+    colmap = {
+        "cid":"trove_uniq",
+        "name":"name",
+        "z":"z",
+        "dist": "lumdist", # Mpc
+        "e_dist":"lumdist_err", # Mpc
+        "raj2000":"ra",
+        "dej2000":"dec",
+        "rmag":"default_mag" # magnitude column to use for pcc
+    }
+
+    def to_standardized_catalog(self, df):
+        df["lumdist_neg_err"] = df.e_dist
+        df["lumdist_pos_err"] = df.e_dist
+
+        self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
+        self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
+
+        df["z_type"] = "z-ind."
+        df["submitter"] = ""
+
+        df = self._standardize_df(df)
+
+        return df
 
 class DesiDr1(StaticCatalog):
     catalog_model = DesiDr1Q3C
@@ -75,7 +107,7 @@ class DesiDr1(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err 
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df
     
 class DesiSpec(StaticCatalog):
@@ -113,7 +145,7 @@ class DesiSpec(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err 
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df    
         
 class FermiLat(StaticCatalog):
@@ -156,7 +188,7 @@ class GladePlus(StaticCatalog):
         df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err   
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df
 
 class Gwgc(StaticCatalog):
@@ -176,7 +208,7 @@ class Gwgc(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z/z ind."
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df
     
 class Hecate1(StaticCatalog):
@@ -204,7 +236,7 @@ class Hecate1(StaticCatalog):
             axis=1
         )
         
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
 
         df = self._standardize_df(df)
 
@@ -228,16 +260,19 @@ class Hecate2(StaticCatalog):
     def to_standardized_catalog(self, df):
         df["lumdist_neg_err"] = df.e_dist
         df["lumdist_pos_err"] = df.e_dist
+        df["z"] = z_at_value(cosmo.luminosity_distance, ### TODO: I think this my be slow, but HECATEv2 doesn't have z's. Remove?
+                             df.dist.values * u.Mpc)
 
         self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
         self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
+        self.colmap["z"] = "z"
 
         df["z_type"] = df.apply(
             lambda row : "z ind." if row.f_dist == 0 else "spec-z",
             axis=1
         )
         
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
 
         df = self._standardize_df(df)
 
@@ -281,7 +316,7 @@ class LsDr10(StaticCatalog):
         df["lumdist_neg_err"] = cosmo.luminosity_distance(df.z_neg_err).to(u.Mpc).value
         df["lumdist_pos_err"] = cosmo.luminosity_distance(df.z_pos_err).to(u.Mpc).value
         df["z_type"] = "photo-z"
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df
 
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
@@ -350,7 +385,7 @@ class Milliquas(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df
 
 class NedLvs(StaticCatalog):
@@ -396,7 +431,7 @@ class NedLvs(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
 
         return df
 
@@ -422,7 +457,7 @@ class Ps1(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "photo-z"
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df
 
 class Ps1Galaxy(Ps1):
@@ -466,7 +501,7 @@ class Sdss12Photoz(StaticCatalog):
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "photo-z"
-        df["submitter"] = [""]*len(df)
+        df["submitter"] = ""
         return df
     
 class TwoMass(StaticCatalog):
