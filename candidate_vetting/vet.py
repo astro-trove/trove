@@ -48,6 +48,7 @@ from candidate_vetting.tasks import async_vet
 
 from candidate_vetting.public_catalogs.static_catalogs import (
     # DesiSpec,
+    Cosmicflows4,
     GladePlus,
     Gwgc,
     Hecate1,
@@ -66,6 +67,7 @@ from candidate_vetting.public_catalogs.static_catalogs import (
 )
 from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
 from candidate_vetting.models import (
+    Cosmicflows4TargetMatch,
     GladePlusTargetMatch,
     GwgcTargetMatch,
     Hecate1TargetMatch,
@@ -122,8 +124,8 @@ GALAXY_CATALOGS = [
     Hecate1,
     # Hecate2, # TODO: commented out for now, need to compare HECATE v1 and v2
     DesiDr1,
-    # DesiSpec, # this duplicates with DESI DR1 (which also includes the EDR data)
     NedLvs,
+    # Cosmicflows4, # TODO: commented out for now
     LsDr10,
     Ps1Galaxy,
     Sdss12Photoz
@@ -140,6 +142,7 @@ GALAXY_TARGETMATCHES = [
     # Hecate2TargetMatch, # TODO: commented out for now, need to compare HECATE v1 and v2
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
+    # Cosmicflows4TargetMatch, # TODO: commented out for now
     LsDr10TargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch]
