@@ -52,7 +52,8 @@ class DesiDr1(StaticCatalog):
         self.catalog_model.objects = self.catalog_model.objects.filter(
             flux_r__gt=0, # anything with a negative flux (in the linear nanomaggy unit) can be ignored
             zwarn = 0, # we don't want anything with ZWARN > 0: https://data.desi.lbl.gov/doc/releases/dr1/
-            zcat_primary = True # only take the best ("primary") redshift for this target
+            zcat_primary = True, # only take the best ("primary") redshift for this target
+            z__gt = 0 # some z's are negative for some reason
         ).annotate(
             default_mag=22.5-2.5*_Log10('flux_r')
         )
