@@ -621,6 +621,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the redshift of user-uploaded host galaxies
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
+    userz_distance_hosts.reset_index(inplace=True) # avoid iloc exception
     if len(userz_distance_hosts):
         max_score = userz_distance_hosts.dist_norm_joint_prob.max()
         max_score_host_name = userz_distance_hosts.iloc[
@@ -630,6 +631,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the redshift independent measurements of distances
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+    ind_distance_hosts.reset_index(inplace=True) # avoid iloc exception
     if len(ind_distance_hosts):
         max_score = ind_distance_hosts.dist_norm_joint_prob.max()
         max_score_host_name = ind_distance_hosts.iloc[
@@ -639,6 +641,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the specz hosts
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
+    specz_hosts.reset_index(inplace=True) # avoid iloc exception
     if len(specz_hosts):
         max_score = specz_hosts.dist_norm_joint_prob.max()
         max_score_host_name = specz_hosts.iloc[
