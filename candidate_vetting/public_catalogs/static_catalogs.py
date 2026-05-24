@@ -410,7 +410,8 @@ class Ps1Galaxy(Ps1):
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
         return query_set.filter(
-            ps_score__lte = PS1_POINT_SOURCE_THRESHOLD
+            ps_score__lte = PS1_POINT_SOURCE_THRESHOLD,
+            rmeanpsfmag__gt = 0
         )
 
 class Ps1PointSource(Ps1):
