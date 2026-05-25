@@ -3,6 +3,7 @@ Code to query dynamically updating photometry catalogs
 """
 
 # packages built into python
+import sys
 import os
 import glob
 import requests
