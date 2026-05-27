@@ -506,9 +506,6 @@ def host_association(
     print(f"Galaxy table queries finished in {end - start}s")
 
     # save the host galaxy dataframe to the TargetExtra "Host Galaxies" keyword
-    if not len(ret_df):
-        # then we don't need to actually save any host information
-        return ret_df
     _save_host_galaxy_df(ret_df, target)
     return ret_df
 
