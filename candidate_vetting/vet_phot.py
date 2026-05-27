@@ -476,11 +476,15 @@ def find_public_phot(
             query_atlas = (
                 days_ago > 3
             )  # otherwise ATLAS probably won't have anything new
+            print(f"ATLAS photometry already exists for {target.name}, most recent at "+
+                  f"{days_ago} days ago")
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
 
     if query_atlas:
+        print("Asynchronously obtaining ATLAS forced photometry with "+
+              f"days_ago = {min(days_ago_max, days_ago):.2f}\n\n")
         async_atlas_query.using(
             priority=queue_priority  # this sets the priority to whatever is passed in
         ).enqueue(
