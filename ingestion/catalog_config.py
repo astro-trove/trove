@@ -13,7 +13,7 @@ import numpy2PGSQL
 
 logger = logging.getLogger(__name__)
 
-comma_nl = ",\n"
+comma_nl = ",\n" # because `",\n".join(...)` doesn't work
 
 Catalogs = Enum('Catalogs', 
 [
@@ -29,29 +29,54 @@ Catalogs = Enum('Catalogs',
 ])
 
 class CatalogConfig():
-    def __init__(self, dbctxt: DBctxt, path: str):
+    """ Abstract class """
+    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
         self.dbctxt:            DBctxt = dbctxt
         self.path:              str    = path
         self.relational_schema: str    = None
         self.data                      = None
+        self.chunk_rows: int           = int(chunk_rows)
+        self.ra: str                   = "ra"
+        self.dec: str                  = "dec"
 
     # ##########################################################################
     # "private"
     # ##########################################################################
     def _tabularize(self, path: str):
-        # ex: return Table.read(path)
+        """ ex: return Table.read(path) """
         raise NotImplementedError()
     
     def _clean_data(self):
         raise NotImplementedError()
     
-    def _relational_schema(self):
+    def _relational_schema(self) -> str:
+        """ define relational_schema if necessary, assign to self.relational_schema, and return self.relational_schema """
         raise NotImplementedError()
 
     def _create_table(self):
-        raise NotImplementedError()
+        """ Generate SQL statement to create table """
+        logger.info(f"Creating new table in database {self.dbctxt.POSTGRES_DB} on host {self.dbctxt.POSTGRES_HOST}.")
 
-    def _data2SQLValues(self) -> str:
+        SQL_statement = ""
+        
+        SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
+        
+        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} {self.relational_schema};"
+        
+        with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
+            with conn.cursor() as cur:
+                try:
+                    cur.execute(SQL_statement)
+                    conn.commit()
+                except psycopg2.errors.DuplicateTable:
+                    raise f"Table {self.dbctxt.sql_table} already exists. Attemtping to continue with existing schema..."
+                except Exception as e: 
+                    raise e
+
+        logger.info("done creating table.")
+
+    def _data2SQL(self) -> str:
+        """ Convert data records into SQL INSERT strings """
         raise NotImplementedError()
 
     # ##########################################################################
@@ -62,23 +87,20 @@ class CatalogConfig():
         self._clean_data()
         self._relational_schema()
         self._create_table()
-        self._data2SQLValues()
+        self._data2SQL()
 
-        for i in range(len(self.data) // self.chunksize + 1):
-            logger.debug(f"Inserting chunk {i+1} of {len(self.data) // self.chunksize + 1}")
-            SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.data[(i * self.chunksize) : ((i + 1) * self.chunksize)])};"
+        for i in range(len(self.data) // self.chunk_rows + 1):
+            logger.info(f"Inserting chunk {i+1} of {len(self.data) // self.chunk_rows + 1}")
+            SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.data[(i * self.chunk_rows) : ((i + 1) * self.chunk_rows)])};"
             execute_statement(self.dbctxt, SQL_STATEMENT)
 
         q3c_index_table(self.dbctxt, self.ra, self.dec)
 
 
 class BasicAstropyConfig(CatalogConfig):
+    """ Abstract class """
     def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
         super().__init__(dbctxt, path)
-
-        self.chunk_rows: int = int(chunk_rows)
-        self.ra: str  = "ra"
-        self.dec: str = "dec"
 
     def _tabularize(self, path: str, format: str = None):
         self.data = Table.read(path, format)
@@ -101,29 +123,10 @@ class BasicAstropyConfig(CatalogConfig):
         
             self.relational_schema = self.relational_schema[:-1] # get rid of the trailing comma bc PGSQL syntax won't ignore it
             self.relational_schema += ")"
+            
             return self.relational_schema
-
-    def _create_table(self):
-        logger.info(f"Creating new table in database {self.dbctxt.POSTGRES_DB} on host {self.dbctxt.POSTGRES_HOST}.")
-
-        SQL_statement = ""
-        
-        SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
-        
-        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} {self.relational_schema};"
-        
-        with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
-            with conn.cursor() as cur:
-                try:
-                    cur.execute(SQL_statement)
-                    conn.commit()
-                except psycopg2.errors.DuplicateTable:
-                    raise f"Table {self.dbctxt.sql_table} already exists. Attemtping to continue with existing schema..."
-                except Exception as e: raise
-
-        logger.info("done creating table.")
                 
-    def _data2SQLValues(self, rows: range) -> str:
+    def _data2SQL(self, rows: range) -> str:
         all_values = []
     
         cols = range(len(self.data.columns))
@@ -177,7 +180,7 @@ class BasicAstropyConfig(CatalogConfig):
             
             logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
             
-            chunked_vals = self._data2SQLValues(rows)
+            chunked_vals = self._data2SQL(rows)
 
             stringified_chunk = ", ".join(chunked_vals)
 
@@ -197,13 +200,9 @@ class BasicAstropyConfig(CatalogConfig):
 
 
 class HeaderedDataConfig(CatalogConfig):
-    def __init__(self, dbctxt: DBctxt, path: str, chunksize: int = 1000):
-        self.dbctxt:            DBctxt = dbctxt
-        self.path:              str    = path
-        self.relational_schema: str    = None
-        self.chunksize:         int    = chunksize
-        self.ra:                str    = "ra"
-        self.dec:               str    = "dec"
+    """ Abstract class """
+    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 1000):
+        super().__init__(dbctxt, path, chunk_rows)
 
     def _tabularize(self, path: str):
         with open(path, "r") as f:
@@ -214,32 +213,8 @@ class HeaderedDataConfig(CatalogConfig):
                 content[i] = row
         
         self.data = content
-    
-    def _relational_schema(self):
-        return self.relational_schema
-    
-    def _create_table(self):
-        logger.info(f"Creating new table in database {self.dbctxt.POSTGRES_DB} on host {self.dbctxt.POSTGRES_HOST}.")
-
-        SQL_statement = ""
         
-        SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
-        
-        comma_nl = ",\n"
-        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} (\n{comma_nl.join(self.relational_schema)});"
-        with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
-            with conn.cursor() as cur:
-                try:
-                    cur.execute(SQL_statement)
-                    conn.commit()
-                except psycopg2.errors.DuplicateTable:
-                    raise f"Table {self.dbctxt.sql_table} already exists. Attemtping to continue with existing schema..."
-                except Exception as e: 
-                    raise e
-
-        logger.info("done creating table.")
-    
-    def _data2SQLValues(self) -> str:
+    def _data2SQL(self) -> str:
         SQL_VALUE = ""
 
         for i, row in enumerate(self.data):
@@ -250,11 +225,7 @@ class HeaderedDataConfig(CatalogConfig):
 
 
 class CosmicFlows4Config(HeaderedDataConfig):
-    def __init__(self, dbctxt, path):
-        super().__init__(dbctxt, path)
-        self.ra  = "RAJ2000"
-        self.dec = "DEJ2000"
-        self.relational_schema = [
+    relational_schema = [
             "recno bigint",
             "Name text",
             "RAJ2000 double precision",
@@ -293,6 +264,10 @@ class CosmicFlows4Config(HeaderedDataConfig):
             "fRel double precision",
             "fracNearby double precision"
         ]
+    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 1000):
+        super().__init__(dbctxt, path, chunk_rows)
+        self.ra  = "RAJ2000"
+        self.dec = "DEJ2000"
 
     def _clean_data(self):
         self.data = self.data[1:-1]
@@ -303,272 +278,276 @@ class CosmicFlows4Config(HeaderedDataConfig):
                 if (col == ""):
                     self.data[i][j] = "NULL"
 
+    def _relational_schema(self):
+        self.relational_schema = CosmicFlows4Config.relational_schema
+        return self._relational_schema
+
 
 class HecateV2Config(HeaderedDataConfig):
-    def __init__(self, dbctxt: DBctxt, path: str, chunksize: int = 1000):
-        super().__init__(dbctxt, path)
+    bytes_ranges = [
+        range(1,7),
+        range(9,38),
+        range(40,58),
+        range(60,78),
+        range(80,98),
+        range(100,117),
+        range(119,128),
+        range(130,139),
+        range(141,142),
+        range(144,153),
+        range(155,164),
+        range(166,175),
+        range(177,178),
+        range(180,200),
+        range(202,211),
+        range(213,215),
+        range(217,225),
+        range(227,238),
+        range(240,252),
+        range(254,265),
+        range(267,279),
+        range(281,292),
+        range(294,304),
+        range(306,306),
+        range(308,314),
+        range(316,323),
+        range(325,330),
+        range(332,337),
+        range(339,344),
+        range(346,351),
+        range(353,357),
+        range(359,363),
+        range(365,369),
+        range(371,375),
+        range(377,388),
+        range(390,401),
+        range(403,414),
+        range(416,427),
+        range(429,429),
+        range(431,431),
+        range(433,433),
+        range(435,435),
+        range(437,447),
+        range(449,459),
+        range(461,471),
+        range(473,482),
+        range(484,488),
+        range(490,494),
+        range(496,500),
+        range(502,506),
+        range(508,520),
+        range(522,529),
+        range(531,539),
+        range(541,549),
+        range(551,560),
+        range(562,571),
+        range(573,582),
+        range(584,594),
+        range(596,607),
+        range(609,620),
+        range(622,627),
+        range(629,634),
+        range(636,641),
+        range(643,647),
+        range(649,656),
+        range(658,662),
+        range(664,664),
+        range(666,677),
+        range(679,690),
+        range(692,703),
+        range(705,716),
+        range(718,729),
+        range(731,741),
+        range(743,754),
+        range(756,767),
+        range(769,780),
+        range(782,793),
+        range(795,806),
+        range(808,819),
+        range(821,826),
+        range(828,833),
+        range(835,846),
+        range(848,859),
+        range(861,872),
+        range(874,885),
+        range(887,898),
+        range(900,911),
+        range(913,924),
+        range(926,937),
+        range(939,950),
+        range(952,963),
+        range(965,976),
+        range(978,989),
+        range(991,1002),
+        range(1004,1015),
+        range(1017,1024),
+        range(1026,1031),
+        range(1033,1038),
+        range(1040,1045),
+        range(1047,1047),
+        range(1049,1053),
+        range(1055,1060),
+        range(1062,1067),
+        range(1069,1074),
+        range(1076,1081),
+        range(1083,1088),
+        range(1090,1101),
+        range(1103,1114),
+        range(1116,1125),
+        range(1127,1135),
+        range(1137,1146),
+        range(1148,1152),
+        range(1154,1156),
+        range(1158,1166),
+        range(1168,1176),
+        range(1178,1182),
+        range(1184,1186),
+        range(1188,1212),
+        range(1214,1221),
+        range(1223,1230),
+        range(1232,1240),
+        range(1242,1250),
+        range(1252,1258),
+        range(1260,1286),
+        range(1288,1289),
+        range(1291,1293),
+        range(1295,1348)
+    ]
+
+    relational_schema = [
+        "PGC            int8",
+        "OBJNAME        text",
+        "ALLWISE        text",
+        "OBJID          text",
+        "SPECOBJID      text",
+        "PS2            text",
+        "RAdeg          float8",
+        "DEdeg          float8",
+        "Fastrom        int8",
+        "R1             float8",
+        "R2             float8",
+        "PA             float8",
+        "Rflag          text",
+        "ROrigin        text",
+        "T              float8",
+        "e_T            float8",
+        "Incl           float8",
+        "HRV            float8",
+        "e_HRV          float8",
+        "Vvir           float8",
+        "e_Vvir         float8",
+        "Dist           float8",
+        "e_Dist         float8",
+        "f_Dist         int8",
+        "AG             float8",
+        "AI             float8",
+        "Umagtot        float8",
+        "Bmagtot        float8",
+        "Vmagtot        float8",
+        "Imagtot        float8",
+        "e_Umagtot      float8",
+        "e_Bmagtot      float8",
+        "e_Vmagtot      float8",
+        "e_Imagtot      float8",
+        "FS12           float8",
+        "FS25           float8",
+        "FS60           float8",
+        "FS100          float8",
+        "q_FS12         int8",
+        "q_FS25         int8",
+        "q_FS60         int8",
+        "q_FS100        int8",
+        "W1mag          float8",
+        "W2mag          float8",
+        "W3mag          float8",
+        "W4mag          float8",
+        "e_W1mag        float8",
+        "e_W2mag        float8",
+        "e_W3mag        float8",
+        "e_W4mag        float8",
+        "ALLWISEap      text",
+        "q_ALLWISE      text",
+        "WF1mag         float8",
+        "WF2mag         float8",
+        "WF3mag         float8",
+        "WF4mag         float8",
+        "e_WF1mag       float8",
+        "e_WF2mag       float8",
+        "e_WF3mag       float8",
+        "e_WF4mag       float8",
+        "Jmag           float8",
+        "Hmag           float8",
+        "Kmag           float8",
+        "e_Jmag         float8",
+        "e_Hmag         float8",
+        "e_Kmag         float8",
+        "R2MASS         int8",
+        "umag           float8",
+        "gmag           float8",
+        "rmag           float8",
+        "imag           float8",
+        "zmag           float8",
+        "ymag           float8",
+        "e_umag         float8",
+        "e_gmag         float8",
+        "e_rmag         float8",
+        "e_imag         float8",
+        "e_zmag         float8",
+        "e_ymag         float8",
+        "RoptPhot       text",
+        "q_optPhot      text",
+        "FHbeta         float8",
+        "e_FHbeta       float8",
+        "FOIII5007      float8",
+        "e_FOIII5007    float8",
+        "FOI6300        float8",
+        "e_FOI6300      float8",
+        "FHalpha        float8",
+        "e_FHalpha      float8",
+        "FNII6584       float8",
+        "e_FNII6584     float8",
+        "FSII6717       float8",
+        "e_FSII6717     float8",
+        "FSII6731       float8",
+        "e_FSII6731     float8",
+        "Rspec          text",
+        "W1_W2_RF       float8",
+        "W2_W3_RF       float8",
+        "G_R_FIB_RF     float8",
+        "ActivClass     int8",
+        "RActivClass    text",
+        "SFGProb        float8",
+        "AGNProb        float8",
+        "LINERProb      float8",
+        "COMPProb       float8",
+        "PASSProb       float8",
+        "ebv            float8",
+        "e_ebv          float8",
+        "logSFRGSW      float8",
+        "logMstarGSW    float8",
+        "logSFRHEC      float8",
+        "q_logSFRHEC    text",
+        "r_logSFRHEC    text",
+        "n_logSFRHEC    text",
+        "logMstarHEC    float8",
+        "q_logMstarHEC  text",
+        "r_logMstarHEC  text",
+        "n_logMstarHEC  text",
+        "Metal          float8",
+        "n_Metal        text",
+        "logMBH         float8",
+        "r_logMBH       text",
+        "DupFlag        int8",
+        "BlendFlag      text",
+        "Star           text",
+        "WCNotes        text",
+        "Notes          text"
+    ]
+
+    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 1000):
+        super().__init__(dbctxt, path, chunk_rows)
         self.ra = "RAdeg"
         self.dec = "DEdeg"
-        
-        self.bytes_ranges = [
-            range(1,7),
-            range(9,38),
-            range(40,58),
-            range(60,78),
-            range(80,98),
-            range(100,117),
-            range(119,128),
-            range(130,139),
-            range(141,142),
-            range(144,153),
-            range(155,164),
-            range(166,175),
-            range(177,178),
-            range(180,200),
-            range(202,211),
-            range(213,215),
-            range(217,225),
-            range(227,238),
-            range(240,252),
-            range(254,265),
-            range(267,279),
-            range(281,292),
-            range(294,304),
-            range(306,306),
-            range(308,314),
-            range(316,323),
-            range(325,330),
-            range(332,337),
-            range(339,344),
-            range(346,351),
-            range(353,357),
-            range(359,363),
-            range(365,369),
-            range(371,375),
-            range(377,388),
-            range(390,401),
-            range(403,414),
-            range(416,427),
-            range(429,429),
-            range(431,431),
-            range(433,433),
-            range(435,435),
-            range(437,447),
-            range(449,459),
-            range(461,471),
-            range(473,482),
-            range(484,488),
-            range(490,494),
-            range(496,500),
-            range(502,506),
-            range(508,520),
-            range(522,529),
-            range(531,539),
-            range(541,549),
-            range(551,560),
-            range(562,571),
-            range(573,582),
-            range(584,594),
-            range(596,607),
-            range(609,620),
-            range(622,627),
-            range(629,634),
-            range(636,641),
-            range(643,647),
-            range(649,656),
-            range(658,662),
-            range(664,664),
-            range(666,677),
-            range(679,690),
-            range(692,703),
-            range(705,716),
-            range(718,729),
-            range(731,741),
-            range(743,754),
-            range(756,767),
-            range(769,780),
-            range(782,793),
-            range(795,806),
-            range(808,819),
-            range(821,826),
-            range(828,833),
-            range(835,846),
-            range(848,859),
-            range(861,872),
-            range(874,885),
-            range(887,898),
-            range(900,911),
-            range(913,924),
-            range(926,937),
-            range(939,950),
-            range(952,963),
-            range(965,976),
-            range(978,989),
-            range(991,1002),
-            range(1004,1015),
-            range(1017,1024),
-            range(1026,1031),
-            range(1033,1038),
-            range(1040,1045),
-            range(1047,1047),
-            range(1049,1053),
-            range(1055,1060),
-            range(1062,1067),
-            range(1069,1074),
-            range(1076,1081),
-            range(1083,1088),
-            range(1090,1101),
-            range(1103,1114),
-            range(1116,1125),
-            range(1127,1135),
-            range(1137,1146),
-            range(1148,1152),
-            range(1154,1156),
-            range(1158,1166),
-            range(1168,1176),
-            range(1178,1182),
-            range(1184,1186),
-            range(1188,1212),
-            range(1214,1221),
-            range(1223,1230),
-            range(1232,1240),
-            range(1242,1250),
-            range(1252,1258),
-            range(1260,1286),
-            range(1288,1289),
-            range(1291,1293),
-            range(1295,1348)
-        ]
-
-        self.relational_schema = [
-            "PGC            int8",
-            "OBJNAME        text",
-            "ALLWISE        text",
-            "OBJID          text",
-            "SPECOBJID      text",
-            "PS2            text",
-            "RAdeg          float8",
-            "DEdeg          float8",
-            "Fastrom        int8",
-            "R1             float8",
-            "R2             float8",
-            "PA             float8",
-            "Rflag          text",
-            "ROrigin        text",
-            "T              float8",
-            "e_T            float8",
-            "Incl           float8",
-            "HRV            float8",
-            "e_HRV          float8",
-            "Vvir           float8",
-            "e_Vvir         float8",
-            "Dist           float8",
-            "e_Dist         float8",
-            "f_Dist         int8",
-            "AG             float8",
-            "AI             float8",
-            "Umagtot        float8",
-            "Bmagtot        float8",
-            "Vmagtot        float8",
-            "Imagtot        float8",
-            "e_Umagtot      float8",
-            "e_Bmagtot      float8",
-            "e_Vmagtot      float8",
-            "e_Imagtot      float8",
-            "FS12           float8",
-            "FS25           float8",
-            "FS60           float8",
-            "FS100          float8",
-            "q_FS12         int8",
-            "q_FS25         int8",
-            "q_FS60         int8",
-            "q_FS100        int8",
-            "W1mag          float8",
-            "W2mag          float8",
-            "W3mag          float8",
-            "W4mag          float8",
-            "e_W1mag        float8",
-            "e_W2mag        float8",
-            "e_W3mag        float8",
-            "e_W4mag        float8",
-            "ALLWISEap      text",
-            "q_ALLWISE      text",
-            "WF1mag         float8",
-            "WF2mag         float8",
-            "WF3mag         float8",
-            "WF4mag         float8",
-            "e_WF1mag       float8",
-            "e_WF2mag       float8",
-            "e_WF3mag       float8",
-            "e_WF4mag       float8",
-            "Jmag           float8",
-            "Hmag           float8",
-            "Kmag           float8",
-            "e_Jmag         float8",
-            "e_Hmag         float8",
-            "e_Kmag         float8",
-            "R2MASS         int8",
-            "umag           float8",
-            "gmag           float8",
-            "rmag           float8",
-            "imag           float8",
-            "zmag           float8",
-            "ymag           float8",
-            "e_umag         float8",
-            "e_gmag         float8",
-            "e_rmag         float8",
-            "e_imag         float8",
-            "e_zmag         float8",
-            "e_ymag         float8",
-            "RoptPhot       text",
-            "q_optPhot      text",
-            "FHbeta         float8",
-            "e_FHbeta       float8",
-            "FOIII5007      float8",
-            "e_FOIII5007    float8",
-            "FOI6300        float8",
-            "e_FOI6300      float8",
-            "FHalpha        float8",
-            "e_FHalpha      float8",
-            "FNII6584       float8",
-            "e_FNII6584     float8",
-            "FSII6717       float8",
-            "e_FSII6717     float8",
-            "FSII6731       float8",
-            "e_FSII6731     float8",
-            "Rspec          text",
-            "W1_W2_RF       float8",
-            "W2_W3_RF       float8",
-            "G_R_FIB_RF     float8",
-            "ActivClass     int8",
-            "RActivClass    text",
-            "SFGProb        float8",
-            "AGNProb        float8",
-            "LINERProb      float8",
-            "COMPProb       float8",
-            "PASSProb       float8",
-            "ebv            float8",
-            "e_ebv          float8",
-            "logSFRGSW      float8",
-            "logMstarGSW    float8",
-            "logSFRHEC      float8",
-            "q_logSFRHEC    text",
-            "r_logSFRHEC    text",
-            "n_logSFRHEC    text",
-            "logMstarHEC    float8",
-            "q_logMstarHEC  text",
-            "r_logMstarHEC  text",
-            "n_logMstarHEC  text",
-            "Metal          float8",
-            "n_Metal        text",
-            "logMBH         float8",
-            "r_logMBH       text",
-            "DupFlag        int8",
-            "BlendFlag      text",
-            "Star           text",
-            "WCNotes        text",
-            "Notes          text"
-        ]
 
     def _tabularize(self, path):
         with open(path, "r") as file:
@@ -593,24 +572,32 @@ class HecateV2Config(HeaderedDataConfig):
                 if (self.data[row][col] == "---" or self.data[row][col] == "--" or self.data[row][col] == "-" or self.data[row][col] == " " or self.data[row][col] == "" or self.data[row][col] == None or self.data[row][col] == "\'\'"):
                     self.data[row][col] = "NULL"
     
+    def _bytes_ranges(self):
+        self.bytes_ranges = HecateV2Config.bytes_ranges
+        return HecateV2Config.bytes_ranges
+    
+    def _relational_schema(self):
+        self.relational_schema = HecateV2Config.relational_schema
+        return self.relational_schema
+
 
 class DESIDR1Config(BasicAstropyConfig):
     COEFF_COUNT = 10
     COEFF_INDEX = 9
     
     def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
-        super().__init__(dbctxt, path)
+        super().__init__(dbctxt, path, chunk_rows)
         self.ra  = "TARGET_RA"
         self.dec = "TARGET_DEC"
 
     def _tabularize(self, path):
-        logger.debug(f"Opening data file {path}...")
+        logger.info(f"Opening data file {path}...")
         try:
             self.data = Table(fitsio.read(path, ext=1)) # this will take a while, this is a large file
         except Exception as e:
-            logger.debug(e)
+            logger.info(e)
 
-        logger.debug("done loading data file.")
+        logger.info("done loading data file.")
 
     def _clean_data(self):
         oldcol = self.data['COEFF'].data
@@ -620,13 +607,13 @@ class DESIDR1Config(BasicAstropyConfig):
 
 
 class LSDR9Config(BasicAstropyConfig):
-    def __init__(self, dbctxt, path, chunksize = 100000):
-        super().__init__(dbctxt, path, chunksize)
+    def __init__(self, dbctxt, path, chunk_rows = 100000):
+        super().__init__(dbctxt, path, chunk_rows)
 
     def _tabularize(self, path):
         if (os.path.isfile(path) and os.path.isfile(path.replace(".fits", "-pz.fits"))):
-            sweep = Table.read(path)
-            sweep_pz = Table.read(path.replace(".fits", "-pz.fits"))
+            sweep = Table.read(path, format="fits")
+            sweep_pz = Table.read(path.replace(".fits", "-pz.fits"), format="fits")
             self.data = join(sweep, sweep_pz)
 
     def _clean_data(self):
@@ -634,18 +621,19 @@ class LSDR9Config(BasicAstropyConfig):
 
     def insert_all(self):
         filenames = os.listdir(self.path)
-        filenames = [filename for filename in filenames if not ("-pz.fits" in filename)]
+        filenames = [filename for filename in filenames if (not ("-pz.fits" in filename) and (".fits" in filename))]
 
+        # create table once
         self._tabularize(f"{os.path.dirname(self.path)}/{filenames[0]}")
         self._clean_data()
         self._relational_schema()
         self._create_table()
 
+        # for each file read data and insert to DB
         for file_index, file in enumerate(filenames):
             self._tabularize(f"{os.path.dirname(self.path)}/{file}")
             self._clean_data()
-            self._relational_schema()
-
+            
             for i in range(0, len(self.data), self.chunk_rows):
 
                 stringified_chunk = ""
@@ -654,7 +642,7 @@ class LSDR9Config(BasicAstropyConfig):
 
                 logger.info(f"File {file_index + 1} of {len(filenames)}. Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
 
-                chunked_vals = self._data2SQLValues(rows)
+                chunked_vals = self._data2SQL(rows)
 
                 stringified_chunk = ", ".join(chunked_vals)
 
@@ -738,9 +726,7 @@ class TwoMASSConfig(CatalogConfig):
     ]
     
     def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
-        super().__init__(dbctxt, path)
-        self.chunk_rows = chunk_rows
-        self.relational_schema = TwoMASSConfig.relational_schema # TODO: redundant
+        super().__init__(dbctxt, path, chunk_rows)
         self.ra  = "ra"
         self.dec = "decl"
 
@@ -759,31 +745,10 @@ class TwoMASSConfig(CatalogConfig):
         pass
 
     def _relational_schema(self):
-        pass
+        self.relational_schema = TwoMASSConfig.relational_schema
+        return self.relational_schema
 
-    def _create_table(self):
-        # #####################################################################
-        # TODO: drop table & create new, edit in place?
-        # #####################################################################
-        logger.info(f"Creating new table in database {self.dbctxt.POSTGRES_DB} on host {self.dbctxt.POSTGRES_HOST}.")
-
-        SQL_statement = ""
-        
-        SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
-        
-        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} (\n{comma_nl.join(self.relational_schema)});"
-        with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
-            with conn.cursor() as cur:
-                try:
-                    cur.execute(SQL_statement)
-                    conn.commit()
-                except psycopg2.errors.DuplicateTable:
-                    raise f"Table {self.dbctxt.sql_table} already exists. Attemtping to continue with existing schema..."
-                except Exception as e: raise
-
-        logger.info("done creating table.")
-
-    def _data2SQLValues(self):
+    def _data2SQL(self):
         for rownum, record in enumerate(self.data):
             for elementnum, element in enumerate(record):
                 if "character" in self.relational_schema[elementnum]:
@@ -810,18 +775,18 @@ class TwoMASSConfig(CatalogConfig):
         for index, filename in enumerate(filenames):
             
             if filename[:4] == "psc_" and filename[-3:] == ".gz":
-                logger.debug(f"File index: {index}\t filename: {filename}")
+                logger.info(f"File index: {index}\t filename: {filename}")
                 
                 self._tabularize(f"{self.path}/{filename}")
                 self._clean_data()
-                self._data2SQLValues()
+                self._data2SQL()
 
                 for start_index in range(0, len(self.data), self.chunk_rows):
-                    logger.debug(f"{self.path}/{filename} rows {start_index}:{min(len(self.data), start_index + self.chunk_rows)}")
+                    logger.info(f"{self.path}/{filename} rows {start_index}:{min(len(self.data), start_index + self.chunk_rows)}")
                     SQL_statement = f"INSERT INTO {self.dbctxt.sql_table} VALUES \n {comma_nl.join(self.data[start_index:start_index + self.chunk_rows])};"
                     execute_statement(self.dbctxt, SQL_statement)
                 
-                logger.debug(f"file {self.path}/{filename} complete.")    
+                logger.info(f"file {self.path}/{filename} complete.")    
         
         q3c_index_table(self.dbctxt, self.ra, self.dec)
 
@@ -860,9 +825,7 @@ class ZTFVarStarConfig(CatalogConfig):
     first_data_row = 36
     
     def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
-        super().__init__(dbctxt, path)
-        self.chunk_rows = chunk_rows
-        self.relational_schema = ZTFVarStarConfig.relational_schema # TODO: redundant
+        super().__init__(dbctxt, path, chunk_rows)
         self.ra  = "RAdeg"
         self.dec = "DEdeg"
 
@@ -889,33 +852,10 @@ class ZTFVarStarConfig(CatalogConfig):
         pass
 
     def _relational_schema(self):
-        pass
+        self.relational_schema = ZTFVarStarConfig.relational_schema
+        return self.relational_schema
 
-    def _create_table(self):
-        logger.info(f"Creating new table in database {self.dbctxt.POSTGRES_DB} on host {self.dbctxt.POSTGRES_HOST}.")
-        
-        SQL_statement = ""
-        comma_nl = ",\n"
-        
-        SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
-        
-        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} (\n{comma_nl.join(self.relational_schema)});"
-        with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
-            with conn.cursor() as cur:
-                try:
-                    cur.execute(SQL_statement)
-                    conn.commit()
-                except psycopg2.errors.DuplicateTable:
-                    raise f"Table {self.dbctxt.sql_table} already exists. Attemtping to continue with existing schema..."
-                except Exception as e: raise
-        
-        logger.info("done creating table.")
-
-    def _data2SQLValues(self):
-        # comma_space = ", "
-        # for rownum, record in enumerate(self.data):
-        #     record = f"({comma_space.join(record)})"
-        #     self.data[rownum] = record
+    def _data2SQL(self):
         for rownum, record in enumerate(self.data):
             for elementnum, element in enumerate(record):
                 if "character" in self.relational_schema[elementnum]:
@@ -934,7 +874,7 @@ class ZTFVarStarConfig(CatalogConfig):
 
         self._tabularize(self.path)
 
-        self._data2SQLValues()
+        self._data2SQL()
 
         self._create_table()
 
@@ -944,4 +884,3 @@ class ZTFVarStarConfig(CatalogConfig):
         execute_statement(self.dbctxt, SQL_statement)
 
         q3c_index_table(self.dbctxt, self.ra, self.dec)
-
