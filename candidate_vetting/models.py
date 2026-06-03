@@ -10,6 +10,7 @@ from django.db import models
 from django.contrib.postgres.fields import ArrayField
 from tom_nonlocalizedevents.models import EventCandidate, Target
 
+
 class AsassnQ3C(models.Model):
     aid = models.AutoField(primary_key=True)
     asassn_id = models.CharField(max_length=40, blank=True, null=True)
@@ -97,7 +98,7 @@ class AsassnQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'asassn_q3c'
+        db_table = "asassn_q3c"
 
 
 class Cosmicflows4Q3C(models.Model):
@@ -142,7 +143,7 @@ class Cosmicflows4Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'cosmicflows4_q3c'
+        db_table = "cosmicflows4_q3c"
 
 
 class DesiSpecQ3C(models.Model):
@@ -289,7 +290,7 @@ class DesiSpecQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'desi_spec_q3c'
+        db_table = "desi_spec_q3c"
 
 
 class DesiDr1Q3C(models.Model):
@@ -441,7 +442,7 @@ class DesiDr1Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'desi_dr1_q3c'
+        db_table = "desi_dr1_q3c"
 
 
 class FermiLatQ3C(models.Model):
@@ -461,7 +462,7 @@ class FermiLatQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fermi_lat_q3c'
+        db_table = "fermi_lat_q3c"
 
 
 class Gaiadr3VariableQ3C(models.Model):
@@ -550,7 +551,7 @@ class Gaiadr3VariableQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'gaiadr3variable_q3c'
+        db_table = "gaiadr3variable_q3c"
 
 
 class GladePlusQ3C(models.Model):
@@ -597,7 +598,8 @@ class GladePlusQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'glade_plus_q3c'
+        db_table = "glade_plus_q3c"
+
 
 class GwgcQ3C(models.Model):
     gid = models.AutoField(primary_key=True)
@@ -623,7 +625,7 @@ class GwgcQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'gwgc_q3c'
+        db_table = "gwgc_q3c"
 
 
 class Hecate1Q3C(models.Model):
@@ -731,7 +733,7 @@ class Hecate1Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'hecate1_q3c'
+        db_table = "hecate1_q3c"
 
 
 class Hecate2Q3C(models.Model):
@@ -866,7 +868,7 @@ class Hecate2Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'hecate2_q3c'
+        db_table = "hecate2_q3c"
 
 
 class LsDr9NorthQ3C(models.Model):
@@ -999,7 +1001,7 @@ class LsDr9NorthQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ls_dr9_q3c' ## TODO: update table name on datatrove and here
+        db_table = "ls_dr9north_q3c"
 
 
 class LsDr10SouthQ3C(models.Model):
@@ -1058,7 +1060,7 @@ class LsDr10SouthQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ls_dr10_q3c' ## TODO: update table name on datatrove and here
+        db_table = "ls_dr10south_q3c"
 
 
 class MilliquasQ3C(models.Model):
@@ -1083,7 +1085,7 @@ class MilliquasQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'milliquas_q3c'
+        db_table = "milliquas_q3c"
 
 
 class NedlvsQ3C(models.Model):
@@ -1165,7 +1167,7 @@ class NedlvsQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'nedlvs_q3c'
+        db_table = "nedlvs_q3c"
 
 
 class Ps1Q3C(models.Model):
@@ -1211,7 +1213,7 @@ class Ps1Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ps1_q3c'
+        db_table = "ps1_q3c"
 
 
 class RomaBzcatQ3C(models.Model):
@@ -1233,7 +1235,7 @@ class RomaBzcatQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'roma_bzcat_q3c'
+        db_table = "roma_bzcat_q3c"
 
 
 class Sdss12PhotozQ3C(models.Model):
@@ -1386,7 +1388,7 @@ class Sdss12PhotozQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'sdss12photoz_q3c'
+        db_table = "sdss12photoz_q3c"
 
 
 class TnsQ3C(models.Model):
@@ -1417,7 +1419,7 @@ class TnsQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'tns_q3c'
+        db_table = "tns_q3c"
 
 
 class TwomassQ3C(models.Model):
@@ -1484,7 +1486,7 @@ class TwomassQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'twomass_q3c'
+        db_table = "twomass_q3c"
 
 
 class ZtfVarstarQ3C(models.Model):
@@ -1518,8 +1520,8 @@ class ZtfVarstarQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ztf_varstar_q3c'
-        
+        db_table = "ztf_varstar_q3c"
+
 
 ## catalog of user-provided host galaxies
 class UserGalaxyQ3C(models.Model):
@@ -1537,15 +1539,15 @@ class UserGalaxyQ3C(models.Model):
     lumdist_pos_err = models.FloatField(blank=True, null=True)
     lumdist_neg_err = models.FloatField(blank=True, null=True)
     default_mag = models.FloatField(blank=True, null=True)
-    source = models.TextField(blank=True, null=True) 
-    submitter = models.TextField(blank=True, null=True) # submitter and original source
+    source = models.TextField(blank=True, null=True)
+    submitter = models.TextField(blank=True, null=True)  # submitter and original source
     og_id = models.BigIntegerField(blank=True, null=True)
-    
-    # managed = True (default, specified here for clarity) 
+
+    # managed = True (default, specified here for clarity)
     # --> allow Django to modify this table
-    class Meta: 
-        managed = True 
-        db_table = 'usergalaxy_q3c'
+    class Meta:
+        managed = True
+        db_table = "usergalaxy_q3c"
 
 
 ## ScoreFactor: subscores (e.g., 'skymap_score') which are used to compute overall score
@@ -1570,6 +1572,7 @@ class Cosmicflows4TargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "cosmicflows4_targetmatch"
 
+
 class DesiDr1TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
@@ -1579,6 +1582,7 @@ class DesiDr1TargetMatch(models.Model):
     class Meta:
         unique_together = ("target", "host_galaxy")
         db_table = "desi_dr1_targetmatch"
+
 
 class GladePlusTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1590,6 +1594,7 @@ class GladePlusTargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "glade_plus_targetmatch"
 
+
 class GwgcTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
@@ -1599,6 +1604,7 @@ class GwgcTargetMatch(models.Model):
     class Meta:
         unique_together = ("target", "host_galaxy")
         db_table = "gwgc_targetmatch"
+
 
 class Hecate1TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1610,6 +1616,7 @@ class Hecate1TargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "hecate1_targetmatch"
 
+
 class Hecate2TargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
@@ -1620,6 +1627,7 @@ class Hecate2TargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "hecate2_targetmatch"
 
+
 class LsDr9NorthTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
@@ -1628,7 +1636,8 @@ class LsDr9NorthTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
-        db_table = "ls_dr9_targetmatch" ## TODO: update table name on datatrove and here
+        db_table = "ls_dr9south_targetmatch"
+
 
 class LsDr10SouthTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1638,7 +1647,8 @@ class LsDr10SouthTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
-        db_table = "ls_dr10_targetmatch" ## TODO: update table name on datatrove and here
+        db_table = "ls_dr10north_targetmatch"
+
 
 class NedLvsTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
@@ -1650,6 +1660,7 @@ class NedLvsTargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "nedlvs_targetmatch"
 
+
 class Ps1GalaxyTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
@@ -1660,6 +1671,7 @@ class Ps1GalaxyTargetMatch(models.Model):
         unique_together = ("target", "host_galaxy")
         db_table = "ps1_targetmatch"
 
+
 class Sdss12PhotozTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
     target = models.ForeignKey(Target, on_delete=models.CASCADE)
@@ -1669,6 +1681,7 @@ class Sdss12PhotozTargetMatch(models.Model):
     class Meta:
         unique_together = ("target", "host_galaxy")
         db_table = "sdss12photoz_targetmatch"
+
 
 class UserGalaxyTargetMatch(models.Model):
     id = models.AutoField(primary_key=True)
