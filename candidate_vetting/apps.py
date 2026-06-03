@@ -1,12 +1,17 @@
 from django.apps import AppConfig
 
+
 class CustomCodeConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'candidate_vetting'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "candidate_vetting"
+
     def target_detail_buttons(self):
-        return {
-            'namespace': 'candidate_vetting:vet_form',
-            'title': 'Run candidate vetting',
-            'class': "btn btn-pink",
-            'text': 'Vet'
-        }
+        return [
+            {
+                "namespace": "candidate_vetting:vet_form",
+                "title": "Run candidate vetting",
+                "class": "btn btn-pink",
+                "text": "Vet",
+                "partial": "candidate_vetting/partials/vet_button.html",
+            }
+        ]

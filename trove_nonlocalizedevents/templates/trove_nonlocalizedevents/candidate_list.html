@@ -132,8 +132,6 @@
   </div>
 </div>
 
-{{ eventcandidate_filter_form.media }}
-
 <script>
 function openSummaryModal() {
     const nleId = "{{ request.GET.nonlocalizedevent }}";
@@ -155,5 +153,7 @@ function copyText() {
     });
 }
 </script>
+
+{{ eventcandidate_filter_form.media }}
 
 {% endblock %}
