@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 def parse_and_insert(dbctxt: DBctxt, catalog_path: str, catalog_type: str):
     match(catalog_config.Catalogs[catalog_type]):
+        case catalog_config.Catalogs.COSMICFLOWS4:
+            datain = catalog_config.CosmicFlows4Config(dbctxt, catalog_path)
+            datain.insert_all()
         case catalog_config.Catalogs.DESIDR1:
             datain = catalog_config.DESIDR1Config(dbctxt, catalog_path)
             datain.insert_all()
@@ -17,6 +20,12 @@ def parse_and_insert(dbctxt: DBctxt, catalog_path: str, catalog_type: str):
             datain.insert_all()
         case catalog_config.Catalogs.FERMI3FHL:
             datain = catalog_config.BasicAstropyConfig(dbctxt, catalog_path)
+            datain.insert_all()
+        case catalog_config.Catalogs.HECATE2:
+            datain = catalog_config.HecateV2Config(dbctxt, catalog_path)
+            datain.insert_all()
+        case catalog_config.Catalogs.LSDR9:
+            datain = catalog_config.LSDR9Config(dbctxt, catalog_path)
             datain.insert_all()
         case catalog_config.Catalogs.NEDLVS:
             datain = catalog_config.BasicAstropyConfig(dbctxt, catalog_path)

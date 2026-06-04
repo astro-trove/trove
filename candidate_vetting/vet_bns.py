@@ -52,7 +52,7 @@ PARAM_RANGES = dict(
 def vet_bns(target_id:int, nonlocalized_event_name:Optional[str]=None,
             param_ranges:dict=PARAM_RANGES):
 
-    logger.info("Running vet BNS")
+    logger.info("Running BNS vetting (KN vetting)")
     
     # get the correct EventCandidate object for this target_id and nonlocalized event
     nonlocalized_event = NonLocalizedEvent.objects.get(

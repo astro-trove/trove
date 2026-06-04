@@ -4,6 +4,7 @@ Vetting code for non-localized events with transients
 
 import time
 import io
+import logging
 
 import numpy as np
 import pandas as pd
@@ -11,11 +12,6 @@ from scipy.stats import norm, rv_continuous
 from scipy.integrate import trapezoid
 
 from astropy.utils.introspection import minversion
-
-if minversion(np, "2.0.0"):
-    np_trapz_fn = np.trapezoid
-else:
-    np_trapz_fn = np.trapz  # np.trapz is deprecated in numpy >2.0.0
 
 import warnings
 
@@ -28,8 +24,7 @@ from sqlalchemy.orm import Session
 
 from django.conf import settings
 
-cosmo = settings.COSMO
-
+from trove_mpc import Transient
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from .models import ScoreFactor
@@ -46,8 +41,7 @@ from tom_nonlocalizedevents.healpix_utils import (
     # uniq_to_bigintrange,
     # update_all_credible_region_percents_for_candidates
 )
-
-from candidate_vetting.tasks import async_vet
+from tom_dataproducts.models import ReducedDatum
 
 from candidate_vetting.public_catalogs.static_catalogs import (
     # DesiSpec,
@@ -84,6 +78,14 @@ from candidate_vetting.models import (
     DesiDr1TargetMatch,
     UserGalaxyTargetMatch,
 )
+
+if minversion(np, "2.0.0"):
+    np_trapz_fn = np.trapezoid
+else:
+    np_trapz_fn = np.trapz  # np.trapz is deprecated in numpy >2.0.0
+
+cosmo = settings.COSMO
+logger = logging.getLogger(__name__)
 
 HOST_DF_COLMAP = {
     "trove_uniq": "troveID",
@@ -310,7 +312,7 @@ def _save_host_galaxy_df(df, target):
             "catalog",
             "submitter",
         ]
-    ]
+    ].copy()
     newdf["z_err"] = [
         [neg, pos]
         if neg != pos  # errors are asymmetric
@@ -445,6 +447,7 @@ def host_association(
     target_id: int,
     radius: float = HOST_ASSOC_RADIUS,
     pcc_threshold: float = PCC_THRESHOLD,
+    _verbose: bool = False,
 ):
     """
     Find all of the potential hosts associated with this target
@@ -459,7 +462,8 @@ def host_association(
     for catalog in GALAXY_CATALOGS:
         cat = catalog()
         catname = cat.__class__.__name__
-        print(f"Querying {cat}...")
+        if _verbose:
+            logger.info(f"Querying {cat}...")
         query_set = cat.query(ra, dec, radius=radius)
 
         # first, delete any matches in <catalog>TargetMatch
@@ -476,11 +480,6 @@ def host_association(
         df = cat.to_standardized_catalog(df)
 
         # some extra cleaning before continuing
-        if "z" in df:
-            # we only need to do this if the redshift is in the dataframe
-            # if it isn't then that's fine because it means the catalog we are using
-            # had a derived distance in it already!
-            df = df[df.z > 0.02]  # otherwise it probably isn't a real redshift
         df = df.dropna(
             subset=["default_mag", "ra", "dec", "lumdist", "lumdist_err"]
         )  # drop rows without the information we need
@@ -516,13 +515,9 @@ def host_association(
     ret_df = df.sort_values("pcc", ascending=True)
 
     end = time.time()
-    print(ret_df)
-    print(f"Queries finished in {end - start}s")
+    print(f"Galaxy table queries finished in {end - start}s")
 
     # save the host galaxy dataframe to the TargetExtra "Host Galaxies" keyword
-    if not len(ret_df):
-        # then we don't need to actually save any host information
-        return ret_df
     _save_host_galaxy_df(ret_df, target)
     return ret_df
 
@@ -635,6 +630,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the redshift of user-uploaded host galaxies
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
+    userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(userz_distance_hosts):
         max_score = userz_distance_hosts.dist_norm_joint_prob.max()
         max_score_host_name = userz_distance_hosts.iloc[
@@ -644,6 +640,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the redshift independent measurements of distances
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+    ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(ind_distance_hosts):
         max_score = ind_distance_hosts.dist_norm_joint_prob.max()
         max_score_host_name = ind_distance_hosts.iloc[
@@ -653,6 +650,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the specz hosts
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
+    specz_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(specz_hosts):
         max_score = specz_hosts.dist_norm_joint_prob.max()
         max_score_host_name = specz_hosts.iloc[
@@ -797,8 +795,7 @@ def agn_association_2d(target_id: int, radius: float = AGN_ASSOC_RADIUS):
     ret_df = df.copy()
 
     end = time.time()
-    print(ret_df)
-    print(f"Queries finished in {end - start}s")
+    logger.info(f"AGN catalog queries finished in {end - start}s")
 
     # save the host galaxy dataframe to the TargetExtra "Associated AGN" keyword
     _save_associated_agn_df(ret_df, target)
@@ -868,11 +865,39 @@ def agn_distance_match(
     return agn_df
 
 
-def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
-    """Asychronously vet according to vetting mode"""
-    for ec in eventcandidates:
-        async_vet.enqueue(
-            target_ids=[ec.target_id],
-            nle_event_id=nle.event_id,
-            vetting_mode=vetting_mode,
+def run_mpc(target_id: int) -> None:
+
+    target = Target.objects.get(id=target_id)
+
+    # get photometry, throwing out limiting mags, phot with no error, and phot with SNR < 5
+    phot = ReducedDatum.objects.filter(
+        target_id=target_id,
+        data_type="photometry",
+        value__magnitude__isnull=False,
+        value__error__isnull=False,
+        value__error__lte=2.5 / np.log(10) / 5,
+    )
+    # if more than (5-sigma) 1 detection, likely not a MPC object
+    if phot.exists() and len(phot) > 1:
+        logger.warn(
+            "This candidate has more than 1 >5-sigma detection, " + "skipping MPC!"
         )
+        mpc_match = None
+    # if only 1 detection, run MPC match
+    elif phot.exists() and len(phot) == 1:
+        latest_det = phot.latest()
+        date = Time(latest_det.timestamp).mjd
+        t = Transient(target.ra, target.dec)
+        mpc_match = t.minor_planet_match(date)
+    # no detections --> can't do MPC match
+    else:
+        logger.warn("This candidate has no photometry, skipping MPC!")
+        mpc_match = None
+
+    if mpc_match is not None:
+        # update the score factor information
+        save_score_to_targetextra(target, "mpc_match_name", mpc_match.match_name)
+        save_score_to_targetextra(target, "mpc_match_sep", mpc_match.distance)
+        save_score_to_targetextra(target, "mpc_match_date", latest_det.timestamp)
+    else:
+        save_score_to_targetextra(target, "mpc_match_name", None)

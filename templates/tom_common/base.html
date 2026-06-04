@@ -50,7 +50,8 @@
           <input type="search" name="name" placeholder="Search by name">
         </form>
         <ul class="navbar-nav ml-auto" id="login-buttons">
-        {% navbar_login %}
+          {# navbar_login #}
+	  {% include 'tom_common/partials/navbar_login.html' %}
         </ul>
       </div>
     </nav>
