@@ -455,7 +455,6 @@ def host_association(
 
     target = Target.objects.filter(id=target_id)[0]
     ra, dec = target.ra, target.dec
-    coord = SkyCoord(ra, dec, unit="deg")
 
     start = time.time()
     res = []
@@ -464,7 +463,7 @@ def host_association(
         catname = cat.__class__.__name__
         if _verbose:
             logger.info(f"Querying {cat}...")
-        query_set = cat.query(ra, dec, radius=radius)
+        query_set = cat.pcc_filter(ra, dec, radius=radius, pcc_max=pcc_threshold)
 
         # first, delete any matches in <catalog>TargetMatch
         matches = GALAXY_TARGETMATCH_DICT[catname].objects.filter(target=target)
@@ -485,12 +484,9 @@ def host_association(
         )  # drop rows without the information we need
         df["trove_uniq"] = df["trove_uniq"].astype(int)  # set to an int
 
-        # calculate Pcc, filter out anything <= pcc_threshold
-        catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
-        seps = coord.separation(catalog_coord).arcsec
-        df["offset"] = seps
-        df["pcc"] = pcc(seps, df["default_mag"])
-        df = df[df.pcc <= pcc_threshold]
+        # copy the ang_dist column to a column called "offset" for
+        # backwards compatability
+        df["offset"] = df.ang_dist
 
         # now save the cleaned dataset
         df["catalog"] = catname

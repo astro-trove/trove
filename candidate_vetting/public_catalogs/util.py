@@ -144,7 +144,7 @@ def pcc_q3c(
     django.QuerySet
         The filtered query set
     """
-    pcc_prefactor = 1.31604388456
+    pcc_prefactor = 1 / (0.33 * np.log(10))
     return queryset.annotate(
         ang_dist=AngDist(ra_colname, dec_colname, ra, dec),
         pcc_sigma=ExpressionWrapper(
@@ -156,10 +156,16 @@ def pcc_q3c(
             output_field=FloatField(),
         ),
         pcc=ExpressionWrapper(
-            np.pi * Power(F("ang_dist") * 3600, 2) * F("pcc_sigma"),
+            1
+            - Exp(
+                Greatest(
+                    -1 * Pi() * Power(F("ang_dist"), 2) * F("pcc_sigma"),
+                    -700,  # anything less than e^-700 will be zero anyways!
+                ),
+            ),
             output_field=FloatField(),
         ),
-    ).filter(pcc__lt=pcc_max)
+    ).filter(pcc__lte=pcc_max)
 
 
 def citation(doi="", ads_bibcode="", version=None, data_url=""):

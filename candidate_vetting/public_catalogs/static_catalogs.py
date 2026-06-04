@@ -11,8 +11,6 @@ from django.db.models import F, Q, Func, Value, IntegerField, Case, When, CharFi
 from django.db.models.functions import Cast
 from django.conf import settings
 
-cosmo = settings.COSMO
-
 from .catalog import StaticCatalog
 from .util import PS1_POINT_SOURCE_THRESHOLD, RADIUS_ARCSEC, citation
 from ..models import (
@@ -36,6 +34,9 @@ from ..models import (
     TwomassQ3C,
     ZtfVarstarQ3C,
 )
+
+
+cosmo = settings.COSMO
 
 
 class _Log10(Func):
@@ -86,6 +87,7 @@ class Cosmicflows4(StaticCatalog):
     catalog_model = Cosmicflows4Q3C
     ra_colname = "raj2000"
     dec_colname = "dej2000"
+    mag_colname = "rmag"
 
     colmap = {
         "cid": "trove_uniq",
@@ -123,6 +125,7 @@ class DesiDr1(StaticCatalog):
     catalog_model = DesiDr1Q3C
     ra_colname = "target_ra"
     dec_colname = "target_dec"
+    mag_colname = "default_mag"
 
     def __init__(self):
         self.catalog_model.objects = self.catalog_model.objects.filter(
@@ -162,6 +165,7 @@ class DesiSpec(StaticCatalog):
     catalog_model = DesiSpecQ3C
     ra_colname = "target_ra"
     dec_colname = "target_dec"
+    mag_colname = "default_mag"
 
     def __init__(self):
         # flux_r is in nanomaggy
@@ -213,6 +217,8 @@ class Gaiadr3Variable(StaticCatalog):
 @citation(doi="10.1093/mnras/stac1443", ads_bibcode="2022MNRAS.514.1403D")
 class GladePlus(StaticCatalog):
     catalog_model = GladePlusQ3C
+    mag_colname = "b"
+
     colmap = {
         "gid": "trove_uniq",
         "gn": "name",
@@ -260,6 +266,7 @@ class Gwgc(StaticCatalog):
         "dec": "dec",
         "b_app": "default_mag",  # magnitude column to use for pcc
     }
+    mag_colname = "b_app"
 
     def to_standardized_catalog(self, df):
         df = self._standardize_df(df)
@@ -273,7 +280,7 @@ class Gwgc(StaticCatalog):
 @citation(doi="10.1093/mnras/stab1799", ads_bibcode="2021MNRAS.506.1896K")
 class Hecate1(StaticCatalog):
     catalog_model = Hecate1Q3C
-
+    mag_colname = "r"
     colmap = {
         "hid": "trove_uniq",
         "objname": "name",
@@ -312,6 +319,7 @@ class Hecate2(StaticCatalog):
     catalog_model = Hecate2Q3C
     ra_colname = "radeg"
     dec_colname = "dedeg"
+    mag_colname = "rmag"
 
     colmap = {
         "hid": "trove_uniq",
@@ -378,6 +386,8 @@ class LsDr9North(StaticCatalog):
             "z_phot_std": "z_err",
         }
 
+        self.mag_colname = "default_mag"
+
         # then, of course, init the super class
         super().__init__()
 
@@ -396,6 +406,12 @@ class LsDr9North(StaticCatalog):
         df["z_type"] = "photo-z"
         df["submitter"] = ""
         return df
+
+    def query(self, ra, dec, radius=RADIUS_ARCSEC):
+        query_set = super().query(ra, dec, radius)
+        return query_set.exclude(
+            default_mag__lt=18, type="PSF"
+        )  # exclude PSF magnitudes that are likely point sources
 
 
 @citation(
@@ -431,6 +447,8 @@ class LsDr10South(StaticCatalog):
             "z_phot_mean": "z",
             "z_phot_std": "z_err",
         }
+
+        self.mag_colname = "default_mag"
 
         # then, of course, init the super class
         super().__init__()
@@ -508,6 +526,8 @@ class Milliquas(StaticCatalog):
             "rmag": "default_mag",  # mag col to use for pcc
         }
 
+        self.mag_colname = "rmag"
+
         # then, of course, init the super class
         super().__init__()
 
@@ -532,6 +552,7 @@ class NedLvs(StaticCatalog):
     some photometric redshifts; acquired 2 June 2025
     """
 
+    mag_colname = "m_j"
     catalog_model = NedlvsQ3C
     colmap = {
         "id": "trove_uniq",
@@ -661,6 +682,7 @@ class Sdss12Photoz(StaticCatalog):
     Releases 11 and 12 of SDSS
     """
 
+    mag_colname = "rmag"
     catalog_model = Sdss12PhotozQ3C
     colmap = {
         "sid": "trove_uniq",
