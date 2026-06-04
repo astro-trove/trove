@@ -132,8 +132,8 @@ GALAXY_CATALOGS = [
     # Hecate2, # TODO: commented out for now, need to compare HECATE v1 and v2
     DesiDr1,
     NedLvs,
-    # Cosmicflows4, # TODO: commented out for now
-    # LsDr9North, # TODO: commented out for now
+    Cosmicflows4,
+    LsDr9North,
     LsDr10South,
     Ps1Galaxy,
     Sdss12Photoz,
@@ -150,8 +150,8 @@ GALAXY_TARGETMATCHES = [
     # Hecate2TargetMatch, # TODO: commented out for now, need to compare HECATE v1 and v2
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
-    # Cosmicflows4TargetMatch, # TODO: commented out for now
-    # LsDr9NorthTargetMatch, # TODO: commented out for now
+    Cosmicflows4TargetMatch,
+    LsDr9NorthTargetMatch,
     LsDr10SouthTargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch,
