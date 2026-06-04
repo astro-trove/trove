@@ -1,6 +1,7 @@
 """
 Define the static catalogs for querying
 """
+
 from astropy import units as u
 from astropy.cosmology import z_at_value
 import pandas as pd
@@ -9,6 +10,7 @@ import numpy as np
 from django.db.models import F, Q, Func, Value, IntegerField, Case, When, CharField
 from django.db.models.functions import Cast
 from django.conf import settings
+
 cosmo = settings.COSMO
 
 from .catalog import StaticCatalog
@@ -35,12 +37,15 @@ from ..models import (
     ZtfVarstarQ3C,
 )
 
+
 class _Log10(Func):
-    function = 'LOG10'
-    template = '%(function)s(%(expressions)s)'
+    function = "LOG10"
+    template = "%(function)s(%(expressions)s)"
+
 
 class AsassnVariableStar(StaticCatalog):
     catalog_model = AsassnQ3C
+
 
 class Cosmicflows4(StaticCatalog):
     catalog_model = Cosmicflows4Q3C
@@ -48,14 +53,14 @@ class Cosmicflows4(StaticCatalog):
     dec_colname = "dej2000"
 
     colmap = {
-        "cid":"trove_uniq",
-        "name":"name",
-        "z":"z",
-        "dist": "lumdist", # Mpc
-        "e_dist":"lumdist_err", # Mpc
-        "raj2000":"ra",
-        "dej2000":"dec",
-        "rmag":"default_mag" # magnitude column to use for pcc
+        "cid": "trove_uniq",
+        "name": "name",
+        "z": "z",
+        "dist": "lumdist",  # Mpc
+        "e_dist": "lumdist_err",  # Mpc
+        "raj2000": "ra",
+        "dej2000": "dec",
+        "rmag": "default_mag",  # magnitude column to use for pcc
     }
 
     def to_standardized_catalog(self, df):
@@ -72,6 +77,7 @@ class Cosmicflows4(StaticCatalog):
 
         return df
 
+
 class DesiDr1(StaticCatalog):
     catalog_model = DesiDr1Q3C
     ra_colname = "target_ra"
@@ -79,95 +85,95 @@ class DesiDr1(StaticCatalog):
 
     def __init__(self):
         self.catalog_model.objects = self.catalog_model.objects.filter(
-            flux_r__gt=0, # anything with a negative flux (in the linear nanomaggy unit) can be ignored
-            zwarn = 0, # we don't want anything with ZWARN > 0: https://data.desi.lbl.gov/doc/releases/dr1/
-            zcat_primary = True, # only take the best ("primary") redshift for this target
-            z__gt = 0 # some z's are negative for some reason
-        ).annotate(
-            default_mag=22.5-2.5*_Log10('flux_r')
-        )
+            flux_r__gt=0,  # anything with a negative flux (in the linear nanomaggy unit) can be ignored
+            zwarn=0,  # we don't want anything with ZWARN > 0: https://data.desi.lbl.gov/doc/releases/dr1/
+            zcat_primary=True,  # only take the best ("primary") redshift for this target
+            z__gt=0,  # some z's are negative for some reason
+        ).annotate(default_mag=22.5 - 2.5 * _Log10("flux_r"))
 
         self.colmap = {
-            "id":"trove_uniq",
-            "desiname":"name",
-            "z":"z",
-            "zerr":"z_err",
-            "target_ra":"ra",
-            "target_dec":"dec",
-            "default_mag":"default_mag"
+            "id": "trove_uniq",
+            "desiname": "name",
+            "z": "z",
+            "zerr": "z_err",
+            "target_ra": "ra",
+            "target_dec": "dec",
+            "default_mag": "default_mag",
         }
-    
+
         # then, of course, init the super class
         super().__init__()
 
     def to_standardized_catalog(self, df):
         df = self._standardize_df(df)
-        df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value 
+        df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value
         df["lumdist_err"] = cosmo.luminosity_distance(df.z_err).to(u.Mpc).value
         df["z_neg_err"] = df.z_err
         df["z_pos_err"] = df.z_err
-        df["lumdist_neg_err"] = df.lumdist_err 
+        df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
         df["submitter"] = ""
         return df
-    
+
+
 class DesiSpec(StaticCatalog):
     catalog_model = DesiSpecQ3C
     ra_colname = "target_ra"
     dec_colname = "target_dec"
-    
+
     def __init__(self):
         # flux_r is in nanomaggy
         self.catalog_model.objects = self.catalog_model.objects.filter(
             flux_r__gt=0
-        ).annotate(
-            default_mag=22.5-2.5*_Log10('flux_r')
-        )
+        ).annotate(default_mag=22.5 - 2.5 * _Log10("flux_r"))
 
         self.colmap = {
-            "did":"trove_uniq",
-            "targetid":"name",
-            "z":"z",
-            "zerr":"z_err",
-            "target_ra":"ra",
-            "target_dec":"dec",
-            "default_mag":"default_mag",
+            "did": "trove_uniq",
+            "targetid": "name",
+            "z": "z",
+            "zerr": "z_err",
+            "target_ra": "ra",
+            "target_dec": "dec",
+            "default_mag": "default_mag",
         }
-        
+
         # then, of course, init the super class
         super().__init__()
 
     def to_standardized_catalog(self, df):
         df = self._standardize_df(df)
-        df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value 
+        df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value
         df["lumdist_err"] = cosmo.luminosity_distance(df.z_err).to(u.Mpc).value
         df["z_neg_err"] = df.z_err
         df["z_pos_err"] = df.z_err
-        df["lumdist_neg_err"] = df.lumdist_err 
+        df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["z_type"] = "spec-z"
         df["submitter"] = ""
-        return df    
-        
+        return df
+
+
 class FermiLat(StaticCatalog):
     catalog_model = FermiLatQ3C
-    
+
+
 class Gaiadr3Variable(StaticCatalog):
     catalog_model = Gaiadr3VariableQ3C
-    
+
+
 class GladePlus(StaticCatalog):
     catalog_model = GladePlusQ3C
     colmap = {
-        "gid":"trove_uniq",
-        "gn":"name",
-        "z_helio":"z",
-        "z_err":"z_err", 
-        "d_l": "lumdist", # Mpc
-        "d_l_err":"lumdist_err", # Mpc
-        "ra":"ra",
-        "dec":"dec",
-        "b":"default_mag" # magnitude column to use for pcc
+        "gid": "trove_uniq",
+        "gn": "name",
+        "z_helio": "z",
+        "z_err": "z_err",
+        "d_l": "lumdist",  # Mpc
+        "d_l_err": "lumdist_err",  # Mpc
+        "ra": "ra",
+        "dec": "dec",
+        "b": "default_mag",  # magnitude column to use for pcc
     }
 
     def to_standardized_catalog(self, df):
@@ -176,33 +182,33 @@ class GladePlus(StaticCatalog):
             if row.dist_flag <= 1:
                 return "photo-z"
             return "spec-z"
-        
+
         df["z_type"] = df.apply(_parse_dist_flag_col, axis=1)
-        
+
         df = self._standardize_df(df)
         df["z_neg_err"] = df.z_err
         df["z_pos_err"] = df.z_err
 
         lumdist_err = pd.Series(
-            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value,
-            index = df.index
+            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value, index=df.index
         )
         df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
         df["lumdist_neg_err"] = df.lumdist_err
-        df["lumdist_pos_err"] = df.lumdist_err   
+        df["lumdist_pos_err"] = df.lumdist_err
         df["submitter"] = ""
         return df
+
 
 class Gwgc(StaticCatalog):
     catalog_model = GwgcQ3C
     colmap = {
-        "gid":"trove_uniq",
-        "name":"name",
-        "dist":"lumdist", # Mpc
-        "e_dist":"lumdist_err", # Mpc
-        "ra":"ra",
-        "dec":"dec",
-        "b_app":"default_mag" # magnitude column to use for pcc
+        "gid": "trove_uniq",
+        "name": "name",
+        "dist": "lumdist",  # Mpc
+        "e_dist": "lumdist_err",  # Mpc
+        "ra": "ra",
+        "dec": "dec",
+        "b_app": "default_mag",  # magnitude column to use for pcc
     }
 
     def to_standardized_catalog(self, df):
@@ -212,18 +218,19 @@ class Gwgc(StaticCatalog):
         df["z_type"] = "spec-z/z ind."
         df["submitter"] = ""
         return df
-    
+
+
 class Hecate1(StaticCatalog):
     catalog_model = Hecate1Q3C
 
     colmap = {
-        "hid":"trove_uniq",
-        "objname":"name",
-        "d":"lumdist", # Mpc
-        "e_d":"lumdist_err", # Mpc
-        "ra":"ra",
-        "dec":"dec",
-        "r":"default_mag" # magnitude to use for pcc
+        "hid": "trove_uniq",
+        "objname": "name",
+        "d": "lumdist",  # Mpc
+        "e_d": "lumdist_err",  # Mpc
+        "ra": "ra",
+        "dec": "dec",
+        "r": "default_mag",  # magnitude to use for pcc
     }
 
     def to_standardized_catalog(self, df):
@@ -234,15 +241,15 @@ class Hecate1(StaticCatalog):
         self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
 
         df["z_type"] = df.apply(
-            lambda row : "z ind." if row.dmethod == "N" else "spec-z",
-            axis=1
+            lambda row: "z ind." if row.dmethod == "N" else "spec-z", axis=1
         )
-        
+
         df["submitter"] = ""
 
         df = self._standardize_df(df)
 
         return df
+
 
 class Hecate2(StaticCatalog):
     catalog_model = Hecate2Q3C
@@ -250,30 +257,29 @@ class Hecate2(StaticCatalog):
     dec_colname = "dedeg"
 
     colmap = {
-        "hid":"trove_uniq",
-        "objname":"name",
-        "dist":"lumdist", # Mpc
-        "e_dist":"lumdist_err", # Mpc
-        "radeg":"ra",
-        "dedeg":"dec",
-        "rmag":"default_mag" # magnitude to use for pcc
+        "hid": "trove_uniq",
+        "objname": "name",
+        "dist": "lumdist",  # Mpc
+        "e_dist": "lumdist_err",  # Mpc
+        "radeg": "ra",
+        "dedeg": "dec",
+        "rmag": "default_mag",  # magnitude to use for pcc
     }
 
     def to_standardized_catalog(self, df):
         df["lumdist_neg_err"] = df.e_dist
         df["lumdist_pos_err"] = df.e_dist
-        df["z"] = z_at_value(cosmo.luminosity_distance, ### TODO: I think this my be slow, but HECATEv2 doesn't have z's. Remove?
-                             df.dist.values * u.Mpc)
+        # df["z"] = z_at_value(cosmo.luminosity_distance, ### TODO: I think this my be slow, but HECATEv2 doesn't have z's. Remove?
+        #                     df.dist.values * u.Mpc)
 
         self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
         self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
         self.colmap["z"] = "z"
 
         df["z_type"] = df.apply(
-            lambda row : "z ind." if row.f_dist == 0 else "spec-z",
-            axis=1
+            lambda row: "z ind." if row.f_dist == 0 else "spec-z", axis=1
         )
-        
+
         df["submitter"] = ""
 
         df = self._standardize_df(df)
@@ -289,18 +295,16 @@ class LsDr9North(StaticCatalog):
         # flux_r is in nanomaggy
         self.catalog_model.objects = self.catalog_model.objects.filter(
             flux_r__gt=0
-        ).annotate(
-            default_mag=22.5-2.5*_Log10('flux_r')
-        )
+        ).annotate(default_mag=22.5 - 2.5 * _Log10("flux_r"))
 
         self.colmap = {
-            "lid":"trove_uniq",
-            "objid":"name",
-            "ra":"ra",
-            "dec":"dec",
-            "default_mag":"default_mag",
-            "z_phot_mean":"z",
-            "z_phot_std":"z_err",
+            "lid": "trove_uniq",
+            "objid": "name",
+            "ra": "ra",
+            "dec": "dec",
+            "default_mag": "default_mag",
+            "z_phot_mean": "z",
+            "z_phot_std": "z_err",
         }
 
         # then, of course, init the super class
@@ -321,27 +325,26 @@ class LsDr9North(StaticCatalog):
         df["z_type"] = "photo-z"
         df["submitter"] = ""
         return df
-    
+
+
 class LsDr10South(StaticCatalog):
     catalog_model = LsDr10SouthQ3C
     dec_colname = "declination"
-    
+
     def __init__(self):
         # flux_r is in nanomaggy
         self.catalog_model.objects = self.catalog_model.objects.filter(
             flux_r__gt=0
-        ).annotate(
-            default_mag=22.5-2.5*_Log10('flux_r')
-        )
+        ).annotate(default_mag=22.5 - 2.5 * _Log10("flux_r"))
 
         self.colmap = {
-            "lid":"trove_uniq",
-            "objid":"name",
-            "ra":"ra",
-            "declination":"dec",
-            "default_mag":"default_mag",
-            "z_phot_mean":"z",
-            "z_phot_std":"z_err",
+            "lid": "trove_uniq",
+            "objid": "name",
+            "ra": "ra",
+            "declination": "dec",
+            "default_mag": "default_mag",
+            "z_phot_mean": "z",
+            "z_phot_std": "z_err",
         }
 
         # then, of course, init the super class
@@ -353,7 +356,7 @@ class LsDr10South(StaticCatalog):
 
         self.colmap["z_neg_err"] = "z_neg_err"
         self.colmap["z_pos_err"] = "z_pos_err"
-        
+
         df = self._standardize_df(df)
         df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value
         df["lumdist_err"] = cosmo.luminosity_distance(df.z_err).to(u.Mpc).value
@@ -366,10 +369,10 @@ class LsDr10South(StaticCatalog):
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
         return query_set.exclude(
-            default_mag__lt = 18,
-            mtype = "PSF" 
-        ) # exclude PSF magnitudes that are likely point sources
-        
+            default_mag__lt=18, mtype="PSF"
+        )  # exclude PSF magnitudes that are likely point sources
+
+
 class Milliquas(StaticCatalog):
     catalog_model = MilliquasQ3C
 
@@ -377,46 +380,44 @@ class Milliquas(StaticCatalog):
         """Override the StaticCatalog init because Milliquas doesn't come with a
         redshift error column, so we need to make some assumptions
         """
-        
+
         num_decimal = Func(
             Func(
                 Cast(
-                    F('z'),
-                    CharField()
-                ), # split_part only works with CharField, need to cast first
-                Value('.'),
+                    F("z"), CharField()
+                ),  # split_part only works with CharField, need to cast first
+                Value("."),
                 Value(2),
-                function='split_part',
-                output_field=CharField()
-            ), # this gets just the decimals of the z field as a string
+                function="split_part",
+                output_field=CharField(),
+            ),  # this gets just the decimals of the z field as a string
             function="length",
-            output_field=IntegerField()
-        ) # then this counts the number of decimal places
-        
+            output_field=IntegerField(),
+        )  # then this counts the number of decimal places
+
         self.catalog_model.objects = self.catalog_model.objects.annotate(
-            num_decimal = num_decimal # this gives a temp row with the number of decimals
+            num_decimal=num_decimal  # this gives a temp row with the number of decimals
         ).annotate(
             z_err=Case(
-                When(num_decimal__lte = 1, then=F("z")*0.1),
-                When(num_decimal = 2, then=F("z")*0.01),
-                default=Value(1e-3)
-            ), # this computes the z_err based on the assumptions outlined in the docs for this catalog
+                When(num_decimal__lte=1, then=F("z") * 0.1),
+                When(num_decimal=2, then=F("z") * 0.01),
+                default=Value(1e-3),
+            ),  # this computes the z_err based on the assumptions outlined in the docs for this catalog
             z_type=Case(
-                When(num_decimal__lte = 2, then=Value("photo-z")),
-                default=Value("spec-z")
-            )
+                When(num_decimal__lte=2, then=Value("photo-z")), default=Value("spec-z")
+            ),
         )
 
         # now that we have these annotations, we can define the colmap
         self.colmap = {
-            "name":"name",
-            "ra":"ra",
-            "dec":"dec",
-            "z":"z",
-            "z_err":"z_err",
-            "rmag":"default_mag" # mag col to use for pcc
+            "name": "name",
+            "ra": "ra",
+            "dec": "dec",
+            "z": "z",
+            "z_err": "z_err",
+            "rmag": "default_mag",  # mag col to use for pcc
         }
-        
+
         # then, of course, init the super class
         super().__init__()
 
@@ -432,18 +433,19 @@ class Milliquas(StaticCatalog):
         df["submitter"] = ""
         return df
 
+
 class NedLvs(StaticCatalog):
     catalog_model = NedlvsQ3C
     colmap = {
-        "id":"trove_uniq",
-        "objname":"name",
-        "z":"z",
-        "z_unc":"z_err", 
-        "distmpc": "lumdist", # Mpc
-        "distmpc_unc":"lumdist_err", # Mpc
-        "ra":"ra",
-        "dec":"dec",
-        "m_j":"default_mag" # use 2MASS J for the Pcc magnitude
+        "id": "trove_uniq",
+        "objname": "name",
+        "z": "z",
+        "z_unc": "z_err",
+        "distmpc": "lumdist",  # Mpc
+        "distmpc_unc": "lumdist_err",  # Mpc
+        "ra": "ra",
+        "dec": "dec",
+        "m_j": "default_mag",  # use 2MASS J for the Pcc magnitude
     }
 
     def to_standardized_catalog(self, df):
@@ -453,9 +455,9 @@ class NedLvs(StaticCatalog):
             if row.z_tech == "SPEC":
                 return "spec-z"
             return "photo-z"
-        
+
         df["z_type"] = df.apply(_get_ztype, axis=1)
-                
+
         df = self._standardize_df(df)
 
         # some rows don't have uncertainty on redshift
@@ -463,35 +465,35 @@ class NedLvs(StaticCatalog):
         df["z_err"] = df.z_err.fillna(1e-3)
         df["z_neg_err"] = df.z_err
         df["z_pos_err"] = df.z_err
-        
+
         lumdist_err = pd.Series(
-            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value,
-            index = df.index
-        ) 
+            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value, index=df.index
+        )
         # when lumdist_err is NaN is when the z_err column is also NaN
         # so we assume an uncertainty on the distance of ~4.5 Mpc (the conversion
         # from z_err = 1e-3 to Mpc)
         df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
-        
+
         df["submitter"] = ""
 
         return df
+
 
 class Ps1(StaticCatalog):
     catalog_model = Ps1Q3C
     colmap = {
-        "pid":"trove_uniq",
-        "objname":"name",
-        "ra":"ra",
-        "dec":"dec",
-        "z_phot":"z",
-        "z_err":"z_err",
-        "rmeanpsfmag":"default_mag" # mag col to use for pcc
+        "pid": "trove_uniq",
+        "objname": "name",
+        "ra": "ra",
+        "dec": "dec",
+        "z_phot": "z",
+        "z_err": "z_err",
+        "rmeanpsfmag": "default_mag",  # mag col to use for pcc
     }
     mag_colname = "rmeanpsfmag"
-    
+
     def to_standardized_catalog(self, df):
         df = self._standardize_df(df)
         df["z_neg_err"] = df.z_err
@@ -504,37 +506,37 @@ class Ps1(StaticCatalog):
         df["submitter"] = ""
         return df
 
-class Ps1Galaxy(Ps1):
 
+class Ps1Galaxy(Ps1):
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
         return query_set.filter(
-            ps_score__lte = PS1_POINT_SOURCE_THRESHOLD,
-            rmeanpsfmag__gt = 0
+            ps_score__lte=PS1_POINT_SOURCE_THRESHOLD, rmeanpsfmag__gt=0
         )
+
 
 class Ps1PointSource(Ps1):
-
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
         return query_set.filter(
-            ps_score__gt = PS1_POINT_SOURCE_THRESHOLD,
-            prob_galaxy__lt = 0.7
+            ps_score__gt=PS1_POINT_SOURCE_THRESHOLD, prob_galaxy__lt=0.7
         )
-    
+
+
 class RomaBzcat(StaticCatalog):
     catalog_model = RomaBzcatQ3C
-    
+
+
 class Sdss12Photoz(StaticCatalog):
     catalog_model = Sdss12PhotozQ3C
     colmap = {
-        "sid":"trove_uniq",
-        "sdssid":"name",
-        "ra":"ra",
-        "dec":"dec",
-        "zph":"z",
-        "e_zph":"z_err",
-        "rmag":"default_mag"
+        "sid": "trove_uniq",
+        "sdssid": "name",
+        "ra": "ra",
+        "dec": "dec",
+        "zph": "z",
+        "e_zph": "z_err",
+        "rmag": "default_mag",
     }
 
     def to_standardized_catalog(self, df):
@@ -548,12 +550,14 @@ class Sdss12Photoz(StaticCatalog):
         df["z_type"] = "photo-z"
         df["submitter"] = ""
         return df
-    
+
+
 class TwoMass(StaticCatalog):
     catalog_model = TwomassQ3C
     ra_colname = "ra"
     dec_colname = "decl"
-    
+
+
 class ZtfVarStar(StaticCatalog):
     catalog_model = ZtfVarstarQ3C
     ra_colname = "radeg"
