@@ -1636,7 +1636,7 @@ class LsDr9NorthTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
-        db_table = "ls_dr9south_targetmatch"
+        db_table = "ls_dr9north_targetmatch"
 
 
 class LsDr10SouthTargetMatch(models.Model):
@@ -1647,7 +1647,7 @@ class LsDr10SouthTargetMatch(models.Model):
 
     class Meta:
         unique_together = ("target", "host_galaxy")
-        db_table = "ls_dr10north_targetmatch"
+        db_table = "ls_dr10south_targetmatch"
 
 
 class NedLvsTargetMatch(models.Model):

@@ -53,6 +53,7 @@ class StaticCatalog(Catalog):
     ra_colname = None
     dec_colname = None
     catalog_model = None
+    colmap = {}
 
     def __init__(self, verbose: bool = False):
         """A catalog object for querying static astronomy catalogs (like galaxy
@@ -86,7 +87,14 @@ class StaticCatalog(Catalog):
             "z_type",
             "default_mag",
             "submitter",
+            "ang_dist",
+            "offset",
+            "pcc",
         }
+
+        # copy the colmap in case it is defined as a class-level variable
+        self.colmap = self.colmap.copy()
+        self.ogcols = list(self.colmap.keys())
 
         super().__init__(self.__class__.__name__, verbose=verbose)
 

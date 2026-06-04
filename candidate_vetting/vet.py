@@ -475,7 +475,9 @@ def host_association(
             continue
 
         # convert to a dataframe and standardize the column names
-        df = pd.DataFrame(list(query_set.values()))
+        cols = list(cat.ogcols) + ["ang_dist", "pcc"]
+        rows = query_set.values_list(*cols)
+        df = pd.DataFrame.from_records(rows, columns=cols)
         df = cat.to_standardized_catalog(df)
 
         # some extra cleaning before continuing

@@ -231,6 +231,10 @@ class GladePlus(StaticCatalog):
         "b": "default_mag",  # magnitude column to use for pcc
     }
 
+    def __init__(self):
+        super().__init__()
+        self.ogcols += ["dist_flag"]  # for the z_type column
+
     def to_standardized_catalog(self, df):
 
         def _parse_dist_flag_col(row):
@@ -291,6 +295,10 @@ class Hecate1(StaticCatalog):
         "r": "default_mag",  # magnitude to use for pcc
     }
 
+    def __init__(self):
+        super().__init__()
+        self.ogcols += ["d_lo68", "d_hi68", "dmethod"]
+
     def to_standardized_catalog(self, df):
         df["lumdist_neg_err"] = df.d - df.d_lo68
         df["lumdist_pos_err"] = df.d_hi68 - df.d
@@ -331,6 +339,10 @@ class Hecate2(StaticCatalog):
         "rmag": "default_mag",  # magnitude to use for pcc
     }
 
+    def __init__(self):
+        super().__init__()
+        self.ogcols += ["f_dist"]
+
     def to_standardized_catalog(self, df):
         df["lumdist_neg_err"] = df.e_dist
         df["lumdist_pos_err"] = df.e_dist
@@ -339,7 +351,7 @@ class Hecate2(StaticCatalog):
 
         self.colmap["lumdist_neg_err"] = "lumdist_neg_err"
         self.colmap["lumdist_pos_err"] = "lumdist_pos_err"
-        self.colmap["z"] = "z"
+        # self.colmap["z"] = "z"
 
         df["z_type"] = df.apply(
             lambda row: "z ind." if row.f_dist == 0 else "spec-z", axis=1
@@ -390,6 +402,7 @@ class LsDr9North(StaticCatalog):
 
         # then, of course, init the super class
         super().__init__()
+        self.ogcols += ["z_phot_l68", "z_phot_u68"]
 
     def to_standardized_catalog(self, df):
         df["z_neg_err"] = df.z_phot_mean - df.z_phot_l68
@@ -452,6 +465,7 @@ class LsDr10South(StaticCatalog):
 
         # then, of course, init the super class
         super().__init__()
+        self.ogcols += ["z_phot_l68", "z_phot_u68"]
 
     def to_standardized_catalog(self, df):
         df["z_neg_err"] = df.z_phot_mean - df.z_phot_l68
@@ -565,6 +579,10 @@ class NedLvs(StaticCatalog):
         "dec": "dec",
         "m_j": "default_mag",  # use 2MASS J for the Pcc magnitude
     }
+
+    def __init__(self):
+        super().__init__()
+        self.ogcols += ["distmpc_method", "z_tech"]
 
     def to_standardized_catalog(self, df):
         def _get_ztype(row):
