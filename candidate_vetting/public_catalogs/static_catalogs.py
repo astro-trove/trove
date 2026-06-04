@@ -14,7 +14,7 @@ from django.conf import settings
 cosmo = settings.COSMO
 
 from .catalog import StaticCatalog
-from .util import PS1_POINT_SOURCE_THRESHOLD, RADIUS_ARCSEC
+from .util import PS1_POINT_SOURCE_THRESHOLD, RADIUS_ARCSEC, citation
 from ..models import (
     AsassnQ3C,
     Cosmicflows4Q3C,
@@ -43,11 +43,46 @@ class _Log10(Func):
     template = "%(function)s(%(expressions)s)"
 
 
+@citation(
+    doi=["10.1088/0004-637X/788/1/48", "10.1093/mnras/stac3801"],
+    ads_bibcode=["2014ApJ...788...48S", "2023MNRAS.519.5271C"],
+    version=10,
+)
 class AsassnVariableStar(StaticCatalog):
+    """
+    Version X (10) of the ASAS-SN catalog of variable stars; ASAS-SN described
+    in Shappee et al 2014
+    """
+
     catalog_model = AsassnQ3C
 
 
+@citation(
+    doi=[
+        "10.1088/0004-6256/138/2/323",
+        "10.1038/s41550-024-02370-0",
+        "10.3847/1538-4357/ac94d8",
+        "10.1051/0004-6361/202556896",
+        "10.1088/1674-4527/ac6416",
+        "10.3847/1538-4365/ad409d",
+    ],
+    ads_bibcode=[
+        "2009AJ....138..323T",
+        "2024NatAs...8.1610V",
+        "2023ApJ...944...94T",
+        "2026A%26A...706A.284T",
+        "2022RAA....22f5001Z",
+        "2024ApJS..272...39W",
+    ],
+    version=4,
+    data_url="https://cdsarc.cds.unistra.fr/viz-bin/cat/J/A+A/706/A284#/browse",
+)
 class Cosmicflows4(StaticCatalog):
+    """
+    Cosmicflows 4 catalogue as curated by REGALADE who crossmatched
+    with photometry catalogs (which are also included in the citation list)
+    """
+
     catalog_model = Cosmicflows4Q3C
     ra_colname = "raj2000"
     dec_colname = "dej2000"
@@ -78,7 +113,13 @@ class Cosmicflows4(StaticCatalog):
         return df
 
 
+@citation(doi="10.3847/1538-3881/ae4c43", ads_bibcode="2026AJ....171..285D")
 class DesiDr1(StaticCatalog):
+    """
+    Data Release 1 of the Dark Energy Spectroscopic Instrument spectroscopic
+    redshifts
+    """
+
     catalog_model = DesiDr1Q3C
     ra_colname = "target_ra"
     dec_colname = "target_dec"
@@ -154,14 +195,22 @@ class DesiSpec(StaticCatalog):
         return df
 
 
+@citation()
 class FermiLat(StaticCatalog):
+    """
+    TODO: Add catalog description
+    TODO: Add citation
+    """
+
     catalog_model = FermiLatQ3C
 
 
+@citation(doi="10.1051/0004-6361/202243940", ads_bibcode="2023A%26A...674A...1G")
 class Gaiadr3Variable(StaticCatalog):
     catalog_model = Gaiadr3VariableQ3C
 
 
+@citation(doi="10.1093/mnras/stac1443", ads_bibcode="2022MNRAS.514.1403D")
 class GladePlus(StaticCatalog):
     catalog_model = GladePlusQ3C
     colmap = {
@@ -199,6 +248,7 @@ class GladePlus(StaticCatalog):
         return df
 
 
+@citation(doi="10.1088/0264-9381/28/8/085016", ads_bibcode="2011CQGra..28h5016W")
 class Gwgc(StaticCatalog):
     catalog_model = GwgcQ3C
     colmap = {
@@ -220,6 +270,7 @@ class Gwgc(StaticCatalog):
         return df
 
 
+@citation(doi="10.1093/mnras/stab1799", ads_bibcode="2021MNRAS.506.1896K")
 class Hecate1(StaticCatalog):
     catalog_model = Hecate1Q3C
 
@@ -251,6 +302,12 @@ class Hecate1(StaticCatalog):
         return df
 
 
+@citation(
+    doi="10.1093/mnras/stag522",
+    ads_bibcode="2026MNRAS.548ag522K",
+    version=2,
+    data_url="https://cdsarc.cds.unistra.fr/viz-bin/cat/J/MNRAS/548/G522#/article",
+)
 class Hecate2(StaticCatalog):
     catalog_model = Hecate2Q3C
     ra_colname = "radeg"
@@ -287,7 +344,21 @@ class Hecate2(StaticCatalog):
         return df
 
 
+@citation(
+    doi=["10.3847/1538-3881/ab089d", "10.1088/1475-7516/2023/11/097"],
+    ads_bibcode=["2019AJ....157..168D", "2023JCAP...11..097Z"],
+    version="DR9 North",
+    data_url=[
+        "https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/north/sweep/9.0/",
+        "https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr9/north/sweep/9.1-photo-z/",
+    ],
+)
 class LsDr9North(StaticCatalog):
+    """
+    Northwern sweeps of Data Release 9 of the Legacy Survey, with object
+    photo-z's computed following Zhou et al 2023
+    """
+
     catalog_model = LsDr9NorthQ3C
     dec_colname = "dec"
 
@@ -327,7 +398,21 @@ class LsDr9North(StaticCatalog):
         return df
 
 
+@citation(
+    doi=["10.3847/1538-3881/ab089d", "10.1088/1475-7516/2023/11/097"],
+    ads_bibcode=["2019AJ....157..168D", "2023JCAP...11..097Z"],
+    version="DR10 South",
+    data_url=[
+        "https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr10/south/sweep/10.1/",
+        "https://portal.nersc.gov/cfs/cosmo/data/legacysurvey/dr10/south/sweep/10.1-photo-z/",
+    ],
+)
 class LsDr10South(StaticCatalog):
+    """
+    Southern sweeps of Data Release 10 of the Legacy Survey, with object
+    photo-z's computed following Zhou et al 2023
+    """
+
     catalog_model = LsDr10SouthQ3C
     dec_colname = "declination"
 
@@ -373,7 +458,12 @@ class LsDr10South(StaticCatalog):
         )  # exclude PSF magnitudes that are likely point sources
 
 
+@citation(doi="10.21105/astro.2308.01505", ads_bibcode="2023OJAp....6E..49F", version=8)
 class Milliquas(StaticCatalog):
+    """
+    Million Quasars Catalog, Version 8
+    """
+
     catalog_model = MilliquasQ3C
 
     def __init__(self):
@@ -434,7 +524,14 @@ class Milliquas(StaticCatalog):
         return df
 
 
+@citation(doi="10.3847/1538-4365/acdd06", ads_bibcode="2023ApJS..268...14C")
 class NedLvs(StaticCatalog):
+    """
+    Local Volume Survey (LVS) of the NASA Extragalactic Database (NED), dominated
+    by redshift-independent distances and spectroscopic redshifts of galaxies, with
+    some photometric redshifts; acquired 2 June 2025
+    """
+
     catalog_model = NedlvsQ3C
     colmap = {
         "id": "trove_uniq",
@@ -481,7 +578,13 @@ class NedLvs(StaticCatalog):
         return df
 
 
+@citation(doi="10.1093/mnras/staa2587", ads_bibcode="2021MNRAS.500.1633B")
 class Ps1(StaticCatalog):
+    """
+    Pan-STARRS 1 Source Types and Redshifts with Machine Learning (PS1-STRM)
+    catalogue, which classifies sources as point sources, quasars, or galaxies
+    """
+
     catalog_model = Ps1Q3C
     colmap = {
         "pid": "trove_uniq",
@@ -507,7 +610,14 @@ class Ps1(StaticCatalog):
         return df
 
 
+@citation(doi="10.1093/mnras/staa2587", ads_bibcode="2021MNRAS.500.1633B")
 class Ps1Galaxy(Ps1):
+    """
+    Pan-STARRS 1 Source Types and Redshifts with Machine Learning (PS1-STRM)
+    catalogue, which classifies sources as point sources, quasars, or galaxies,
+    selecting for objects with point source score < 0.83
+    """
+
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
         return query_set.filter(
@@ -515,7 +625,14 @@ class Ps1Galaxy(Ps1):
         )
 
 
+@citation(doi="10.1093/mnras/staa2587", ads_bibcode="2021MNRAS.500.1633B")
 class Ps1PointSource(Ps1):
+    """
+    Pan-STARRS 1 Source Types and Redshifts with Machine Learning (PS1-STRM)
+    catalogue, which classifies sources as point sources, quasars, or galaxies,
+    selecting for objects with galaxy score < 0.7
+    """
+
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
         query_set = super().query(ra, dec, radius)
         return query_set.filter(
@@ -523,11 +640,27 @@ class Ps1PointSource(Ps1):
         )
 
 
+@citation()
 class RomaBzcat(StaticCatalog):
+    """
+    TODO: Add catalog description
+    TODO: Add citation
+    """
+
     catalog_model = RomaBzcatQ3C
 
 
+@citation(
+    doi="10.1088/0067-0049/219/1/12",
+    ads_bibcode="2015ApJS..219...12A",
+    version="DR11 & DR12",
+)
 class Sdss12Photoz(StaticCatalog):
+    """
+    Photometric redshifts catalog built using imaging and spectra from Data
+    Releases 11 and 12 of SDSS
+    """
+
     catalog_model = Sdss12PhotozQ3C
     colmap = {
         "sid": "trove_uniq",
@@ -552,13 +685,24 @@ class Sdss12Photoz(StaticCatalog):
         return df
 
 
+@citation()
 class TwoMass(StaticCatalog):
+    """
+    TODO: Add short description
+    TODO: Add citation
+    """
+
     catalog_model = TwomassQ3C
     ra_colname = "ra"
     dec_colname = "decl"
 
 
+@citation(doi="10.3847/1538-4365/ab9cae", ads_bibcode="2020ApJS..249...18C")
 class ZtfVarStar(StaticCatalog):
+    """
+    Periodic variable stars from the Zwicky Transient Facility
+    """
+
     catalog_model = ZtfVarstarQ3C
     ra_colname = "radeg"
     dec_colname = "dedeg"
