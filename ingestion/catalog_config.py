@@ -31,13 +31,13 @@ Catalogs = Enum('Catalogs',
 class CatalogConfig():
     """ Abstract class """
     def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
-        self.dbctxt:            DBctxt = dbctxt
-        self.path:              str    = path
-        self.relational_schema: str    = None
-        self.data                      = None
-        self.chunk_rows: int           = int(chunk_rows)
-        self.ra: str                   = "ra"
-        self.dec: str                  = "dec"
+        self.dbctxt: DBctxt               = dbctxt
+        self.path: str                    = path
+        self.relational_schema: list[str] = None
+        self.data                         = None
+        self.chunk_rows: int              = int(chunk_rows)
+        self.ra: str                      = "ra"
+        self.dec: str                     = "dec"
 
     # ##########################################################################
     # "private"
@@ -61,7 +61,7 @@ class CatalogConfig():
         
         SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
         
-        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} {self.relational_schema};"
+        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} ({comma_nl.join(self.relational_schema)});"
         
         with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
             with conn.cursor() as cur:
@@ -75,7 +75,7 @@ class CatalogConfig():
 
         logger.info("done creating table.")
 
-    def _data2SQL(self) -> str:
+    def _data2SQL(self, rows: range) -> list[str]:
         """ Convert data records into SQL INSERT strings """
         raise NotImplementedError()
 
@@ -84,15 +84,28 @@ class CatalogConfig():
     # ##########################################################################
     def insert_all(self):
         self._tabularize(self.path)
-        self._clean_data()
         self._relational_schema()
+        self._clean_data()
         self._create_table()
-        self._data2SQL()
 
-        for i in range(len(self.data) // self.chunk_rows + 1):
-            logger.info(f"Inserting chunk {i+1} of {len(self.data) // self.chunk_rows + 1}")
-            SQL_STATEMENT = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self.data[(i * self.chunk_rows) : ((i + 1) * self.chunk_rows)])};"
-            execute_statement(self.dbctxt, SQL_STATEMENT)
+        for i in range(0, len(self.data), self.chunk_rows):
+
+            SQL_statement = ""
+            rows = range(i, min(len(self.data), i + self.chunk_rows))
+
+            logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
+
+            SQL_statement = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self._data2SQL(rows))};"
+
+            # connect to db & insert
+            with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, user=self.dbctxt.POSTGRES_USER, port=self.dbctxt.POSTGRES_PORT, password=self.dbctxt.POSTGRES_PASSWORD, dbname=self.dbctxt.POSTGRES_DB) as conn:
+                with conn.cursor() as cur:
+                    try:
+                        cur.execute(SQL_statement)
+                        conn.commit()
+                    except Exception as e:
+                        raise e
+            logger.info("done.")
 
         q3c_index_table(self.dbctxt, self.ra, self.dec)
 
@@ -106,7 +119,7 @@ class BasicAstropyConfig(CatalogConfig):
         self.data = Table.read(path, format)
 
     def _relational_schema(self):
-            self.relational_schema = "( "
+            self.relational_schema = []
 
             # ap_types = set() # used in devel to get src data types (in the fits file, not implementation)
             for col_index in range(len(self.data.colnames)):
@@ -119,14 +132,11 @@ class BasicAstropyConfig(CatalogConfig):
                     pg_dtype += f"[{self.data[colname].shape[1]}]"
                 
                 # ap_types.add(ap_dtype) # used in devel to get src data types (in the fits file, not implementation)
-                self.relational_schema += f"\n{colname.ljust(20)}\t{pg_dtype},"
-        
-            self.relational_schema = self.relational_schema[:-1] # get rid of the trailing comma bc PGSQL syntax won't ignore it
-            self.relational_schema += ")"
+                self.relational_schema.append(f"\n{colname.ljust(20)}\t{pg_dtype}")
             
             return self.relational_schema
                 
-    def _data2SQL(self, rows: range) -> str:
+    def _data2SQL(self, rows: range) -> list[str]:
         all_values = []
     
         cols = range(len(self.data.columns))
@@ -165,66 +175,9 @@ class BasicAstropyConfig(CatalogConfig):
             all_values.append(values)
 
         return all_values
-    
-    def insert_all(self):
-        self._tabularize(self.path)
-        self._clean_data()
-        self._relational_schema()
-        self._create_table()
-        
-        for i in range(0, len(self.data), self.chunk_rows):
-
-            stringified_chunk = ""
-            SQL_statement = ""
-            rows = range(i, min(len(self.data), i + self.chunk_rows))
-            
-            logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}.")
-            
-            chunked_vals = self._data2SQL(rows)
-
-            stringified_chunk = ", ".join(chunked_vals)
-
-            SQL_statement = f"INSERT INTO {self.dbctxt.sql_table} VALUES {stringified_chunk};"
-
-            # connect to db & insert
-            with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, user=self.dbctxt.POSTGRES_USER, port=self.dbctxt.POSTGRES_PORT, password=self.dbctxt.POSTGRES_PASSWORD, dbname=self.dbctxt.POSTGRES_DB) as conn:
-                with conn.cursor() as cur:
-                    try:
-                        cur.execute(SQL_statement)
-                        conn.commit()
-                    except Exception as e:
-                        raise e
-            logger.info("done.")
-
-        q3c_index_table(self.dbctxt, self.ra, self.dec)
 
 
-class HeaderedDataConfig(CatalogConfig):
-    """ Abstract class """
-    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 1000):
-        super().__init__(dbctxt, path, chunk_rows)
-
-    def _tabularize(self, path: str):
-        with open(path, "r") as f:
-            content = f.read()
-            content = content.split("\n")
-            for i, row in enumerate(content):
-                row = row.split(",")
-                content[i] = row
-        
-        self.data = content
-        
-    def _data2SQL(self) -> str:
-        SQL_VALUE = ""
-
-        for i, row in enumerate(self.data):
-            SQL_VALUE = "("
-            SQL_VALUE += ", ".join(row)
-            SQL_VALUE += ")"
-            self.data[i] = SQL_VALUE
-
-
-class CosmicFlows4Config(HeaderedDataConfig):
+class CosmicFlows4Config(CatalogConfig):
     relational_schema = [
             "recno bigint",
             "Name text",
@@ -269,6 +222,16 @@ class CosmicFlows4Config(HeaderedDataConfig):
         self.ra  = "RAJ2000"
         self.dec = "DEJ2000"
 
+    def _tabularize(self, path: str):
+        with open(path, "r") as f:
+            content = f.read()
+            content = content.split("\n")
+            for i, row in enumerate(content):
+                row = row.split(",")
+                content[i] = row
+
+        self.data = content
+
     def _clean_data(self):
         self.data = self.data[1:-1]
         for i, row in enumerate(self.data):
@@ -282,136 +245,176 @@ class CosmicFlows4Config(HeaderedDataConfig):
         self.relational_schema = CosmicFlows4Config.relational_schema
         return self._relational_schema
 
+    def _data2SQL(self, rows: range) -> list[str]:
+        all_values = []
 
-class HecateV2Config(HeaderedDataConfig):
+        cols = range(len(self.data[0]))
+
+        for row_index in rows:
+            values = "( "
+
+            for col_index in cols:
+                value = str(self.data[row_index][col_index])
+                dtype = numpy2PGSQL.convert(self.data[self.data.colnames[col_index]].dtype.str)
+
+                # ##############################################################
+                # TODO: DRY: delegate to a fun. for cleaning
+                # ##############################################################
+                if (type(self.data[row_index][col_index]) is np.ma.core.MaskedConstant):
+                    value = "NULL"
+
+                if (type(self.data[row_index][col_index]) is np.ndarray):
+                    value = "'{" + f'{", ".join(value.replace("[", "").replace("]", "").split())}' + "}'"
+
+                if dtype == "text":
+                    value = value.replace(" ", "")
+
+                    if (value == "" or value == " " or value == "-" or value == "--" or value == "---" or value == " --"):
+                        value = "NULL"
+
+                    value = value.replace('"', '"""') # SQL escapes a quote with another quote
+                    value = value.replace("'", "''")
+                    values += f"\'{value}\', "
+                else:
+                    values += f"{value}, "
+
+            values = values[:-2] # strip trailing comma bc PGSQL syntax won't accept it
+            values += " )"
+
+            all_values.append(values)
+
+        return all_values
+
+
+class HecateV2Config(CatalogConfig):
     bytes_ranges = [
-        range(1,7),
-        range(9,38),
-        range(40,58),
-        range(60,78),
-        range(80,98),
-        range(100,117),
-        range(119,128),
-        range(130,139),
-        range(141,142),
-        range(144,153),
-        range(155,164),
-        range(166,175),
-        range(177,178),
-        range(180,200),
-        range(202,211),
-        range(213,215),
-        range(217,225),
-        range(227,238),
-        range(240,252),
-        range(254,265),
-        range(267,279),
-        range(281,292),
-        range(294,304),
-        range(306,306),
-        range(308,314),
-        range(316,323),
-        range(325,330),
-        range(332,337),
-        range(339,344),
-        range(346,351),
-        range(353,357),
-        range(359,363),
-        range(365,369),
-        range(371,375),
-        range(377,388),
-        range(390,401),
-        range(403,414),
-        range(416,427),
-        range(429,429),
-        range(431,431),
-        range(433,433),
-        range(435,435),
-        range(437,447),
-        range(449,459),
-        range(461,471),
-        range(473,482),
-        range(484,488),
-        range(490,494),
-        range(496,500),
-        range(502,506),
-        range(508,520),
-        range(522,529),
-        range(531,539),
-        range(541,549),
-        range(551,560),
-        range(562,571),
-        range(573,582),
-        range(584,594),
-        range(596,607),
-        range(609,620),
-        range(622,627),
-        range(629,634),
-        range(636,641),
-        range(643,647),
-        range(649,656),
-        range(658,662),
-        range(664,664),
-        range(666,677),
-        range(679,690),
-        range(692,703),
-        range(705,716),
-        range(718,729),
-        range(731,741),
-        range(743,754),
-        range(756,767),
-        range(769,780),
-        range(782,793),
-        range(795,806),
-        range(808,819),
-        range(821,826),
-        range(828,833),
-        range(835,846),
-        range(848,859),
-        range(861,872),
-        range(874,885),
-        range(887,898),
-        range(900,911),
-        range(913,924),
-        range(926,937),
-        range(939,950),
-        range(952,963),
-        range(965,976),
-        range(978,989),
-        range(991,1002),
-        range(1004,1015),
-        range(1017,1024),
-        range(1026,1031),
-        range(1033,1038),
-        range(1040,1045),
-        range(1047,1047),
-        range(1049,1053),
-        range(1055,1060),
-        range(1062,1067),
-        range(1069,1074),
-        range(1076,1081),
-        range(1083,1088),
-        range(1090,1101),
-        range(1103,1114),
-        range(1116,1125),
-        range(1127,1135),
-        range(1137,1146),
-        range(1148,1152),
-        range(1154,1156),
-        range(1158,1166),
-        range(1168,1176),
-        range(1178,1182),
-        range(1184,1186),
-        range(1188,1212),
-        range(1214,1221),
-        range(1223,1230),
-        range(1232,1240),
-        range(1242,1250),
-        range(1252,1258),
-        range(1260,1286),
-        range(1288,1289),
-        range(1291,1293),
-        range(1295,1348)
+        range(0,7),
+        range(8,38),
+        range(39,58),
+        range(59,78),
+        range(79,98),
+        range(99,117),
+        range(118,128),
+        range(129,139),
+        range(140,142),
+        range(143,153),
+        range(154,164),
+        range(165,175),
+        range(176,178),
+        range(179,200),
+        range(201,211),
+        range(212,215),
+        range(216,225),
+        range(226,238),
+        range(239,252),
+        range(253,265),
+        range(266,279),
+        range(280,292),
+        range(293,304),
+        range(305,306),
+        range(307,314),
+        range(315,323),
+        range(324,330),
+        range(331,337),
+        range(338,344),
+        range(345,351),
+        range(352,357),
+        range(358,363),
+        range(364,369),
+        range(370,375),
+        range(376,388),
+        range(389,401),
+        range(402,414),
+        range(415,427),
+        range(428,429),
+        range(430,431),
+        range(432,433),
+        range(434,435),
+        range(436,447),
+        range(448,459),
+        range(460,471),
+        range(472,482),
+        range(483,488),
+        range(489,494),
+        range(495,500),
+        range(501,506),
+        range(507,520),
+        range(521,529),
+        range(530,539),
+        range(540,549),
+        range(550,560),
+        range(561,571),
+        range(572,582),
+        range(583,594),
+        range(595,607),
+        range(608,620),
+        range(621,627),
+        range(628,634),
+        range(635,641),
+        range(642,647),
+        range(648,656),
+        range(657,662),
+        range(663,664),
+        range(665,677),
+        range(678,690),
+        range(691,703),
+        range(704,716),
+        range(717,729),
+        range(730,741),
+        range(742,754),
+        range(755,767),
+        range(768,780),
+        range(781,793),
+        range(794,806),
+        range(807,819),
+        range(820,826),
+        range(827,833),
+        range(834,846),
+        range(847,859),
+        range(860,872),
+        range(873,885),
+        range(886,898),
+        range(899,911),
+        range(912,924),
+        range(925,937),
+        range(938,950),
+        range(951,963),
+        range(964,976),
+        range(977,989),
+        range(990,1002),
+        range(1003,1015),
+        range(1016,1024),
+        range(1025,1031),
+        range(1032,1038),
+        range(1039,1045),
+        range(1046,1047),
+        range(1048,1053),
+        range(1054,1060),
+        range(1061,1067),
+        range(1068,1074),
+        range(1075,1081),
+        range(1082,1088),
+        range(1089,1101),
+        range(1102,1114),
+        range(1115,1125),
+        range(1126,1135),
+        range(1136,1146),
+        range(1147,1152),
+        range(1153,1156),
+        range(1157,1166),
+        range(1167,1176),
+        range(1177,1182),
+        range(1183,1186),
+        range(1187,1212),
+        range(1213,1221),
+        range(1222,1230),
+        range(1231,1240),
+        range(1241,1250),
+        range(1251,1258),
+        range(1259,1286),
+        range(1287,1289),
+        range(1290,1293),
+        range(1294,1348)
     ]
 
     relational_schema = [
@@ -544,10 +547,12 @@ class HecateV2Config(HeaderedDataConfig):
         "Notes          text"
     ]
 
-    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 1000):
+    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
         super().__init__(dbctxt, path, chunk_rows)
         self.ra = "RAdeg"
         self.dec = "DEdeg"
+        self.bytes_ranges = HecateV2Config.bytes_ranges
+        self.relational_schema = HecateV2Config.relational_schema
 
     def _tabularize(self, path):
         with open(path, "r") as file:
@@ -579,6 +584,15 @@ class HecateV2Config(HeaderedDataConfig):
     def _relational_schema(self):
         self.relational_schema = HecateV2Config.relational_schema
         return self.relational_schema
+
+    def _data2SQL(self, rows: range) -> list[str]:
+        all_values = []
+
+        for row_index in rows:
+            values = f"({', '.join(self.data[row_index])})"
+            all_values.append(values)
+
+        return all_values
 
 
 class DESIDR1Config(BasicAstropyConfig):
@@ -625,8 +639,8 @@ class LSDR9Config(BasicAstropyConfig):
 
         # create table once
         self._tabularize(f"{os.path.dirname(self.path)}/{filenames[0]}")
-        self._clean_data()
         self._relational_schema()
+        self._clean_data()
         self._create_table()
 
         # for each file read data and insert to DB
@@ -766,7 +780,6 @@ class TwoMASSConfig(CatalogConfig):
 
     def insert_all(self):
         SQL_statement = ""
-        comma_nl = ",\n"
 
         filenames = sorted(os.listdir(self.path))
         
@@ -870,7 +883,6 @@ class ZTFVarStarConfig(CatalogConfig):
 
     def insert_all(self):
         SQL_statement = ""
-        comma_nl = ",\n"
 
         self._tabularize(self.path)
 
