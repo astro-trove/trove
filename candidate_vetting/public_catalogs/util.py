@@ -122,7 +122,7 @@ def cone_search_q3c(
 def pcc_q3c(
     queryset, ra, dec, pcc_max, mag_colname, ra_colname="ra", dec_colname="dec"
 ):
-    f"""Do a cut on Pcc with q3c on the provided QuerySet. Pcc is from Bloom+2002 and
+    """Do a cut on Pcc with q3c on the provided QuerySet. Pcc is from Bloom+2002 and
     we use the re-calibration from Berger2010.
 
     Parameters
@@ -162,7 +162,7 @@ def pcc_q3c(
             1
             - Exp(
                 Greatest(
-                    -1 * Pi() * Power(F("ang_dist"), 2) * F("pcc_sigma"),
+                    -1 * Pi() * Power(3600 * F("ang_dist"), 2) * F("pcc_sigma"),
                     -700,  # anything less than e^-700 will be zero anyways!
                 ),
             ),
