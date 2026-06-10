@@ -12,6 +12,7 @@ from scipy.stats import norm, rv_continuous
 from scipy.integrate import trapezoid
 
 from astropy.utils.introspection import minversion
+
 import warnings
 
 from astropy.coordinates import SkyCoord
@@ -44,10 +45,13 @@ from tom_dataproducts.models import ReducedDatum
 
 from candidate_vetting.public_catalogs.static_catalogs import (
     # DesiSpec,
+    Cosmicflows4,
     GladePlus,
     Gwgc,
     Hecate1,
-    LsDr10,
+    Hecate2,
+    LsDr9North,
+    LsDr10South,
     Ps1Galaxy,
     Sdss12Photoz,
     AsassnVariableStar,
@@ -61,10 +65,13 @@ from candidate_vetting.public_catalogs.static_catalogs import (
 )
 from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
 from candidate_vetting.models import (
+    Cosmicflows4TargetMatch,
     GladePlusTargetMatch,
     GwgcTargetMatch,
     Hecate1TargetMatch,
-    LsDr10TargetMatch,
+    Hecate2TargetMatch,
+    LsDr9NorthTargetMatch,
+    LsDr10SouthTargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch,
     NedLvsTargetMatch,
@@ -121,11 +128,12 @@ GALAXY_CATALOGS = [
     UserGalaxy,
     GladePlus,
     Gwgc,
-    Hecate1,
+    Hecate2,
     DesiDr1,
-    # DesiSpec, # this duplicates with DESI DR1 (which also includes the EDR data)
     NedLvs,
-    LsDr10,
+    Cosmicflows4,
+    LsDr9North,
+    LsDr10South,
     Ps1Galaxy,
     Sdss12Photoz,
 ]
@@ -137,10 +145,12 @@ GALAXY_TARGETMATCHES = [
     UserGalaxyTargetMatch,
     GladePlusTargetMatch,
     GwgcTargetMatch,
-    Hecate1TargetMatch,
+    Hecate2TargetMatch,
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
-    LsDr10TargetMatch,
+    Cosmicflows4TargetMatch,
+    LsDr9NorthTargetMatch,
+    LsDr10SouthTargetMatch,
     Ps1GalaxyTargetMatch,
     Sdss12PhotozTargetMatch,
 ]
@@ -413,7 +423,8 @@ def skymap_association(
 
 def pcc(r: list[float], m: list[float]):
     """
-    Probability of chance coincidence calculation (Bloom et al. 2002)
+    Probability of chance coincidence calculation (originally from
+    Bloom et al. 2002 and re-calibrated in Berger2010)
 
     PARAMETERS
     ----------
@@ -443,7 +454,6 @@ def host_association(
 
     target = Target.objects.filter(id=target_id)[0]
     ra, dec = target.ra, target.dec
-    coord = SkyCoord(ra, dec, unit="deg")
 
     start = time.time()
     res = []
@@ -452,7 +462,7 @@ def host_association(
         catname = cat.__class__.__name__
         if _verbose:
             logger.info(f"Querying {cat}...")
-        query_set = cat.query(ra, dec, radius=radius)
+        query_set = cat.pcc_filter(ra, dec, radius=radius, pcc_max=pcc_threshold)
 
         # first, delete any matches in <catalog>TargetMatch
         matches = GALAXY_TARGETMATCH_DICT[catname].objects.filter(target=target)
@@ -464,7 +474,9 @@ def host_association(
             continue
 
         # convert to a dataframe and standardize the column names
-        df = pd.DataFrame(list(query_set.values()))
+        cols = list(cat.ogcols) + ["ang_dist", "pcc"]
+        rows = query_set.values_list(*cols)
+        df = pd.DataFrame.from_records(rows, columns=cols)
         df = cat.to_standardized_catalog(df)
 
         # some extra cleaning before continuing
@@ -473,12 +485,9 @@ def host_association(
         )  # drop rows without the information we need
         df["trove_uniq"] = df["trove_uniq"].astype(int)  # set to an int
 
-        # calculate Pcc, filter out anything <= pcc_threshold
-        catalog_coord = SkyCoord(df.ra, df.dec, unit="deg")
-        seps = coord.separation(catalog_coord).arcsec
-        df["offset"] = seps
-        df["pcc"] = pcc(seps, df["default_mag"])
-        df = df[df.pcc <= pcc_threshold]
+        # copy the ang_dist column to a column called "offset" for
+        # backwards compatability
+        df["offset"] = df.ang_dist
 
         # now save the cleaned dataset
         df["catalog"] = catname
@@ -618,7 +627,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the redshift of user-uploaded host galaxies
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
-    userz_distance_hosts.reset_index(inplace=True) # avoid iloc exception
+    userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(userz_distance_hosts):
         max_score = userz_distance_hosts.dist_norm_joint_prob.max()
         max_score_host_name = userz_distance_hosts.iloc[
@@ -628,7 +637,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the redshift independent measurements of distances
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
-    ind_distance_hosts.reset_index(inplace=True) # avoid iloc exception
+    ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(ind_distance_hosts):
         max_score = ind_distance_hosts.dist_norm_joint_prob.max()
         max_score_host_name = ind_distance_hosts.iloc[
@@ -638,7 +647,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then use the specz hosts
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
-    specz_hosts.reset_index(inplace=True) # avoid iloc exception
+    specz_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(specz_hosts):
         max_score = specz_hosts.dist_norm_joint_prob.max()
         max_score_host_name = specz_hosts.iloc[
