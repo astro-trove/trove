@@ -128,8 +128,7 @@ GALAXY_CATALOGS = [
     UserGalaxy,
     GladePlus,
     Gwgc,
-    Hecate1,
-    # Hecate2, # TODO: commented out for now, need to compare HECATE v1 and v2
+    Hecate2,
     DesiDr1,
     NedLvs,
     Cosmicflows4,
@@ -146,8 +145,7 @@ GALAXY_TARGETMATCHES = [
     UserGalaxyTargetMatch,
     GladePlusTargetMatch,
     GwgcTargetMatch,
-    Hecate1TargetMatch,
-    # Hecate2TargetMatch, # TODO: commented out for now, need to compare HECATE v1 and v2
+    Hecate2TargetMatch,
     DesiDr1TargetMatch,
     NedLvsTargetMatch,
     Cosmicflows4TargetMatch,
