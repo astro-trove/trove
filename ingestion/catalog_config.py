@@ -76,8 +76,13 @@ class CatalogConfig():
         logger.info("done creating table.")
 
     def _data2SQL(self, rows: range) -> list[str]:
-        """ Convert data records into SQL INSERT strings """
-        raise NotImplementedError()
+        all_values = []
+
+        for row_index in rows:
+            values = f"({', '.join(self.data[row_index])})"
+            all_values.append(values)
+
+        return all_values
 
     # ##########################################################################
     # "public"
@@ -135,26 +140,17 @@ class BasicAstropyConfig(CatalogConfig):
                 self.relational_schema.append(f"\n{colname.ljust(20)}\t{pg_dtype}")
             
             return self.relational_schema
-                
-    def _data2SQL(self, rows: range) -> list[str]:
-        all_values = []
-    
-        cols = range(len(self.data.columns))
 
-        for row_index in rows:
-            values = "( "
+    def _clean_data(self):
+        for i, row in enumerate(self.data):
+            for j, col in enumerate(row):
+                value = str(self.data[i][j])
+                dtype = numpy2PGSQL.convert(self.data[self.data.colnames[j]].dtype.str)
 
-            for col_index in cols:
-                value = str(self.data[row_index][col_index])
-                dtype = numpy2PGSQL.convert(self.data[self.data.colnames[col_index]].dtype.str)
-
-                # ##############################################################
-                # TODO: DRY: delegate to a fun. for cleaning
-                # ##############################################################
-                if (type(self.data[row_index][col_index]) is np.ma.core.MaskedConstant):
+                if (type(self.data[i][j]) is np.ma.core.MaskedConstant):
                     value = "NULL"
 
-                if (type(self.data[row_index][col_index]) is np.ndarray):
+                if (type(self.data[i][j]) is np.ndarray):
                     value = "'{" + f'{", ".join(value.replace("[", "").replace("]", "").split())}' + "}'"
 
                 if dtype == "text":
@@ -165,16 +161,8 @@ class BasicAstropyConfig(CatalogConfig):
                     
                     value = value.replace('"', '"""') # SQL escapes a quote with another quote
                     value = value.replace("'", "''")
-                    values += f"\'{value}\', "
-                else:
-                    values += f"{value}, "
 
-            values = values[:-2] # strip trailing comma bc PGSQL syntax won't accept it
-            values += " )"
-
-            all_values.append(values)
-
-        return all_values
+        self.data[i][j] = value
 
 
 class CosmicFlows4Config(CatalogConfig):
@@ -231,9 +219,9 @@ class CosmicFlows4Config(CatalogConfig):
                 content[i] = row
 
         self.data = content
+        self.data = self.data[1:-1]
 
     def _clean_data(self):
-        self.data = self.data[1:-1]
         for i, row in enumerate(self.data):
             self.data[i][1] = f"\'{row[1]}\'"
 
@@ -241,29 +229,13 @@ class CosmicFlows4Config(CatalogConfig):
                 if (col == ""):
                     self.data[i][j] = "NULL"
 
-    def _relational_schema(self):
-        self.relational_schema = CosmicFlows4Config.relational_schema
-        return self._relational_schema
+                value = str(self.data[i][j])
+                dtype = numpy2PGSQL.convert(self.data[self.data.colnames[j]].dtype.str)
 
-    def _data2SQL(self, rows: range) -> list[str]:
-        all_values = []
-
-        cols = range(len(self.data[0]))
-
-        for row_index in rows:
-            values = "( "
-
-            for col_index in cols:
-                value = str(self.data[row_index][col_index])
-                dtype = numpy2PGSQL.convert(self.data[self.data.colnames[col_index]].dtype.str)
-
-                # ##############################################################
-                # TODO: DRY: delegate to a fun. for cleaning
-                # ##############################################################
-                if (type(self.data[row_index][col_index]) is np.ma.core.MaskedConstant):
+                if (type(self.data[i][j]) is np.ma.core.MaskedConstant):
                     value = "NULL"
 
-                if (type(self.data[row_index][col_index]) is np.ndarray):
+                if (type(self.data[i][j]) is np.ndarray):
                     value = "'{" + f'{", ".join(value.replace("[", "").replace("]", "").split())}' + "}'"
 
                 if dtype == "text":
@@ -274,16 +246,12 @@ class CosmicFlows4Config(CatalogConfig):
 
                     value = value.replace('"', '"""') # SQL escapes a quote with another quote
                     value = value.replace("'", "''")
-                    values += f"\'{value}\', "
-                else:
-                    values += f"{value}, "
 
-            values = values[:-2] # strip trailing comma bc PGSQL syntax won't accept it
-            values += " )"
+                self.data[i][j] = value
 
-            all_values.append(values)
-
-        return all_values
+    def _relational_schema(self):
+        self.relational_schema = CosmicFlows4Config.relational_schema
+        return self._relational_schema
 
 
 class HecateV2Config(CatalogConfig):
@@ -585,15 +553,6 @@ class HecateV2Config(CatalogConfig):
         self.relational_schema = HecateV2Config.relational_schema
         return self.relational_schema
 
-    def _data2SQL(self, rows: range) -> list[str]:
-        all_values = []
-
-        for row_index in rows:
-            values = f"({', '.join(self.data[row_index])})"
-            all_values.append(values)
-
-        return all_values
-
 
 class DESIDR1Config(BasicAstropyConfig):
     COEFF_COUNT = 10
@@ -756,13 +715,6 @@ class TwoMASSConfig(CatalogConfig):
             self.data = file_content
                 
     def _clean_data(self):
-        pass
-
-    def _relational_schema(self):
-        self.relational_schema = TwoMASSConfig.relational_schema
-        return self.relational_schema
-
-    def _data2SQL(self):
         for rownum, record in enumerate(self.data):
             for elementnum, element in enumerate(record):
                 if "character" in self.relational_schema[elementnum]:
@@ -773,18 +725,24 @@ class TwoMASSConfig(CatalogConfig):
                 if "date" in self.relational_schema[elementnum]:
                     record[elementnum] = f"\'{element}\'"
 
-            comma_space = ", "
-            record = f"({comma_space.join(record)})"
-
             self.data[rownum] = record
+
+    def _relational_schema(self):
+        self.relational_schema = TwoMASSConfig.relational_schema
+        return self.relational_schema
+
+    def _data2SQL(self, rows):
+        for rowindex, row in enumerate(self.data):
+            self.data[rowindex] = f"({", ".join(row)})"
 
     def insert_all(self):
         SQL_statement = ""
 
-        filenames = sorted(os.listdir(self.path))
-        
+        self._relational_schema()
         self._create_table()
 
+        filenames = sorted(os.listdir(self.path))
+        
         for index, filename in enumerate(filenames):
             
             if filename[:4] == "psc_" and filename[-3:] == ".gz":
@@ -853,8 +811,7 @@ class ZTFVarStarConfig(CatalogConfig):
 
             for index, row in enumerate(file_content):
                 file_content[index] = " ".join(row.split())
-
-            
+    
             for rownum, record in enumerate(file_content):
                 file_content[rownum] = record.split(" ")
 
@@ -862,37 +819,14 @@ class ZTFVarStarConfig(CatalogConfig):
         logger.info(f"done creating internal data table.")
                 
     def _clean_data(self):
-        pass
-
-    def _relational_schema(self):
-        self.relational_schema = ZTFVarStarConfig.relational_schema
-        return self.relational_schema
-
-    def _data2SQL(self):
         for rownum, record in enumerate(self.data):
             for elementnum, element in enumerate(record):
                 if "character" in self.relational_schema[elementnum]:
                     element = element.replace('"', '"""') # SQL escapes a quote with another quote
                     element = element.replace("'", "''")
                     record[elementnum] = f"\'{element}\'"
-
-            comma_space = ", "
-            record = f"({comma_space.join(record)})"
-
             self.data[rownum] = record
 
-    def insert_all(self):
-        SQL_statement = ""
-
-        self._tabularize(self.path)
-
-        self._data2SQL()
-
-        self._create_table()
-
-        # insert values
-        SQL_statement = f"INSERT INTO {self.dbctxt.sql_table} VALUES \n {comma_nl.join(self.data)};"
-        
-        execute_statement(self.dbctxt, SQL_statement)
-
-        q3c_index_table(self.dbctxt, self.ra, self.dec)
+    def _relational_schema(self):
+        self.relational_schema = ZTFVarStarConfig.relational_schema
+        return self.relational_schema
