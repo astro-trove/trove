@@ -425,7 +425,8 @@ def skymap_association(
 
 def pcc(r: list[float], m: list[float]):
     """
-    Probability of chance coincidence calculation (Bloom et al. 2002)
+    Probability of chance coincidence calculation (originally from
+    Bloom et al. 2002 and re-calibrated in Berger2010)
 
     PARAMETERS
     ----------

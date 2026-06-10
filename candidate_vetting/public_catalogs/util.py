@@ -122,7 +122,8 @@ def cone_search_q3c(
 def pcc_q3c(
     queryset, ra, dec, pcc_max, mag_colname, ra_colname="ra", dec_colname="dec"
 ):
-    f"""Do a cone search with q3c on the provided QuerySet
+    f"""Do a cut on Pcc with q3c on the provided QuerySet. Pcc is from Bloom+2002 and
+    we use the re-calibration from Berger2010.
 
     Parameters
     ----------
@@ -132,8 +133,10 @@ def pcc_q3c(
         The RA in degrees
     dec : float
         The dec in degrees
-    radius : float, default={RADIUS_ARCSEC}
-        The search radius in arcseconds
+    pcc_max : float
+        The maximum Pcc to consider
+    mag_colname : str
+        The magnitude column name to use for Pcc
     ra_colname: str, default='ra'
         The RA column name in the SQL table
     dec_colname: str, default="dec"
