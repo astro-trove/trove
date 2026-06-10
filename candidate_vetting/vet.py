@@ -487,7 +487,8 @@ def host_association(
 
         # copy the ang_dist column to a column called "offset" for
         # backwards compatability
-        df["offset"] = df.ang_dist
+        # and convert to arcsec from degrees
+        df["offset"] = 3600 * df.ang_dist
 
         # now save the cleaned dataset
         df["catalog"] = catname
