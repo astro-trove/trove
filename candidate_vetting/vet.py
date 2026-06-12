@@ -504,6 +504,12 @@ def host_association(
             ]
         )
 
+    if not res: # if no host matches
+        cols = list(HOST_DF_COLMAP.keys()) + ["z_neg_err", "z_pos_err", "lumdist_neg_err", "lumdist_pos_err"]
+        rows = []*len(cols)
+        res.append(pd.DataFrame(rows, columns=cols)) # append empty df with appropriate columns
+
+    # concact results of individual catalogs into one dataframe
     df = pd.concat(res).reset_index(drop=True)
 
     # TODO: We will need to put some deduplication code for the galaxy dataframe
