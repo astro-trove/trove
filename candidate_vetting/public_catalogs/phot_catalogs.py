@@ -488,7 +488,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         return stacked_magnitudes
 
-    def _ATLAS_read_and_sigma_clip_data(self, filecontent, log, clipping_sigma=2.2):
+    def _ATLAS_read_and_sigma_clip_data(self, filecontent, clipping_sigma=2.2):
         """
         Clean up data by performing sigma clipping.
         
@@ -539,7 +539,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
         maskList = []
         for flux in [cdataFlux, odataFlux]:
             fullMask = _rolling_window_sigma_clip(
-                log=log, array=flux, clippingSigma=clipping_sigma, windowSize=11
+                array=flux, clippingSigma=clipping_sigma, windowSize=11
             )
             maskList.append(fullMask)
 
