@@ -30,6 +30,7 @@ dependencies = [
     "astropy",
     "astroquery",
     "django",
+    "django-autocomplete-light",
     "django-crispy-forms",
     "django-extensions",
     "django-filter",
