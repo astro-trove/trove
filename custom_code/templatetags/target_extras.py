@@ -35,7 +35,6 @@ def split_name(name):
         name_info['tns_objname'] = None
     return name_info
 
-
 @register.inclusion_tag('tom_targets/partials/aladin_custom.html')
 def aladin_custom(target):
     """

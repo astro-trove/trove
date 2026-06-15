@@ -5,8 +5,11 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
+
 from django.db import models
-from tom_nonlocalizedevents.models import EventCandidate
+from django.contrib.postgres.fields import ArrayField
+from tom_nonlocalizedevents.models import EventCandidate, Target
+
 
 class AsassnQ3C(models.Model):
     aid = models.AutoField(primary_key=True)
@@ -95,7 +98,53 @@ class AsassnQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'asassn_q3c'
+        db_table = "asassn_q3c"
+
+
+class Cosmicflows4Q3C(models.Model):
+    cid = models.AutoField(primary_key=True)
+    recno = models.IntegerField(blank=True, null=True)
+    name = models.CharField(max_length=64, blank=True, null=True)
+    raj2000 = models.FloatField(blank=True, null=True)
+    dej2000 = models.FloatField(blank=True, null=True)
+    dist = models.FloatField(blank=True, null=True)
+    z = models.FloatField(blank=True, null=True)
+    distmin = models.FloatField(blank=True, null=True)
+    distmax = models.FloatField(blank=True, null=True)
+    e_dist = models.FloatField(blank=True, null=True)
+    distinput = models.FloatField(blank=True, null=True)
+    e_distinput = models.FloatField(blank=True, null=True)
+    disttmean = models.FloatField(blank=True, null=True)
+    r_distinput = models.FloatField(blank=True, null=True)
+    ndist = models.FloatField(blank=True, null=True)
+    r1 = models.FloatField(blank=True, null=True)
+    r2 = models.FloatField(blank=True, null=True)
+    pa = models.FloatField(blank=True, null=True)
+    r_r1 = models.FloatField(blank=True, null=True)
+    idcat = models.FloatField(blank=True, null=True)
+    gaia_uppercase_g_mag = models.FloatField(blank=True, null=True)
+    bpmag = models.FloatField(blank=True, null=True)
+    pm = models.FloatField(blank=True, null=True)
+    angdist = models.FloatField(blank=True, null=True)
+    rmagpsf = models.FloatField(blank=True, null=True)
+    gmag = models.FloatField(blank=True, null=True)
+    rmag = models.FloatField(blank=True, null=True)
+    imag = models.FloatField(blank=True, null=True)
+    zmag = models.FloatField(blank=True, null=True)
+    w1mag = models.FloatField(blank=True, null=True)
+    w2mag = models.FloatField(blank=True, null=True)
+    dk = models.FloatField(blank=True, null=True)
+    r_gmag = models.FloatField(blank=True, null=True)
+    r_w1mag = models.FloatField(blank=True, null=True)
+    ebv = models.FloatField(blank=True, null=True)
+    logm = models.FloatField(blank=True, null=True)
+    frel = models.FloatField(blank=True, null=True)
+    fracnearby = models.FloatField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "cosmicflows4_q3c"
+
 
 class DesiSpecQ3C(models.Model):
     did = models.AutoField(primary_key=True)
@@ -241,7 +290,160 @@ class DesiSpecQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'desi_spec_q3c'
+        db_table = "desi_spec_q3c"
+
+
+class DesiDr1Q3C(models.Model):
+    targetid = models.BigIntegerField(blank=True, null=True)
+    survey = models.TextField(blank=True, null=True)
+    program = models.TextField(blank=True, null=True)
+    healpix = models.IntegerField(blank=True, null=True)
+    spgrpval = models.IntegerField(blank=True, null=True)
+    z = models.FloatField(blank=True, null=True)
+    zerr = models.FloatField(blank=True, null=True)
+    zwarn = models.BigIntegerField(blank=True, null=True)
+    chi2 = models.FloatField(blank=True, null=True)
+    coeff_00 = models.FloatField(blank=True, null=True)
+    coeff_01 = models.FloatField(blank=True, null=True)
+    coeff_02 = models.FloatField(blank=True, null=True)
+    coeff_03 = models.FloatField(blank=True, null=True)
+    coeff_04 = models.FloatField(blank=True, null=True)
+    coeff_05 = models.FloatField(blank=True, null=True)
+    coeff_06 = models.FloatField(blank=True, null=True)
+    coeff_07 = models.FloatField(blank=True, null=True)
+    coeff_08 = models.FloatField(blank=True, null=True)
+    coeff_09 = models.FloatField(blank=True, null=True)
+    npixels = models.BigIntegerField(blank=True, null=True)
+    spectype = models.TextField(blank=True, null=True)
+    subtype = models.TextField(blank=True, null=True)
+    ncoeff = models.BigIntegerField(blank=True, null=True)
+    deltachi2 = models.FloatField(blank=True, null=True)
+    coadd_fiberstatus = models.IntegerField(blank=True, null=True)
+    target_ra = models.FloatField(blank=True, null=True)
+    target_dec = models.FloatField(blank=True, null=True)
+    pmra = models.FloatField(blank=True, null=True)
+    pmdec = models.FloatField(blank=True, null=True)
+    ref_epoch = models.FloatField(blank=True, null=True)
+    fa_target = models.BigIntegerField(blank=True, null=True)
+    fa_type = models.SmallIntegerField(blank=True, null=True)
+    objtype = models.TextField(blank=True, null=True)
+    subpriority = models.FloatField(blank=True, null=True)
+    obsconditions = models.IntegerField(blank=True, null=True)
+    release = models.SmallIntegerField(blank=True, null=True)
+    brickname = models.TextField(blank=True, null=True)
+    brickid = models.IntegerField(blank=True, null=True)
+    brick_objid = models.IntegerField(blank=True, null=True)
+    morphtype = models.TextField(blank=True, null=True)
+    ebv = models.FloatField(blank=True, null=True)
+    flux_g = models.FloatField(blank=True, null=True)
+    flux_r = models.FloatField(blank=True, null=True)
+    flux_z = models.FloatField(blank=True, null=True)
+    flux_w1 = models.FloatField(blank=True, null=True)
+    flux_w2 = models.FloatField(blank=True, null=True)
+    flux_ivar_g = models.FloatField(blank=True, null=True)
+    flux_ivar_r = models.FloatField(blank=True, null=True)
+    flux_ivar_z = models.FloatField(blank=True, null=True)
+    flux_ivar_w1 = models.FloatField(blank=True, null=True)
+    flux_ivar_w2 = models.FloatField(blank=True, null=True)
+    fiberflux_g = models.FloatField(blank=True, null=True)
+    fiberflux_r = models.FloatField(blank=True, null=True)
+    fiberflux_z = models.FloatField(blank=True, null=True)
+    fibertotflux_g = models.FloatField(blank=True, null=True)
+    fibertotflux_r = models.FloatField(blank=True, null=True)
+    fibertotflux_z = models.FloatField(blank=True, null=True)
+    maskbits = models.SmallIntegerField(blank=True, null=True)
+    sersic = models.FloatField(blank=True, null=True)
+    shape_r = models.FloatField(blank=True, null=True)
+    shape_e1 = models.FloatField(blank=True, null=True)
+    shape_e2 = models.FloatField(blank=True, null=True)
+    ref_id = models.BigIntegerField(blank=True, null=True)
+    ref_cat = models.TextField(blank=True, null=True)
+    gaia_phot_g_mean_mag = models.FloatField(blank=True, null=True)
+    gaia_phot_bp_mean_mag = models.FloatField(blank=True, null=True)
+    gaia_phot_rp_mean_mag = models.FloatField(blank=True, null=True)
+    parallax = models.FloatField(blank=True, null=True)
+    photsys = models.TextField(blank=True, null=True)
+    priority_init = models.BigIntegerField(blank=True, null=True)
+    numobs_init = models.BigIntegerField(blank=True, null=True)
+    cmx_target = models.BigIntegerField(blank=True, null=True)
+    desi_target = models.BigIntegerField(blank=True, null=True)
+    bgs_target = models.BigIntegerField(blank=True, null=True)
+    mws_target = models.BigIntegerField(blank=True, null=True)
+    scnd_target = models.BigIntegerField(blank=True, null=True)
+    sv1_desi_target = models.BigIntegerField(blank=True, null=True)
+    sv1_bgs_target = models.BigIntegerField(blank=True, null=True)
+    sv1_mws_target = models.BigIntegerField(blank=True, null=True)
+    sv1_scnd_target = models.BigIntegerField(blank=True, null=True)
+    sv2_desi_target = models.BigIntegerField(blank=True, null=True)
+    sv2_bgs_target = models.BigIntegerField(blank=True, null=True)
+    sv2_mws_target = models.BigIntegerField(blank=True, null=True)
+    sv2_scnd_target = models.BigIntegerField(blank=True, null=True)
+    sv3_desi_target = models.BigIntegerField(blank=True, null=True)
+    sv3_bgs_target = models.BigIntegerField(blank=True, null=True)
+    sv3_mws_target = models.BigIntegerField(blank=True, null=True)
+    sv3_scnd_target = models.BigIntegerField(blank=True, null=True)
+    plate_ra = models.FloatField(blank=True, null=True)
+    plate_dec = models.FloatField(blank=True, null=True)
+    coadd_numexp = models.SmallIntegerField(blank=True, null=True)
+    coadd_exptime = models.FloatField(blank=True, null=True)
+    coadd_numnight = models.SmallIntegerField(blank=True, null=True)
+    coadd_numtile = models.SmallIntegerField(blank=True, null=True)
+    mean_delta_x = models.FloatField(blank=True, null=True)
+    rms_delta_x = models.FloatField(blank=True, null=True)
+    mean_delta_y = models.FloatField(blank=True, null=True)
+    rms_delta_y = models.FloatField(blank=True, null=True)
+    mean_psf_to_fiber_specflux = models.FloatField(blank=True, null=True)
+    mean_fiber_ra = models.FloatField(blank=True, null=True)
+    std_fiber_ra = models.FloatField(blank=True, null=True)
+    mean_fiber_dec = models.FloatField(blank=True, null=True)
+    std_fiber_dec = models.FloatField(blank=True, null=True)
+    min_mjd = models.FloatField(blank=True, null=True)
+    max_mjd = models.FloatField(blank=True, null=True)
+    mean_mjd = models.FloatField(blank=True, null=True)
+    tsnr2_gpbdark_b = models.FloatField(blank=True, null=True)
+    tsnr2_elg_b = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbright_b = models.FloatField(blank=True, null=True)
+    tsnr2_lya_b = models.FloatField(blank=True, null=True)
+    tsnr2_bgs_b = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbackup_b = models.FloatField(blank=True, null=True)
+    tsnr2_qso_b = models.FloatField(blank=True, null=True)
+    tsnr2_lrg_b = models.FloatField(blank=True, null=True)
+    tsnr2_gpbdark_r = models.FloatField(blank=True, null=True)
+    tsnr2_elg_r = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbright_r = models.FloatField(blank=True, null=True)
+    tsnr2_lya_r = models.FloatField(blank=True, null=True)
+    tsnr2_bgs_r = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbackup_r = models.FloatField(blank=True, null=True)
+    tsnr2_qso_r = models.FloatField(blank=True, null=True)
+    tsnr2_lrg_r = models.FloatField(blank=True, null=True)
+    tsnr2_gpbdark_z = models.FloatField(blank=True, null=True)
+    tsnr2_elg_z = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbright_z = models.FloatField(blank=True, null=True)
+    tsnr2_lya_z = models.FloatField(blank=True, null=True)
+    tsnr2_bgs_z = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbackup_z = models.FloatField(blank=True, null=True)
+    tsnr2_qso_z = models.FloatField(blank=True, null=True)
+    tsnr2_lrg_z = models.FloatField(blank=True, null=True)
+    tsnr2_gpbdark = models.FloatField(blank=True, null=True)
+    tsnr2_elg = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbright = models.FloatField(blank=True, null=True)
+    tsnr2_lya = models.FloatField(blank=True, null=True)
+    tsnr2_bgs = models.FloatField(blank=True, null=True)
+    tsnr2_gpbbackup = models.FloatField(blank=True, null=True)
+    tsnr2_qso = models.FloatField(blank=True, null=True)
+    tsnr2_lrg = models.FloatField(blank=True, null=True)
+    main_nspec = models.SmallIntegerField(blank=True, null=True)
+    main_primary = models.BooleanField(blank=True, null=True)
+    sv_nspec = models.SmallIntegerField(blank=True, null=True)
+    sv_primary = models.BooleanField(blank=True, null=True)
+    zcat_nspec = models.SmallIntegerField(blank=True, null=True)
+    zcat_primary = models.BooleanField(blank=True, null=True)
+    desiname = models.TextField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "desi_dr1_q3c"
+
 
 class FermiLatQ3C(models.Model):
     fid = models.AutoField(primary_key=True)
@@ -260,7 +462,7 @@ class FermiLatQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'fermi_lat_q3c'
+        db_table = "fermi_lat_q3c"
 
 
 class Gaiadr3VariableQ3C(models.Model):
@@ -349,7 +551,7 @@ class Gaiadr3VariableQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'gaiadr3variable_q3c'
+        db_table = "gaiadr3variable_q3c"
 
 
 class GladePlusQ3C(models.Model):
@@ -396,7 +598,8 @@ class GladePlusQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'glade_plus_q3c'
+        db_table = "glade_plus_q3c"
+
 
 class GwgcQ3C(models.Model):
     gid = models.AutoField(primary_key=True)
@@ -422,7 +625,7 @@ class GwgcQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'gwgc_q3c'
+        db_table = "gwgc_q3c"
 
 
 class Hecate1Q3C(models.Model):
@@ -530,10 +733,278 @@ class Hecate1Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'hecate1_q3c'
+        db_table = "hecate1_q3c"
 
 
-class LsDr10Q3C(models.Model):
+class Hecate2Q3C(models.Model):
+    hid = models.AutoField(primary_key=True)
+    pgc = models.IntegerField(blank=True, null=True)
+    objname = models.CharField(max_length=64, blank=True, null=True)
+    allwise = models.CharField(max_length=64, blank=True, null=True)
+    objid = models.CharField(max_length=64, blank=True, null=True)
+    specobjid = models.CharField(max_length=64, blank=True, null=True)
+    ps2 = models.CharField(max_length=64, blank=True, null=True)
+    radeg = models.FloatField(blank=True, null=True)
+    dedeg = models.FloatField(blank=True, null=True)
+    fastrom = models.IntegerField(blank=True, null=True)
+    r1 = models.FloatField(blank=True, null=True)
+    r2 = models.FloatField(blank=True, null=True)
+    pa = models.FloatField(blank=True, null=True)
+    rflag = models.CharField(max_length=64, blank=True, null=True)
+    rorigin = models.CharField(max_length=64, blank=True, null=True)
+    t = models.FloatField(blank=True, null=True)
+    e_t = models.FloatField(blank=True, null=True)
+    incl = models.FloatField(blank=True, null=True)
+    hrv = models.FloatField(blank=True, null=True)
+    e_hrv = models.FloatField(blank=True, null=True)
+    vvir = models.FloatField(blank=True, null=True)
+    e_vvir = models.FloatField(blank=True, null=True)
+    dist = models.FloatField(blank=True, null=True)
+    e_dist = models.FloatField(blank=True, null=True)
+    f_dist = models.IntegerField(blank=True, null=True)
+    ag = models.FloatField(blank=True, null=True)
+    ai = models.FloatField(blank=True, null=True)
+    umagtot = models.FloatField(blank=True, null=True)
+    bmagtot = models.FloatField(blank=True, null=True)
+    vmagtot = models.FloatField(blank=True, null=True)
+    imagtot = models.FloatField(blank=True, null=True)
+    e_umagtot = models.FloatField(blank=True, null=True)
+    e_bmagtot = models.FloatField(blank=True, null=True)
+    e_vmagtot = models.FloatField(blank=True, null=True)
+    e_imagtot = models.FloatField(blank=True, null=True)
+    fs12 = models.FloatField(blank=True, null=True)
+    fs25 = models.FloatField(blank=True, null=True)
+    fs60 = models.FloatField(blank=True, null=True)
+    fs100 = models.FloatField(blank=True, null=True)
+    q_fs12 = models.IntegerField(blank=True, null=True)
+    q_fs25 = models.IntegerField(blank=True, null=True)
+    q_fs60 = models.IntegerField(blank=True, null=True)
+    q_fs100 = models.IntegerField(blank=True, null=True)
+    w1mag = models.FloatField(blank=True, null=True)
+    w2mag = models.FloatField(blank=True, null=True)
+    w3mag = models.FloatField(blank=True, null=True)
+    w4mag = models.FloatField(blank=True, null=True)
+    e_w1mag = models.FloatField(blank=True, null=True)
+    e_w2mag = models.FloatField(blank=True, null=True)
+    e_w3mag = models.FloatField(blank=True, null=True)
+    e_w4mag = models.FloatField(blank=True, null=True)
+    allwiseap = models.CharField(max_length=64, blank=True, null=True)
+    q_allwise = models.CharField(max_length=64, blank=True, null=True)
+    wf1mag = models.FloatField(blank=True, null=True)
+    wf2mag = models.FloatField(blank=True, null=True)
+    wf3mag = models.FloatField(blank=True, null=True)
+    wf4mag = models.FloatField(blank=True, null=True)
+    e_wf1mag = models.FloatField(blank=True, null=True)
+    e_wf2mag = models.FloatField(blank=True, null=True)
+    e_wf3mag = models.FloatField(blank=True, null=True)
+    e_wf4mag = models.FloatField(blank=True, null=True)
+    jmag = models.FloatField(blank=True, null=True)
+    hmag = models.FloatField(blank=True, null=True)
+    kmag = models.FloatField(blank=True, null=True)
+    e_jmag = models.FloatField(blank=True, null=True)
+    e_hmag = models.FloatField(blank=True, null=True)
+    e_kmag = models.FloatField(blank=True, null=True)
+    r2mass = models.IntegerField(blank=True, null=True)
+    umag = models.FloatField(blank=True, null=True)
+    gmag = models.FloatField(blank=True, null=True)
+    rmag = models.FloatField(blank=True, null=True)
+    imag = models.FloatField(blank=True, null=True)
+    zmag = models.FloatField(blank=True, null=True)
+    ymag = models.FloatField(blank=True, null=True)
+    e_umag = models.FloatField(blank=True, null=True)
+    e_gmag = models.FloatField(blank=True, null=True)
+    e_rmag = models.FloatField(blank=True, null=True)
+    e_imag = models.FloatField(blank=True, null=True)
+    e_zmag = models.FloatField(blank=True, null=True)
+    e_ymag = models.FloatField(blank=True, null=True)
+    roptphot = models.CharField(max_length=64, blank=True, null=True)
+    q_optphot = models.CharField(max_length=64, blank=True, null=True)
+    fhbeta = models.FloatField(blank=True, null=True)
+    e_fhbeta = models.FloatField(blank=True, null=True)
+    foiii5007 = models.FloatField(blank=True, null=True)
+    e_foiii5007 = models.FloatField(blank=True, null=True)
+    foi6300 = models.FloatField(blank=True, null=True)
+    e_foi6300 = models.FloatField(blank=True, null=True)
+    fhalpha = models.FloatField(blank=True, null=True)
+    e_fhalpha = models.FloatField(blank=True, null=True)
+    fnii6584 = models.FloatField(blank=True, null=True)
+    e_fnii6584 = models.FloatField(blank=True, null=True)
+    fsii6717 = models.FloatField(blank=True, null=True)
+    e_fsii6717 = models.FloatField(blank=True, null=True)
+    fsii6731 = models.FloatField(blank=True, null=True)
+    e_fsii6731 = models.FloatField(blank=True, null=True)
+    rspec = models.CharField(max_length=64, blank=True, null=True)
+    w1_w2_rf = models.FloatField(blank=True, null=True)
+    w2_w3_rf = models.FloatField(blank=True, null=True)
+    g_r_fib_rf = models.FloatField(blank=True, null=True)
+    activclass = models.IntegerField(blank=True, null=True)
+    ractivclass = models.CharField(max_length=64, blank=True, null=True)
+    sfgprob = models.FloatField(blank=True, null=True)
+    agnprob = models.FloatField(blank=True, null=True)
+    linerprob = models.FloatField(blank=True, null=True)
+    compprob = models.FloatField(blank=True, null=True)
+    passprob = models.FloatField(blank=True, null=True)
+    ebv = models.FloatField(blank=True, null=True)
+    e_ebv = models.FloatField(blank=True, null=True)
+    logsfrgsw = models.FloatField(blank=True, null=True)
+    logmstargsw = models.FloatField(blank=True, null=True)
+    logsfrhec = models.FloatField(blank=True, null=True)
+    q_logsfrhec = models.CharField(max_length=64, blank=True, null=True)
+    r_logsfrhec = models.CharField(max_length=64, blank=True, null=True)
+    n_logsfrhec = models.CharField(max_length=64, blank=True, null=True)
+    logmstarhec = models.FloatField(blank=True, null=True)
+    q_logmstarhec = models.CharField(max_length=64, blank=True, null=True)
+    r_logmstarhec = models.CharField(max_length=64, blank=True, null=True)
+    n_logmstarhec = models.CharField(max_length=64, blank=True, null=True)
+    metal = models.FloatField(blank=True, null=True)
+    n_metal = models.CharField(max_length=64, blank=True, null=True)
+    logmbh = models.FloatField(blank=True, null=True)
+    r_logmbh = models.CharField(max_length=64, blank=True, null=True)
+    dupflag = models.IntegerField(blank=True, null=True)
+    blendflag = models.CharField(max_length=64, blank=True, null=True)
+    star = models.CharField(max_length=64, blank=True, null=True)
+    wcnotes = models.CharField(max_length=64, blank=True, null=True)
+    notes = models.CharField(max_length=64, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "hecate2_q3c"
+
+
+class LsDr9NorthQ3C(models.Model):
+    lid = models.BigAutoField(primary_key=True)
+    release = models.SmallIntegerField(blank=True, null=True)
+    brickname = models.CharField(max_length=64, blank=True, null=True)
+    objid = models.IntegerField(blank=True, null=True)
+    type = models.CharField(max_length=64, blank=True, null=True)
+    ra = models.FloatField(blank=True, null=True)
+    dec = models.FloatField(blank=True, null=True)
+    ra_ivar = models.FloatField(blank=True, null=True)
+    dec_ivar = models.FloatField(blank=True, null=True)
+    dchisq = models.FloatField(blank=True, null=True)
+    ebv = models.FloatField(blank=True, null=True)
+    flux_g = models.FloatField(blank=True, null=True)
+    flux_r = models.FloatField(blank=True, null=True)
+    flux_z = models.FloatField(blank=True, null=True)
+    flux_w1 = models.FloatField(blank=True, null=True)
+    flux_w2 = models.FloatField(blank=True, null=True)
+    flux_w3 = models.FloatField(blank=True, null=True)
+    flux_w4 = models.FloatField(blank=True, null=True)
+    flux_ivar_g = models.FloatField(blank=True, null=True)
+    flux_ivar_r = models.FloatField(blank=True, null=True)
+    flux_ivar_z = models.FloatField(blank=True, null=True)
+    flux_ivar_w1 = models.FloatField(blank=True, null=True)
+    flux_ivar_w2 = models.FloatField(blank=True, null=True)
+    flux_ivar_w3 = models.FloatField(blank=True, null=True)
+    flux_ivar_w4 = models.FloatField(blank=True, null=True)
+    mw_transmission_g = models.FloatField(blank=True, null=True)
+    mw_transmission_r = models.FloatField(blank=True, null=True)
+    mw_transmission_z = models.FloatField(blank=True, null=True)
+    mw_transmission_w1 = models.FloatField(blank=True, null=True)
+    mw_transmission_w2 = models.FloatField(blank=True, null=True)
+    mw_transmission_w3 = models.FloatField(blank=True, null=True)
+    mw_transmission_w4 = models.FloatField(blank=True, null=True)
+    nobs_g = models.SmallIntegerField(blank=True, null=True)
+    nobs_r = models.SmallIntegerField(blank=True, null=True)
+    nobs_z = models.SmallIntegerField(blank=True, null=True)
+    nobs_w1 = models.SmallIntegerField(blank=True, null=True)
+    nobs_w2 = models.SmallIntegerField(blank=True, null=True)
+    nobs_w3 = models.SmallIntegerField(blank=True, null=True)
+    nobs_w4 = models.SmallIntegerField(blank=True, null=True)
+    rchisq_g = models.FloatField(blank=True, null=True)
+    rchisq_r = models.FloatField(blank=True, null=True)
+    rchisq_z = models.FloatField(blank=True, null=True)
+    rchisq_w1 = models.FloatField(blank=True, null=True)
+    rchisq_w2 = models.FloatField(blank=True, null=True)
+    rchisq_w3 = models.FloatField(blank=True, null=True)
+    rchisq_w4 = models.FloatField(blank=True, null=True)
+    fracflux_g = models.FloatField(blank=True, null=True)
+    fracflux_r = models.FloatField(blank=True, null=True)
+    fracflux_z = models.FloatField(blank=True, null=True)
+    fracflux_w1 = models.FloatField(blank=True, null=True)
+    fracflux_w2 = models.FloatField(blank=True, null=True)
+    fracflux_w3 = models.FloatField(blank=True, null=True)
+    fracflux_w4 = models.FloatField(blank=True, null=True)
+    fracmasked_g = models.FloatField(blank=True, null=True)
+    fracmasked_r = models.FloatField(blank=True, null=True)
+    fracmasked_z = models.FloatField(blank=True, null=True)
+    fracin_g = models.FloatField(blank=True, null=True)
+    fracin_r = models.FloatField(blank=True, null=True)
+    fracin_z = models.FloatField(blank=True, null=True)
+    anymask_g = models.SmallIntegerField(blank=True, null=True)
+    anymask_r = models.SmallIntegerField(blank=True, null=True)
+    anymask_z = models.SmallIntegerField(blank=True, null=True)
+    allmask_g = models.SmallIntegerField(blank=True, null=True)
+    allmask_r = models.SmallIntegerField(blank=True, null=True)
+    allmask_z = models.SmallIntegerField(blank=True, null=True)
+    wisemask_w1 = models.SmallIntegerField(blank=True, null=True)
+    wisemask_w2 = models.SmallIntegerField(blank=True, null=True)
+    psfsize_g = models.FloatField(blank=True, null=True)
+    psfsize_r = models.FloatField(blank=True, null=True)
+    psfsize_z = models.FloatField(blank=True, null=True)
+    psfdepth_g = models.FloatField(blank=True, null=True)
+    psfdepth_r = models.FloatField(blank=True, null=True)
+    psfdepth_z = models.FloatField(blank=True, null=True)
+    galdepth_g = models.FloatField(blank=True, null=True)
+    galdepth_r = models.FloatField(blank=True, null=True)
+    galdepth_z = models.FloatField(blank=True, null=True)
+    psfdepth_w1 = models.FloatField(blank=True, null=True)
+    psfdepth_w2 = models.FloatField(blank=True, null=True)
+    wise_coadd_id = models.TextField(blank=True, null=True)
+    shape_r = models.FloatField(blank=True, null=True)
+    shape_r_ivar = models.FloatField(blank=True, null=True)
+    shape_e1 = models.FloatField(blank=True, null=True)
+    shape_e1_ivar = models.FloatField(blank=True, null=True)
+    shape_e2 = models.FloatField(blank=True, null=True)
+    shape_e2_ivar = models.FloatField(blank=True, null=True)
+    fiberflux_g = models.FloatField(blank=True, null=True)
+    fiberflux_r = models.FloatField(blank=True, null=True)
+    fiberflux_z = models.FloatField(blank=True, null=True)
+    fibertotflux_g = models.FloatField(blank=True, null=True)
+    fibertotflux_r = models.FloatField(blank=True, null=True)
+    fibertotflux_z = models.FloatField(blank=True, null=True)
+    ref_cat = models.TextField(blank=True, null=True)
+    ref_id = models.BigIntegerField(blank=True, null=True)
+    ref_epoch = models.FloatField(blank=True, null=True)
+    gaia_phot_g_mean_mag = models.FloatField(blank=True, null=True)
+    gaia_phot_g_mean_flux_over_error = models.FloatField(blank=True, null=True)
+    gaia_phot_bp_mean_mag = models.FloatField(blank=True, null=True)
+    gaia_phot_bp_mean_flux_over_error = models.FloatField(blank=True, null=True)
+    gaia_phot_rp_mean_mag = models.FloatField(blank=True, null=True)
+    gaia_phot_rp_mean_flux_over_error = models.FloatField(blank=True, null=True)
+    gaia_astrometric_excess_noise = models.FloatField(blank=True, null=True)
+    gaia_duplicated_source = models.BooleanField(blank=True, null=True)
+    gaia_phot_bp_rp_excess_factor = models.FloatField(blank=True, null=True)
+    gaia_astrometric_sigma5d_max = models.FloatField(blank=True, null=True)
+    gaia_astrometric_params_solved = models.SmallIntegerField(blank=True, null=True)
+    parallax = models.FloatField(blank=True, null=True)
+    parallax_ivar = models.FloatField(blank=True, null=True)
+    pmra = models.FloatField(blank=True, null=True)
+    pmra_ivar = models.FloatField(blank=True, null=True)
+    pmdec = models.FloatField(blank=True, null=True)
+    pmdec_ivar = models.FloatField(blank=True, null=True)
+    maskbits = models.SmallIntegerField(blank=True, null=True)
+    fitbits = models.SmallIntegerField(blank=True, null=True)
+    sersic = models.FloatField(blank=True, null=True)
+    sersic_ivar = models.FloatField(blank=True, null=True)
+    z_phot_mean = models.FloatField(blank=True, null=True)
+    z_phot_median = models.FloatField(blank=True, null=True)
+    z_phot_std = models.FloatField(blank=True, null=True)
+    z_phot_l68 = models.FloatField(blank=True, null=True)
+    z_phot_u68 = models.FloatField(blank=True, null=True)
+    z_phot_l95 = models.FloatField(blank=True, null=True)
+    z_phot_u95 = models.FloatField(blank=True, null=True)
+    z_spec = models.FloatField(blank=True, null=True)
+    survey = models.TextField(blank=True, null=True)
+    training = models.BooleanField(blank=True, null=True)
+    kfold = models.SmallIntegerField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "ls_dr9north_q3c"
+
+
+class LsDr10SouthQ3C(models.Model):
     lid = models.BigAutoField(primary_key=True)
     brickid = models.IntegerField(blank=True, null=True)
     objid = models.IntegerField(blank=True, null=True)
@@ -589,7 +1060,7 @@ class LsDr10Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ls_dr10_q3c'
+        db_table = "ls_dr10south_q3c"
 
 
 class MilliquasQ3C(models.Model):
@@ -614,7 +1085,89 @@ class MilliquasQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'milliquas_q3c'
+        db_table = "milliquas_q3c"
+
+
+class NedlvsQ3C(models.Model):
+    objname = models.TextField(blank=True, null=True)
+    ra = models.FloatField(blank=True, null=True)
+    dec = models.FloatField(blank=True, null=True)
+    objtype = models.TextField(blank=True, null=True)
+    z = models.FloatField(blank=True, null=True)
+    z_unc = models.FloatField(blank=True, null=True)
+    z_tech = models.TextField(blank=True, null=True)
+    z_qual = models.BooleanField(blank=True, null=True)
+    z_qual_flag = models.BooleanField(blank=True, null=True)
+    z_refcode = models.TextField(blank=True, null=True)
+    zidist = models.FloatField(blank=True, null=True)
+    zidist_unc = models.FloatField(blank=True, null=True)
+    zidist_method = models.TextField(blank=True, null=True)
+    zidist_indicator = models.TextField(blank=True, null=True)
+    zidist_refcode = models.TextField(blank=True, null=True)
+    distmpc = models.FloatField(blank=True, null=True)
+    distmpc_unc = models.FloatField(blank=True, null=True)
+    distmpc_method = models.TextField(blank=True, null=True)
+    ebv = models.FloatField(blank=True, null=True)
+    a_fuv_mwext = models.FloatField(blank=True, null=True)
+    a_nuv_mwext = models.FloatField(blank=True, null=True)
+    a_j_mwext = models.FloatField(blank=True, null=True)
+    a_h_mwext = models.FloatField(blank=True, null=True)
+    a_ks_mwext = models.FloatField(blank=True, null=True)
+    a_w1_mwext = models.FloatField(blank=True, null=True)
+    a_w2_mwext = models.FloatField(blank=True, null=True)
+    a_w3_mwext = models.FloatField(blank=True, null=True)
+    a_w4_mwext = models.FloatField(blank=True, null=True)
+    m_fuv = models.FloatField(blank=True, null=True)
+    m_fuv_unc = models.FloatField(blank=True, null=True)
+    m_nuv = models.FloatField(blank=True, null=True)
+    m_nuv_unc = models.FloatField(blank=True, null=True)
+    lum_fuv = models.FloatField(blank=True, null=True)
+    lum_fuv_unc = models.FloatField(blank=True, null=True)
+    lum_nuv = models.FloatField(blank=True, null=True)
+    lum_nuv_unc = models.FloatField(blank=True, null=True)
+    galexphot = models.TextField(blank=True, null=True)
+    m_j = models.FloatField(blank=True, null=True)
+    m_j_unc = models.FloatField(blank=True, null=True)
+    m_h = models.FloatField(blank=True, null=True)
+    m_h_unc = models.FloatField(blank=True, null=True)
+    m_ks = models.FloatField(blank=True, null=True)
+    m_ks_unc = models.FloatField(blank=True, null=True)
+    lum_j = models.FloatField(blank=True, null=True)
+    lum_j_unc = models.FloatField(blank=True, null=True)
+    lum_h = models.FloatField(blank=True, null=True)
+    lum_h_unc = models.FloatField(blank=True, null=True)
+    lum_ks = models.FloatField(blank=True, null=True)
+    lum_ks_unc = models.FloatField(blank=True, null=True)
+    tmassphot = models.TextField(blank=True, null=True)
+    m_w1 = models.FloatField(blank=True, null=True)
+    m_w1_unc = models.FloatField(blank=True, null=True)
+    m_w2 = models.FloatField(blank=True, null=True)
+    m_w2_unc = models.FloatField(blank=True, null=True)
+    m_w3 = models.FloatField(blank=True, null=True)
+    m_w3_unc = models.FloatField(blank=True, null=True)
+    m_w4 = models.FloatField(blank=True, null=True)
+    m_w4_unc = models.FloatField(blank=True, null=True)
+    lum_w1 = models.FloatField(blank=True, null=True)
+    lum_w1_unc = models.FloatField(blank=True, null=True)
+    lum_w2 = models.FloatField(blank=True, null=True)
+    lum_w2_unc = models.FloatField(blank=True, null=True)
+    lum_w3 = models.FloatField(blank=True, null=True)
+    lum_w3_unc = models.FloatField(blank=True, null=True)
+    lum_w4 = models.FloatField(blank=True, null=True)
+    lum_w4_unc = models.FloatField(blank=True, null=True)
+    wisephot = models.TextField(blank=True, null=True)
+    sfr_w4 = models.FloatField(blank=True, null=True)
+    sfr_w4_unc = models.FloatField(blank=True, null=True)
+    sfr_hybrid = models.FloatField(blank=True, null=True)
+    sfr_hybrid_unc = models.FloatField(blank=True, null=True)
+    et_flag = models.BooleanField(blank=True, null=True)
+    mstar = models.FloatField(blank=True, null=True)
+    mstar_unc = models.FloatField(blank=True, null=True)
+    mlratio = models.FloatField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "nedlvs_q3c"
 
 
 class Ps1Q3C(models.Model):
@@ -660,7 +1213,7 @@ class Ps1Q3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'ps1_q3c'
+        db_table = "ps1_q3c"
 
 
 class RomaBzcatQ3C(models.Model):
@@ -682,7 +1235,7 @@ class RomaBzcatQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'roma_bzcat_q3c'
+        db_table = "roma_bzcat_q3c"
 
 
 class Sdss12PhotozQ3C(models.Model):
@@ -835,7 +1388,7 @@ class Sdss12PhotozQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'sdss12photoz_q3c'
+        db_table = "sdss12photoz_q3c"
 
 
 class TnsQ3C(models.Model):
@@ -866,40 +1419,8 @@ class TnsQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'tns_q3c'
+        db_table = "tns_q3c"
 
-class ZtfVarstarQ3C(models.Model):
-    id = models.CharField(max_length=22, blank=True, primary_key=True)
-    sourceid = models.BigIntegerField(blank=True, null=True)
-    radeg = models.FloatField(blank=True, null=True)
-    dedeg = models.FloatField(blank=True, null=True)
-    per = models.FloatField(blank=True, null=True)
-    r21 = models.FloatField(blank=True, null=True)
-    phi21 = models.FloatField(blank=True, null=True)
-    t0 = models.FloatField(blank=True, null=True)
-    gmag = models.FloatField(blank=True, null=True)
-    rmag = models.FloatField(blank=True, null=True)
-    per_g = models.FloatField(blank=True, null=True)
-    per_r = models.FloatField(blank=True, null=True)
-    num_g = models.IntegerField(blank=True, null=True)
-    num_r = models.IntegerField(blank=True, null=True)
-    r21_g = models.FloatField(blank=True, null=True)
-    r21_r = models.FloatField(blank=True, null=True)
-    phi21_g = models.FloatField(blank=True, null=True)
-    phi21_r = models.FloatField(blank=True, null=True)
-    r2_g = models.FloatField(blank=True, null=True)
-    r2_r = models.FloatField(blank=True, null=True)
-    amp_g = models.FloatField(blank=True, null=True)
-    amp_r = models.FloatField(blank=True, null=True)
-    logfap_g = models.FloatField(blank=True, null=True)
-    logfap_r = models.FloatField(blank=True, null=True)
-    type = models.CharField(max_length=5, blank=True, null=True)
-    dmin_g = models.FloatField(blank=True, null=True)
-    dmin_r = models.FloatField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'ztf_varstar_q3c'
 
 class TwomassQ3C(models.Model):
     ra = models.FloatField(blank=True, null=True)
@@ -965,240 +1486,71 @@ class TwomassQ3C(models.Model):
 
     class Meta:
         managed = False
-        db_table = 'twomass_q3c'
+        db_table = "twomass_q3c"
 
-class NedlvsQ3C(models.Model):
+
+class ZtfVarstarQ3C(models.Model):
+    id = models.CharField(max_length=22, blank=True, primary_key=True)
+    sourceid = models.BigIntegerField(blank=True, null=True)
+    radeg = models.FloatField(blank=True, null=True)
+    dedeg = models.FloatField(blank=True, null=True)
+    per = models.FloatField(blank=True, null=True)
+    r21 = models.FloatField(blank=True, null=True)
+    phi21 = models.FloatField(blank=True, null=True)
+    t0 = models.FloatField(blank=True, null=True)
+    gmag = models.FloatField(blank=True, null=True)
+    rmag = models.FloatField(blank=True, null=True)
+    per_g = models.FloatField(blank=True, null=True)
+    per_r = models.FloatField(blank=True, null=True)
+    num_g = models.IntegerField(blank=True, null=True)
+    num_r = models.IntegerField(blank=True, null=True)
+    r21_g = models.FloatField(blank=True, null=True)
+    r21_r = models.FloatField(blank=True, null=True)
+    phi21_g = models.FloatField(blank=True, null=True)
+    phi21_r = models.FloatField(blank=True, null=True)
+    r2_g = models.FloatField(blank=True, null=True)
+    r2_r = models.FloatField(blank=True, null=True)
+    amp_g = models.FloatField(blank=True, null=True)
+    amp_r = models.FloatField(blank=True, null=True)
+    logfap_g = models.FloatField(blank=True, null=True)
+    logfap_r = models.FloatField(blank=True, null=True)
+    type = models.CharField(max_length=5, blank=True, null=True)
+    dmin_g = models.FloatField(blank=True, null=True)
+    dmin_r = models.FloatField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = "ztf_varstar_q3c"
+
+
+## catalog of user-provided host galaxies
+class UserGalaxyQ3C(models.Model):
+    id = models.AutoField(primary_key=True)
     objname = models.TextField(blank=True, null=True)
     ra = models.FloatField(blank=True, null=True)
     dec = models.FloatField(blank=True, null=True)
-    objtype = models.TextField(blank=True, null=True)
     z = models.FloatField(blank=True, null=True)
-    z_unc = models.FloatField(blank=True, null=True)
-    z_tech = models.TextField(blank=True, null=True)
-    z_qual = models.BooleanField(blank=True, null=True)
-    z_qual_flag = models.BooleanField(blank=True, null=True)
-    z_refcode = models.TextField(blank=True, null=True)
-    zidist = models.FloatField(blank=True, null=True)
-    zidist_unc = models.FloatField(blank=True, null=True)
-    zidist_method = models.TextField(blank=True, null=True)
-    zidist_indicator = models.TextField(blank=True, null=True)
-    zidist_refcode = models.TextField(blank=True, null=True)
-    distmpc = models.FloatField(blank=True, null=True)
-    distmpc_unc = models.FloatField(blank=True, null=True)
-    distmpc_method = models.TextField(blank=True, null=True)
-    ebv = models.FloatField(blank=True, null=True)
-    a_fuv_mwext = models.FloatField(blank=True, null=True)
-    a_nuv_mwext = models.FloatField(blank=True, null=True)
-    a_j_mwext = models.FloatField(blank=True, null=True)
-    a_h_mwext = models.FloatField(blank=True, null=True)
-    a_ks_mwext = models.FloatField(blank=True, null=True)
-    a_w1_mwext = models.FloatField(blank=True, null=True)
-    a_w2_mwext = models.FloatField(blank=True, null=True)
-    a_w3_mwext = models.FloatField(blank=True, null=True)
-    a_w4_mwext = models.FloatField(blank=True, null=True)
-    m_fuv = models.FloatField(blank=True, null=True)
-    m_fuv_unc = models.FloatField(blank=True, null=True)
-    m_nuv = models.FloatField(blank=True, null=True)
-    m_nuv_unc = models.FloatField(blank=True, null=True)
-    lum_fuv = models.FloatField(blank=True, null=True)
-    lum_fuv_unc = models.FloatField(blank=True, null=True)
-    lum_nuv = models.FloatField(blank=True, null=True)
-    lum_nuv_unc = models.FloatField(blank=True, null=True)
-    galexphot = models.TextField(blank=True, null=True)
-    m_j = models.FloatField(blank=True, null=True)
-    m_j_unc = models.FloatField(blank=True, null=True)
-    m_h = models.FloatField(blank=True, null=True)
-    m_h_unc = models.FloatField(blank=True, null=True)
-    m_ks = models.FloatField(blank=True, null=True)
-    m_ks_unc = models.FloatField(blank=True, null=True)
-    lum_j = models.FloatField(blank=True, null=True)
-    lum_j_unc = models.FloatField(blank=True, null=True)
-    lum_h = models.FloatField(blank=True, null=True)
-    lum_h_unc = models.FloatField(blank=True, null=True)
-    lum_ks = models.FloatField(blank=True, null=True)
-    lum_ks_unc = models.FloatField(blank=True, null=True)
-    tmassphot = models.TextField(blank=True, null=True)
-    m_w1 = models.FloatField(blank=True, null=True)
-    m_w1_unc = models.FloatField(blank=True, null=True)
-    m_w2 = models.FloatField(blank=True, null=True)
-    m_w2_unc = models.FloatField(blank=True, null=True)
-    m_w3 = models.FloatField(blank=True, null=True)
-    m_w3_unc = models.FloatField(blank=True, null=True)
-    m_w4 = models.FloatField(blank=True, null=True)
-    m_w4_unc = models.FloatField(blank=True, null=True)
-    lum_w1 = models.FloatField(blank=True, null=True)
-    lum_w1_unc = models.FloatField(blank=True, null=True)
-    lum_w2 = models.FloatField(blank=True, null=True)
-    lum_w2_unc = models.FloatField(blank=True, null=True)
-    lum_w3 = models.FloatField(blank=True, null=True)
-    lum_w3_unc = models.FloatField(blank=True, null=True)
-    lum_w4 = models.FloatField(blank=True, null=True)
-    lum_w4_unc = models.FloatField(blank=True, null=True)
-    wisephot = models.TextField(blank=True, null=True)
-    sfr_w4 = models.FloatField(blank=True, null=True)
-    sfr_w4_unc = models.FloatField(blank=True, null=True)
-    sfr_hybrid = models.FloatField(blank=True, null=True)
-    sfr_hybrid_unc = models.FloatField(blank=True, null=True)
-    et_flag = models.BooleanField(blank=True, null=True)
-    mstar = models.FloatField(blank=True, null=True)
-    mstar_unc = models.FloatField(blank=True, null=True)
-    mlratio = models.FloatField(blank=True, null=True)
+    z_err = models.FloatField(blank=True, null=True)
+    z_pos_err = models.FloatField(blank=True, null=True)
+    z_neg_err = models.FloatField(blank=True, null=True)
+    z_type = models.TextField(blank=True, null=True)
+    lumdist = models.FloatField(blank=True, null=True)
+    lumdist_err = models.FloatField(blank=True, null=True)
+    lumdist_pos_err = models.FloatField(blank=True, null=True)
+    lumdist_neg_err = models.FloatField(blank=True, null=True)
+    default_mag = models.FloatField(blank=True, null=True)
+    source = models.TextField(blank=True, null=True)
+    submitter = models.TextField(blank=True, null=True)  # submitter and original source
+    og_id = models.BigIntegerField(blank=True, null=True)
 
+    # managed = True (default, specified here for clarity)
+    # --> allow Django to modify this table
     class Meta:
-        managed = False
-        db_table = 'nedlvs_q3c'
+        managed = True
+        db_table = "usergalaxy_q3c"
 
-class DesiDr1Q3C(models.Model):
-    targetid = models.BigIntegerField(blank=True, null=True)
-    survey = models.TextField(blank=True, null=True)
-    program = models.TextField(blank=True, null=True)
-    healpix = models.IntegerField(blank=True, null=True)
-    spgrpval = models.IntegerField(blank=True, null=True)
-    z = models.FloatField(blank=True, null=True)
-    zerr = models.FloatField(blank=True, null=True)
-    zwarn = models.BigIntegerField(blank=True, null=True)
-    chi2 = models.FloatField(blank=True, null=True)
-    coeff_00 = models.FloatField(blank=True, null=True)
-    coeff_01 = models.FloatField(blank=True, null=True)
-    coeff_02 = models.FloatField(blank=True, null=True)
-    coeff_03 = models.FloatField(blank=True, null=True)
-    coeff_04 = models.FloatField(blank=True, null=True)
-    coeff_05 = models.FloatField(blank=True, null=True)
-    coeff_06 = models.FloatField(blank=True, null=True)
-    coeff_07 = models.FloatField(blank=True, null=True)
-    coeff_08 = models.FloatField(blank=True, null=True)
-    coeff_09 = models.FloatField(blank=True, null=True)
-    npixels = models.BigIntegerField(blank=True, null=True)
-    spectype = models.TextField(blank=True, null=True)
-    subtype = models.TextField(blank=True, null=True)
-    ncoeff = models.BigIntegerField(blank=True, null=True)
-    deltachi2 = models.FloatField(blank=True, null=True)
-    coadd_fiberstatus = models.IntegerField(blank=True, null=True)
-    target_ra = models.FloatField(blank=True, null=True)
-    target_dec = models.FloatField(blank=True, null=True)
-    pmra = models.FloatField(blank=True, null=True)
-    pmdec = models.FloatField(blank=True, null=True)
-    ref_epoch = models.FloatField(blank=True, null=True)
-    fa_target = models.BigIntegerField(blank=True, null=True)
-    fa_type = models.SmallIntegerField(blank=True, null=True)
-    objtype = models.TextField(blank=True, null=True)
-    subpriority = models.FloatField(blank=True, null=True)
-    obsconditions = models.IntegerField(blank=True, null=True)
-    release = models.SmallIntegerField(blank=True, null=True)
-    brickname = models.TextField(blank=True, null=True)
-    brickid = models.IntegerField(blank=True, null=True)
-    brick_objid = models.IntegerField(blank=True, null=True)
-    morphtype = models.TextField(blank=True, null=True)
-    ebv = models.FloatField(blank=True, null=True)
-    flux_g = models.FloatField(blank=True, null=True)
-    flux_r = models.FloatField(blank=True, null=True)
-    flux_z = models.FloatField(blank=True, null=True)
-    flux_w1 = models.FloatField(blank=True, null=True)
-    flux_w2 = models.FloatField(blank=True, null=True)
-    flux_ivar_g = models.FloatField(blank=True, null=True)
-    flux_ivar_r = models.FloatField(blank=True, null=True)
-    flux_ivar_z = models.FloatField(blank=True, null=True)
-    flux_ivar_w1 = models.FloatField(blank=True, null=True)
-    flux_ivar_w2 = models.FloatField(blank=True, null=True)
-    fiberflux_g = models.FloatField(blank=True, null=True)
-    fiberflux_r = models.FloatField(blank=True, null=True)
-    fiberflux_z = models.FloatField(blank=True, null=True)
-    fibertotflux_g = models.FloatField(blank=True, null=True)
-    fibertotflux_r = models.FloatField(blank=True, null=True)
-    fibertotflux_z = models.FloatField(blank=True, null=True)
-    maskbits = models.SmallIntegerField(blank=True, null=True)
-    sersic = models.FloatField(blank=True, null=True)
-    shape_r = models.FloatField(blank=True, null=True)
-    shape_e1 = models.FloatField(blank=True, null=True)
-    shape_e2 = models.FloatField(blank=True, null=True)
-    ref_id = models.BigIntegerField(blank=True, null=True)
-    ref_cat = models.TextField(blank=True, null=True)
-    gaia_phot_g_mean_mag = models.FloatField(blank=True, null=True)
-    gaia_phot_bp_mean_mag = models.FloatField(blank=True, null=True)
-    gaia_phot_rp_mean_mag = models.FloatField(blank=True, null=True)
-    parallax = models.FloatField(blank=True, null=True)
-    photsys = models.TextField(blank=True, null=True)
-    priority_init = models.BigIntegerField(blank=True, null=True)
-    numobs_init = models.BigIntegerField(blank=True, null=True)
-    cmx_target = models.BigIntegerField(blank=True, null=True)
-    desi_target = models.BigIntegerField(blank=True, null=True)
-    bgs_target = models.BigIntegerField(blank=True, null=True)
-    mws_target = models.BigIntegerField(blank=True, null=True)
-    scnd_target = models.BigIntegerField(blank=True, null=True)
-    sv1_desi_target = models.BigIntegerField(blank=True, null=True)
-    sv1_bgs_target = models.BigIntegerField(blank=True, null=True)
-    sv1_mws_target = models.BigIntegerField(blank=True, null=True)
-    sv1_scnd_target = models.BigIntegerField(blank=True, null=True)
-    sv2_desi_target = models.BigIntegerField(blank=True, null=True)
-    sv2_bgs_target = models.BigIntegerField(blank=True, null=True)
-    sv2_mws_target = models.BigIntegerField(blank=True, null=True)
-    sv2_scnd_target = models.BigIntegerField(blank=True, null=True)
-    sv3_desi_target = models.BigIntegerField(blank=True, null=True)
-    sv3_bgs_target = models.BigIntegerField(blank=True, null=True)
-    sv3_mws_target = models.BigIntegerField(blank=True, null=True)
-    sv3_scnd_target = models.BigIntegerField(blank=True, null=True)
-    plate_ra = models.FloatField(blank=True, null=True)
-    plate_dec = models.FloatField(blank=True, null=True)
-    coadd_numexp = models.SmallIntegerField(blank=True, null=True)
-    coadd_exptime = models.FloatField(blank=True, null=True)
-    coadd_numnight = models.SmallIntegerField(blank=True, null=True)
-    coadd_numtile = models.SmallIntegerField(blank=True, null=True)
-    mean_delta_x = models.FloatField(blank=True, null=True)
-    rms_delta_x = models.FloatField(blank=True, null=True)
-    mean_delta_y = models.FloatField(blank=True, null=True)
-    rms_delta_y = models.FloatField(blank=True, null=True)
-    mean_psf_to_fiber_specflux = models.FloatField(blank=True, null=True)
-    mean_fiber_ra = models.FloatField(blank=True, null=True)
-    std_fiber_ra = models.FloatField(blank=True, null=True)
-    mean_fiber_dec = models.FloatField(blank=True, null=True)
-    std_fiber_dec = models.FloatField(blank=True, null=True)
-    min_mjd = models.FloatField(blank=True, null=True)
-    max_mjd = models.FloatField(blank=True, null=True)
-    mean_mjd = models.FloatField(blank=True, null=True)
-    tsnr2_gpbdark_b = models.FloatField(blank=True, null=True)
-    tsnr2_elg_b = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbright_b = models.FloatField(blank=True, null=True)
-    tsnr2_lya_b = models.FloatField(blank=True, null=True)
-    tsnr2_bgs_b = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbackup_b = models.FloatField(blank=True, null=True)
-    tsnr2_qso_b = models.FloatField(blank=True, null=True)
-    tsnr2_lrg_b = models.FloatField(blank=True, null=True)
-    tsnr2_gpbdark_r = models.FloatField(blank=True, null=True)
-    tsnr2_elg_r = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbright_r = models.FloatField(blank=True, null=True)
-    tsnr2_lya_r = models.FloatField(blank=True, null=True)
-    tsnr2_bgs_r = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbackup_r = models.FloatField(blank=True, null=True)
-    tsnr2_qso_r = models.FloatField(blank=True, null=True)
-    tsnr2_lrg_r = models.FloatField(blank=True, null=True)
-    tsnr2_gpbdark_z = models.FloatField(blank=True, null=True)
-    tsnr2_elg_z = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbright_z = models.FloatField(blank=True, null=True)
-    tsnr2_lya_z = models.FloatField(blank=True, null=True)
-    tsnr2_bgs_z = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbackup_z = models.FloatField(blank=True, null=True)
-    tsnr2_qso_z = models.FloatField(blank=True, null=True)
-    tsnr2_lrg_z = models.FloatField(blank=True, null=True)
-    tsnr2_gpbdark = models.FloatField(blank=True, null=True)
-    tsnr2_elg = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbright = models.FloatField(blank=True, null=True)
-    tsnr2_lya = models.FloatField(blank=True, null=True)
-    tsnr2_bgs = models.FloatField(blank=True, null=True)
-    tsnr2_gpbbackup = models.FloatField(blank=True, null=True)
-    tsnr2_qso = models.FloatField(blank=True, null=True)
-    tsnr2_lrg = models.FloatField(blank=True, null=True)
-    main_nspec = models.SmallIntegerField(blank=True, null=True)
-    main_primary = models.BooleanField(blank=True, null=True)
-    sv_nspec = models.SmallIntegerField(blank=True, null=True)
-    sv_primary = models.BooleanField(blank=True, null=True)
-    zcat_nspec = models.SmallIntegerField(blank=True, null=True)
-    zcat_primary = models.BooleanField(blank=True, null=True)
-    desiname = models.TextField(blank=True, null=True)
 
-    class Meta:
-        managed = False
-        db_table = 'desi_dr1_q3c'
-        
+## ScoreFactor: subscores (e.g., 'skymap_score') which are used to compute overall score
 class ScoreFactor(models.Model):
     id = models.AutoField(primary_key=True)
     event_candidate = models.ForeignKey(EventCandidate, on_delete=models.CASCADE)
@@ -1207,3 +1559,136 @@ class ScoreFactor(models.Model):
 
     class Meta:
         unique_together = ("event_candidate", "key")
+
+
+## <catalogname>TargetMatch: tables for storing target : host galaxy associations
+class Cosmicflows4TargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "cosmicflows4_targetmatch"
+
+
+class DesiDr1TargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "desi_dr1_targetmatch"
+
+
+class GladePlusTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "glade_plus_targetmatch"
+
+
+class GwgcTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "gwgc_targetmatch"
+
+
+class Hecate1TargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "hecate1_targetmatch"
+
+
+class Hecate2TargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "hecate2_targetmatch"
+
+
+class LsDr9NorthTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "ls_dr9north_targetmatch"
+
+
+class LsDr10SouthTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "ls_dr10south_targetmatch"
+
+
+class NedLvsTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "nedlvs_targetmatch"
+
+
+class Ps1GalaxyTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "ps1_targetmatch"
+
+
+class Sdss12PhotozTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "sdss12photoz_targetmatch"
+
+
+class UserGalaxyTargetMatch(models.Model):
+    id = models.AutoField(primary_key=True)
+    target = models.ForeignKey(Target, on_delete=models.CASCADE)
+    host_galaxy = models.BigIntegerField(blank=False, null=False)
+    pcc = models.FloatField(blank=False, null=False)
+
+    class Meta:
+        unique_together = ("target", "host_galaxy")
+        db_table = "usergalaxy_targetmatch"

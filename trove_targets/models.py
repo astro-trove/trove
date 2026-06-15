@@ -9,16 +9,13 @@ class Target(BaseTarget):
     classification = models.CharField(max_length=255, null=True, blank=True)
     redshift = models.FloatField(null=True, blank=True)
     mwebv = models.FloatField(verbose_name='Milky Way E(B-V)', null=True, blank=True)
-    healpix = models.BigIntegerField()
+    healpix = models.BigIntegerField(null=True, blank=True)
     healpix.hidden = True
 
     def save(self, *args, **kwargs):
         ra = self.ra if self.ra is not None else self.basetarget_ptr.ra
         dec = self.dec if self.dec is not None else self.basetarget_ptr.dec
-        try:
-            coord = SkyCoord(ra, dec, unit='deg')
-        except:
-            import pdb; pdb.set_trace()
+        coord = SkyCoord(ra, dec, unit='deg')
         
         self.galactic_lng = coord.galactic.l.deg
         self.galactic_lat = coord.galactic.b.deg

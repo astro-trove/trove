@@ -6,37 +6,37 @@ import math
 
 register = template.Library()
 
-SI_PREFIXES = ['', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y', 'R', 'Q']
+SI_PREFIXES = ["", "k", "M", "G", "T", "P", "E", "Z", "Y", "R", "Q"]
 
 
 @register.filter
 def format_inverse_far_yr(far):
     if not far:
-        return ''
-    inv_far = 1. / far
-    if inv_far > 1.:
-        log1000 = math.log10(inv_far) / 3.
+        return ""
+    inv_far = 1.0 / far
+    if inv_far > 1.0:
+        log1000 = math.log10(inv_far) / 3.0
         i = int(log1000)
         if i < len(SI_PREFIXES):
-            inv_far *= 1000. ** -i
-            unit = SI_PREFIXES[i] + 'yr'
+            inv_far *= 1000.0**-i
+            unit = SI_PREFIXES[i] + "yr"
         else:
-            unit = 'yr'
+            unit = "yr"
     else:  # convert to days
         inv_far *= 365.25
-        unit = 'd'
-    if inv_far >= 1000.:
-        return f'{inv_far:.0e} {unit}'
-    elif inv_far > 10.:
-        return f'{inv_far:.0f} {unit}'
+        unit = "d"
+    if inv_far >= 1000.0:
+        return f"{inv_far:.0e} {unit}"
+    elif inv_far > 10.0:
+        return f"{inv_far:.0f} {unit}"
     else:
-        return f'{inv_far:.1f} {unit}'
+        return f"{inv_far:.1f} {unit}"
 
 
 @register.filter
 def format_inverse_far(far):
     if not far:
-        return ''
+        return ""
     far_yr = far / 3.168808781402895e-08  # 1/Hz to 1/yr
     return format_inverse_far_yr(far_yr)
 
@@ -44,50 +44,54 @@ def format_inverse_far(far):
 @register.filter
 def format_distance(localization):
     if localization is None or not localization.distance_mean:
-        return ''
+        return ""
     dist_mean = localization.distance_mean
     dist_std = localization.distance_std
-    if localization.distance_mean < 1000.:
-        unit = 'Mpc'
+    if localization.distance_mean < 1000.0:
+        unit = "Mpc"
     else:
-        dist_mean /= 1000.
-        dist_std /= 1000.
-        unit = 'Gpc'
-    return f'{dist_mean:.0f} ± {dist_std:.0f} {unit}' if dist_mean > 10. else f'{dist_mean:.1f} ± {dist_std:.1f} {unit}'
+        dist_mean /= 1000.0
+        dist_std /= 1000.0
+        unit = "Gpc"
+    return (
+        f"{dist_mean:.0f} ± {dist_std:.0f} {unit}"
+        if dist_mean > 10.0
+        else f"{dist_mean:.1f} ± {dist_std:.1f} {unit}"
+    )
 
 
 @register.filter
 def format_area(area):
-    unit = 'deg²'
-    if area < 1.:
-        area *= 3600.
-        unit = 'arcmin²'
-    if area < 1.:
-        area *= 3600.
-        unit = 'arcsec²'
-    if area >= 10.:
-        return f'{area:.0f} {unit}'
+    unit = "deg²"
+    if area < 1.0:
+        area *= 3600.0
+        unit = "arcmin²"
+    if area < 1.0:
+        area *= 3600.0
+        unit = "arcsec²"
+    if area >= 10.0:
+        return f"{area:.0f} {unit}"
     else:
-        return f'{area:.1f} {unit}'
+        return f"{area:.1f} {unit}"
 
 
 @register.filter
 def get_most_likely_class(details):
     if not details:
         return
-    elif details['search'] == 'SSM':
-        return details['search']
-    elif details['group'] == 'CBC':
-        classification = details['classification']
+    elif details["search"] == "SSM":
+        return details["search"]
+    elif details["group"] == "CBC":
+        classification = details["classification"]
         return max(classification, key=classification.get)
     else:  # burst
-        return details['group']
+        return details["group"]
 
 
 @register.filter
 def percentformat(value, d=0):
     try:
-        return f'{float(value):.{d}%}'
+        return f"{float(value):.{d}%}"
     except ValueError:
         return value
 
@@ -95,7 +99,7 @@ def percentformat(value, d=0):
 @register.filter
 def millisecondformat(value, d=0):
     try:
-        return f'{value * 1000.:.{d}f} ms'
+        return f"{value * 1000.0:.{d}f} ms"
     except ValueError:
         return value
 
@@ -103,20 +107,25 @@ def millisecondformat(value, d=0):
 @register.filter
 def truncate(string, length=5):
     if len(string) > length:
-        return string[:length-1] + '.'
+        return string[: length - 1] + "."
     else:
         return string
 
 
 @register.filter
 def sort_localizations(localizations):
-    return localizations.annotate(Max('sequences__sequence_id')).order_by('sequences__sequence_id__max')
+    return localizations.annotate(Max("sequences__sequence_id")).order_by(
+        "sequences__sequence_id__max"
+    )
 
 
-@register.inclusion_tag('tom_nonlocalizedevents/partials/nonlocalizedevent_details.html', takes_context=True)
+@register.inclusion_tag(
+    "tom_nonlocalizedevents/partials/nonlocalizedevent_details.html", takes_context=True
+)
 def nonlocalizedevent_details(context, localization=None):
+    print("Loading nonlocalizedevent details")
     if localization is None:
-        event_id = context['request'].GET.get('nonlocalizedevent')
+        event_id = context["request"].GET.get("nonlocalizedevent")
         if event_id is None:
             return
         nle = NonLocalizedEvent.objects.get(id=event_id)
@@ -127,86 +136,128 @@ def nonlocalizedevent_details(context, localization=None):
     else:
         sequence = localization.sequences.last()
 
-    if sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GRAVITATIONAL_WAVE:
-        if sequence.details['group'] == 'CBC':
+    if (
+        sequence.nonlocalizedevent.event_type
+        == NonLocalizedEvent.NonLocalizedEventType.GRAVITATIONAL_WAVE
+    ):
+        if sequence.details["group"] == "CBC":
             details_to_display = [
                 [
-                    ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
-                    ('Instrument', '+'.join(sequence.details['instruments'])),
-                    ('50% Area', format_area(localization.area_50)),
-                    ('90% Area', format_area(localization.area_90)),
+                    (
+                        "Event Type",
+                        f"{sequence.nonlocalizedevent.event_type} {sequence.details['group']}",
+                    ),
+                    ("Instrument", "+".join(sequence.details["instruments"])),
+                    ("50% Area", format_area(localization.area_50)),
+                    ("90% Area", format_area(localization.area_90)),
                 ],
                 [
-                    ('1/FAR', format_inverse_far(sequence.details['far'])),
-                    ('Distance', format_distance(localization)),
-                ] +
-                [(prop, f'{prob:.0%}') for prop, prob in sequence.details['properties'].items()],
-                [(classification, f'{prob:.0%}') for classification, prob in sequence.details['classification'].items()],
-            ]
-        elif sequence.details['group'] == 'Burst':
-            details_to_display = [
-                [
-                    ('Event Type', f'{sequence.nonlocalizedevent.event_type} {sequence.details["group"]}'),
-                    ('Instrument', '+'.join(sequence.details['instruments'])),
-                    ('50% Area', format_area(localization.area_50)),
-                    ('90% Area', format_area(localization.area_90)),
-                ],
-                [
-                    ('1/FAR', format_inverse_far(sequence.details['far'])),
-                    ('Duration', millisecondformat(sequence.details['duration'])),
-                    ('Frequency', f'{sequence.details["central_frequency"]:.0f} Hz'),
+                    ("1/FAR", format_inverse_far(sequence.details["far"])),
+                    ("Distance", format_distance(localization)),
                 ]
+                + [
+                    (prop, f"{prob:.0%}")
+                    for prop, prob in sequence.details["properties"].items()
+                ],
+                [
+                    (classification, f"{prob:.0%}")
+                    for classification, prob in sequence.details[
+                        "classification"
+                    ].items()
+                ],
+            ]
+        elif sequence.details["group"] == "Burst":
+            details_to_display = [
+                [
+                    (
+                        "Event Type",
+                        f"{sequence.nonlocalizedevent.event_type} {sequence.details['group']}",
+                    ),
+                    ("Instrument", "+".join(sequence.details["instruments"])),
+                    ("50% Area", format_area(localization.area_50)),
+                    ("90% Area", format_area(localization.area_90)),
+                ],
+                [
+                    ("1/FAR", format_inverse_far(sequence.details["far"])),
+                    ("Duration", millisecondformat(sequence.details["duration"])),
+                    ("Frequency", f"{sequence.details['central_frequency']:.0f} Hz"),
+                ],
             ]
         else:
             details_to_display = []
-    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GAMMA_RAY_BURST:
+    elif (
+        sequence.nonlocalizedevent.event_type
+        == NonLocalizedEvent.NonLocalizedEventType.GAMMA_RAY_BURST
+    ):
         details_to_display = [
             [
-                ('Event Type', sequence.nonlocalizedevent.event_type),
-                ('Instrument', sequence.details['notice_type'].split()[0]),
-                ('50% Area', format_area(localization.area_50)),
-                ('90% Area', format_area(localization.area_90)),
+                ("Event Type", sequence.nonlocalizedevent.event_type),
+                ("Instrument", sequence.details["notice_type"].split()[0]),
+                ("50% Area", format_area(localization.area_50)),
+                ("90% Area", format_area(localization.area_90)),
             ],
             [
-                ('Significance', sequence.details['data_signif'].replace(' [sigma]', 'σ')),
-                ('Interval', millisecondformat(float(sequence.details['data_interval'].split()[0]))),
-                ('Energy', '[' + sequence.details['e_range'].replace(' -', ',').replace(']', '').replace(' [', '] ')),
-            ]
+                (
+                    "Significance",
+                    sequence.details["data_signif"].replace(" [sigma]", "σ"),
+                ),
+                (
+                    "Interval",
+                    millisecondformat(
+                        float(sequence.details["data_interval"].split()[0])
+                    ),
+                ),
+                (
+                    "Energy",
+                    "["
+                    + sequence.details["e_range"]
+                    .replace(" -", ",")
+                    .replace("]", "")
+                    .replace(" [", "] "),
+                ),
+            ],
         ]
-    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.UNKNOWN:  # Einstein probe
+    elif (
+        sequence.nonlocalizedevent.event_type
+        == NonLocalizedEvent.NonLocalizedEventType.UNKNOWN
+    ):  # Einstein probe
         details_to_display = [
             [
-                ('Event Type', 'X-ray Transient'),
-                ('Instrument', sequence.details['instrument']),
-                ('50% Area', format_area(localization.area_50)),
-                ('90% Area', format_area(localization.area_90)),
+                ("Event Type", "X-ray Transient"),
+                ("Instrument", sequence.details["instrument"]),
+                ("50% Area", format_area(localization.area_50)),
+                ("90% Area", format_area(localization.area_90)),
             ],
             [
-                ('Image S/N', sequence.details['image_snr']),
-                ('Count Rate', f'{sequence.details["net_count_rate"]} s⁻¹'),
-                ('Energy', f'{sequence.details["image_energy_range"]} keV'),
-            ]
+                ("Image S/N", sequence.details["image_snr"]),
+                ("Count Rate", f"{sequence.details['net_count_rate']} s⁻¹"),
+                ("Energy", f"{sequence.details['image_energy_range']} keV"),
+            ],
         ]
-    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.NEUTRINO:
+    elif (
+        sequence.nonlocalizedevent.event_type
+        == NonLocalizedEvent.NonLocalizedEventType.NEUTRINO
+    ):
         details_to_display = [
             [
-                ('Event Type', f'Neutrino {sequence.details["notice_type"].title()}'),
-                ('50% Area', format_area(localization.area_50)),
-                ('90% Area', format_area(localization.area_90)),
+                ("Event Type", f"Neutrino {sequence.details['notice_type'].title()}"),
+                ("50% Area", format_area(localization.area_50)),
+                ("90% Area", format_area(localization.area_90)),
             ],
             [
-                ('1/FAR', format_inverse_far_yr(sequence.details['far'])),
-                ('Energy', f'{sequence.details["energy"]:.0f} TeV'),
-                ('Signalness', percentformat(sequence.details['signalness'])),
+                ("1/FAR", format_inverse_far_yr(sequence.details["far"])),
+                ("Energy", f"{sequence.details['energy']:.0f} TeV"),
+                ("Signalness", percentformat(sequence.details["signalness"])),
             ],
             [
-                ('Date', sequence.details['time'][:10]),
-                ('Time', sequence.details['time'][11:22]),
+                ("Date", sequence.details["time"][:10]),
+                ("Time", sequence.details["time"][11:22]),
             ],
         ]
     else:
         details_to_display = []
-    return {'details': details_to_display}
+    print("Finished loading NLE details")
+    return {"details": details_to_display}
 
 
 @register.filter

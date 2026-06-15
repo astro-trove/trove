@@ -1,29 +1,26 @@
 """
 This is an abstract base class for catalogs
 """
+
 import os
 from abc import ABC, abstractmethod
 
 from django.db import models
 
-from .util import RADIUS_ARCSEC, cone_search_q3c, pcc_q3c 
+from .util import RADIUS_ARCSEC, cone_search_q3c, pcc_q3c
 
 # database connection constants
-DB_HOST = os.getenv('POSTGRES_HOST', 'localhost')
-DB_NAME = os.getenv('POSTGRES_DB', 'sassy')
-DB_PASS = os.getenv('POSTGRES_PASSWORD', None)
-DB_PORT = os.getenv('POSTGRES_PORT', 5432)
-DB_USER = os.getenv('POSTGRES_USER', 'sassy')
+DB_HOST = os.getenv("POSTGRES_HOST", "localhost")
+DB_NAME = os.getenv("POSTGRES_DB", "sassy")
+DB_PASS = os.getenv("POSTGRES_PASSWORD", None)
+DB_PORT = os.getenv("POSTGRES_PORT", 5432)
+DB_USER = os.getenv("POSTGRES_USER", "sassy")
 
 DB_CONNECT = f"postgresql+psycopg2://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-class Catalog(ABC):
 
-    def __init__(
-            self,
-            name:str,
-            verbose:bool=False
-    ):
+class Catalog(ABC):
+    def __init__(self, name: str, verbose: bool = False):
         """A catalog object for querying
 
         Parameters
@@ -33,7 +30,7 @@ class Catalog(ABC):
         verbose : bool, default=True
             If the class should be verbose and print a bunch of stuff (for debug)
         """
-        
+
         self.name = name
         self._verbose = verbose
 
@@ -42,7 +39,7 @@ class Catalog(ABC):
         if cls is Catalog:
             return any("query" in B.__dict__ for B in C.__mro__)
         return NotImplemented
-    
+
     @abstractmethod
     def query():
         """The method that actually does the querying
@@ -50,17 +47,15 @@ class Catalog(ABC):
         This is an abstract method and must be implemented to construct the class
         """
         return NotImplemented
-    
-class StaticCatalog(Catalog):
 
+
+class StaticCatalog(Catalog):
     ra_colname = None
     dec_colname = None
     catalog_model = None
-    
-    def __init__(
-            self,
-            verbose:bool=False
-    ):
+    colmap = {}
+
+    def __init__(self, verbose: bool = False):
         """A catalog object for querying static astronomy catalogs (like galaxy
         catalogs)
 
@@ -77,6 +72,7 @@ class StaticCatalog(Catalog):
         self.catalog_type = "static"
 
         self.colnames = {
+            "trove_uniq",
             "name",
             "ra",
             "dec",
@@ -89,59 +85,70 @@ class StaticCatalog(Catalog):
             "lumdist_neg_err",
             "lumdist_pos_err",
             "z_type",
-            "default_mag"
+            "default_mag",
+            "submitter",
+            "ang_dist",
+            "offset",
+            "pcc",
         }
-        
-        super().__init__(self.__class__.__name__, verbose=verbose)        
+
+        # copy the colmap in case it is defined as a class-level variable
+        self.colmap = self.colmap.copy()
+        self.ogcols = list(self.colmap.keys())
+
+        super().__init__(self.__class__.__name__, verbose=verbose)
 
     def __init_subclass__(cls, *args, **kwargs):
-        if not getattr(cls, 'ra_colname'):
+        if not getattr(cls, "ra_colname"):
             # then default to ra
             cls.ra_colname = "ra"
-        if not getattr(cls, 'dec_colname'):
+        if not getattr(cls, "dec_colname"):
             # then default to dec
             cls.dec_colname = "dec"
-        if not getattr(cls, "catalog_model") and not isinstance(cls.catalog_model, models.Model):
-            raise TypeError(f"Can't instantiate abstract class {cls.__name__} without catalog_model attribute defined")
+        if not getattr(cls, "catalog_model") and not isinstance(
+            cls.catalog_model, models.Model
+        ):
+            raise TypeError(
+                f"Can't instantiate abstract class {cls.__name__} without catalog_model attribute defined"
+            )
 
         return super().__init_subclass__(*args, **kwargs)
 
     def query(self, ra, dec, radius=RADIUS_ARCSEC):
-        """Do a cone search query on this catalog 
-        """
+        """Do a cone search query on this catalog"""
         return cone_search_q3c(
             self.catalog_model.objects.all(),
             ra,
             dec,
             radius=radius,
             ra_colname=self.ra_colname,
-            dec_colname=self.dec_colname
+            dec_colname=self.dec_colname,
         )
 
-    def _pcc_filter(self, ra, dec, pcc_max=0.5):
+    def pcc_filter(self, ra, dec, radius=RADIUS_ARCSEC, pcc_max=0.5):
+        # first do the cone search
+        cone_search_qset = self.query(ra, dec, radius=radius)
+
+        # then only annotate the result of the cone search
         return pcc_q3c(
-            self.catalog_model.objects.all(),
+            cone_search_qset,
             ra,
             dec,
             pcc_max,
             self.mag_colname,
             ra_colname=self.ra_colname,
-            dec_colname=self.dec_colname
+            dec_colname=self.dec_colname,
         )
-        
+
     def _standardize_df(self, df):
         if not getattr(self, "colmap"):
             raise TypeError("Missing the colmap, can't standardize dataset!")
         df = df.rename(columns=self.colmap)
         return df[list(self.colnames & set(df.columns))]
-    
+
+
 class PhotCatalog(Catalog):
-    def __init__(
-            self,
-            name:str,
-            nthreads:int=2,
-            verbose:bool=False
-    ):
+    def __init__(self, name: str, nthreads: int = 2, verbose: bool = False):
         """A catalog object for querying photometry catalogs (like ZTF and ATLAS)
 
         Parameters
@@ -157,4 +164,3 @@ class PhotCatalog(Catalog):
         self.catalog_type = "photometry"
         self.nthreads = nthreads
         super().__init__(name, verbose=verbose)
-
