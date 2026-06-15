@@ -12,7 +12,6 @@ import imaplib
 import json
 import logging
 import math
-import os
 import random
 import re
 import string
@@ -98,7 +97,7 @@ class TNS_Phot(PhotCatalog):
     """Query the TNS for the photometry they have available"""
 
     def query(self, target: Target, timelimit: int = 10):
-        f"""Query the TNS for photometry they have available on this event
+        """Query the TNS for photometry they have available on this event
 
         Parameters
         ----------
@@ -332,7 +331,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
         if token is None:
             raise ValueError('No ATLAS API token provided. Set ATLAS_API_KEY in settings or environment.')
 
-        _verbose = self._verbo
+        _verbose = self._verbose
 
         BASEURL = "https://fallingstar-data.com/forcedphot"
 
@@ -489,7 +488,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         return stacked_magnitudes
 
-    def _ATLAS_read_and_sigma_clip_data(self, filecontent, clipping_sigma=2.2):
+    def _ATLAS_read_and_sigma_clip_data(self, filecontent, log, clipping_sigma=2.2):
         """
         Clean up data by performing sigma clipping.
         
@@ -539,8 +538,8 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         maskList = []
         for flux in [cdataFlux, odataFlux]:
-            fullMask = rolling_window_sigma_clip(
-                log=log, array=flux, clippingSigma=clippingSigma, windowSize=11
+            fullMask = _rolling_window_sigma_clip(
+                log=log, array=flux, clippingSigma=clipping_sigma, windowSize=11
             )
             maskList.append(fullMask)
 
@@ -558,9 +557,9 @@ class ATLAS_Forced_Phot(PhotCatalog):
         # Returns ordered dictionary of all parameters
         return cepochs + oepochs
 
-    def _stack_photometry(self, magnitudes, binningDays=1.0):
+    def _stack_photometry(self, magnitudes, binning_days=1.0):
         # IF WE WANT TO 'STACK' THE PHOTOMETRY
-        summedMagnitudes = {
+        summed_magnitudes = {
             "c": {"mjds": [], "mags": [], "magErrs": [], "n": [], "lim5sig": []},
             "o": {"mjds": [], "mags": [], "magErrs": [], "n": [], "lim5sig": []},
             "I": {"mjds": [], "mags": [], "magErrs": [], "n": [], "lim5sig": []},
@@ -568,19 +567,19 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         # MAGNITUDES/FLUXES ARE DIVIDED IN UNIQUE FILTER SETS - SO ITERATE OVER
         # FILTERS
-        allData = []
+        all_data = []
         for fil, data in list(magnitudes.items()):
             # WE'RE GOING TO CREATE FURTHER SUBSETS FOR EACH UNQIUE MJD (FLOORED TO AN INTEGER)
             # MAG VARIABLE == FLUX (JUST TO CONFUSE YOU)
-            distinctMjds = {}
+            distinct_mjds = {}
             for mjd, flx, err, lim in zip(
                 data["mjds"], data["mags"], data["magErrs"], data["lim5sig"]
             ):
                 # DICT KEY IS THE UNIQUE INTEGER MJD
-                key = str(int(math.floor(mjd / float(binningDays))))
+                key = str(int(math.floor(mjd / float(binning_days))))
                 # FIRST DATA POINT OF THE NIGHTS? CREATE NEW DATA SET
-                if key not in distinctMjds:
-                    distinctMjds[key] = {
+                if key not in distinct_mjds:
+                    distinct_mjds[key] = {
                         "mjds": [mjd],
                         "mags": [flx],
                         "magErrs": [err],
