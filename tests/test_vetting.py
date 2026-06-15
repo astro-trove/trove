@@ -325,12 +325,12 @@ class TestStaticCatalogStandardization:
         assert 'z' in result.columns
         assert 'lumdist' in result.columns
     
-    def test_ls_dr10_standardize(self):
+    def test_ls_dr10_south_standardize(self):
         """Test Legacy Survey DR10 standardization."""
         import pandas as pd
-        from candidate_vetting.public_catalogs.static_catalogs import LsDr10
+        from candidate_vetting.public_catalogs.static_catalogs import LsDr10South
         
-        cat = LsDr10()
+        cat = LsDr10South()
         df = pd.DataFrame({
             'objid': [12345],
             'ra': [150.0],
