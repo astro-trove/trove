@@ -539,7 +539,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
         maskList = []
         for flux in [cdataFlux, odataFlux]:
             fullMask = _rolling_window_sigma_clip(
-                array=flux, clipping_sigma=clipping_sigma, windowSize=11
+                array=flux, clipping_sigma=clipping_sigma, window_size=11
             )
             maskList.append(fullMask)
 
