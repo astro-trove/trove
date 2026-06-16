@@ -6,7 +6,11 @@ This runs the exact same code path exercised by ``tests/test_nle_ingestion.py``
 current Django settings point at. To target the remote ``datatrove-test`` database,
 set the ``POSTGRES_*`` environment variables (or ``settings_local.py``) before running.
 
-Example (dry run -- just shows which DB and parses the files, no writes):
+Before writing, the command checks whether a NonLocalizedEvent with the alert's
+``superevent_id`` already exists in the target database and reports it. Pass
+``--skip-existing`` to abort instead of adding another sequence to an existing event.
+
+Example (dry run -- shows which DB, parses the files, and reports if the event exists):
 
     python manage.py ingest_local_nle \
         tests/data/GW170817-update.json \
@@ -26,6 +30,8 @@ import logging
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
+
+from tom_nonlocalizedevents.models import NonLocalizedEvent
 
 from custom_code.nle_ingestion import (
     attach_skymap_to_alert,
@@ -73,6 +79,12 @@ class Command(BaseCommand):
             help="Parse the files and report the target database without writing to it.",
         )
         parser.add_argument(
+            "--skip-existing",
+            action="store_true",
+            help="Abort without writing if a NonLocalizedEvent with this superevent_id "
+            "already exists in the target database.",
+        )
+        parser.add_argument(
             "--yes",
             action="store_true",
             help="Skip the interactive confirmation prompt before writing.",
@@ -88,12 +100,19 @@ class Command(BaseCommand):
             f"user={db.get('USER', '?')}"
         )
 
+    def _find_existing_nle(self, superevent_id):
+        """Return the existing NonLocalizedEvent for this superevent_id, or None."""
+        if not superevent_id or superevent_id == "<unknown>":
+            return None
+        return NonLocalizedEvent.objects.filter(event_id=superevent_id).first()
+
     def handle(self, *args, **options):
         alert_json = options["alert_json"]
         skymap_fits = options["skymap_fits"]
         convert = not options["no_convert_skymap"]
         combined = options["combined"]
         dry_run = options["dry_run"]
+        skip_existing = options["skip_existing"]
         assume_yes = options["yes"]
 
         target_db = self._describe_db()
@@ -122,6 +141,62 @@ class Command(BaseCommand):
                 f"Skymap normalized to multi-order ({len(skymap_bytes)} bytes)."
             )
 
+        # Connect to the DB so we can check whether this event already exists.
+        # A read-only existence check is safe even for --dry-run; if the DB is
+        # unreachable during a dry run we just skip the check rather than fail.
+        db_reachable = True
+        try:
+            connection.ensure_connection()
+        except Exception as exc:
+            db_reachable = False
+            if not dry_run:
+                raise CommandError(
+                    f"Could not connect to the database ({target_db}): {exc}"
+                ) from exc
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Could not connect to the database to check for an existing event: {exc}"
+                )
+            )
+
+        existing = None
+        existence_checked = False
+        if db_reachable:
+            try:
+                existing = self._find_existing_nle(superevent_id)
+                existence_checked = True
+            except Exception as exc:
+                if not dry_run:
+                    raise CommandError(
+                        f"Failed to query for existing NonLocalizedEvent '{superevent_id}' "
+                        f"(is the target database migrated?): {exc}"
+                    ) from exc
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Could not check for an existing event: {exc}"
+                    )
+                )
+
+        if existing is not None:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"NonLocalizedEvent '{superevent_id}' already exists "
+                    f"(id={existing.id}, {existing.sequences.count()} sequence(s)). "
+                    "Ingesting will add a new sequence/localization to it."
+                )
+            )
+            if skip_existing:
+                self.stdout.write(
+                    self.style.NOTICE(
+                        "--skip-existing set; aborting without changes."
+                    )
+                )
+                return
+        elif existence_checked and superevent_id not in (None, "", "<unknown>"):
+            self.stdout.write(
+                f"No existing NonLocalizedEvent '{superevent_id}'; a new one will be created."
+            )
+
         if dry_run:
             self.stdout.write(
                 self.style.SUCCESS(
@@ -130,17 +205,11 @@ class Command(BaseCommand):
             )
             return
 
-        # Verify we can actually reach the DB before prompting / writing.
-        try:
-            connection.ensure_connection()
-        except Exception as exc:
-            raise CommandError(
-                f"Could not connect to the database ({target_db}): {exc}"
-            ) from exc
-
         if not assume_yes:
+            action = "update existing" if existing is not None else "create new"
             answer = input(
-                f"About to ingest {superevent_id} into:\n  {target_db}\nProceed? [y/N] "
+                f"About to {action} NonLocalizedEvent {superevent_id} in:\n  {target_db}\n"
+                "Proceed? [y/N] "
             )
             if answer.strip().lower() not in ("y", "yes"):
                 self.stdout.write(self.style.NOTICE("Aborted; no changes made."))

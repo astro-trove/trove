@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 from astropy.table import Table
+from django.core.management import call_command
 from hop.models import JSONBlob
 from ligo.skymap import moc
 from ligo.skymap.io import write_sky_map
@@ -221,3 +222,77 @@ class TestUploadLocalNle:
         alert_passed = mock_ingest.call_args.args[0]
         assert alert_passed["superevent_id"] == "GW170817"
         assert alert_passed["event"]["skymap"] == tiny_multiorder_skymap_bytes
+
+
+_CMD = "custom_code.management.commands.ingest_local_nle"
+
+
+class TestIngestLocalNleExistenceCheck:
+    """The ingest_local_nle command checks for an existing NLE before writing."""
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.ingest_local_igwn_alert")
+    @patch(f"{_CMD}.load_skymap_bytes", return_value=b"fits-bytes")
+    @patch(f"{_CMD}.NonLocalizedEvent")
+    def test_skip_existing_aborts_when_event_exists(
+        self, mock_nle, mock_load_skymap, mock_ingest, mock_conn
+    ):
+        existing = MagicMock()
+        existing.id = 42
+        existing.sequences.count.return_value = 3
+        mock_nle.objects.filter.return_value.first.return_value = existing
+
+        call_command(
+            "ingest_local_nle",
+            str(GW170817_JSON),
+            str(GW170817_SKYMAP),
+            "--no-convert-skymap",
+            "--skip-existing",
+        )
+
+        mock_nle.objects.filter.assert_called_once_with(event_id="GW170817")
+        mock_ingest.assert_not_called()
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.ingest_local_igwn_alert")
+    @patch(f"{_CMD}.load_skymap_bytes", return_value=b"fits-bytes")
+    @patch(f"{_CMD}.NonLocalizedEvent")
+    def test_existing_without_skip_proceeds(
+        self, mock_nle, mock_load_skymap, mock_ingest, mock_conn
+    ):
+        existing = MagicMock()
+        existing.id = 42
+        existing.sequences.count.return_value = 1
+        mock_nle.objects.filter.return_value.first.return_value = existing
+        mock_ingest.return_value = (MagicMock(event_id="GW170817"), MagicMock())
+
+        call_command(
+            "ingest_local_nle",
+            str(GW170817_JSON),
+            str(GW170817_SKYMAP),
+            "--no-convert-skymap",
+            "--yes",
+        )
+
+        mock_ingest.assert_called_once()
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.ingest_local_igwn_alert")
+    @patch(f"{_CMD}.load_skymap_bytes", return_value=b"fits-bytes")
+    @patch(f"{_CMD}.NonLocalizedEvent")
+    def test_skip_existing_proceeds_when_event_absent(
+        self, mock_nle, mock_load_skymap, mock_ingest, mock_conn
+    ):
+        mock_nle.objects.filter.return_value.first.return_value = None
+        mock_ingest.return_value = (MagicMock(event_id="GW170817"), MagicMock())
+
+        call_command(
+            "ingest_local_nle",
+            str(GW170817_JSON),
+            str(GW170817_SKYMAP),
+            "--no-convert-skymap",
+            "--skip-existing",
+            "--yes",
+        )
+
+        mock_ingest.assert_called_once()
