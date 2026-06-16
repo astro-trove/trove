@@ -1,3 +1,58 @@
+Metadata-Version: 2.4
+Name: saguaro-tom
+Version: 0.1.0
+Summary: SAGUARO Target and Observation Manager for gravitational wave follow-up
+Author: SAGUARO-MMA Team
+License: MIT
+Project-URL: Homepage, https://github.com/SAGUARO-MMA/saguaro_tom
+Project-URL: Repository, https://github.com/SAGUARO-MMA/saguaro_tom.git
+Keywords: astronomy,gravitational-waves,tom,transients
+Classifier: Development Status :: 4 - Beta
+Classifier: Framework :: Django
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Astronomy
+Requires-Python: <3.13,>=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: astroplan
+Requires-Dist: astropy
+Requires-Dist: astroquery
+Requires-Dist: django
+Requires-Dist: django-crispy-forms
+Requires-Dist: django-extensions
+Requires-Dist: django-filter
+Requires-Dist: django-guardian
+Requires-Dist: django-ninja
+Requires-Dist: django-tasks
+Requires-Dist: dustmaps
+Requires-Dist: healpix-alchemy
+Requires-Dist: healpy
+Requires-Dist: ligo.skymap
+Requires-Dist: matplotlib
+Requires-Dist: numpy
+Requires-Dist: tomtoolkit==2.24.5
+Requires-Dist: tom-alertstreams
+Requires-Dist: tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
+Requires-Dist: plotly
+Requires-Dist: psycopg2-binary
+Requires-Dist: python-dateutil
+Requires-Dist: requests
+Requires-Dist: slack-sdk
+Requires-Dist: specutils
+Requires-Dist: SQLAlchemy
+Requires-Dist: whitenoise
+Requires-Dist: trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: pytest-django; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: ruff; extra == "dev"
+
 # SAGUARO TOM #
 
 Welcome to the SAGUARO target and observation manager for GW follow-up.

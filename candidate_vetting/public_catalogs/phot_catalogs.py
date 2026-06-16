@@ -1,42 +1,92 @@
 """
 Code to query dynamically updating photometry catalogs
 """
+import csv
+import email
 
 # packages built into python
 import sys
 import os
 import glob
-import requests
-import time
+import imaplib
 import json
 import logging
-import re
-import csv
 import math
 import random
+import re
 import string
-import imaplib
 import subprocess
 import time
-import email
+from collections import OrderedDict
 from datetime import datetime
 from operator import itemgetter
-from collections import OrderedDict
 
-# other packages
 import numpy as np
 import pandas as pd
-from astropy.time import Time, TimezoneInfo
+import requests
 from astropy import units
 from astropy.coordinates import SkyCoord
-from fundamentals.stats import rolling_window_sigma_clip
+from astropy.time import Time, TimezoneInfo
 from django.conf import settings
 from django.db.models import F, FloatField, ExpressionWrapper
 from django.db.models.functions import Sqrt
 
 from .catalog import PhotCatalog
 from .util import _QUERY_METHOD_DOCSTRING, RADIUS_ARCSEC, create_phot
-from pyasassn.client import SkyPatrolClient
+
+
+def _rolling_window_sigma_clip(array, clipping_sigma=2.2, window_size=11):
+    """
+    Perform sigma clipping using a rolling window.
+    
+    Replacement for fundamentals.stats.rolling_window_sigma_clip.
+    Uses numpy for vectorized operations.
+    
+    Parameters
+    ----------
+    array : array-like
+        Input data array
+    clipping_sigma : float
+        Number of standard deviations for clipping threshold
+    window_size : int
+        Size of the rolling window (must be odd)
+    
+    Returns
+    -------
+    mask : np.ndarray
+        Boolean mask where True indicates clipped (bad) values
+    """
+    array = np.asarray(array, dtype=float)
+    n = len(array)
+    
+    if n == 0:
+        return np.array([], dtype=bool)
+    
+    if n < window_size:
+        window_size = max(3, n if n % 2 == 1 else n - 1)
+    
+    half_window = window_size // 2
+    mask = np.zeros(n, dtype=bool)
+    
+    for i in range(n):
+        start = max(0, i - half_window)
+        end = min(n, i + half_window + 1)
+        window = array[start:end]
+        
+        if len(window) < 3:
+            continue
+            
+        median = np.nanmedian(window)
+        std = np.nanstd(window)
+        
+        if std > 0:
+            deviation = abs(array[i] - median)
+            if deviation > clipping_sigma * std:
+                mask[i] = True
+    
+    return mask
+
+
 
 from trove_targets.models import Target
 
@@ -47,7 +97,7 @@ class TNS_Phot(PhotCatalog):
     """Query the TNS for the photometry they have available"""
 
     def query(self, target: Target, timelimit: int = 10):
-        f"""Query the TNS for photometry they have available on this event
+        """Query the TNS for photometry they have available on this event
 
         Parameters
         ----------
@@ -207,42 +257,79 @@ class TNS_Phot(PhotCatalog):
 
 
 class ASASSN_SkyPatrol(PhotCatalog):
-    """ASASSN Forced photometry server"""
-
-    def query(self, ra: float, dec: float, radius: float = RADIUS_ARCSEC):
-        f"""Query the ASASSN SkyPatrol forced photometry service
+    """ASASSN SkyPatrol forced photometry service.
+    
+    Queries the ASASSN SkyPatrol API directly without requiring pyasassn.
+    API documentation: https://asas-sn.osu.edu/
+    """
+    
+    ASASSN_API_URL = "https://asas-sn.osu.edu/api/v1/light_curves"
+    
+    def query(
+            self,
+            ra: float,
+            dec: float,
+            radius: float = RADIUS_ARCSEC
+    ):
+        f"""Query the ASASSN SkyPatrol forced photometry service.
 
         {_QUERY_METHOD_DOCSTRING}
+        
+        Returns
+        -------
+        dict or None
+            Light curve data from ASASSN, or None if query fails
         """
-        client = SkyPatrolClient()
-        light_curve = client.cone_search(
-            ra_deg=ra,
-            dec_deg=dec,
-            radius=radius,
-            units="arcsec",
-            download=True,
-            threads=self.nthreads,
-        )
-
-        return light_curve
+        try:
+            params = {
+                'ra': ra,
+                'dec': dec,
+                'radius': radius / 3600.0,  # Convert arcsec to degrees
+                'download': True,
+            }
+            
+            response = requests.get(
+                self.ASASSN_API_URL,
+                params=params,
+                timeout=60
+            )
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"ASASSN query failed with status {response.status_code}")
+                return None
+                
+        except requests.RequestException as e:
+            print(f"ASASSN query error: {e}")
+            return None
 
 
 class ATLAS_Forced_Phot(PhotCatalog):
-    """ATLAS Forced photometry server"""
-
+    """ATLAS Forced photometry server."""
+    
     def query(
-        self,
-        target: Target,
-        radius: float = RADIUS_ARCSEC,
-        days_ago: float = 200.0,
-        token: str = None,
+            self,
+            target: Target,
+            radius: float = RADIUS_ARCSEC,
+            days_ago: float = 200.,
+            token: str = None
     ):
-        f"""Query the ATLAS forced photometry service
+        f"""Query the ATLAS forced photometry service.
 
         {_QUERY_METHOD_DOCSTRING}
         """
-        # get the RA and Dec from the target
         ra, dec = target.ra, target.dec
+        
+        BASEURL = "https://fallingstar-data.com/forcedphot"
+
+        if token is None:
+            token = getattr(settings, 'ATLAS_API_KEY', None)
+        if token is None:
+            token = os.environ.get('ATLAS_API_KEY', None)
+
+        if token is None:
+            raise ValueError('No ATLAS API token provided. Set ATLAS_API_KEY in settings or environment.')
 
         _verbose = self._verbose
 
@@ -299,7 +386,7 @@ class ATLAS_Forced_Phot(PhotCatalog):
                 else:
                     print(f"ERROR {resp.status_code}")
                     print(resp.json())
-                    sys.exit()
+                    return None
 
         result_url = None
         taskstarted_printed = False
@@ -321,24 +408,18 @@ class ATLAS_Forced_Phot(PhotCatalog):
                             taskstarted_printed = True
                         time.sleep(2)
                     else:
-                        # print(f"Waiting for job to start (queued at {timestamp})")
                         time.sleep(4)
                 else:
                     print(f"ERROR {resp.status_code}")
                     print(resp.text)
-                    sys.exit()
+                    return None
 
         with requests.Session() as s:
             textdata = s.get(result_url, headers=headers).text
 
-            # if we'll be making a lot of requests, keep the web queue from being
-            # cluttered (and reduce server storage usage) by sending a delete operation
-            # s.delete(task_url, headers=headers).json()
+        atlas_phot = self._ATLAS_stack(textdata)
 
-        ATLASphot = self._ATLAS_stack(textdata)
-
-        # add the photometry to the target
-        return self._add_phot(target, ATLASphot)
+        return self._add_phot(target, atlas_phot)
 
     def _add_phot(self, target, data, signal_to_noise_cutoff=3.0):
 
@@ -379,19 +460,22 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
     def _ATLAS_stack(self, filecontent):
         """
-        Function adapted from David Young's :func:`plotter.plot_single_result`
-        https://github.com/thespacedoctor/plot-results-from-atlas-force-photometry-service/blob/main/plot_atlas_fp.py
+        Stack ATLAS photometry data.
+        
+        Adapted from David Young's plot_atlas_fp.py
+        https://github.com/thespacedoctor/plot-results-from-atlas-force-photometry-service
         """
-        epochs = self._ATLAS_read_and_sigma_clip_data(filecontent, log=logger)
+        if not filecontent or not filecontent.strip():
+            return []
+            
+        epochs = self._ATLAS_read_and_sigma_clip_data(filecontent, clipping_sigma=2.2)
 
-        # c = cyan, o = arange
         magnitudes = {
             "c": {"mjds": [], "mags": [], "magErrs": [], "lim5sig": []},
             "o": {"mjds": [], "mags": [], "magErrs": [], "lim5sig": []},
             "I": {"mjds": [], "mags": [], "magErrs": [], "lim5sig": []},
         }
 
-        # SPLIT BY FILTER
         for epoch in epochs:
             if epoch["F"] in ["c", "o", "I"]:
                 magnitudes[epoch["F"]]["mjds"].append(epoch["MJD"])
@@ -404,17 +488,11 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         return stacked_magnitudes
 
-    def _ATLAS_read_and_sigma_clip_data(self, filecontent, log, clippingSigma=2.2):
+    def _ATLAS_read_and_sigma_clip_data(self, filecontent, clipping_sigma=2.2):
         """
-        Function adapted from David Young's :func:`plotter.read_and_sigma_clip_data`
-        https://github.com/thespacedoctor/plot-results-from-atlas-force-photometry-service/blob/main/plot_atlas_fp.py
-
-        *clean up rouge data from the files by performing some basic clipping*
-        **Key Arguments:**
-        - `fpFile` -- path to single force photometry file
-        - `clippingSigma` -- the level at which to clip flux data
-        **Return:**
-        - `epochs` -- sigma clipped and cleaned epoch data
+        Clean up data by performing sigma clipping.
+        
+        Adapted from David Young's plot_atlas_fp.py
         """
 
         # CLEAN UP FILE FOR EASIER READING
@@ -428,7 +506,6 @@ class ATLAS_Forced_Phot(PhotCatalog):
             .splitlines()
         )
 
-        # PARSE DATA WITH SOME FIXED CLIPPING
         oepochs = []
         cepochs = []
         csvReader = csv.DictReader(
@@ -461,8 +538,8 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         maskList = []
         for flux in [cdataFlux, odataFlux]:
-            fullMask = rolling_window_sigma_clip(
-                log=log, array=flux, clippingSigma=clippingSigma, windowSize=11
+            fullMask = _rolling_window_sigma_clip(
+                array=flux, clipping_sigma=clipping_sigma, window_size=11
             )
             maskList.append(fullMask)
 
@@ -480,9 +557,9 @@ class ATLAS_Forced_Phot(PhotCatalog):
         # Returns ordered dictionary of all parameters
         return cepochs + oepochs
 
-    def _stack_photometry(self, magnitudes, binningDays=1.0):
+    def _stack_photometry(self, magnitudes, binning_days=1.0):
         # IF WE WANT TO 'STACK' THE PHOTOMETRY
-        summedMagnitudes = {
+        summed_magnitudes = {
             "c": {"mjds": [], "mags": [], "magErrs": [], "n": [], "lim5sig": []},
             "o": {"mjds": [], "mags": [], "magErrs": [], "n": [], "lim5sig": []},
             "I": {"mjds": [], "mags": [], "magErrs": [], "n": [], "lim5sig": []},
@@ -490,85 +567,63 @@ class ATLAS_Forced_Phot(PhotCatalog):
 
         # MAGNITUDES/FLUXES ARE DIVIDED IN UNIQUE FILTER SETS - SO ITERATE OVER
         # FILTERS
-        allData = []
+        all_data = []
         for fil, data in list(magnitudes.items()):
             # WE'RE GOING TO CREATE FURTHER SUBSETS FOR EACH UNQIUE MJD (FLOORED TO AN INTEGER)
             # MAG VARIABLE == FLUX (JUST TO CONFUSE YOU)
-            distinctMjds = {}
+            distinct_mjds = {}
             for mjd, flx, err, lim in zip(
                 data["mjds"], data["mags"], data["magErrs"], data["lim5sig"]
             ):
                 # DICT KEY IS THE UNIQUE INTEGER MJD
-                key = str(int(math.floor(mjd / float(binningDays))))
+                key = str(int(math.floor(mjd / float(binning_days))))
                 # FIRST DATA POINT OF THE NIGHTS? CREATE NEW DATA SET
-                if key not in distinctMjds:
-                    distinctMjds[key] = {
+                if key not in distinct_mjds:
+                    distinct_mjds[key] = {
                         "mjds": [mjd],
                         "mags": [flx],
                         "magErrs": [err],
                         "lim5sig": [lim],
                     }
-                # OR NOT THE FIRST? APPEND TO ALREADY CREATED LIST
                 else:
-                    distinctMjds[key]["mjds"].append(mjd)
-                    distinctMjds[key]["mags"].append(flx)
-                    distinctMjds[key]["magErrs"].append(err)
-                    distinctMjds[key]["lim5sig"].append(lim)
+                    distinct_mjds[key]["mjds"].append(mjd)
+                    distinct_mjds[key]["mags"].append(flx)
+                    distinct_mjds[key]["magErrs"].append(err)
+                    distinct_mjds[key]["lim5sig"].append(lim)
 
-            # ALL DATA NOW IN MJD SUBSETS. SO FOR EACH SUBSET (I.E. INDIVIDUAL
-            # NIGHTS) ...
-            for k, v in list(distinctMjds.items()):
-                # GIVE ME THE MEAN MJD
-                meanMjd = sum(v["mjds"]) / len(v["mjds"])
-
-                # GIVE ME THE MEAN FLUX
-                meanFLux = sum(v["mags"]) / len(v["mags"])
-
-                # GIVE ME THE COMBINED ERROR
-                sum_of_squares = sum(x**2 for x in v["magErrs"])
-                combError = math.sqrt(sum_of_squares) / len(v["magErrs"])
-
-                # 5-sigma limits
-                try:
-                    comb5SigLimit = 23.9 - 2.5 * math.log10(5.0 * combError)
-                except ValueError:
-                    logger.warn(
-                        "Skipping this ATLAS photometry point because math.log10 raises a domain error!"
-                    )
-                    continue  # this skips to the next for-loop iteration
-
-                # GIVE ME NUMBER OF DATA POINTS COMBINED
+            for k, v in distinct_mjds.items():
+                mean_mjd = sum(v["mjds"]) / len(v["mjds"])
+                mean_flux = sum(v["mags"]) / len(v["mags"])
+                sum_of_squares = sum(x ** 2 for x in v["magErrs"])
+                comb_error = math.sqrt(sum_of_squares) / len(v["magErrs"])
+                
+                comb_5sig_limit = 23.9 - 2.5 * math.log10(5. * comb_error) if comb_error > 0 else 99.0
+                
                 n = len(v["mjds"])
+                
+                summed_magnitudes[fil]["mjds"].append(mean_mjd)
+                summed_magnitudes[fil]["mags"].append(mean_flux)
+                summed_magnitudes[fil]["magErrs"].append(comb_error)
+                summed_magnitudes[fil]["lim5sig"].append(comb_5sig_limit)
+                summed_magnitudes[fil]["n"].append(n)
+                
+                all_data.append({
+                    'mjd': mean_mjd,
+                    'uJy': mean_flux,
+                    'duJy': comb_error,
+                    'F': fil,
+                    'n': n,
+                    'mag5sig': comb_5sig_limit
+                })
 
-                summedMagnitudes[fil]["mjds"].append(meanMjd)
-                summedMagnitudes[fil]["mags"].append(meanFLux)
-                summedMagnitudes[fil]["magErrs"].append(combError)
-                summedMagnitudes[fil]["lim5sig"].append(comb5SigLimit)
-                summedMagnitudes[fil]["n"].append(n)
-
-                allData.append(
-                    {
-                        "mjd": meanMjd,
-                        "uJy": meanFLux,
-                        "duJy": combError,
-                        "F": fil,
-                        "n": n,
-                        "mag5sig": comb5SigLimit,
-                    }
-                )
-        print("completed the ``stack_photometry`` method")
-
-        return allData
+        return all_data
 
 
 class ZTF_Forced_Phot(PhotCatalog):
-    """ZTF Forced photometry server
-
+    """ZTF Forced photometry server.
+    
     Most of this code was yoinked from Dave Coulter's YSE PZ code:
     https://github.com/davecoulter/YSE_PZ/blob/58f3e6a1622ec5755e5322aee2d00f3941510749/YSE_App/data_ingest/ZTF_Forced_Phot.py
-
-    Noah: I'm hacking it together from there to resemble e.g., the ATLAS_Forced_Phot.query
-    function call
     """
 
     def __init__(self):
@@ -585,15 +640,15 @@ class ZTF_Forced_Phot(PhotCatalog):
         super().__init__("ZTF Forced Photometry")
 
     def query(
-        self,
-        target: Target,
-        radius: float = RADIUS_ARCSEC,
-        days_ago: float = 200,
-        wait_for_results=False,
-        max_wait_time=24 * 60 * 60,  # default to a day long max wait time (in seconds)
-        dt_wait_time=5 * 60,  # wait 5 minutes between every email query
+            self,
+            target: Target,
+            radius: float = RADIUS_ARCSEC,
+            days_ago: float = 200,
+            wait_for_results: bool = False,
+            max_wait_time: int = 24*60*60,
+            dt_wait_time: int = 5*60,
     ):
-        f"""Query the ZTF forced photometry service
+        f"""Query the ZTF forced photometry service.
 
         {_QUERY_METHOD_DOCSTRING}
         """
@@ -604,22 +659,20 @@ class ZTF_Forced_Phot(PhotCatalog):
             return
 
         ztf_forced_phot_file = None
-        start_time = time.time()
         total_time_waited = 0
         while ztf_forced_phot_file is None:
-            # wait for the ZTF email to arrive
             ztf_forced_phot_file = self._query_ztf_email(ztf_logs)
 
             # wait the "dt_wait_time" before trying again
             time.sleep(dt_wait_time)
-
             total_time_waited += dt_wait_time
 
             if total_time_waited > max_wait_time:
                 break
 
     def check_for_new_data(self):
-        """Check the TROVE gmail for new ZTF forced photometry, parse it, and upload it"""
+        """Check the TROVE gmail for new ZTF forced photometry, parse it, and upload it."""
+        logfiles = glob.glob(os.path.join(settings.ZTFTMPDIR, "*.txt"))
 
         # get a list of all input log files
         logfiles = glob.glob(os.path.join(settings.ZTFTMPDIR, "*.txt"))
@@ -631,7 +684,6 @@ class ZTF_Forced_Phot(PhotCatalog):
             if result is None:
                 continue
 
-            # unpack the files
             fplc, fplog = result
 
             ra, dec = self._read_fp_log(fplog)
@@ -732,15 +784,13 @@ class ZTF_Forced_Phot(PhotCatalog):
             )
 
     def _query_ztf_email(self, log_file_name, source_name=None):
-        """This checks the trove email address for new emails from ZTF withd dataproducts"""
-
+        """Check the trove email address for new emails from ZTF with data products."""
         downloaded_file_names = None
 
         if not os.path.exists(log_file_name):
-            print("%s does not exist." % log_file_name)
+            print(f"{log_file_name} does not exist.")
             return
 
-        # Interpret the request sent to the ZTF forced photometry server
         job_info = self._read_job_log(log_file_name)
 
         try:
@@ -749,12 +799,10 @@ class ZTF_Forced_Phot(PhotCatalog):
 
             status, messages = imap.select("INBOX")
             processing_match = False
-            # if it's not in the first 100 messages, then I don't care
             for i in range(int(messages[0]), 0, -1)[0:100]:
                 if processing_match:
                     break
 
-                # Fetch the email message by ID
                 res, msg = imap.fetch(str(i), "(RFC822)")
                 for response in msg:
                     if not isinstance(response, tuple):
@@ -762,7 +810,6 @@ class ZTF_Forced_Phot(PhotCatalog):
 
                     # Parse a bytes email into a message object
                     msg = email.message_from_bytes(response[1])
-                    # decode the email subject
                     sender, encoding = email.header.decode_header(msg.get("From"))[0]
 
                     if isinstance(sender, bytes) or not re.search(
@@ -832,22 +879,17 @@ class ZTF_Forced_Phot(PhotCatalog):
             imap.close()
             imap.logout()
 
-        # Connection could be broken
         except Exception as e:
             logger.exception(e)
-            pass
 
         if downloaded_file_names is not None:
             for file_name in downloaded_file_names:
-                logger.info("Downloaded: %s" % file_name)
+                logger.info(f"Downloaded: {file_name}")
 
         return downloaded_file_names
 
-    def _ztf_forced_photometry(
-        self, ra, decl, jdstart=None, jdend=None, days=60, send=True
-    ):
-        """Start the ZTF forced photometry job"""
-
+    def _ztf_forced_photometry(self, ra, decl, jdstart=None, jdend=None, days=60, send=True):
+        """Start the ZTF forced photometry job."""
         if jdend is None:
             jdend = Time(datetime.utcnow(), scale="utc").jd
 
@@ -927,9 +969,8 @@ class ZTF_Forced_Phot(PhotCatalog):
         return url.split("/")[-1]
 
     def _match_ztf_message(self, job_info, message_body, message_time_epoch):
-
+        """Match ZTF email message to job info."""
         match = False
-
         message_lines = message_body.splitlines()
 
         for line in message_lines:
@@ -971,7 +1012,7 @@ class ZTF_Forced_Phot(PhotCatalog):
         return match
 
     def _read_job_log(self, file_name):
-
+        """Read ZTF job log file."""
         job_info = pd.read_html(file_name)[0]
         job_info["ra"] = np.format_float_positional(
             float(job_info["ra"].to_list()[0]), precision=6, pad_right=6
@@ -997,7 +1038,7 @@ class ZTF_Forced_Phot(PhotCatalog):
         return job_info
 
     def _read_fp_log(self, filename):
-
+        """Read forced photometry log file."""
         with open(filename, "r") as f:
             loglines = f.readlines()
 

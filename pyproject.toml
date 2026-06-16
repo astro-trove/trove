@@ -1,0 +1,100 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "saguaro-tom"
+version = "0.1.0"
+description = "SAGUARO Target and Observation Manager for gravitational wave follow-up"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10,<3.13"
+authors = [
+    {name = "SAGUARO-MMA Team"}
+]
+keywords = ["astronomy", "gravitational-waves", "tom", "transients"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Framework :: Django",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+dependencies = [
+    "astroplan",
+    "astropy",
+    "astroquery",
+    "django",
+    "django-autocomplete-light",
+    "django-crispy-forms",
+    "django-extensions",
+    "django-filter",
+    "django-guardian",
+    "django-ninja",
+    "django-tasks",
+    "dustmaps",
+    "fitsio",
+    "healpix-alchemy",
+    "healpy",
+    "ligo.skymap",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "tomtoolkit==2.24.5",
+    "tom-alertstreams",
+    "tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git",
+    "tom-registration",
+    "plotly",
+    "psycopg2-binary",
+    "python-dateutil",
+    "requests",
+    "scipy",
+    "slack-sdk",
+    "specutils",
+    "SQLAlchemy",
+    "whitenoise",
+    "trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-django",
+    "black",
+    "ruff",
+]
+
+[project.urls]
+Homepage = "https://github.com/SAGUARO-MMA/saguaro_tom"
+Repository = "https://github.com/SAGUARO-MMA/saguaro_tom.git"
+
+[tool.setuptools]
+packages = [
+    "saguaro_tom",
+    "custom_code",
+    "candidate_vetting",
+    "trove_nonlocalizedevents",
+    "trove_targets",
+    "tests",
+]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"*" = ["templates/**", "static/**", "migrations/**"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "saguaro_tom.settings"
+python_files = ["test_*.py", "*_test.py"]

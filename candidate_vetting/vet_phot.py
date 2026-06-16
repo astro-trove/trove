@@ -13,8 +13,6 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
-from lightcurve_fitting.lightcurve import LC
-
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
 from trove_targets.models import Target
@@ -324,7 +322,68 @@ def estimate_max_find_decay_rate(
     ]  # need to use min here b/s magnitudes are backwards
 
     return model, best_fit_params, max_time, decay_rate
+    
+FILTER_EFF_FREQ = {
+    'u': 8.468e14 * u.Hz,
+    'g': 6.289e14 * u.Hz,
+    'r': 4.832e14 * u.Hz,
+    'i': 3.948e14 * u.Hz,
+    'z': 3.343e14 * u.Hz,
+    'y': 3.043e14 * u.Hz,
+    'U': 8.468e14 * u.Hz,
+    'B': 6.810e14 * u.Hz,
+    'V': 5.483e14 * u.Hz,
+    'R': 4.610e14 * u.Hz,
+    'I': 3.807e14 * u.Hz,
+    'c': 5.4e14 * u.Hz, # ATLAS cyan
+    'o': 4.8e14 * u.Hz, # ATLAS orange
+    'G': 5.5e14 * u.Hz, # Gaia G-band
+    'w': 5.208e14 * u.Hz, # Pan-STARRS w (wide)
+    'F070W': 4.310e14 * u.Hz, # JWST
+    'F090W': 3.362e14 * u.Hz,
+    'F115W': 2.629e14 * u.Hz,
+    'F150W': 2.019e14 * u.Hz,
+    'F182M': 1.631e14 * u.Hz,
+    'F200W': 1.526e14 * u.Hz,
+    'F250M': 1.199e14 * u.Hz,
+    'F277W': 1.101e14 * u.Hz,
+    'F300M': 1.006e14 * u.Hz,
+    'F335M': 0.894e14 * u.Hz,
+    'F356W': 0.850e14 * u.Hz,
+    'F360M': 0.829e14 * u.Hz,
+    'F444W': 0.690e14 * u.Hz,
+    'F560W': 0.537e14 * u.Hz,
+    'F770W': 0.399e14 * u.Hz,
+    'F1000W': 0.303e14 * u.Hz,
+    'F1130W': 0.265e14 * u.Hz,
+    'F1280W': 0.236e14 * u.Hz,
+    'F1500W': 0.201e14 * u.Hz,
+    'F1800W': 0.168e14 * u.Hz,
+    'F2100W': 0.146e14 * u.Hz,
+    'F2550W': 0.119e14 * u.Hz,
+    'F062': 4.962e14 * u.Hz, # Roman
+    'F087': 3.494e14 * u.Hz,
+    'F106': 2.876e14 * u.Hz,
+    'F129': 2.355e14 * u.Hz,
+    'F146': 2.355e14 * u.Hz,
+    'F158': 1.929e14 * u.Hz,
+    'F213': 1.421e14 * u.Hz,
+}
 
+def _mag_to_flux(mag, magerr=None):
+    """
+    Convert AB magnitude to flux in W/m^2/Hz.
+    
+    For AB magnitudes: flux (Jy) = 10^((8.9 - mag) / 2.5)
+    1 Jy = 1e-26 W/m^2/Hz
+    """
+    flux_jy = 10**((8.9 - mag) / 2.5)
+    flux = flux_jy * 1e-26
+    
+    if magerr is not None:
+        dflux = np.abs(flux * magerr * np.log(10) / 2.5)
+        return flux, dflux
+    return flux
 
 def compute_peak_lum(
     mag: Iterable[float],
@@ -356,27 +415,25 @@ def compute_peak_lum(
     -------
     The peak luminosity (nu L_nu) in erg/s
     """
-
-    lc = LC([mag, magerr, filters], names=["mag", "dmag", "filter"])
-    lc.calcFlux()
-
-    if len(lc) == 0:
-        return None  # we don't want to change the score if there isn't photometry to do this
-
-    # find the max of the light curve
-    fluxmax_idx = np.argmax(lc["flux"])
-    fluxmax = lc["flux"][fluxmax_idx]
+    mag = np.asarray(mag)
+    magerr = np.asarray(magerr)
+    
+    if len(mag) == 0:
+        return None
+    
+    flux, dflux = _mag_to_flux(mag, magerr)
+    
+    fluxmax_idx = np.argmax(flux)
+    fluxmax = flux[fluxmax_idx]
     if consider_err:
-        # turn the flux max into the 3 sigma upper error
-        fluxmax += 3 * lc["dflux"][fluxmax_idx]
-    filtermax = lc["filter"][fluxmax_idx]
-
-    # now convert that flux to a luminosity
+        fluxmax += 3 * dflux[fluxmax_idx]
+    filtermax = filters[fluxmax_idx]
+    
     fluxmax = fluxmax * u.Unit("W/m^2/Hz")
     lummax = _flux_to_lum(fluxmax, lumdist).to("erg/s/Hz")
 
-    # then we need to multiply be the effective frequency of the filter
-    nu_lummax = (filtermax.freq_eff * lummax).to("erg/s")
+    freq_eff = FILTER_EFF_FREQ.get(filtermax, 5.0e14 * u.Hz)
+    nu_lummax = (freq_eff * lummax).to("erg/s")
     return nu_lummax
 
 
