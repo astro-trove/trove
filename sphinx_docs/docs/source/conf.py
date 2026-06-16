@@ -5,6 +5,7 @@
 
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath("../../.."))
 
 # -- Project information -----------------------------------------------------
@@ -46,7 +47,7 @@ html_favicon = "img/favicon.ico"
 html_title = "TROVE"
 
 html_theme_options = {
-    "repository_url": "https://github.com/astro-otter/otter",
+    "repository_url": "https://github.com/astro-trove/trove",
     "use_repository_button": True,
     "use_issues_button": True,
     "use_edit_page_button": True,
@@ -55,7 +56,7 @@ html_theme_options = {
     "show_toc_level": 3,
 }
 
-html_baseurl = "https://astro-otter.readthedocs.io/en/latest/"
+html_baseurl = "https://datatrove.as.arizona.edu"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
