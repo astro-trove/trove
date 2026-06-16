@@ -40,6 +40,5 @@ tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3
 tom-alertstreams==1.2.1
 tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
 tom-registration==1.0.5
-tom-swift==0.2.0
 trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
 whitenoise==6.12.0

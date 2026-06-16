@@ -145,12 +145,15 @@ if _db_name:
         }
     }
 else:
-    # SQLite fallback for local dev when Postgres is not configured
+    # SQLite fallback for local dev when Postgres is not configured.
+    # django_tasks' DatabaseBackend requires SQLite to use EXCLUSIVE transactions,
+    # otherwise `manage.py check` fails with a SystemCheckError.
     _sqlite_path = os.path.join(BASE_DIR, 'db.sqlite3')
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': _sqlite_path,
+            'OPTIONS': {'transaction_mode': 'EXCLUSIVE'},
         }
     }
     # tom_nonlocalizedevents builds its engine from DATABASES; use env so it gets SQLite too
