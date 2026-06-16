@@ -21,7 +21,10 @@ from trove_targets.models import Target
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from candidate_vetting.tasks import async_atlas_query
 
-from .vet import get_eventcandidate_default_distance, _distance_at_healpix
+from candidate_vetting.vet import (
+    get_eventcandidate_default_distance,
+    _distance_at_healpix,
+)
 
 from custom_code.templatetags.photometry_extras import error_to_snr
 
@@ -476,15 +479,19 @@ def find_public_phot(
             query_atlas = (
                 days_ago > 3
             )  # otherwise ATLAS probably won't have anything new
-            print(f"ATLAS photometry already exists for {target.name}, most recent at "+
-                  f"{days_ago} days ago")
+            print(
+                f"ATLAS photometry already exists for {target.name}, most recent at "
+                + f"{days_ago} days ago"
+            )
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
 
     if query_atlas:
-        print("Asynchronously obtaining ATLAS forced photometry with "+
-              f"days_ago = {min(days_ago_max, days_ago):.2f}\n\n")
+        print(
+            "Asynchronously obtaining ATLAS forced photometry with "
+            + f"days_ago = {min(days_ago_max, days_ago):.2f}\n\n"
+        )
         async_atlas_query.using(
             priority=queue_priority  # this sets the priority to whatever is passed in
         ).enqueue(
