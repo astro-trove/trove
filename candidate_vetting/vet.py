@@ -164,36 +164,41 @@ class AsymmetricGaussian(rv_continuous):
     Custom Asymmetric Gaussian distribution for uneven uncertainties
     """
 
+    # Number of grid points used for the normalization integral. Fixed so the
+    # normalization does not depend on how many query points happen to be passed
+    # to _pdf (passing a single point previously yielded a zero-width grid and a
+    # divide-by-zero in the normalization).
+    _N_INTEG = 1000
+
     def _pdf_unnorm(self, x, mean, unc_minus, unc_plus):
-        """**Unnormalized** asymmetric Gaussian PDF"""
-        # piecewise return a Gaussian depending on the side of the mean you are on
-        where_minus = np.where(x < mean)[0]
-        where_plus = np.where(x >= mean)[0]
+        """**Unnormalized** asymmetric Gaussian PDF (order-preserving, broadcastable)."""
+        x = np.asarray(x, dtype=float)
+        mean = np.broadcast_to(mean, x.shape)
+        unc_minus = np.broadcast_to(unc_minus, x.shape)
+        unc_plus = np.broadcast_to(unc_plus, x.shape)
 
-        minus_dist = np.exp(
-            -0.5 * ((x[where_minus] - mean[where_minus]) / unc_minus[where_minus]) ** 2
-        )  # Left side Gaussian-like
-        plus_dist = np.exp(
-            -0.5 * ((x[where_plus] - mean[where_plus]) / unc_plus[where_plus]) ** 2
-        )  # Right side Gaussian-like
-
-        return np.concatenate((minus_dist, plus_dist))
+        # choose the relevant uncertainty per element depending on the side of the mean
+        unc = np.where(x < mean, unc_minus, unc_plus)
+        return np.exp(-0.5 * ((x - mean) / unc) ** 2)
 
     def _pdf(self, x, mean, unc_minus, unc_plus, integ_a, integ_b):
         """**Normalized** asymmetric Gaussian PDF"""
-        # unclear why, but even when floats are passed to this function for
-        # args mean, unc_minus, unc_plus, integ_a, integ_b, they become lists
-        # of the same value repeated len(x) times
+        # scipy passes mean, unc_minus, unc_plus, integ_a, integ_b as arrays of the
+        # same scalar value repeated len(x) times; the distribution parameters are
+        # constant across x, so take the scalar value from the first element.
+        mean_s = np.asarray(mean).ravel()[0]
+        unc_minus_s = np.asarray(unc_minus).ravel()[0]
+        unc_plus_s = np.asarray(unc_plus).ravel()[0]
 
-        # numerically integrate asymmetric Gaussian, for normalization
-        integ_x = np.linspace(integ_a[0], integ_b[0], x.shape[0])
+        # numerically integrate asymmetric Gaussian, for normalization, on a fixed
+        # grid that is independent of the number of query points in x
+        integ_x = np.linspace(integ_a[0], integ_b[0], self._N_INTEG)
         integ = np_trapz_fn(
-            y=self._pdf_unnorm(integ_x, mean, unc_minus, unc_plus), x=integ_x
+            y=self._pdf_unnorm(integ_x, mean_s, unc_minus_s, unc_plus_s), x=integ_x
         )
-        integ_norm = 1 / integ
 
-        # return unnormalized PDF multiplied by normalization factor
-        return self._pdf_unnorm(x, mean, unc_minus, unc_plus) * integ_norm
+        # return unnormalized PDF divided by the normalization integral
+        return self._pdf_unnorm(x, mean, unc_minus, unc_plus) / integ
 
 
 def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):

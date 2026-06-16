@@ -14,9 +14,17 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 from .settings_local import *
 import os
 import tempfile
+import datetime as _datetime
 from astropy.cosmology import FlatLambdaCDM
 from astropy import units as _u
 import warnings
+
+# Django 5.0 removed django.utils.timezone.utc (deprecated since 4.1), but the installed
+# tom_nonlocalizedevents still references it (healpix_utils.create_localization_for_skymap),
+# which otherwise breaks skymap/localization ingestion. Restore it for compatibility.
+from django.utils import timezone as _timezone
+if not hasattr(_timezone, "utc"):
+    _timezone.utc = _datetime.timezone.utc
 
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -137,12 +145,15 @@ if _db_name:
         }
     }
 else:
-    # SQLite fallback for local dev when Postgres is not configured
+    # SQLite fallback for local dev when Postgres is not configured.
+    # django_tasks' DatabaseBackend requires SQLite to use EXCLUSIVE transactions,
+    # otherwise `manage.py check` fails with a SystemCheckError.
     _sqlite_path = os.path.join(BASE_DIR, 'db.sqlite3')
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': _sqlite_path,
+            'OPTIONS': {'transaction_mode': 'EXCLUSIVE'},
         }
     }
     # tom_nonlocalizedevents builds its engine from DATABASES; use env so it gets SQLite too

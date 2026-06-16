@@ -3,16 +3,22 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "saguaro-tom"
+name = "trove"
 version = "0.1.0"
-description = "SAGUARO Target and Observation Manager for gravitational wave follow-up"
+description = "TROVE (A Tool for Rapid Object Vetting and Examination): an open-source, API-enabled platform for the real-time evaluation of transients associated with multi-messenger astrophysics events"
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.11,<3.13"
 authors = [
-    {name = "SAGUARO-MMA Team"}
+    {name = "TROVE Team"},
 ]
-keywords = ["astronomy", "gravitational-waves", "tom", "transients"]
+keywords = [
+    "astronomy",
+    "multi-messenger",
+    "gravitational waves",
+    "transients",
+    "time domain",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Django",
@@ -20,54 +26,14 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
-dependencies = [
-    "astroplan==0.10.1",
-    "astropy==6.1.7",
-    "astroquery==0.4.11",
-    "django==5.2.13",
-    "django-autocomplete-light",
-    "django-bootstrap4==24.4",
-    "django-contrib-comments==2.2.0",
-    "django-crispy-forms==2.4.0",
-    "django-extensions==3.2.3",
-    "django-filter==24.3",
-    "django-guardian==2.4.0",
-    "django-htmx==1.23.2",
-    "django-ninja",
-    "django-stubs-ext==5.2.1",
-    "django-tables2",
-    "django-tasks==0.6.1",
-    "django-webpack-loader==3.2.1",
-    "djangorestframework==3.16.0",
-    "dustmaps==1.0.14",
-    "fitsio==1.3.0",
-    "healpix-alchemy==1.1.0",
-    "healpy==1.19.0",
-    "matplotlib==3.10.9",
-    "numpy==1.26.4",
-    "pandas==3.0.3",
-    "paramiko==5.0.0",
-    "plotly==5.24.1",
-    "psycopg2-binary==2.9.12",
-    "python-dateutil==2.9.0.post0",
-    "requests==2.34.2",
-    "scipy==1.17.1",
-    "skypatrol==0.6.21",
-    "slack_sdk==3.42.0",
-    "specutils==1.20.3",
-    "SQLAlchemy==2.0.50",
-    "tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3",
-    "tom-alertstreams==1.2.1",
-    "tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git",
-    "tom-registration==1.0.5",
-    "trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git",
-    "whitenoise==6.12.0",
-]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
 dev = [
@@ -78,8 +44,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SAGUARO-MMA/saguaro_tom"
-Repository = "https://github.com/SAGUARO-MMA/saguaro_tom.git"
+Homepage = "https://astro-trove.github.io"
+Repository = "https://github.com/astro-trove/trove.git"
+Issues = "https://github.com/astro-trove/trove/issues"
 
 [tool.setuptools]
 packages = [
@@ -97,7 +64,7 @@ include-package-data = true
 
 [tool.ruff]
 line-length = 120
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
@@ -106,3 +73,6 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "saguaro_tom.settings"
 python_files = ["test_*.py", "*_test.py"]
+markers = [
+    "slow: tests that read or convert large skymap fixtures",
+]

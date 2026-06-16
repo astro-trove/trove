@@ -1,0 +1,31 @@
+{
+  "alert_type": "UPDATE",
+  "time_created": "2017-08-17T16:11:42.000000Z",
+  "superevent_id": "GW170817",
+  "urls": {
+    "gracedb": "https://gracedb.ligo.org/superevents/GW170817/view/"
+  },
+  "event": {
+    "time": "2017-08-17T12:41:04.444458Z",
+    "far": 3.0e-12,
+    "significant": true,
+    "instruments": ["H1", "L1", "V1"],
+    "group": "CBC",
+    "pipeline": "pycbc",
+    "search": "AllSky",
+    "properties": {
+      "HasNS": 0.99,
+      "HasRemnant": 0.98,
+      "HasMassGap": 0.01
+    },
+    "classification": {
+      "BNS": 0.99,
+      "NSBH": 0.005,
+      "BBH": 0.003,
+      "Terrestrial": 0.002
+    },
+    "duration": null,
+    "central_frequency": null
+  },
+  "external_coinc": null
+}
