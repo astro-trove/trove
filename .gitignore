@@ -2,6 +2,14 @@ db.sqlite3
 **/__pycache__
 .idea
 data/
+# Keep small test fixtures under tests/data/ even though data/ is ignored above.
+# Large artifacts (db-static tarball, db.sqlite3) remain excluded via tests/data/* below.
+!tests/data/
+tests/data/*
+!tests/data/.gitkeep
+!tests/data/README.md
+!tests/data/GW170817-update.json
+!tests/data/GW170817-bayestar.fits.gz
 _static/
 saguaro_tom/settings_local.py
 .DS_Store
