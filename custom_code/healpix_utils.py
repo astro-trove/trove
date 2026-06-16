@@ -29,13 +29,13 @@ class SaTarget(Base):
     basetarget_ptr_id = sa.Column(sa.Integer, primary_key=True)
     healpix = sa.Column(sa.BigInteger)
 
-
-def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
+def get_target_ids_in_prob_credible_region(eventsequence, prob=0.95, target_ids=None):
     """
-    Creates an EventCandidate for each target that falls within the `prob` credible region of the localization region
+    Get target IDs of of targets that fall within the `prob` credible region of the localization region
     associated with `eventsequence`. If no `target_ids` are given, all targets created after the
     event time are considered.
     """
+    
     if target_ids is None:
         targets = Target.objects.filter(created__gte=eventsequence.details['time'])
         target_ids = list(targets.values_list('pk', flat=True))
@@ -73,24 +73,36 @@ def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
         )
 
         results = session.execute(query)
+        
+        return results
 
-        new_candidates = []
-        for result in results:
-            ec, created = EventCandidate.objects.get_or_create(
-                target=Target.objects.get(id=result[0]),
-                nonlocalizedevent=eventsequence.nonlocalizedevent,
-            )
-            if created:
-                new_candidates.append(ec)
+def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
+    """
+    Creates an EventCandidate for each target that falls within the `prob` credible region of the localization region
+    associated with `eventsequence`. If no `target_ids` are given, all targets created after the
+    event time are considered.
+    """
 
-        logger.info(f'Linked {len(new_candidates)} new candidates to event {eventsequence.nonlocalizedevent.event_id}')
+    results = get_target_ids_in_prob_credible_region(eventsequence, 
+                                                      prob, 
+                                                      target_ids)
+    new_candidates = []
+    for result in results:
+        ec, created = EventCandidate.objects.get_or_create(
+            target=Target.objects.get(id=result[0]),
+            nonlocalizedevent=eventsequence.nonlocalizedevent,
+        )
+        if created:
+            new_candidates.append(ec)
 
-        if len(new_candidates): # only do this (time-consuming) step if any new candidates were linked
-            localizations = eventsequence.nonlocalizedevent.localizations.all()
-            for localization in localizations:
-                update_all_credible_region_percents_for_candidates(localization, [cand.id for cand in new_candidates])
+    logger.info(f'Linked {len(new_candidates)} new candidates to event {eventsequence.nonlocalizedevent.event_id}')
 
-        return new_candidates
+    if len(new_candidates): # only do this (time-consuming) step if any new candidates were linked
+        localizations = eventsequence.nonlocalizedevent.localizations.all()
+        for localization in localizations:
+            update_all_credible_region_percents_for_candidates(localization, [cand.id for cand in new_candidates])
+
+    return new_candidates
 
 
 def create_elliptical_localization(nonlocalizedevent, center, radius, conf_inv=0.9):
