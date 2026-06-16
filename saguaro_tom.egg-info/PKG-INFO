@@ -19,34 +19,51 @@ Classifier: Programming Language :: Python :: 3.12
 Classifier: Topic :: Scientific/Engineering :: Astronomy
 Requires-Python: <3.13,>=3.10
 Description-Content-Type: text/markdown
-Requires-Dist: astroplan
-Requires-Dist: astropy
-Requires-Dist: astroquery
-Requires-Dist: django
-Requires-Dist: django-crispy-forms
-Requires-Dist: django-extensions
-Requires-Dist: django-filter
-Requires-Dist: django-guardian
-Requires-Dist: django-ninja
-Requires-Dist: django-tasks
-Requires-Dist: dustmaps
-Requires-Dist: healpix-alchemy
-Requires-Dist: healpy
-Requires-Dist: ligo.skymap
-Requires-Dist: matplotlib
-Requires-Dist: numpy
-Requires-Dist: tomtoolkit==2.24.5
-Requires-Dist: tom-alertstreams
+Requires-Dist: setuptools==81.0.0
+Requires-Dist: astroplan==0.10.1
+Requires-Dist: astropy==6.1.7
+Requires-Dist: astroquery==0.4.11
+Requires-Dist: django==5.2.13
+Requires-Dist: django-autocomplete-light==4.0.0
+Requires-Dist: django-bootstrap4==24.4
+Requires-Dist: django-contrib-comments==2.2.0
+Requires-Dist: django-crispy-forms==2.4.0
+Requires-Dist: django-extensions==3.2.3
+Requires-Dist: django-filter==24.3
+Requires-Dist: django-gravatar2==1.4.5
+Requires-Dist: django-guardian==2.4.0
+Requires-Dist: django-htmx==1.23.2
+Requires-Dist: django-ninja==1.6.2
+Requires-Dist: django-phonenumber-field==8.1.0
+Requires-Dist: django-phonenumbers==1.0.1
+Requires-Dist: django-stubs-ext==5.2.1
+Requires-Dist: django-tables2==3.0.0
+Requires-Dist: django-tasks==0.6.1
+Requires-Dist: django-webpack-loader==3.2.1
+Requires-Dist: djangorestframework==3.16.0
+Requires-Dist: dustmaps==1.0.14
+Requires-Dist: fitsio==1.3.0
+Requires-Dist: healpix-alchemy==1.1.0
+Requires-Dist: healpy==1.19.0
+Requires-Dist: ligo.skymap==2.4.0
+Requires-Dist: matplotlib==3.10.9
+Requires-Dist: numpy==1.26.4
+Requires-Dist: paramiko==5.0.0
+Requires-Dist: plotly==5.24.1
+Requires-Dist: psycopg2-binary==2.9.12
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: requests==2.34.2
+Requires-Dist: skypatrol==0.6.21
+Requires-Dist: slack_sdk==3.42.0
+Requires-Dist: specutils==1.20.3
+Requires-Dist: SQLAlchemy==2.0.50
+Requires-Dist: tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3
+Requires-Dist: tom-alertstreams==1.2.1
 Requires-Dist: tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
-Requires-Dist: plotly
-Requires-Dist: psycopg2-binary
-Requires-Dist: python-dateutil
-Requires-Dist: requests
-Requires-Dist: slack-sdk
-Requires-Dist: specutils
-Requires-Dist: SQLAlchemy
-Requires-Dist: whitenoise
+Requires-Dist: tom-registration==1.0.5
+Requires-Dist: tom-swift==0.2.0
 Requires-Dist: trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
+Requires-Dist: whitenoise==6.12.0
 Provides-Extra: dev
 Requires-Dist: pytest; extra == "dev"
 Requires-Dist: pytest-django; extra == "dev"
