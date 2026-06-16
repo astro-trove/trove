@@ -25,51 +25,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
-dependencies = [
-    "astroplan==0.10.1",
-    "astropy==6.1.7",
-    "astroquery==0.4.11",
-    "django==5.2.13",
-    "django-autocomplete-light",
-    "django-bootstrap4==24.4",
-    "django-contrib-comments==2.2.0",
-    "django-crispy-forms==2.4.0",
-    "django-extensions==3.2.3",
-    "django-filter==24.3",
-    "django-guardian==2.4.0",
-    "django-htmx==1.23.2",
-    "django-ninja",
-    "django-phonenumber-field==8.1.0",
-    "django-phonenumbers==1.0.1",
-    "django-stubs-ext==5.2.1",
-    "django-tables2",
-    "django-tasks==0.6.1",
-    "django-webpack-loader==3.2.1",
-    "djangorestframework==3.16.0",
-    "dustmaps==1.0.14",
-    "fitsio==1.3.0",
-    "healpix-alchemy==1.1.0",
-    "healpy==1.19.0",
-    "matplotlib==3.10.9",
-    "numpy==1.26.4",
-    "pandas",
-    "paramiko==5.0.0",
-    "plotly==5.24.1",
-    "psycopg2-binary==2.9.12",
-    "python-dateutil==2.9.0.post0",
-    "requests==2.34.2",
-    "scipy",
-    "skypatrol==0.6.21",
-    "slack_sdk==3.42.0",
-    "specutils==1.20.3",
-    "SQLAlchemy==2.0.50",
-    "tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3",
-    "tom-alertstreams==1.2.1",
-    "tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git",
-    "tom-registration==1.0.5",
-    "trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git",
-    "whitenoise==6.12.0",
-]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
 
 [project.optional-dependencies]
 dev = [
