@@ -10,7 +10,7 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
 
 ## Installation (for development)
 
-  **Prerequisites:** Python 3.10, 3.11, or 3.12 (the `tom-nonlocalizedevents` dependency does not support 3.9 or 3.13+). A PostgreSQL database is required for the application.
+  **Prerequisites:** Python 3.11 or 3.12 (`django-autocomplete-light==4.0.0` requires 3.11+, and the `tom-nonlocalizedevents` dependency does not support 3.13+). A PostgreSQL database is required for the application.
 
  1. Clone the repository:
 
