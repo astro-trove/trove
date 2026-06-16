@@ -19,8 +19,12 @@ from custom_code.nle_ingestion import (
     build_hop_message,
     decompress_fits_bytes,
     ensure_multiorder_skymap_bytes,
+    fetch_gracedb_alert,
+    iter_gracedb_superevents,
+    latest_voevent_filename,
     load_alert_dict,
     load_skymap_bytes,
+    parse_voevent_xml,
     read_skymap_table,
     upload_local_nle,
 )
@@ -296,3 +300,332 @@ class TestIngestLocalNleExistenceCheck:
         )
 
         mock_ingest.assert_called_once()
+
+
+# A representative GraceDB superevent VOEvent (LVC/IGWN "Update" notice), trimmed to the
+# fields ingestion cares about. Namespaced root + unqualified What/Param like real notices.
+SAMPLE_VOEVENT_XML = b"""<?xml version="1.0" ?>
+<voe:VOEvent xmlns:voe="http://www.ivoa.net/xml/VOEvent/v2.0"
+             ivorn="ivo://gwnet/LVC#S190814bv-5-Update" role="observation" version="2.0">
+  <Who>
+    <Date>2019-08-15T10:19:10</Date>
+    <Author><contactName>LIGO/Virgo</contactName></Author>
+  </Who>
+  <What>
+    <Param name="Packet_Type" value="153"/>
+    <Param name="internal" value="0"/>
+    <Param name="Pkt_Ser_Num" value="5"/>
+    <Param name="GraceID" value="S190814bv" ucd="meta.id"/>
+    <Param name="AlertType" value="Update"/>
+    <Param name="HardwareInj" value="0"/>
+    <Param name="OpenAlert" value="1"/>
+    <Param name="EventPage" value="https://gracedb.ligo.org/superevents/S190814bv/view/"/>
+    <Param name="Instruments" value="H1,L1,V1"/>
+    <Param name="FAR" value="2.033e-33"/>
+    <Param name="Significant" value="1"/>
+    <Param name="Group" value="CBC"/>
+    <Param name="Pipeline" value="gstlal"/>
+    <Param name="Search" value="AllSky"/>
+    <Group type="GW_SKYMAP" name="LALInference.v1">
+      <Param name="skymap_fits"
+             value="https://gracedb.ligo.org/api/superevents/S190814bv/files/LALInference.v1.fits.gz"/>
+    </Group>
+    <Group type="Classification">
+      <Param name="BNS" value="0.0"/>
+      <Param name="NSBH" value="1.0"/>
+      <Param name="BBH" value="0.0"/>
+      <Param name="Terrestrial" value="0.0"/>
+    </Group>
+    <Group type="Properties">
+      <Param name="HasNS" value="1.0"/>
+      <Param name="HasRemnant" value="0.0"/>
+      <Param name="HasMassGap" value="0.0"/>
+    </Group>
+  </What>
+  <WhereWhen>
+    <ObsDataLocation>
+      <ObservationLocation>
+        <AstroCoords coord_system_id="UTC-FK5-GEO">
+          <Time><TimeInstant><ISOTime>2019-08-14T21:10:39.012957</ISOTime></TimeInstant></Time>
+        </AstroCoords>
+      </ObservationLocation>
+    </ObsDataLocation>
+  </WhereWhen>
+</voe:VOEvent>
+"""
+
+SAMPLE_RETRACTION_XML = b"""<?xml version="1.0" ?>
+<voe:VOEvent xmlns:voe="http://www.ivoa.net/xml/VOEvent/v2.0"
+             ivorn="ivo://gwnet/LVC#S190814bv-6-Retraction" role="observation" version="2.0">
+  <Who><Date>2019-08-15T11:00:00</Date></Who>
+  <What>
+    <Param name="GraceID" value="S190814bv"/>
+    <Param name="AlertType" value="Retraction"/>
+    <Param name="EventPage" value="https://gracedb.ligo.org/superevents/S190814bv/view/"/>
+  </What>
+</voe:VOEvent>
+"""
+
+
+class TestLatestVoeventFilename:
+    def test_picks_highest_version(self):
+        names = [
+            "S190814bv-1-Preliminary.xml",
+            "S190814bv-2-Initial.xml",
+            "S190814bv-3-Preliminary.xml",
+            "S190814bv-4-Update.xml",
+            "S190814bv-5-Update.xml",
+            "bayestar.fits.gz",
+            "p_astro.json",
+        ]
+        assert latest_voevent_filename(names, "S190814bv") == "S190814bv-5-Update.xml"
+
+    def test_ignores_revision_aliases(self):
+        names = [
+            "S190814bv-5-Update.xml",
+            "S190814bv-5-Update.xml,0",
+            "S190814bv-4-Update.xml,0",
+        ]
+        assert latest_voevent_filename(names, "S190814bv") == "S190814bv-5-Update.xml"
+
+    def test_raises_when_no_voevent(self):
+        with pytest.raises(ValueError):
+            latest_voevent_filename(["bayestar.fits.gz"], "S190814bv")
+
+
+class TestParseVoeventXml:
+    def test_parses_update_alert(self):
+        alert, skymap_url = parse_voevent_xml(SAMPLE_VOEVENT_XML)
+
+        assert alert["superevent_id"] == "S190814bv"
+        assert alert["alert_type"] == "UPDATE"
+        assert alert["time_created"] == "2019-08-15T10:19:10Z"
+        assert alert["urls"]["gracedb"].endswith("/superevents/S190814bv/view/")
+
+        event = alert["event"]
+        assert event["time"] == "2019-08-14T21:10:39.012957Z"
+        assert event["far"] == pytest.approx(2.033e-33)
+        assert event["significant"] is True
+        assert event["instruments"] == ["H1", "L1", "V1"]
+        assert event["group"] == "CBC"
+        assert event["pipeline"] == "gstlal"
+        assert event["search"] == "AllSky"
+        assert event["properties"]["HasNS"] == pytest.approx(1.0)
+        assert event["classification"]["NSBH"] == pytest.approx(1.0)
+
+        assert skymap_url.endswith("/files/LALInference.v1.fits.gz")
+
+    def test_retraction_has_no_event_or_skymap(self):
+        alert, skymap_url = parse_voevent_xml(SAMPLE_RETRACTION_XML)
+        assert alert["alert_type"] == "RETRACTION"
+        assert alert["event"] is None
+        assert skymap_url is None
+
+
+class TestFetchGracedbAlert:
+    def _make_session(self, files, voevent_xml, skymap_bytes):
+        """A fake requests.Session whose .get dispatches by URL substring."""
+        def fake_get(url, timeout=None):
+            resp = MagicMock()
+            resp.raise_for_status.return_value = None
+            if url.endswith("/files/"):
+                resp.json.return_value = files
+            elif url.endswith(".xml"):
+                resp.content = voevent_xml
+            else:
+                resp.content = skymap_bytes
+            return resp
+
+        session = MagicMock()
+        session.get.side_effect = fake_get
+        return session
+
+    def test_fetches_latest_voevent_and_skymap(self):
+        files = {
+            "S190814bv-4-Update.xml": "https://gracedb.test/api/.../S190814bv-4-Update.xml",
+            "S190814bv-5-Update.xml": "https://gracedb.test/api/.../S190814bv-5-Update.xml",
+        }
+        session = self._make_session(files, SAMPLE_VOEVENT_XML, b"raw-fits-bytes")
+
+        alert, skymap_bytes, voevent_name = fetch_gracedb_alert(
+            "S190814bv", base_url="https://gracedb.test", session=session
+        )
+
+        assert voevent_name == "S190814bv-5-Update.xml"
+        assert alert["superevent_id"] == "S190814bv"
+        assert skymap_bytes == b"raw-fits-bytes"
+
+    def test_retraction_returns_no_skymap(self):
+        files = {"S190814bv-6-Retraction.xml": "https://gracedb.test/x/S190814bv-6-Retraction.xml"}
+        session = self._make_session(files, SAMPLE_RETRACTION_XML, b"unused")
+
+        alert, skymap_bytes, voevent_name = fetch_gracedb_alert(
+            "S190814bv", base_url="https://gracedb.test", session=session
+        )
+
+        assert voevent_name == "S190814bv-6-Retraction.xml"
+        assert skymap_bytes is None
+
+
+class TestIngestLocalNleGracedbSource:
+    """The --gracedb mode builds the alert from GraceDB instead of local files."""
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.ingest_local_igwn_alert")
+    @patch(f"{_CMD}.ensure_multiorder_skymap_bytes", return_value=b"moc-fits")
+    @patch(f"{_CMD}.fetch_gracedb_alert")
+    @patch(f"{_CMD}.NonLocalizedEvent")
+    def test_gracedb_source_ingests(
+        self, mock_nle, mock_fetch, mock_convert, mock_ingest, mock_conn
+    ):
+        alert = {"superevent_id": "S190814bv", "alert_type": "UPDATE", "event": {}}
+        mock_fetch.return_value = (alert, b"raw-fits", "S190814bv-5-Update.xml")
+        mock_nle.objects.filter.return_value.first.return_value = None
+        mock_ingest.return_value = (MagicMock(event_id="S190814bv"), MagicMock())
+
+        call_command("ingest_local_nle", "--gracedb", "S190814bv", "--yes")
+
+        mock_fetch.assert_called_once()
+        assert mock_fetch.call_args.args[0] == "S190814bv"
+        mock_ingest.assert_called_once()
+        ingested_alert = mock_ingest.call_args.args[0]
+        assert ingested_alert["event"]["skymap"] == b"moc-fits"
+
+    def test_gracedb_and_positionals_are_mutually_exclusive(self):
+        from django.core.management.base import CommandError
+
+        with pytest.raises(CommandError):
+            call_command(
+                "ingest_local_nle",
+                str(GW170817_JSON),
+                "--gracedb",
+                "S190814bv",
+            )
+
+    def test_requires_a_source(self):
+        from django.core.management.base import CommandError
+
+        with pytest.raises(CommandError):
+            call_command("ingest_local_nle")
+
+
+class TestIterGracedbSuperevents:
+    def _paged_session(self, pages):
+        """Fake session whose .get returns successive page dicts (by ?start=)."""
+        def fake_get(url, params=None, timeout=None):
+            start = (params or {}).get("start", 0)
+            resp = MagicMock()
+            resp.raise_for_status.return_value = None
+            resp.json.return_value = pages[start]
+            return resp
+
+        session = MagicMock()
+        session.get.side_effect = fake_get
+        return session
+
+    def test_follows_pagination(self):
+        pages = {
+            0: {"numRows": 3, "superevents": [{"superevent_id": "S1"}, {"superevent_id": "S2"}]},
+            2: {"numRows": 3, "superevents": [{"superevent_id": "S3"}]},
+        }
+        session = self._paged_session(pages)
+        ids = [s["superevent_id"] for s in iter_gracedb_superevents(
+            "category: Production", session=session, page_size=2
+        )]
+        assert ids == ["S1", "S2", "S3"]
+
+    def test_respects_limit(self):
+        pages = {
+            0: {"numRows": 10, "superevents": [{"superevent_id": f"S{i}"} for i in range(5)]},
+        }
+        session = self._paged_session(pages)
+        ids = [s["superevent_id"] for s in iter_gracedb_superevents(
+            "q", session=session, page_size=5, limit=2
+        )]
+        assert ids == ["S0", "S1"]
+
+
+class TestIngestLocalNleGracedbAll:
+    """--gracedb-all enumerates events, skips existing ones, and ingests the rest."""
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.ingest_local_igwn_alert")
+    @patch(f"{_CMD}.ensure_multiorder_skymap_bytes", return_value=b"moc-fits")
+    @patch(f"{_CMD}.fetch_gracedb_alert")
+    @patch(f"{_CMD}.iter_gracedb_superevents")
+    @patch(f"{_CMD}.NonLocalizedEvent")
+    def test_skips_existing_and_ingests_new(
+        self, mock_nle, mock_iter, mock_fetch, mock_convert, mock_ingest, mock_conn
+    ):
+        mock_iter.return_value = [
+            {"superevent_id": "S_existing"},
+            {"superevent_id": "S_new"},
+        ]
+
+        # S_existing already in DB; S_new is not.
+        def filter_side_effect(event_id):
+            result = MagicMock()
+            result.first.return_value = MagicMock() if event_id == "S_existing" else None
+            return result
+
+        mock_nle.objects.filter.side_effect = filter_side_effect
+        mock_fetch.return_value = (
+            {"superevent_id": "S_new", "event": {}},
+            b"raw-fits",
+            "S_new-1-Preliminary.xml",
+        )
+        mock_ingest.return_value = (MagicMock(event_id="S_new"), MagicMock())
+
+        call_command("ingest_local_nle", "--gracedb-all", "--yes")
+
+        # Only the new event is fetched and ingested.
+        mock_fetch.assert_called_once()
+        assert mock_fetch.call_args.args[0] == "S_new"
+        mock_ingest.assert_called_once()
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.ingest_local_igwn_alert")
+    @patch(f"{_CMD}.fetch_gracedb_alert")
+    @patch(f"{_CMD}.iter_gracedb_superevents")
+    @patch(f"{_CMD}.NonLocalizedEvent")
+    def test_dry_run_does_not_fetch_or_ingest(
+        self, mock_nle, mock_iter, mock_fetch, mock_ingest, mock_conn
+    ):
+        mock_iter.return_value = [{"superevent_id": "S_new"}]
+        mock_nle.objects.filter.return_value.first.return_value = None
+
+        call_command("ingest_local_nle", "--gracedb-all", "--dry-run")
+
+        mock_fetch.assert_not_called()
+        mock_ingest.assert_not_called()
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.iter_gracedb_superevents")
+    def test_default_query_is_significant(self, mock_iter, mock_conn):
+        from custom_code.nle_ingestion import GRACEDB_SIGNIFICANT_QUERY
+
+        mock_iter.return_value = []
+        call_command("ingest_local_nle", "--gracedb-all", "--dry-run")
+
+        assert mock_iter.call_args.args[0] == GRACEDB_SIGNIFICANT_QUERY
+
+    @patch(f"{_CMD}.connection")
+    @patch(f"{_CMD}.iter_gracedb_superevents")
+    def test_include_low_significance_uses_production_query(self, mock_iter, mock_conn):
+        from custom_code.nle_ingestion import GRACEDB_PRODUCTION_QUERY
+
+        mock_iter.return_value = []
+        call_command(
+            "ingest_local_nle",
+            "--gracedb-all",
+            "--include-low-significance",
+            "--dry-run",
+        )
+
+        assert mock_iter.call_args.args[0] == GRACEDB_PRODUCTION_QUERY
+
+    def test_gracedb_all_rejects_other_sources(self):
+        from django.core.management.base import CommandError
+
+        with pytest.raises(CommandError):
+            call_command("ingest_local_nle", "--gracedb-all", "--gracedb", "S190814bv")
