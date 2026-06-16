@@ -26,12 +26,6 @@ candidate_vetting/migrations/0006_desidr1q3c_nedlvsq3c_twomassq3c_ztfvarstarq3c.
 candidate_vetting/migrations/0007_cosmicflows4q3c_hecate1q3c_hecate2q3c_lsdr10southq3c_and_more.py
 candidate_vetting/migrations/0008_alter_lsdr10southtargetmatch_table_and_more.py
 candidate_vetting/migrations/__init__.py
-candidate_vetting/migrations/__pycache__/0001_initial.cpython-311.pyc
-candidate_vetting/migrations/__pycache__/0002_create_views.cpython-311.pyc
-candidate_vetting/migrations/__pycache__/0003_scorefactor.cpython-311.pyc
-candidate_vetting/migrations/__pycache__/0004_rename_event_candidate_id_scorefactor_event_candidate.cpython-311.pyc
-candidate_vetting/migrations/__pycache__/0005_alter_scorefactor_unique_together.cpython-311.pyc
-candidate_vetting/migrations/__pycache__/__init__.cpython-311.pyc
 candidate_vetting/templates/candidate_vetting/update_redshift_form.html
 candidate_vetting/templates/candidate_vetting/vetting_form.html
 candidate_vetting/templates/candidate_vetting/partials/vet_button.html
@@ -52,10 +46,6 @@ custom_code/migrations/0013_alter_cssfieldcredibleregion_options_and_more.py
 custom_code/migrations/0014_alter_credibleregioncontour_localization_and_more.py
 custom_code/migrations/0015_alter_credibleregioncontour_id.py
 custom_code/migrations/__init__.py
-custom_code/migrations/__pycache__/0013_alter_cssfieldcredibleregion_options_and_more.cpython-311.pyc
-custom_code/migrations/__pycache__/0014_alter_credibleregioncontour_localization_and_more.cpython-311.pyc
-custom_code/migrations/__pycache__/0015_alter_credibleregioncontour_id.cpython-311.pyc
-custom_code/migrations/__pycache__/__init__.cpython-311.pyc
 saguaro_tom/__init__.py
 saguaro_tom/api.py
 saguaro_tom/asgi.py
@@ -88,7 +78,6 @@ trove_nonlocalizedevents/tests.py
 trove_nonlocalizedevents/urls.py
 trove_nonlocalizedevents/views.py
 trove_nonlocalizedevents/migrations/__init__.py
-trove_nonlocalizedevents/migrations/__pycache__/__init__.cpython-311.pyc
 trove_nonlocalizedevents/templates/trove_nonlocalizedevents/candidate_list.html
 trove_targets/__init__.py
 trove_targets/admin.py
@@ -104,7 +93,3 @@ trove_targets/migrations/0001_initial.py
 trove_targets/migrations/0002_target_classification_target_mwebv_target_redshift.py
 trove_targets/migrations/0003_alter_target_healpix.py
 trove_targets/migrations/__init__.py
-trove_targets/migrations/__pycache__/0001_initial.cpython-311.pyc
-trove_targets/migrations/__pycache__/0002_target_classification_target_mwebv_target_redshift.cpython-311.pyc
-trove_targets/migrations/__pycache__/0003_fix_tom_targets_migration.cpython-311.pyc
-trove_targets/migrations/__pycache__/__init__.cpython-311.pyc
