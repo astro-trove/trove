@@ -27,7 +27,7 @@ classifiers = [
 ]
 dependencies = [
     "astroplan==0.10.1",
-    "astropy==6.1.7,"
+    "astropy==6.1.7",
     "astroquery==0.4.11",
     "django==5.2.13",
     "django-autocomplete-light",
@@ -71,7 +71,6 @@ dependencies = [
     "tom-swift==0.2.0",
     "trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git"
     "whitenoise==6.12.0",
-    ,
 ]
 
 [project.optional-dependencies]
