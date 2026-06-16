@@ -67,3 +67,6 @@ ignore = ["E501"]
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "saguaro_tom.settings"
 python_files = ["test_*.py", "*_test.py"]
+markers = [
+    "slow: tests that read or convert large skymap fixtures",
+]
