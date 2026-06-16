@@ -45,3 +45,4 @@ django-stubs-ext==5.2.1
 django-tables2==3.0.0
 django-webpack-loader==3.2.1
 djangorestframework==3.16.0
+sphinx==9.0.4
