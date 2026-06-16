@@ -14,9 +14,11 @@ from candidate_vetting.vet import (
     skymap_association,
     host_distance_match,
     # agn_distance_match,
+    get_distance_score,
+)
+from .util import (
     update_score_factor,
     delete_score_factor,
-    get_distance_score,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
