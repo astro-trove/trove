@@ -3,16 +3,22 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "saguaro-tom"
+name = "trove"
 version = "0.1.0"
-description = "SAGUARO Target and Observation Manager for gravitational wave follow-up"
+description = "TROVE (A Tool for Rapid Object Vetting and Examination): an open-source, API-enabled platform for the real-time evaluation of transients associated with multi-messenger astrophysics events"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11,<3.13"
 authors = [
-    {name = "SAGUARO-MMA Team"}
+    {name = "TROVE Team"},
 ]
-keywords = ["astronomy", "gravitational-waves", "tom", "transients"]
+keywords = [
+    "astronomy",
+    "multi-messenger",
+    "gravitational waves",
+    "transients",
+    "time domain",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Framework :: Django",
@@ -38,8 +44,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/SAGUARO-MMA/saguaro_tom"
-Repository = "https://github.com/SAGUARO-MMA/saguaro_tom.git"
+Homepage = "https://astro-trove.github.io"
+Repository = "https://github.com/astro-trove/trove.git"
+Issues = "https://github.com/astro-trove/trove/issues"
 
 [tool.setuptools]
 packages = [
