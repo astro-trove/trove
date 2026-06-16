@@ -50,6 +50,45 @@ def _tiny_multiorder_skymap_bytes() -> bytes:
     return buffer.read()
 
 
+def _flat_bayestar_skymap_bytes() -> bytes:
+    """Minimal *flat* (rasterized) BAYESTAR-style skymap: NESTED + PROB, piecewise constant.
+
+    Built so that derasterize can merge identical-valued sibling pixels back into coarse tiles,
+    mimicking a real flat bayestar.fits.gz (which is a rasterization of a multi-order map).
+    """
+    nside = 8
+    npix = 12 * nside ** 2
+    prob = np.zeros(npix)
+    prob[:64] = 1.0
+    prob /= prob.sum()
+    table = Table(
+        {
+            "PROB": prob,
+            "DISTMU": np.full(npix, 40.0),
+            "DISTSIGMA": np.full(npix, 10.0),
+            "DISTNORM": np.full(npix, 1.0),
+        }
+    )
+    table.meta.update(
+        {
+            "ORDERING": "NESTED",
+            "DISTMEAN": 40.0,
+            "DISTSTD": 10.0,
+            "OBJECT": "GW170817",
+            "DATE": "2017-08-17T12:41:04.444458",
+        }
+    )
+    buffer = BytesIO()
+    write_sky_map(buffer, table, nest=True)
+    buffer.seek(0)
+    return buffer.read()
+
+
+@pytest.fixture
+def flat_bayestar_skymap_bytes() -> bytes:
+    return _flat_bayestar_skymap_bytes()
+
+
 @pytest.fixture
 def gw170817_alert() -> dict:
     return load_alert_dict(GW170817_JSON)
@@ -101,6 +140,30 @@ class TestNleIngestionHelpers:
 
     def test_decompress_fits_bytes_idempotent_on_raw_fits(self, tiny_multiorder_skymap_bytes):
         assert decompress_fits_bytes(tiny_multiorder_skymap_bytes) == tiny_multiorder_skymap_bytes
+
+    def test_ensure_multiorder_passes_through_existing_multiorder(self, tiny_multiorder_skymap_bytes):
+        out = ensure_multiorder_skymap_bytes(tiny_multiorder_skymap_bytes)
+        assert out == tiny_multiorder_skymap_bytes
+
+    def test_ensure_multiorder_converts_flat_to_adaptive(self, flat_bayestar_skymap_bytes):
+        import astropy_healpix as ah
+        import astropy.units as u
+
+        flat = Table.read(BytesIO(flat_bayestar_skymap_bytes), format="fits")
+        converted_bytes = ensure_multiorder_skymap_bytes(flat_bayestar_skymap_bytes)
+        moc_table = Table.read(BytesIO(converted_bytes), format="fits")
+
+        assert "UNIQ" in moc_table.colnames
+        assert "PROBDENSITY" in moc_table.colnames
+        # adaptive: identical-valued siblings collapse, so far fewer tiles than flat pixels
+        assert len(moc_table) < len(flat)
+        # PROBDENSITY must be a probability density per steradian for confidence regions
+        assert moc_table["PROBDENSITY"].unit == u.steradian ** -1
+        # total probability integrates to ~1 (and the units are convertible -> no parse error)
+        level, _ = ah.uniq_to_level_ipix(moc_table["UNIQ"])
+        pixel_area = ah.nside_to_pixel_area(ah.level_to_nside(level))
+        total_prob = (pixel_area * moc_table["PROBDENSITY"]).sum()
+        assert abs(float(total_prob) - 1.0) < 1e-6
 
     @pytest.mark.slow
     def test_ensure_multiorder_skymap_bytes_gw170817(self, gw170817_skymap_bytes):

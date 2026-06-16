@@ -14,13 +14,11 @@ from io import BytesIO
 from pathlib import Path
 from typing import Any
 
-import astropy_healpix as ah
 import healpy as hp
-import numpy as np
 from astropy.table import Table
 from hop.io import Metadata
 from hop.models import JSONBlob
-from ligo.skymap import moc
+from ligo.skymap.bayestar import derasterize
 from ligo.skymap.io import write_sky_map
 
 from custom_code.alertstream_handlers import handle_message_and_send_alerts
@@ -96,8 +94,11 @@ def ensure_multiorder_skymap_bytes(skymap_bytes: bytes) -> bytes:
     Ensure skymap bytes are in multi-order HEALPix (UNIQ + PROBDENSITY) form.
 
     ``create_localization_for_skymap`` expects GraceDB-style ``*.multiorder.fits`` tables.
-    Classic ``bayestar.fits.gz`` files (NESTED + PROB, full-resolution) are converted to
-    multi-order UNIQ indexing in memory (same requirement as GraceDB ``bayestar.multiorder.fits``).
+    Classic flat ``bayestar.fits.gz`` files (NESTED + PROB, full-resolution) are converted
+    with :func:`ligo.skymap.bayestar.derasterize`, the canonical inverse of the rasterization
+    used to build flat BAYESTAR maps. It merges identical-valued sibling pixels back into
+    coarse tiles, so the result is an *adaptive* multi-resolution grid (a manageable number of
+    tiles, not one per full-resolution pixel) with ``PROBDENSITY`` correctly expressed in 1/sr.
     """
     fits_bytes = decompress_fits_bytes(skymap_bytes)
     table = Table.read(BytesIO(fits_bytes), format="fits")
@@ -111,32 +112,25 @@ def ensure_multiorder_skymap_bytes(skymap_bytes: bytes) -> bytes:
             f"found columns: {table.colnames}"
         )
 
-    ordering = (table.meta.get("ORDERING") or "").upper()
-    if ordering not in ("NESTED", "NUNIQ", ""):
+    # derasterize / reconstruct_nested assume NESTED ordering; reorder a RING map if needed.
+    ordering = table.meta.get("ORDERING", "NESTED")
+    if isinstance(ordering, (list, tuple)):  # duplicate FITS cards come back as a list
+        ordering = ordering[0] if ordering else "NESTED"
+    ordering = str(ordering).upper()
+    if ordering == "RING":
+        for name in table.colnames:
+            table[name] = hp.reorder(table[name], r2n=True)
+        table.meta["ORDERING"] = "NESTED"
+    elif ordering not in ("NESTED", "NUNIQ"):
         raise ValueError(f"Unsupported ORDERING {ordering!r} for skymap conversion")
 
     logger.info(
-        "Converting classic BAYESTAR skymap (NSIDE=%s, %d pixels) to multi-order UNIQ/PROBDENSITY",
-        table.meta.get("NSIDE"),
+        "Converting flat BAYESTAR skymap (%d pixels) to adaptive multi-order UNIQ/PROBDENSITY",
         len(table),
     )
 
-    nside = int(table.meta["NSIDE"])
-    order = ah.nside_to_level(nside)
-    npix = len(table)
-    ipix = np.arange(npix, dtype=np.int64)
-    uniq = moc.nest2uniq(order, ipix)
-    probdensity = table["PROB"] / hp.nside2pixarea(nside)
-
-    columns = [uniq, probdensity]
-    names = ["UNIQ", "PROBDENSITY"]
-    for extra in ("DISTMU", "DISTSIGMA", "DISTNORM"):
-        if extra in table.colnames:
-            columns.append(table[extra])
-            names.append(extra)
-
-    converted = Table(columns, names=names)
-    converted.meta.update(table.meta)
+    converted = derasterize(table)
+    logger.info("Adaptive multi-order skymap has %d tiles", len(converted))
 
     buffer = BytesIO()
     write_sky_map(buffer, converted, nest=True)

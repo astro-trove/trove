@@ -200,7 +200,7 @@ def prepare_and_send_alerts(nle, seq):
                 localizations.append(seq.localization)
             if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
                 localizations.append(seq.external_coincidence.localization)
-        #is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         format_kwargs = {
             'nle': nle,
             'seq': seq,
