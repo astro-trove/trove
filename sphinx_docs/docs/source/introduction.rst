@@ -16,5 +16,5 @@ Quickstart
 
 Getting Additional Help
 -----------------------
-Feel free to join our Slack workspace (Under Construction) and ask questions there. Also see the `FAQ <faq>` page for some
-common questions and feel free to open `GitHub issues <https://github.com/astro-trove/trove/issues>`.
+Feel free to join our Slack workspace (Under Construction) and ask questions there. Also see the `FAQ <faq>`_ page for some
+common questions and feel free to open `GitHub issues <https://github.com/astro-trove/trove/issues>`_.

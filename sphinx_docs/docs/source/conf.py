@@ -57,7 +57,7 @@ html_theme_options = {
     "repository_url": "https://github.com/astro-trove/trove",
     "use_repository_button": True,
     "use_issues_button": True,
-    "use_edit_page_button": True,
+    "use_edit_page_button": False,
     "path_to_docs": "sphinx_docs/docs/source",
     "show_navbar_depth": 1,
     "show_toc_level": 3,
