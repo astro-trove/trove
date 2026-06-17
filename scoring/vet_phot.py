@@ -457,7 +457,7 @@ def find_public_phot(
     """
 
     # check TNS for any new photometry
-    created_new_tns_phot = TNS_Phot("tns").query(target, timelimit=10)
+    created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
 
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
