@@ -7,18 +7,14 @@ import logging
 from typing import Optional
 from astropy.time import Time, TimeDelta
 from astropy import units as u
-import pandas as pd
 import numpy as np
 
-from candidate_vetting.vet import (
-    skymap_association,
-    host_distance_match,
-    # agn_distance_match,
-    get_distance_score,
-)
 from .scoring import (
     update_score_factor,
     delete_score_factor,
+    host_distance_match,
+    get_distance_score,
+    skymap_association,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (

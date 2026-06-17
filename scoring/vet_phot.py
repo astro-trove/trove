@@ -20,12 +20,7 @@ from tom_dataproducts.models import ReducedDatum
 from trove_targets.models import Target
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from .tasks import async_atlas_query
-
-from candidate_vetting.vet import (
-    get_eventcandidate_default_distance,
-    _distance_at_healpix,
-)
-
+from .scoring import get_eventcandidate_default_distance
 from custom_code.templatetags.photometry_extras import error_to_snr
 
 logger = logging.getLogger(__name__)
