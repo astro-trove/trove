@@ -77,14 +77,17 @@ class Command(BaseCommand):
         seq = nle.sequences.last()
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
         
+        logger.info(f"\nNLE is {nle}, NLE sequence time is {nle_time}")
+
         # get all targets created with discovery date in the relevant time window
         tns_transients = TnsQ3C.objects.filter(
             discoverydate__gte = nle_time + timedelta(days=first_det_min),
             discoverydate__lte = nle_time + timedelta(days=first_det_max)
         )
-        tns_names = [q.name_prefix + q.name for q in list(tns_transients)]
+        tns_transients_ls = list(tns_transients)
+        tns_names = [q.name_prefix + q.name for q in tns_transients_ls]
         targets = Target.objects.filter(name__in=tns_names).order_by("name")
-        
+
         logger.info(f"\nFound {len(targets):d} targets with discovery date "+
                     f"between {first_det_min} and {first_det_max} days of "+
                     f"{nle.event_id} ({nle_time})")
