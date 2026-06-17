@@ -59,7 +59,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--snr-min", 
             help="Targets' first detection must have SNR greater than or "+
-            "equal to this value",
+            "equal to this value. Set to negative number to impose no SNR "+
+            "constraint",
             type=float,
             default=5,
         )
@@ -93,54 +94,59 @@ class Command(BaseCommand):
                     f"{nle.event_id} ({nle_time})")
         logger.info(f"{targets}")
         logger.info(f"Now checking if they lie within the {prob} probability "+
-                    f"region and their first detection has SNR > {snr_min}.")
+                    "region"+f" and their first detection has SNR > {snr_min}." if snr_min > 0 else "")
 
         ## loop through targets
         new_candidates = []
         for target in targets:
             logger.info(f"\nChecking target {target.name}...")
             
-            # is first detection >= SNR threshold?
-            first_det = target.reduceddatum_set.filter(
-                data_type="photometry", 
-                value__magnitude__isnull=False,
-                value__error__isnull=False,
-                value__error__lte=2.5/np.log(10)/snr_min).order_by("timestamp").first()
-            if first_det:
-                logger.info(f"First non-limit, SNR >= {snr_min} detection: {first_det.timestamp}")
-            else:
-                logger.info(f"No SNR >= {snr_min} detections, skipping")
-                continue
-            # is first detection within prescribed time window?
-            if (
-                first_det.timestamp > nle_time + timedelta(days=first_det_min)  and 
-                first_det.timestamp < nle_time + timedelta(days=first_det_max)
-                ):
-                # is target within the `prob` credible region?
-                tids = get_target_ids_in_prob_credible_region(
-                    seq,
-                    prob=prob,
-                    target_ids=[target.id])
-                try:
-                    _ = [Target(id=tid) for tid in tids][0] # IndexError raised if was not within prob region
-                    if _:
-                        logger.info(f"Target {target.name} has first detection "+
-                                    f"with SNR > {snr_min} within "+
-                                    f"{first_det_min} and {first_det_max} days of NLE "+
-                                    f"{nle.event_id} and lies in its {prob} "+
-                                    "probability region")
-                        # attempt to create the eventcandidate
-                        new_cand = create_candidates_from_targets(
-                            seq, 
-                            prob=prob,
-                            target_ids=[target.id])
-                        if len(new_cand):
-                            new_candidates += new_cand
-                            logger.info("New eventcandidate created")
-                        else:
-                            logger.info("Eventcandidate already exists")
-                except IndexError: 
+            if snr_min > 0: # if excluding based first detection's SNR and time...
+                first_det = target.reduceddatum_set.filter(
+                    data_type="photometry",
+                    value__magnitude__isnull=False,
+                    value__error__isnull=False,
+                    value__error__lte=2.5/np.log(10)/snr_min).order_by("timestamp").first()
+                # is first detection >= SNR threshold?
+                if first_det:
+                    logger.info(f"First non-limit, SNR >= {snr_min} detection: {first_det.timestamp}")
+                else:
+                    logger.info(f"No SNR >= {snr_min} detections, skipping")
                     continue
+                # is first detection within prescribed time window?
+                if not(
+                    first_det.timestamp > nle_time + timedelta(days=first_det_min)  and
+                    first_det.timestamp < nle_time + timedelta(days=first_det_max)
+                    ):
+                    logger.info("First detection is outside of "+
+                                f"{nle_time + timedelta(days=first_det_min)} to "+
+                                f"{nle_time + timedelta(days=first_det_max)} "+
+                                "time window")
+                    continue
+            # is target within the `prob` credible region?
+            tids = get_target_ids_in_prob_credible_region(
+                seq,
+                prob=prob,
+                target_ids=[target.id])
+            try:
+                _ = [Target(id=tid) for tid in tids][0] # IndexError raised if was not within prob region
+                if _:
+                    logger.info(f"Target {target.name} lies within {prob} "+
+                                f"probability region of {nle.event_id}")
+                    # attempt to create the eventcandidate
+                    new_cand = create_candidates_from_targets(
+                        seq,
+                        prob=prob,
+                        target_ids=[target.id])
+                    if len(new_cand):
+                        new_candidates += new_cand
+                        logger.info("New eventcandidate created")
+                    else:
+                        logger.info("Eventcandidate already exists")
+            except IndexError:
+                logger.info(f"Target {target.name} lies OUTSIDE {prob} "+
+                            f"probability region of {nle.event_id}")
+                continue
                     
         logger.info(f"\nLinked {len(new_candidates)} candidates to event {nle.event_id}")
         
