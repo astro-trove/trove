@@ -2,9 +2,9 @@ API Docs
 ========
 
 TROVE provides a few useful API endpoints:
+
 1. Get the scores for all candidates from a nonlocalized event name (e.g., S251112cm)
-2. Get the scores for all candidates in a cone search from a nonlocalized event name. This can be useful for e.g., prioritizing
-   candidates for followup with a telescope.
+2. Get the scores for all candidates in a cone search from a nonlocalized event name. This can be useful for e.g., prioritizing candidates for followup with a telescope.
 3. Uploading new targets and/or new photometry.
 
 API Quickstart
@@ -27,4 +27,5 @@ see the `Example Jupyter Notebooks <apiexample>`_.
    :maxdepth: 2
    :hidden:
 
+   Example Notebook <nbs/basic_usage>
    API Reference <https://datatrove.as.arizona.edu/docs/api>
