@@ -85,7 +85,8 @@ def vet_basic(
         logger.info("Running Point Source Matching...")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            ps_score = point_source_association(target_id)
+            ps_matches = point_source_association(target_id)
+            ps_score = int(len(ps_matches) < 1)  # 1 if no ps_matches, 0 otherwise
             save_score_to_targetextra(target, "ps_score", ps_score)
 
     # run the minor planet checker
