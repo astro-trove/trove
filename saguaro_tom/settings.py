@@ -79,8 +79,6 @@ INSTALLED_APPS = [
     "sphinx_docs",
     "dal",
     "dal_select2",
-    "dal",
-    "dal_select2",
     "django_tables2",
 ]
 

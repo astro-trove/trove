@@ -24,6 +24,7 @@ healpix-alchemy==1.1.0
 healpy==1.19.0
 ligo.skymap==2.4.0
 matplotlib==3.10.9
+nbsphinx==0.9.8
 numpy==1.26.4
 pandas==3.0.3
 paramiko==5.0.0
@@ -35,25 +36,11 @@ scipy==1.17.1
 skypatrol==0.6.21
 slack_sdk==3.42.0
 specutils==1.20.3
+sphinx==9.0.4
 SQLAlchemy==2.0.50
 tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3
 tom-alertstreams==1.2.1
 tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
 tom-registration==1.0.5
 trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
-fundamentals==2.8.3
-skypatrol==0.6.21
-django-autocomplete-light==4.0.0
-django-bootstrap4==24.4
-django-contrib-comments==2.2.0
-django-gravatar2==1.4.5
-django-htmx==1.23.2
-django-phonenumber-field==8.1.0
-django-phonenumbers==1.0.1
-django-stubs-ext==5.2.1
-django-tables2==3.0.0
-django-webpack-loader==3.2.1
-djangorestframework==3.16.0
-sphinx==9.0.4
-nbsphinx
 whitenoise==6.12.0
