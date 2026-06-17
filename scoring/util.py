@@ -14,15 +14,16 @@ from tom_nonlocalizedevents.models import (
 )
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
-from candidate_vetting.models import ScoreFactor
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 
 from candidate_vetting.vet import localization_sequence_from_name
-from candidate_vetting.vet_phot import PHOT_SCORE_MIN
-from candidate_vetting.vet_bns import PARAM_RANGES as KN_PARAM_RANGES
-from candidate_vetting.vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
-from candidate_vetting.vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
+
+from .vet_phot import PHOT_SCORE_MIN
+from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
+from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
+from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
+from .models import ScoreFactor
 
 import time
 
@@ -69,22 +70,6 @@ MPC_KEYS = [
     "mpc_match_sep",
     "mpc_match_date",
 ]
-
-
-def update_score_factor(event_candidate, key, value):
-    ScoreFactor.objects.update_or_create(
-        event_candidate=event_candidate, key=key, defaults=dict(value=value)
-    )
-
-
-def delete_score_factor(event_candidate, key):
-    """This is basically only used since we are updating various scores
-    and may want to delete some, rather than update them, in the process"""
-    # first get any score factors that match this event candidate and key
-    matches = ScoreFactor.objects.filter(event_candidate=event_candidate, key=key)
-
-    if matches.count():
-        matches.delete()
 
 
 def _check_phot_val(val, param_ranges, param_range_key):

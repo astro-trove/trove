@@ -5,9 +5,8 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ("candidate_vetting", "0006_desidr1q3c_nedlvsq3c_twomassq3c_ztfvarstarq3c"),
+        ("scoring", "0006_desidr1q3c_nedlvsq3c_twomassq3c_ztfvarstarq3c"),
         ("trove_targets", "0003_alter_target_healpix"),
     ]
 

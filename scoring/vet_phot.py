@@ -19,7 +19,7 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
 from trove_targets.models import Target
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
-from candidate_vetting.tasks import async_atlas_query
+from .tasks import async_atlas_query
 
 from candidate_vetting.vet import (
     get_eventcandidate_default_distance,

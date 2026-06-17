@@ -5,20 +5,28 @@ import django.db.models.deletion
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('tom_nonlocalizedevents', '0017_alter_eventsequence_external_coincidence_and_more'),
-        ('candidate_vetting', '0002_create_views'),
+        (
+            "tom_nonlocalizedevents",
+            "0017_alter_eventsequence_external_coincidence_and_more",
+        ),
+        ("scoring", "0002_create_views"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ScoreFactor',
+            name="ScoreFactor",
             fields=[
-                ('id', models.AutoField(primary_key=True, serialize=False)),
-                ('key', models.CharField(max_length=200)),
-                ('value', models.CharField(max_length=200)),
-                ('event_candidate_id', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='tom_nonlocalizedevents.eventcandidate')),
+                ("id", models.AutoField(primary_key=True, serialize=False)),
+                ("key", models.CharField(max_length=200)),
+                ("value", models.CharField(max_length=200)),
+                (
+                    "event_candidate_id",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="tom_nonlocalizedevents.eventcandidate",
+                    ),
+                ),
             ],
         ),
     ]

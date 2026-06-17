@@ -16,7 +16,7 @@ from candidate_vetting.vet import (
     # agn_distance_match,
     get_distance_score,
 )
-from .util import (
+from .scoring import (
     update_score_factor,
     delete_score_factor,
 )

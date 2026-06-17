@@ -4,15 +4,14 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('candidate_vetting', '0003_scorefactor'),
+        ("scoring", "0003_scorefactor"),
     ]
 
     operations = [
         migrations.RenameField(
-            model_name='scorefactor',
-            old_name='event_candidate_id',
-            new_name='event_candidate',
+            model_name="scorefactor",
+            old_name="event_candidate_id",
+            new_name="event_candidate",
         ),
     ]

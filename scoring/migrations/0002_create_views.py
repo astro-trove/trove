@@ -4,10 +4,8 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('candidate_vetting', '0001_initial'),
+        ("scoring", "0001_initial"),
     ]
 
-    operations = [
-    ]
+    operations = []

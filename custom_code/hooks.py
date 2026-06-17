@@ -5,11 +5,11 @@ from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_dataproducts.models import ReducedDatum
 
-from candidate_vetting.vet_phot import find_public_phot
-from candidate_vetting.vet_bns import vet_bns
-from candidate_vetting.vet_kn_in_sn import vet_kn_in_sn
-from candidate_vetting.vet_super_kn import vet_super_kn
-from candidate_vetting.vet_basic import vet_basic
+from scoring.vet_phot import find_public_phot
+from scoring.vet_bns import vet_bns
+from scoring.vet_kn_in_sn import vet_kn_in_sn
+from scoring.vet_super_kn import vet_super_kn
+from scoring.vet_basic import vet_basic
 
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from custom_code.healpix_utils import create_candidates_from_targets
