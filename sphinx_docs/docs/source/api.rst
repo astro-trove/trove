@@ -28,7 +28,7 @@ see the `Example Jupyter Notebooks <apiexample>`_.
    :hidden:
 
    Example Notebook <nbs/basic_usage>
-   API Reference <https://datatrove.as.arizona.edu/docs/api>
+   API Reference <https://datatrove.as.arizona.edu/api/docs>
    
    
 .. rubric:: Footnotes
