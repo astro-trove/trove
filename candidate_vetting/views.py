@@ -3,9 +3,10 @@ Page views for candidate vetting
 """
 
 import numpy as np
-
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import RedirectView
@@ -20,8 +21,14 @@ from tom_nonlocalizedevents.models import (
     NonLocalizedEvent,
     EventLocalization,
 )
-from .forms import VettingChoiceForm, RedshiftUpdateForm
-from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
+from .forms import (VettingChoiceForm,
+                    RedshiftUpdateForm,
+                    NonLocalizedEventAssociateTargetsForm
+                    )
+from .config import (FORM_CHOICE_FUNC_MAP,
+                     VETTING_FORM_CHOICES,
+                     DETECTION_HORIZON_DEFAULTS
+                     )
 
 from .vet import host_association, localization_sequence_from_name
 from .tasks import vet_all_async
@@ -353,6 +360,91 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
             f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate; check back later.",
         )
         vet_all_async(ecs, nle, vetting_mode)
+
+        return redirect(
+            f"/eventcandidates/?nonlocalizedevent={nle.id}"
+        )  # this redirects back to the NLE page
+
+
+
+class NonLocalizedEventAssociateTargetsFormView(FormView):
+    template_name = "candidate_vetting/nle_associate_targets_form.html"
+    form_class = NonLocalizedEventAssociateTargetsForm
+
+    # overriding the get_form function
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+
+        # set a default SNR_min
+        form.fields["snr_min"].initial = 5
+
+        # get NLE
+        nle_id = self.request.session["nle_id"].split("=")[-1]
+        nle_eventseq = localization_sequence_from_name(
+            NonLocalizedEvent.objects.get(id=nle_id)
+        )
+        nle_most_likely_class = get_most_likely_class(
+            nle_eventseq.details
+        )  # most likely class for the NLE
+
+        # set a default time horizon based on NLE most likely class
+        try:
+            form.fields["first_det_tmin"].initial, form.fields["first_det_tmax"].initial = DETECTION_HORIZON_DEFAULTS[nle_most_likely_class]
+            print(DETECTION_HORIZON_DEFAULTS[nle_most_likely_class])
+        except KeyError: # if NLE most likely class not recognized
+            form.fields["first_det_tmin"].initial, form.fields["first_det_tmax"].initial = DETECTION_HORIZON_DEFAULTS[""]
+        return form
+
+    # overriding the get_context_data function
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['skymap_prob_contour'] = settings.SKYMAP_PROB_CONTOUR
+        return context
+
+    def get(self, request, *args, **kwargs):
+        referer = request.META.get("HTTP_REFERER")
+        if referer:
+            self.request.session["nle_id"] = urlparse(referer).query
+        return super().get(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        pk = self.kwargs["pk"]
+        first_det_tmin = form.cleaned_data["first_det_tmin"]
+        first_det_tmax = form.cleaned_data["first_det_tmax"]
+        snr_min = form.cleaned_data["snr_min"]
+
+        # get the nonlocalized event
+        nle = NonLocalizedEvent.objects.filter(id=pk)[0]
+        seq = nle.sequences.last()
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+
+        # helpful prints
+        first_det_tmin_toprint = (nle_time + timedelta(days=first_det_tmin)).strftime("%Y-%m-%dT%H:%M:%S")
+        first_det_tmax_toprint = (nle_time + timedelta(days=first_det_tmax)).strftime("%Y-%m-%dT%H:%M:%S")
+        if snr_min > 0:
+            messages.info(
+                self.request,
+                f"Searching for targets within the {settings.SKYMAP_PROB_CONTOUR*100:.0f}% "+
+                f"localization of {nle.event_id}, with first detection with "+
+                f"SNR > {snr_min} and between "+
+                f"{first_det_tmin_toprint} and {first_det_tmax_toprint}. This "+
+                "will take a few seconds per target in the localization "+
+                "region; check back later to see if new event candidates have "+
+                "been created!"
+            )
+        else:
+            messages.info(
+                self.request,
+                f"Searching for targets within the {settings.SKYMAP_PROB_CONTOUR*100:.0f}% "+
+                f"localization of {nle.event_id}, with first detection between"+
+                f"{first_det_tmin_toprint} and {first_det_tmax_toprint}. This "+
+                "will take a few seconds per candidate in the localization "+
+                "region; check back later to see if new event candidates have "+
+                "been created!"
+            )
+
+        # run the association asynchronously
+        ### TODO
 
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"

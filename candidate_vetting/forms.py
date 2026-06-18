@@ -15,7 +15,6 @@ class VettingChoiceForm(Form):
     )
     
 class RedshiftUpdateForm(Form):
-    
     host_galaxy_id = ChoiceField(
         choices = [], # these are specified in the view
         widget = Select(),
@@ -31,3 +30,9 @@ class RedshiftUpdateForm(Form):
     z_err = FloatField(label="Redshift uncertainty [default 0.001]", required=False)
     
     submitter = CharField(label="Submitter")
+
+
+class NonLocalizedEventAssociateTargetsForm(Form):
+    first_det_tmin = FloatField(label=r"Minimum time")
+    first_det_tmax = FloatField(label="Maximum time")
+    snr_min = FloatField(label="SNR minimum [default 5.0]", required=False)

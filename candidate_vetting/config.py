@@ -43,3 +43,11 @@ FORM_CHOICE_FUNC_MAP = { # this should have the same keys as the first value in 
     "super-KN":vet_super_kn,
     # "AGN-flare":???,
 }
+
+
+DETECTION_HORIZON_DEFAULTS = { # time horizon (min, max) for first detections, dependent on NLE
+    "": (0, 10), # if NLE most likely class not known, 0, 10
+    "BNS": (0, 10),
+    "NSBH": (0, 10),
+    "SSM": (-1, 10),
+    "BBH":(0,10)}
