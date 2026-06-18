@@ -442,3 +442,6 @@ ZTFTMPDIR = os.path.join(os.getcwd(), "ztf-forced-phot-logs")
 PRIORITY_HIGH = 100
 PRIORITY_MID = 10
 PRIORITY_LOW = 0
+
+# skymap probability contour within which we consider a target and candidate associated
+SKYMAP_PROB_CONTOUR = 0.95
