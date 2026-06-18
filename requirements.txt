@@ -38,6 +38,7 @@ slack_sdk==3.42.0
 specutils==1.20.3
 sphinx==9.0.4
 sphinx_book_theme==1.2.0
+sphinx_design==0.7.0
 SQLAlchemy==2.0.50
 tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3
 tom-alertstreams==1.2.1
