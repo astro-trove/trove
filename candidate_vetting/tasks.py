@@ -43,7 +43,13 @@ def async_vet(
                 target_id=ti, nonlocalized_event_name=nle_event_id
             )
 
-
+@task(queue_name="associate_targets", priority=settings.PRIORITY_HIGH)
+def async_associate_targets(
+    target_ids: list, nle_event_id: str, first_det_tmin: float, first_det_tmax: float, snr_min: float, *args, **kwargs
+) -> None:
+    pass
+    
+    
 def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
     """Asychronously vet according to vetting mode, wraps async_vet for a list of eventcandidates"""
     for ec in eventcandidates:
@@ -51,4 +57,15 @@ def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
             target_ids=[ec.target_id],
             nle_event_id=nle.event_id,
             vetting_mode=vetting_mode,
+        )
+
+def associate_targets_with_nle(targets, nle, first_det_tmin, first_det_tmax, snr_min) -> None:
+    """Asychronously attempt to associate targets with an NLE, if they pass certain criteria"""
+    for targ in targets:
+        async_associate_targets.enqueue(
+            target_ids=[targ.id],
+            nle_event_id=nle.event_id,
+            first_det_tmin=first_det_tmin,
+            first_det_tmax=first_det_tmax,
+            snr_min=snr_min
         )
