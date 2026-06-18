@@ -32,6 +32,7 @@
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
   
   <!-- So that users can add custom icons -->
   <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -43,6 +44,7 @@
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="_static/design-tabs.js?v=f930bc37"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api';</script>
     <link rel="canonical" href="https://datatrove.as.arizona.edu/api.html" />
@@ -156,7 +158,7 @@
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ &amp; Glossary</a></li>
 </ul>
 
     </div>
@@ -366,14 +368,14 @@
 <p>TROVE provides a few useful API endpoints:</p>
 <ol class="arabic simple">
 <li><p>Get the scores for all candidates from a nonlocalized event name (e.g., S251112cm)</p></li>
-<li><p>Get the scores for all candidates in a cone search from a nonlocalized event name. This can be useful for e.g., prioritizing candidates for followup with a telescope.</p></li>
+<li><p>Get the scores for all candidates in a cone search from a nonlocalized event name. This can be useful for, e.g., prioritizing candidates for followup with a telescope.</p></li>
 <li><p>Uploading new targets and/or new photometry.</p></li>
 </ol>
 <section id="api-quickstart">
 <h2>API Quickstart<a class="headerlink" href="#api-quickstart" title="Link to this heading">#</a></h2>
 <p>Details and examples with curl commands to access the endpoints are on the RESTful API Reference docs
-page: <a class="reference external" href="https://datatrove.as.arizona.edu/docs/api">https://datatrove.as.arizona.edu/docs/api</a></p>
-<p>An example curl command is</p>
+page: <a class="reference external" href="https://datatrove.as.arizona.edu/api/docs">https://datatrove.as.arizona.edu/api/docs</a> . <a class="footnote-reference brackets" href="#f1" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a></p>
+<p>An example curl command is:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-X<span class="w"> </span><span class="s1">&#39;GET&#39;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span><span class="s1">&#39;https://datatrove.as.arizona.edu/api/score/S251112cm&#39;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-u<span class="w"> </span><span class="s1">&#39;&lt;username&gt;:&lt;password&gt;&#39;</span>
@@ -383,6 +385,13 @@ page: <a class="reference external" href="https://datatrove.as.arizona.edu/docs/
 see the <a class="reference external" href="apiexample">Example Jupyter Notebooks</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
+<p class="rubric">Footnotes</p>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="f1" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>If you’re a developer working on the <code class="file docutils literal notranslate"><span class="pre">integration</span></code> branch, you’ll want <a class="reference external" href="https://datatrove-test.as.arizona.edu/api/docs">https://datatrove-test.as.arizona.edu/api/docs</a>. If on <code class="file docutils literal notranslate"><span class="pre">staging</span></code>, go to <a class="reference external" href="https://datatrove-staging.as.arizona.edu/api/docs">https://datatrove-staging.as.arizona.edu/api/docs</a>.</p>
+</aside>
+</aside>
 </section>
 </section>
 

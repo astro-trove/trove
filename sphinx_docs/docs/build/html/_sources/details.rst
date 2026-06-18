@@ -13,9 +13,12 @@ Before logging in the home page should look like the following, with no targets 
 
 .. image:: webappimg/home-loggedout.png
 
+|
+
 After logging in you should be able to see a list of targets and comments:
 
 .. image:: webappimg/home-loggedin.png
+
 
 Viewing Nonlocalized Events
 ---------------------------
@@ -29,6 +32,8 @@ First, click on the "Nonlocalized Events" tab dropdown in the navigation bar (na
 
 .. image:: webappimg/nle-gw.png
 
+|
+
 On this page, you will see a list of all gravitational wave (GW) events that we have ingested into our database from the IGWN. By 
 default, we filter the table to only include events with an false alarm rate (FAR) < 0.5 per year (i.e., once per two years) 
 (the recommendation from the International Gravitational-Wave Observatory Network, IGWN). You can adjust this FAR 
@@ -40,12 +45,16 @@ clicking on a GW event you should see a page like:
 
 .. image:: webappimg/candidate-top.png
 
+|
+
 This section shows (1) some basic information on the GW event and (2) a skymap with the candidates plotted on top of the
 GW localization.
 
 Scrolling down you should now see a table of the candidates ranked by score. For example:
 
 .. image:: webappimg/candidate-table.png
+
+|
 
 Depending on the type of event, you will see different types of scores in the "score" column. For a binary neutron star (BNS) merger 
 or neutron star - black hole (NSBH) merger, only the kilonova (KN) score will be displayed. For a subsolar mass merger (SSM) event like 
@@ -66,9 +75,13 @@ may or may not be associated with a nonlocalized event. This will look something
 
 .. image:: webappimg/target-top.png
 
+|
+
 Scrolling down, you will see a table of targets with the most recently ingested, edited, and discovered targets near the top:
 
 .. image:: webappimg/target-table.png
+
+|
 
 From this page, just like on the candidate page, you can click individual targets and go to their page.
 
@@ -77,6 +90,8 @@ The Target Page
 This page contains details of the targets themselves. When first coming to a target page it will look like:
 
 .. image:: webappimg/target-host-table.png
+
+|
 
 Things like coordinates, name aliases, redshift (if known), and extinction are all shown on the left sidebar. At top, 
 see buttons for:
@@ -95,6 +110,8 @@ so only low Pcc galaxies should appear in this table. The distances, redshifts, 
 shown in this table. An atlas viewer at bottom left shows the position of the target and these potential hosts:
 
 .. image:: webappimg/target-atlas.png
+
+|
 
 Finally, on the right side below the host galaxy table is the light curve, including photometry from TNS and forced photometry
 servers. This light curve looks like the following:

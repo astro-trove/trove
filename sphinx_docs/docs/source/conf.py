@@ -29,6 +29,7 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
+    "sphinx_design",
 ]
 
 templates_path = ["_templates"]
