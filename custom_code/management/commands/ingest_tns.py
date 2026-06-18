@@ -106,7 +106,10 @@ class Command(BaseCommand):
                      dec = tns.declination,
                      modified = NOW()
                  FROM tns_q3c AS tns
-                 WHERE REGEXP_REPLACE(tt.name, '^[^0-9]*', '') = tns.name
+                 WHERE (tt.name=CONCAT('AT', tns.name)
+                        OR tt.name=CONCAT('SN', tns.name)
+                        OR tt.name=CONCAT('TDE', tns.name)
+                        OR tt.name=CONCAT('FRB', tns.name))
                    AND (q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
                         OR tt.name != CONCAT(tns.name_prefix, tns.name))
                  RETURNING tt.id;
@@ -134,7 +137,7 @@ class Command(BaseCommand):
                         tns.declination as dec
                     FROM tns_q3c AS tns
                     WHERE q3c_join(target.ra, target.dec, tns.ra, tns.declination, 2. / 3600) AND name_prefix != 'FRB'
-                    ORDER BY sep, discoverydate LIMIT 1 -- if there are duplicates in the TNS, use the earlier one
+                    ORDER BY sep, discoverydate, tns.name LIMIT 1 -- if there are duplicates in the TNS, use the earlier one
                 ) AS t ON true
                 WHERE t.tns_name IS NOT NULL;
                 
@@ -171,9 +174,16 @@ class Command(BaseCommand):
         with connection.cursor() as cursor:
             cursor.execute(
                 """
+                --STEP 2.5: save the old target name as an alias, unless it is a temporary "J" name
+                INSERT INTO tom_targets_targetname (name, created, target_id, modified)
+                SELECT tm.name, NOW(), tm.id, NOW()
+                FROM top_tns_matches AS tm
+                WHERE tm.name != tm.tns_name AND LEFT(tm.name, 1) != 'J'
+                ON CONFLICT (name) DO NOTHING;
+
                 --STEP 3: merge any other matches into the new target
                 CREATE TEMPORARY TABLE targets_to_merge AS
-                SELECT tm.id AS old_id, ttm.id  AS new_id, tm.name AS old_name, ttm.name AS new_name
+                SELECT tm.id AS old_id, ttm.id AS new_id, tm.name AS old_name, ttm.name AS new_name
                 FROM tns_matches as tm
                 JOIN top_tns_matches AS ttm ON ttm.name=tm.tns_name;
                 
@@ -237,6 +247,17 @@ class Command(BaseCommand):
         deleted_targets = Target.objects.filter(id__in=ids_to_delete)
         deleted_targets.delete()
 
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                --STEP 3.5: save the old target name as an alias, unless it is a temporary "J" name
+                INSERT INTO tom_targets_targetname (name, created, target_id, modified)
+                SELECT old_name, NOW(), new_id, NOW()
+                FROM targets_to_merge AS tm
+                WHERE LEFT(old_name, 1) != 'J'
+                ON CONFLICT (name) DO NOTHING;
+                """
+            )
         logger.info(f"Merged {len(deleted_targets):d} targets into TNS targets.")
         for target in deleted_targets:
             logger.info(f" - deleted target {target.name} during merge")
@@ -248,10 +269,8 @@ class Command(BaseCommand):
                 INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
                 SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, ''
                 FROM tns_q3c
-                WHERE name_prefix != 'FRB' AND
-                      name != '2023hzc' AND -- this is a duplicate of AT2016jlf in the TNS
-                      CONCAT(name_prefix, name) NOT IN (SELECT name FROM tom_targets_basetarget)
-                
+                WHERE name_prefix != 'FRB'
+                      AND name != '2023hzc' AND name != '2026pmf' -- skip duplicates in the TNS: AT2016jlf, AT2026pme
                 ON CONFLICT (name) DO NOTHING
                 RETURNING id;
                 """
