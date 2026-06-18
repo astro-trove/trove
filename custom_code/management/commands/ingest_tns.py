@@ -1,22 +1,13 @@
 import time
-import numpy as np
 
 from django.core.management.base import BaseCommand
-from django.conf import settings
 from django.db import connection
 from trove_targets.models import Target
 from tom_targets.models import BaseTarget
-from custom_code.alertstream_handlers import (
-    pick_slack_channel,
-    send_slack,
-    vet_or_post_error,
-)
-from custom_code.templatetags.skymap_extras import get_preferred_localization
-from datetime import datetime, timedelta, timezone
-from custom_code.templatetags.target_extras import split_name
+from custom_code.alertstream_handlers import vet_or_post_error
+from datetime import datetime, timedelta
 from candidate_vetting.models import TnsQ3C
 
-# from slack_sdk import WebClient
 import logging
 
 from astropy.coordinates import SkyCoord
@@ -26,11 +17,6 @@ logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
     handler.setFormatter(new_format)
-
-# slack_tns = WebClient(settings.SLACK_TOKEN_TNS)
-# slack_tns50 = WebClient(settings.SLACK_TOKEN_TNS50)
-# slack_ep = WebClient(settings.SLACK_TOKEN_EP)
-
 
 class Command(BaseCommand):
     help = ("Updates, merges, and adds targets from the tns_q3c table (maintained outside the TOM Toolkit). \n"+
