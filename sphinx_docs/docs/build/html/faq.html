@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>FAQ &#8212; TROVE</title>
+    <title>FAQ &amp; Glossary &#8212; TROVE</title>
   
   
   
@@ -32,6 +32,7 @@
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
   
   <!-- So that users can add custom icons -->
   <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -43,6 +44,8 @@
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'faq';</script>
     <link rel="canonical" href="https://datatrove.as.arizona.edu/faq.html" />
     <link rel="icon" href="_static/favicon.ico"/>
@@ -149,11 +152,12 @@
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Welcome to TROVE’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="details.html">Web App Details</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="api.html">API Docs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="nbs/basic_usage.html">Example Notebook</a></li>
 <li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/docs/api">API Reference</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">FAQ</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">FAQ &amp; Glossary</a></li>
 </ul>
 
     </div>
@@ -224,23 +228,6 @@
   <i class="fab fa-github"></i>
   </span>
 <span class="btn__text-container">Repository</span>
-</a>
-</li>
-      
-      
-      
-      
-      <li><a href="https://github.com/astro-trove/trove/edit/main/sphinx_docs/docs/source/faq.rst" target="_blank"
-   class="btn btn-sm btn-source-edit-button dropdown-item"
-   title="Suggest edit"
-   data-bs-placement="left" data-bs-toggle="tooltip"
->
-  
-
-<span class="btn__icon-container">
-  <i class="fas fa-pencil-alt"></i>
-  </span>
-<span class="btn__text-container">Suggest edit</span>
 </a>
 </li>
       
@@ -340,7 +327,9 @@
 <button class="btn btn-sm pst-navbar-icon search-button search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
     <i class="fa-solid fa-magnifying-glass fa-lg"></i>
 </button>
-
+<button class="sidebar-toggle secondary-toggle btn btn-sm pst-navbar-icon" title="Toggle secondary sidebar" data-bs-placement="bottom" data-bs-toggle="tooltip">
+    <span class="fa-solid fa-list"></span>
+</button>
 </div></div>
       
     </div>
@@ -351,11 +340,20 @@
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>FAQ</h1>
+    <h1>FAQ & Glossary</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
             
+            <div>
+                <h2> Contents </h2>
+            </div>
+            <nav aria-label="Page">
+                <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#frequently-asked-questions-faq">Frequently Asked Questions (FAQ)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#glossary-of-frequently-used-terms">Glossary of Frequently Used Terms</a></li>
+</ul>
+            </nav>
         </div>
     </div>
 </div>
@@ -365,13 +363,66 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="faq">
-<h1>FAQ<a class="headerlink" href="#faq" title="Link to this heading">#</a></h1>
-<ol class="arabic">
-<li><p>Q: Why TROVE?</p>
-<p>A: Because it’s public and awesome!</p>
-</li>
-</ol>
+  <section id="faq-glossary">
+<h1>FAQ &amp; Glossary<a class="headerlink" href="#faq-glossary" title="Link to this heading">#</a></h1>
+<section id="frequently-asked-questions-faq">
+<h2>Frequently Asked Questions (FAQ)<a class="headerlink" href="#frequently-asked-questions-faq" title="Link to this heading">#</a></h2>
+<details class="sd-sphinx-override sd-dropdown sd-card sd-mb-3">
+<summary class="sd-summary-title sd-card-header">
+<span class="sd-summary-text">Why TROVE?</span><span class="sd-summary-state-marker sd-summary-chevron-right"><svg version="1.1" width="1.5em" height="1.5em" class="sd-octicon sd-octicon-chevron-right" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.72 18.78a.75.75 0 0 1 0-1.06L14.44 12 8.72 6.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0Z"></path></svg></span></summary><div class="sd-summary-content sd-card-body docutils">
+<p class="sd-card-text">Because it’s public and awesome!</p>
+</div>
+</details><details class="sd-sphinx-override sd-dropdown sd-card sd-mb-3">
+<summary class="sd-summary-title sd-card-header">
+<span class="sd-summary-text">What does TROVE do which other tools do not?</span><span class="sd-summary-state-marker sd-summary-chevron-right"><svg version="1.1" width="1.5em" height="1.5em" class="sd-octicon sd-octicon-chevron-right" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.72 18.78a.75.75 0 0 1 0-1.06L14.44 12 8.72 6.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0Z"></path></svg></span></summary><div class="sd-summary-content sd-card-body docutils">
+<p class="sd-card-text">…</p>
+</div>
+</details></section>
+<section id="glossary-of-frequently-used-terms">
+<h2>Glossary of Frequently Used Terms<a class="headerlink" href="#glossary-of-frequently-used-terms" title="Link to this heading">#</a></h2>
+<details class="sd-sphinx-override sd-dropdown sd-card sd-mb-3" open="open">
+<summary class="sd-summary-title sd-card-header">
+<span class="sd-summary-text">Glossary</span><span class="sd-summary-state-marker sd-summary-chevron-right"><svg version="1.1" width="1.5em" height="1.5em" class="sd-octicon sd-octicon-chevron-right" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.72 18.78a.75.75 0 0 1 0-1.06L14.44 12 8.72 6.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0Z"></path></svg></span></summary><div class="sd-summary-content sd-card-body docutils">
+<p class="sd-card-text"><strong>AGN</strong>: Active galactic nucleus / active galactic nuclei</p>
+<p class="sd-card-text"><strong>ATLAS</strong>: The Asteroid Terrestrial-impact Last Alert System. A network of telescopes around the world.
+We use ATLAS’ forced photometry server to augment the lightcurves of <em>targets</em>.</p>
+<p class="sd-card-text"><strong>API</strong>: Application programming interface</p>
+<p class="sd-card-text"><strong>BBH</strong>: Binary black hole merger</p>
+<p class="sd-card-text"><strong>BNS</strong>: Binary neutron star merger</p>
+<p class="sd-card-text"><strong>candidate</strong>: Sometimes used as shorthand for event candidate.</p>
+<p class="sd-card-text"><strong>event candidate</strong>: A <em>target</em> which has been associated with a <em>nonlocalized event (NLE)</em>.
+A candidate electromagnetic counterpart to said NLE.</p>
+<p class="sd-card-text"><strong>forced photometry</strong>:</p>
+<p class="sd-card-text"><strong>FXT</strong>: Fast X-ray transient</p>
+<p class="sd-card-text"><strong>GRB</strong>: Gamma-ray burst</p>
+<p class="sd-card-text"><strong>GW</strong>: Gravitational wave</p>
+<p class="sd-card-text"><strong>kilonova (KN)</strong>: Ultraviolet/optical/infrared transient powered by the radioactive
+decay of freshly synthesized heavy elements. The expected electromagnetic
+counterpart to <em>BNS</em> and <em>NSBH</em> events.</p>
+<p class="sd-card-text"><strong>kilonova-in-supernova (KN-in-SN)</strong>: <em>Kilonova</em> embedded in a supernova.
+Hypothesized electromagnetic counterpart to <em>SSM</em> events. Sometimes used
+interchangably with <em>super-kilonova</em>.</p>
+<p class="sd-card-text"><strong>neutrino</strong>:</p>
+<p class="sd-card-text"><strong>NLE</strong>: Nonlocalized event. A nonlocalized event (NLE)—sometimes more aptly termed a poorly
+localized event—is some astrophysical source with an uncertain position on the sky. These can be
+large uncertainties of tens to thousands of square degrees (e.g., gravitational waves) or tens of
+square arcminutes (e.g., fast X-ray transients.)</p>
+<p class="sd-card-text"><strong>NSBH</strong>: Neutron star + black hole merger</p>
+<p class="sd-card-text"><strong>SSM</strong>: Subsolar mass merger; merger involving at least one object subsolar in mass</p>
+<p class="sd-card-text"><strong>super-kilonova (super-KN)</strong>: Longer-lasting, “scaled up” <em>kilonova</em>
+hypothesized to occur following the collapse of extremely massive (helium core in excess of 100 solar masses),
+rapidly-rotating stars. Sometimes used interchangably with <em>kilonova-in-supernova</em>.
+Hypothesized electromagnetic counterpart to <em>SSM</em> events.</p>
+<p class="sd-card-text"><strong>target</strong>: An object defined by its name and position on the sky. Usually accompanied
+by additional information like photometry or a redshift.</p>
+<p class="sd-card-text"><strong>TNS</strong>: The Transient Name Server. A repository of transients and their
+photometry and spectroscopy. We continuously ingest transients from the TNS
+to create <em>targets</em>.</p>
+<p class="sd-card-text"><strong>ZTF</strong>: Zwicky Transient Facility. A consortium of wide field-of-view optical telescopes which
+survey a signifcant fraction of the night sky. We use the ZTF forced photometry
+server to augment the lightcurves of <em>targets</em>.</p>
+</div>
+</details></section>
 </section>
 
 
@@ -400,6 +451,24 @@
             </div>
             
             
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item"><div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> Contents
+  </div>
+  <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#frequently-asked-questions-faq">Frequently Asked Questions (FAQ)</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#glossary-of-frequently-used-terms">Glossary of Frequently Used Terms</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
               
             
           </div>

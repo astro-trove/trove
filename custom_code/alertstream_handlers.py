@@ -200,7 +200,7 @@ def prepare_and_send_alerts(nle, seq):
                 localizations.append(seq.localization)
             if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
                 localizations.append(seq.external_coincidence.localization)
-        #is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
+        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
         format_kwargs = {
             'nle': nle,
             'seq': seq,
@@ -268,7 +268,7 @@ def handle_message_and_send_alerts(message, metadata):
 
     if nle is None:  # test event and SAVE_TEST_ALERTS = False
         logger.info('Test alert not saved')
-        return
+        return None, None
 
     localizations = prepare_and_send_alerts(nle, seq)
 
@@ -281,6 +281,7 @@ def handle_message_and_send_alerts(message, metadata):
                 calculate_credible_region(skymap, localization)
 
     logger.info(f'Finished processing alert for {nle.event_id}')
+    return nle, seq
 
 
 def handle_einstein_probe_alert(message, metadata):

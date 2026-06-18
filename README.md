@@ -10,6 +10,8 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
 
 ## Installation (for development)
 
+  **Prerequisites:** Python 3.11 or 3.12 (`django-autocomplete-light==4.0.0` requires 3.11+, and the `tom-nonlocalizedevents` dependency does not support 3.13+). A PostgreSQL database is required for the application.
+
  1. Clone the repository:
 
   ```bash
@@ -17,7 +19,7 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
     % git clone https://github.com/SAGUARO-MMA/saguaro_tom.git
   ```
 
- 2. Copy settings_local.template.py to settings_local.py and edit as you see fit:
+ 2. Copy settings_local.template.py to settings_local.py and edit as needed. At minimum, set `SECRET_KEY`, and the `POSTGRES_*` database settings so the app can connect. For local development you may set `DEBUG = True`.
 
   ```bash
     % cd /var/www/saguaro_tom/saguaro_tom
@@ -25,7 +27,17 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
     % vi settings_local.py
   ```
 
-  3. Create virtual environment and install dependencies:
+  3. Create virtual environment and install dependencies.
+
+  **Option A — Conda** (from the project root, so `requirements.txt` is found):
+
+  ```bash
+    % cd /var/www/saguaro_tom
+    % conda env create -f environment.yml
+    % conda activate trove
+  ```
+
+  **Option B — venv + pip:**
 
   ```bash
     % cd /var/www/saguaro_tom
@@ -35,12 +47,26 @@ Welcome to the SAGUARO target and observation manager for GW follow-up.
     % pip install -r requirements.txt
   ```
 
-  4. Run the development server:
+  4. Apply migrations. Use **PostgreSQL** for the database; the project's migrations are not fully compatible with SQLite (e.g. `tom_nonlocalizedevents.0016` can raise "near None: syntax error" on SQLite). On a **fresh database**, the packaged migration `tom_targets.0025` (RunPython) can run before `guardian` or `trove_targets` exist in the migration state, and faking it can trigger `post_migrate` before `tom_common` is applied (causing "no such table: tom_common_profile"). So run a full migrate first (it will fail on 0025), then fake 0025, then migrate again:
+
+  ```bash
+    % python manage.py migrate
+    % python manage.py migrate tom_targets 0025 --fake
+    % python manage.py migrate
+  ```
+
+  The first run applies everything up to and including `tom_targets.0024` (and `tom_common`, guardian, etc.); it will then fail on 0025. Faking 0025 and re-running migrate applies the rest. On a new DB there are no "Public" permissions to migrate anyway, so faking 0025 is safe.
+
+  If you use **SQLite**, run **`python manage.py repair_migrate`** instead of `migrate` alone. It creates missing tables (e.g. `tom_nonlocalizedevents_superevent`), fakes renames when the target table already exists, and retries migrate by faking any migration that fails with "table already exists" or "no such column" until migrate succeeds. For one-off fixes you can still use `python manage.py repair_superevent_table` then `migrate`. Prefer PostgreSQL to avoid these issues.
+
+  5. Run the development server. The first time, Django may attempt to download the SFD dust map (network access required).
 
   ```bash
     % python3 manage.py collectstatic # only the first time you start the development server
     % python3 manage.py runserver
   ```
+
+  Then open **http://127.0.0.1:8000/** in your browser to view the TOM. If you use PostgreSQL, create the database first (e.g. `createdb trove`) and set the `POSTGRES_*` values in `settings_local.py` to match.
 
 ## Enabling WSGI under Apache2
 

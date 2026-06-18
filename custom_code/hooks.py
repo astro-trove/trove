@@ -15,7 +15,6 @@ from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 from trove_targets.models import Target
-from astropy.cosmology import FlatLambdaCDM
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
 from astroquery.ipac.irsa.irsa_dust import IrsaDust

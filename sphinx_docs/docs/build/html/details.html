@@ -32,6 +32,7 @@
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
   
   <!-- So that users can add custom icons -->
   <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -43,6 +44,8 @@
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'details';</script>
     <link rel="canonical" href="https://datatrove.as.arizona.edu/details.html" />
     <link rel="icon" href="_static/favicon.ico"/>
@@ -150,11 +153,12 @@
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Welcome to TROVE’s documentation!</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Web App Details</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="api.html">API Docs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="nbs/basic_usage.html">Example Notebook</a></li>
 <li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/docs/api">API Reference</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ &amp; Glossary</a></li>
 </ul>
 
     </div>
@@ -225,23 +229,6 @@
   <i class="fab fa-github"></i>
   </span>
 <span class="btn__text-container">Repository</span>
-</a>
-</li>
-      
-      
-      
-      
-      <li><a href="https://github.com/astro-trove/trove/edit/main/sphinx_docs/docs/source/details.rst" target="_blank"
-   class="btn btn-sm btn-source-edit-button dropdown-item"
-   title="Suggest edit"
-   data-bs-placement="left" data-bs-toggle="tooltip"
->
-  
-
-<span class="btn__icon-container">
-  <i class="fas fa-pencil-alt"></i>
-  </span>
-<span class="btn__text-container">Suggest edit</span>
 </a>
 </li>
       
@@ -384,64 +371,98 @@
 <section id="getting-started">
 <h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">#</a></h2>
 <p>TROVE is located at <a class="reference external" href="https://datatrove.as.arizona.edu">https://datatrove.as.arizona.edu</a>. When you first arrive at the page you will see the home page, with no
-content, and you should either register for an account or login. If you are registering for the first time it may take 1-2
-days for your account to be approved by an administrator. If it has not been in that time please post a help message in the
-slack workspace.</p>
+content, and you should either register for an account or login. If you are registering for the first time, it may take 1-2
+days for your account to be approved by an administrator. If it has not been approved in that time, please post a help message in the
+Slack workspace.</p>
 <p>Before logging in the home page should look like the following, with no targets or comments shown:</p>
 <img alt="_images/home-loggedout.png" src="_images/home-loggedout.png" />
-<p>And after logging in you should be able to see a list of targets and comments:</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>After logging in you should be able to see a list of targets and comments:</p>
 <img alt="_images/home-loggedin.png" src="_images/home-loggedin.png" />
 </section>
 <section id="viewing-nonlocalized-events">
 <h2>Viewing Nonlocalized Events<a class="headerlink" href="#viewing-nonlocalized-events" title="Link to this heading">#</a></h2>
-<p>First, you click on the “Nonlocalized Events” tab dropdown in the navbar. From the dropdown menu you can select “Gravitational
-Waves” which will then take you to the following page:</p>
+<p>A nonlocalized event (NLE)—sometimes more aptly termed a poorly localized event—is some astrophysical source with an
+uncertain position on the sky. These can be large uncertainties of tens to thousands of square degrees (e.g., gravitational waves)
+or tens of square arcminutes (e.g., fast X-ray transients.)</p>
+<p>First, click on the “Nonlocalized Events” tab dropdown in the navigation bar (navbar). From the dropdown menu, select
+“Gravitational Waves” to go the following page:</p>
 <img alt="_images/nle-gw.png" src="_images/nle-gw.png" />
-<p>On this page you can see a list of all gravitational wave events that we have ingested into our database from the IGWN. By default,
-we filter the table to only include events with a false alarm rate (FAR) &gt; 2 (the recommendation from IGWN). But, you are able
-to adjust this FAR limit using the form at the top. There are also various other options that you are able to filter on using
-the form at the top of the page.</p>
-<p>From this table, you are able to access the candidates for a specific GW event by clicking on it’s name from the table. After
-clicking on a GW event you should see a page like this:</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>On this page, you will see a list of all gravitational wave (GW) events that we have ingested into our database from the IGWN. By
+default, we filter the table to only include events with an false alarm rate (FAR) &lt; 0.5 per year (i.e., once per two years)
+(the recommendation from the International Gravitational-Wave Observatory Network, IGWN). You can adjust this FAR
+limit using the form at the top. There are also various other options that you are able to filter on using the form at the top
+of the page.</p>
+<p>From this table, you are able to access the candidates for a specific GW event by clicking on its name from the table. After
+clicking on a GW event you should see a page like:</p>
 <img alt="_images/candidate-top.png" src="_images/candidate-top.png" />
-<p>This part of the page shows some basic information on the GW event and a skymap with the candidates plotted on top of the
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>This section shows (1) some basic information on the GW event and (2) a skymap with the candidates plotted on top of the
 GW localization.</p>
-<p>Scrolling down you should now see a table of the candidates ranked by score. See the following screenshot as an example:</p>
+<p>Scrolling down you should now see a table of the candidates ranked by score. For example:</p>
 <img alt="_images/candidate-table.png" src="_images/candidate-table.png" />
-<p>Depending on the type of event, you will see different types of scores in the “score” column. For a BNS or NSBH it will just be
-the KN score. For an SSM event it will be the KN, KN-in-SN, and superKN score.</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Depending on the type of event, you will see different types of scores in the “score” column. For a binary neutron star (BNS) merger
+or neutron star - black hole (NSBH) merger, only the kilonova (KN) score will be displayed. For a subsolar mass merger (SSM) event like
+S251112cm above, you’ll see KN, kilonova-in-supernova (KN-in-SN), and super-kilonova (super-KN) scores.</p>
 <p>At the top of this table you can search by candidate name and link new candidates if something is missing (although the candidates
-should be linked automatically!). If you want to rerun forced photometry and re-score everything you can use the “Vet All”
-button. Although, note that “Vet All” will take ~minutes-hours and it is usually best practice to re-vet the candidates of
-interest.</p>
-<p>From this page the normal workflow is to click on specific candidates and look at details. We will go into details about targets
+should be linked automatically!). To asynchronously rerun forced photometry and re-score everything, use the “Vet All” button.
+Note however that the scoring will take a few seconds per candidate, which can add up to ~minutes-hours for GW events with many
+candidates. Forced photometry will take ~hours-days. It is usually best practice to re-vet the candidates of interest.</p>
+<p>From this page, the normal workflow is to click on specific candidates and look at details. We will go into details about targets
 in the next two sections.</p>
 </section>
 <section id="target-list-page">
 <h2>Target List Page<a class="headerlink" href="#target-list-page" title="Link to this heading">#</a></h2>
-<p>Besides being able to access targets from the candidate page (which you saw above), we can instead just click the “Targets”
-tab in the navbar. This will look something like</p>
+<p>In addition to accessing candidates via NLEs to which they are associated, we can also search for “Targets” which
+may or may not be associated with a nonlocalized event. This will look something like:</p>
 <img alt="_images/target-top.png" src="_images/target-top.png" />
-<p>and scrolling down you will see a table of targets with the most recently ingested/edited/discovered targets near the top</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Scrolling down, you will see a table of targets with the most recently ingested, edited, and discovered targets near the top:</p>
 <img alt="_images/target-table.png" src="_images/target-table.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
 <p>From this page, just like on the candidate page, you can click individual targets and go to their page.</p>
 </section>
 <section id="the-target-page">
 <h2>The Target Page<a class="headerlink" href="#the-target-page" title="Link to this heading">#</a></h2>
-<p>This page contains detalis of the targets themselves. When first coming to a target page it will look like</p>
+<p>This page contains details of the targets themselves. When first coming to a target page it will look like:</p>
 <img alt="_images/target-host-table.png" src="_images/target-host-table.png" />
-<p>On the right side you can see details of the subscores that are general to the target and are specific to individual
-nonlocalized events. For example, crossmatching with the point source, agn, and asteroid catalogs are specific to the
-target while other scores (distance score, 2D score, etc.) can only be determined on a nle-by-nle basis.</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Things like coordinates, name aliases, redshift (if known), and extinction are all shown on the left sidebar. At top,
+see buttons for:</p>
+<ol class="arabic simple">
+<li><p>Update Lightcurve: Submit a job to obtain forced photometry from ATLAS or ZTF.</p></li>
+<li><p>Update Host z: Submit a spectroscopic redshift measurement for one of the host galaxies in the galaxy table.</p></li>
+</ol>
+<p>On the right, see details of the subscores that are general to the target, and others specific to a
+NLE-target pair. For example, crossmatching with point sources, asteroids from the Minor Planet Center (MPC), and AGN
+is possible for all targets, while other scores (2D localization, distance, and photometry) are dependent on the NLE.</p>
 <p>Below the score details is a table of potential host galaxies. These are determined based on a probability of chance
 coincidence calculation (Pcc), where a lower Pcc indicates a more likely host galaxy. In TROVE we make a cut on Pcc &lt; 0.15,
-so only low Pcc galaxies should appear in this table. The distances and redshifts of these individual host galaxies are also
-shown in this table.</p>
-<p>Things like coordinates, name aliases, redshift (if known), and extinction are all shown on the left sidebar.
-Below that there is also an atlas viewer that has the different host galaxies shown as circles:</p>
+so only low Pcc galaxies should appear in this table. The distances, redshifts, and type of distance measurement
+(redshift-independent, spectroscopic redshift, photometric redshift) of these individual host galaxies are also
+shown in this table. An atlas viewer at bottom left shows the position of the target and these potential hosts:</p>
 <img alt="_images/target-atlas.png" src="_images/target-atlas.png" />
-<p>Finally, on the right side underneath the host galaxy table is the light curve, including photometry from TNS forced photometry
-servers. This light curve looks like the following</p>
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Finally, on the right side below the host galaxy table is the light curve, including photometry from TNS and forced photometry
+servers. This light curve looks like the following:</p>
 <img alt="_images/target-photometry.png" src="_images/target-photometry.png" />
 </section>
 </section>

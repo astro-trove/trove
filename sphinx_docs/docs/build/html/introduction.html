@@ -32,6 +32,7 @@
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
   
   <!-- So that users can add custom icons -->
   <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -43,6 +44,8 @@
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
+    <script src="_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'introduction';</script>
     <link rel="canonical" href="https://datatrove.as.arizona.edu/introduction.html" />
     <link rel="icon" href="_static/favicon.ico"/>
@@ -150,11 +153,12 @@
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">Welcome to TROVE’s documentation!</a></li>
 <li class="toctree-l1"><a class="reference internal" href="details.html">Web App Details</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="api.html">API Docs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="nbs/basic_usage.html">Example Notebook</a></li>
 <li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/docs/api">API Reference</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ &amp; Glossary</a></li>
 </ul>
 
     </div>
@@ -225,23 +229,6 @@
   <i class="fab fa-github"></i>
   </span>
 <span class="btn__text-container">Repository</span>
-</a>
-</li>
-      
-      
-      
-      
-      <li><a href="https://github.com/astro-trove/trove/edit/main/sphinx_docs/docs/source/introduction.rst" target="_blank"
-   class="btn btn-sm btn-source-edit-button dropdown-item"
-   title="Suggest edit"
-   data-bs-placement="left" data-bs-toggle="tooltip"
->
-  
-
-<span class="btn__icon-container">
-  <i class="fas fa-pencil-alt"></i>
-  </span>
-<span class="btn__text-container">Suggest edit</span>
 </a>
 </li>
       
@@ -379,7 +366,8 @@
                   
   <section id="welcome-to-trove-s-documentation">
 <h1>Welcome to TROVE’s documentation!<a class="headerlink" href="#welcome-to-trove-s-documentation" title="Link to this heading">#</a></h1>
-<p><strong>TROVE</strong> (The Tool for Rapid Oject Vetting and Examination) is a web application and API designed for real-time object vetting of new transients for optimizing follow-up of poorly localized astronomical events.</p>
+<p><strong>TROVE</strong> (the Tool for Rapid Object Vetting and Examination) is a web application and application programming interface (API)
+designed for real-time object vetting of new transients for optimizing follow-up of poorly localized astronomical events.</p>
 <section id="quickstart">
 <h2>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">#</a></h2>
 <ol class="arabic simple">
@@ -387,15 +375,18 @@
 <li><p>Login or register for an account (Note that registration may take 1-2 days to be approved)</p></li>
 <li><p>You can see GW events by clicking “Nonlocalized Events” → “Gravitational Waves”</p></li>
 <li><p>You can click on any of the GW event names to navigate to an “Event Candidate” page that contains a ranked list of scores
-for that candidate.</p></li>
-<li><p>From the “Event Candidate” page you can click on individual targets to see more details.</p></li>
-<li><p>You can also see a full list of targets by clicking the “Targets” tab in the navbar at the top of the website</p></li>
+for all event candidates associated with a particular event.</p></li>
+<li><p>From the “Event Candidate” page, you can click on individual targets to see more details.</p></li>
+<li><p>You can also see a full list of targets by clicking the “Targets” tab in the navigation bar at the top of the website</p></li>
 </ol>
 </section>
 <section id="getting-additional-help">
 <h2>Getting Additional Help<a class="headerlink" href="#getting-additional-help" title="Link to this heading">#</a></h2>
-<p>Feel free to join our Slack workspace (Under Construction) and ask questions there. Also see the <cite>FAQ &lt;faq&gt;</cite> page for some
-common questions and feel free to open <cite>GitHub issues &lt;https://github.com/astro-trove/trove/issues&gt;</cite>.</p>
+<ul class="simple">
+<li><p>Join our Slack workspace (<em>under construction</em>) and ask questions there!</p></li>
+<li><p>See the <a class="reference external" href="faq.html">FAQ &amp; Glossary</a> page for some frequently asked questions and a glossary of common terms!</p></li>
+<li><p>Open a <a class="reference external" href="https://github.com/astro-trove/trove/issues">GitHub issue</a>!</p></li>
+</ul>
 </section>
 </section>
 

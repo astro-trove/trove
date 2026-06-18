@@ -22,12 +22,14 @@ author = "TROVE Collaboration"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
+    "nbsphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
+    "sphinx_design",
 ]
 
 templates_path = ["_templates"]
@@ -35,8 +37,14 @@ templates_path = ["_templates"]
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
-
+exclude_patterns = [
+    "_build",
+    "**.ipynb_checkpoints",
+    "Thumbs.db",
+    ".DS_Store",
+    ".env",
+    "*/.virtual_documents/*",
+]
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -50,7 +58,7 @@ html_theme_options = {
     "repository_url": "https://github.com/astro-trove/trove",
     "use_repository_button": True,
     "use_issues_button": True,
-    "use_edit_page_button": True,
+    "use_edit_page_button": False,
     "path_to_docs": "sphinx_docs/docs/source",
     "show_navbar_depth": 1,
     "show_toc_level": 3,
