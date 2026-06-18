@@ -25,3 +25,5 @@ MPCORB.csv
 test.py
 ztf-forced-phot-logs/
 ztf-forced-phot-logs-backup/
+build/
+trove.egg-info/
