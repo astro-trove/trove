@@ -85,16 +85,14 @@ see buttons for:
 2. Update Host z: Submit a spectroscopic redshift measurement for one of the host galaxies in the galaxy table.
 
 On the right, see details of the subscores that are general to the target, and others specific to a 
-NLE-target pair. For example, crossmatching with the point source, AGN, and asteroids from the Minor Planet Center (MPC) 
-is possible for all targets, while other scores (2D localization, distance, and photometry) are dependent on the 
-NLE. 
+NLE-target pair. For example, crossmatching with point sources, asteroids from the Minor Planet Center (MPC), and AGN 
+is possible for all targets, while other scores (2D localization, distance, and photometry) are dependent on the NLE. 
 
 Below the score details is a table of potential host galaxies. These are determined based on a probability of chance
 coincidence calculation (Pcc), where a lower Pcc indicates a more likely host galaxy. In TROVE we make a cut on Pcc < 0.15,
-so only low Pcc galaxies should appear in this table. The distances and redshifts of these individual host galaxies are also
-shown in this table.
-
-Below that there is also an atlas viewer that has the different host galaxies shown as circles:
+so only low Pcc galaxies should appear in this table. The distances, redshifts, and type of distance measurement 
+(redshift-independent, spectroscopic redshift, photometric redshift) of these individual host galaxies are also
+shown in this table. An atlas viewer at bottom left shows the position of the target and these potential hosts:
 
 .. image:: webappimg/target-atlas.png
 
