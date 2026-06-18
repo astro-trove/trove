@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import logging
 
 from django.core.management.base import BaseCommand
+from django.conf import settings
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent 
 
@@ -10,10 +11,6 @@ from trove_targets.models import Target
 from candidate_vetting.models import TnsQ3C
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.healpix_utils import get_target_ids_in_prob_credible_region
-from candidate_vetting.vet_basic import vet_basic
-
-# from astropy.coordinates import SkyCoord
-# from healpix_alchemy.constants import HPX
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
@@ -37,10 +34,10 @@ class Command(BaseCommand):
             help="Target position must have cumulative probability exceeding "+
             "this value in NLE localization region",
             type=float, 
-            default=0.95,
+            default=settings.SKYMAP_PROB_CONTOUR,
         )
         parser.add_argument(
-            "--first-det-min",
+            "--first-det-tmin",
             help="Associate TNS targets with first detection at EARLIEST "+
             "|first-det-min| days before nonlocalized event. NEGATIVE number "+
             "expected. Default -1, which will consider targets with first "+
@@ -49,7 +46,7 @@ class Command(BaseCommand):
             default=-1,
         )
         parser.add_argument(
-            "--first-det-max",
+            "--first-det-tmax",
             help="Associate TNS targets with first detection at LATEST "+
             "first-det-max days after nonlocalized event. POSITIVE number "+
             "expected.",
@@ -68,8 +65,8 @@ class Command(BaseCommand):
     def handle(self, 
                nle_id, 
                prob=0.95, 
-               first_det_min=-1,
-               first_det_max=10,
+               first_det_tmin=-1,
+               first_det_tmax=10,
                snr_min=5, 
                **kwargs):
         
@@ -82,15 +79,15 @@ class Command(BaseCommand):
 
         # get all targets created with discovery date in the relevant time window
         tns_transients = TnsQ3C.objects.filter(
-            discoverydate__gte = nle_time + timedelta(days=first_det_min),
-            discoverydate__lte = nle_time + timedelta(days=first_det_max)
+            discoverydate__gte = nle_time + timedelta(days=first_det_tmin),
+            discoverydate__lte = nle_time + timedelta(days=first_det_tmax)
         )
         tns_transients_ls = list(tns_transients)
         tns_names = [q.name_prefix + q.name for q in tns_transients_ls]
         targets = Target.objects.filter(name__in=tns_names).order_by("name")
 
         logger.info(f"\nFound {len(targets):d} targets with discovery date "+
-                    f"between {first_det_min} and {first_det_max} days of "+
+                    f"between {first_det_tmin} and {first_det_tmax} days of "+
                     f"{nle.event_id} ({nle_time})")
         logger.info(f"{targets}")
         logger.info(f"Now checking if they lie within the {prob} probability "+
@@ -115,12 +112,12 @@ class Command(BaseCommand):
                     continue
                 # is first detection within prescribed time window?
                 if not(
-                    first_det.timestamp > nle_time + timedelta(days=first_det_min)  and
-                    first_det.timestamp < nle_time + timedelta(days=first_det_max)
+                    first_det.timestamp > nle_time + timedelta(days=first_det_tmin)  and
+                    first_det.timestamp < nle_time + timedelta(days=first_det_tmax)
                     ):
                     logger.info("First detection is outside of "+
-                                f"{nle_time + timedelta(days=first_det_min)} to "+
-                                f"{nle_time + timedelta(days=first_det_max)} "+
+                                f"{nle_time + timedelta(days=first_det_tmin)} to "+
+                                f"{nle_time + timedelta(days=first_det_tmax)} "+
                                 "time window")
                     continue
             # is target within the `prob` credible region?
