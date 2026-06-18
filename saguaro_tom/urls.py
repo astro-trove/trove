@@ -31,4 +31,5 @@ urlpatterns = [
         include("tom_nonlocalizedevents.urls", namespace="nonlocalizedevents"),
     ),
     path("api/", api.urls),
+    path("docs/", include("sphinx_docs.urls", namespace="sphinx_docs")),
 ]

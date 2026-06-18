@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "candidate_vetting",
     "trove_targets",
     "trove_nonlocalizedevents",
+    "sphinx_docs",
     "dal",
     "dal_select2",
     "django_tables2",
