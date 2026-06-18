@@ -126,7 +126,7 @@ WSGI_APPLICATION = "saguaro_tom.wsgi.application"
 TASKS = {
     "default": {
         "BACKEND": "django_tasks.backends.database.DatabaseBackend",
-        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_all"],
+        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_all", "associate_targets"],
     }
 }
 
@@ -443,5 +443,5 @@ PRIORITY_HIGH = 100
 PRIORITY_MID = 10
 PRIORITY_LOW = 0
 
-# skymap probability contour within which we consider a target and candidate associated
+# skymap probability contour within which we may consider a target and nonlocalized event associated
 SKYMAP_PROB_CONTOUR = 0.95
