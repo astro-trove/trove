@@ -45,7 +45,7 @@ Glossary of Frequently Used Terms
     
     **neutrino**:
     
-    **NLE**: Nonlocalized event. A nonlocalized event (NLE)—sometimes more aptly termed a poorly a 
+    **NLE**: Nonlocalized event. A nonlocalized event (NLE)—sometimes more aptly termed a poorly 
     localized event—is some astrophysical source with an uncertain position on the sky. These can be 
     large uncertainties of tens to thousands of square degrees (e.g., gravitational waves) or tens of 
     square arcminutes (e.g., fast X-ray transients.)

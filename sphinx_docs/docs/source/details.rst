@@ -23,7 +23,7 @@ After logging in you should be able to see a list of targets and comments:
 Viewing Nonlocalized Events
 ---------------------------
 
-A nonlocalized event (NLE)---sometimes more aptly termed a poorly a localized event---is some astrophysical source with an 
+A nonlocalized event (NLE)---sometimes more aptly termed a poorly localized event---is some astrophysical source with an 
 uncertain position on the sky. These can be large uncertainties of tens to thousands of square degrees (e.g., gravitational waves)
 or tens of square arcminutes (e.g., fast X-ray transients.)
 

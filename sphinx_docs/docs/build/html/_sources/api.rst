@@ -10,7 +10,7 @@ TROVE provides a few useful API endpoints:
 API Quickstart
 --------------
 Details and examples with curl commands to access the endpoints are on the RESTful API Reference docs
-page: https://datatrove.as.arizona.edu/api/docs . [#f1]_
+page: https://datatrove.as.arizona.edu/api/docs. [#f1]_
 
 An example curl command is:
 
