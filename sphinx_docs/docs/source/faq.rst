@@ -21,7 +21,10 @@ Glossary of Frequently Used Terms
 
     **AGN**: Active galactic nucleus / active galactic nuclei
     
-    **ATLAS**:
+    **ATLAS**: The Asteroid Terrestrial-impact Last Alert System. A network of telescopes around the world.
+    We use ATLAS' forced photometry server to augment the lightcurves of *targets*.
+    
+    **API**: Application programming interface
     
     **BBH**: Binary black hole merger
     
@@ -29,7 +32,8 @@ Glossary of Frequently Used Terms
     
     **candidate**: Sometimes used as shorthand for event candidate.
     
-    **event candidate**: 
+    **event candidate**: A *target* which has been associated with a *nonlocalized event (NLE)*.
+    A candidate electromagnetic counterpart to said NLE.
     
     **forced photometry**:
     
@@ -39,9 +43,13 @@ Glossary of Frequently Used Terms
     
     **GW**: Gravitational wave
     
-    **kilonova (KN)**:
+    **kilonova (KN)**: Ultraviolet/optical/infrared transient powered by the radioactive 
+    decay of freshly synthesized heavy elements. The expected electromagnetic 
+    counterpart to *BNS* and *NSBH* events. 
     
-    **kilonova-in-supernova (KN-in-SN)**:
+    **kilonova-in-supernova (KN-in-SN)**: *Kilonova* embedded in a supernova. 
+    Hypothesized electromagnetic counterpart to *SSM* events. Sometimes used 
+    interchangably with *super-kilonova*.
     
     **neutrino**:
     
@@ -52,8 +60,20 @@ Glossary of Frequently Used Terms
     
     **NSBH**: Neutron star + black hole merger
     
-    **super-kilonova (super-KN)**:
+    **SSM**: Subsolar mass merger; merger involving at least one object subsolar in mass
     
-    **target**:
+    **super-kilonova (super-KN)**: Longer-lasting, "scaled up" *kilonova* 
+    hypothesized to occur following the collapse of extremely massive (helium core in excess of 100 solar masses), 
+    rapidly-rotating stars. Sometimes used interchangably with *kilonova-in-supernova*. 
+    Hypothesized electromagnetic counterpart to *SSM* events.
     
-    **ZTF**:
+    **target**: An object defined by its name and position on the sky. Usually accompanied 
+    by additional information like photometry or a redshift.
+    
+    **TNS**: The Transient Name Server. A repository of transients and their 
+    photometry and spectroscopy. We continuously ingest transients from the TNS 
+    to create *targets*.
+    
+    **ZTF**: Zwicky Transient Facility. A consortium of wide field-of-view optical telescopes which
+    survey a signifcant fraction of the night sky. We use the ZTF forced photometry 
+    server to augment the lightcurves of *targets*.

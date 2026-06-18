@@ -1,7 +1,7 @@
 Welcome to TROVE's documentation!
 =================================
 
-**TROVE** (the Tool for Rapid Oject Vetting and Examination) is a web application and API 
+**TROVE** (the Tool for Rapid Object Vetting and Examination) is a web application and application programming interface (API) 
 designed for real-time object vetting of new transients for optimizing follow-up of poorly localized astronomical events.
 
 Quickstart
@@ -17,5 +17,6 @@ Quickstart
 
 Getting Additional Help
 -----------------------
-Feel free to join our Slack workspace (Under Construction) and ask questions there. Also see the `FAQ <faq.html>`_ page for some
-common questions and feel free to open `GitHub issues <https://github.com/astro-trove/trove/issues>`_.
+- Join our Slack workspace (*under construction*) and ask questions there!
+- See the `FAQ & Glossary <faq.html>`_ page for some frequently asked questions and a glossary of common terms!
+- Open a `GitHub issue <https://github.com/astro-trove/trove/issues>`_!
