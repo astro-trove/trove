@@ -31,7 +31,7 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      )
 
 from .vet import host_association, localization_sequence_from_name
-from .tasks import vet_all_async
+from .tasks import vet_all_async, associate_targets_with_nle
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .public_catalogs.phot_catalogs import ZTF_Forced_Phot
@@ -390,7 +390,6 @@ class NonLocalizedEventAssociateTargetsFormView(FormView):
         # set a default time horizon based on NLE most likely class
         try:
             form.fields["first_det_tmin"].initial, form.fields["first_det_tmax"].initial = DETECTION_HORIZON_DEFAULTS[nle_most_likely_class]
-            print(DETECTION_HORIZON_DEFAULTS[nle_most_likely_class])
         except KeyError: # if NLE most likely class not recognized
             form.fields["first_det_tmin"].initial, form.fields["first_det_tmax"].initial = DETECTION_HORIZON_DEFAULTS[""]
         return form
@@ -444,7 +443,7 @@ class NonLocalizedEventAssociateTargetsFormView(FormView):
             )
 
         # run the association asynchronously
-        ### TODO
+        associate_targets_with_nle(nle, first_det_tmin, first_det_tmax, snr_min)
 
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"
