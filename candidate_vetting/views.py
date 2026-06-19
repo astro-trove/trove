@@ -418,8 +418,8 @@ class NonLocalizedEventAssociateTargetsFormView(FormView):
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
 
         # helpful prints
-        first_det_tmin_toprint = (nle_time + timedelta(days=first_det_tmin)).strftime("%Y-%m-%dT%H:%M:%S")
-        first_det_tmax_toprint = (nle_time + timedelta(days=first_det_tmax)).strftime("%Y-%m-%dT%H:%M:%S")
+        first_det_tmin_toprint = (nle_time + timedelta(days=first_det_tmin)).strftime("%Y-%m-%d %H:%M:%S")
+        first_det_tmax_toprint = (nle_time + timedelta(days=first_det_tmax)).strftime("%Y-%m-%d %H:%M:%S")
         if snr_min > 0:
             messages.info(
                 self.request,
@@ -435,9 +435,9 @@ class NonLocalizedEventAssociateTargetsFormView(FormView):
             messages.info(
                 self.request,
                 f"Searching for targets within the {settings.SKYMAP_PROB_CONTOUR*100:.0f}% "+
-                f"localization of {nle.event_id}, with first detection between"+
+                f"localization of {nle.event_id}, with first detection between "+
                 f"{first_det_tmin_toprint} and {first_det_tmax_toprint}. This "+
-                "will take a few seconds per candidate in the localization "+
+                "will take a few seconds per target in the localization "+
                 "region; check back later to see if new event candidates have "+
                 "been created!"
             )

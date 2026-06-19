@@ -50,4 +50,5 @@ DETECTION_HORIZON_DEFAULTS = { # time horizon (min, max) for first detections, d
     "BNS": (0, 10),
     "NSBH": (0, 10),
     "SSM": (-1, 10),
-    "BBH":(0,10)}
+    "BBH":(0,10)
+}

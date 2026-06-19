@@ -88,14 +88,14 @@ def associate_targets_with_nle(
 
     # get targets within the probability region
     logger.info("Finding targets in the "+
-                f"{settings.SKYMAP_PROB_CONTOURS*100:.0f}% localization "+
+                f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
                 f"region of {nle.event_id}")
     tids = get_target_ids_in_prob_credible_region(
         seq,
         prob=settings.SKYMAP_PROB_CONTOUR)
     targets = [Target(id=tid) for tid in tids]
     for targ in targets:
-        print(targ)
+        logger.info(f"{targ.name}")
 
     # for targ in targets:
     #     async_associate_targets.enqueue(

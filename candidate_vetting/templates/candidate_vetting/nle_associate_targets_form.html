@@ -105,8 +105,8 @@
     <div class="associate-card">
         <h2>Associate Targets with a Nonlocalized Event</h2>
         
-        <p>Search for and associate targets with first detection within some time window of the nonlocalized event and (optionally) some minimum signal to noise (SNR). Set SNR minimum to -1 to impose no cutoff on SNR.</p>
-        <p><i>Example:</i> for minimum time -1, maximum time 10, and SNR minimum 5, we will search for targets with first detection with SNR > 5 from 1 day pre-NLE to 10 days post-NLE, within the {{ skymap_prob_contour }} localization.</p>
+        <p>Search for and associate targets with first detection within some time window of the nonlocalized event and (optionally) some minimum signal to noise (SNR). Set SNR minimum < 0 to impose no cutoff on SNR.</p>
+        <p><i>Example:</i> for minimum time -1, maximum time 10, and SNR minimum 5, we will search for targets with first detection with SNR > 5 from 1 day pre-NLE to 10 days post-NLE, within the {{ skymap_prob_contour }} localization region.</p>
         <form action="" method="post">
             {% csrf_token %}
           
