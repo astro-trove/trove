@@ -145,22 +145,39 @@ if _db_name:
             "PASSWORD": os.getenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
             "HOST": os.getenv("POSTGRES_HOST", POSTGRES_HOST),
             "PORT": os.getenv("POSTGRES_PORT", int(POSTGRES_PORT)),
-        }
+        },
+        "catalogs": {
+            "ENGINE": "django.db.backends.postgresql_psycopg2",
+            "NAME": os.getenv("POSTGRES_DB2", POSTGRES_DB2),
+            "USER": os.getenv("POSTGRES_USER2", POSTGRES_USER2),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD2", POSTGRES_PASSWORD2),
+            "HOST": os.getenv("POSTGRES_HOST2", POSTGRES_HOST2),
+            "PORT": os.getenv("POSTGRES_PORT2", POSTGRES_PORT2),
+        },
     }
 else:
     # SQLite fallback for local dev when Postgres is not configured.
     # django_tasks' DatabaseBackend requires SQLite to use EXCLUSIVE transactions,
     # otherwise `manage.py check` fails with a SystemCheckError.
     _sqlite_path = os.path.join(BASE_DIR, "db.sqlite3")
+    _sqlite_path_catalogs = os.path.join(BASE_DIR, "catalogdb.sqlite3")
+
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": _sqlite_path,
             "OPTIONS": {"transaction_mode": "EXCLUSIVE"},
-        }
+        },
+        "catalogs": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": _sqlite_path_catalogs,
+            "OPTIONS": {"transaction_mode": "EXCLUSIVE"},
+        },
     }
     # tom_nonlocalizedevents builds its engine from DATABASES; use env so it gets SQLite too
     os.environ.setdefault("SA_DB_CONNECTION_URL", "sqlite:///" + _sqlite_path)
+
+DATABASE_ROUTERS = ["candidate_vetting.routers.CatalogRouter"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
