@@ -299,6 +299,72 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
         'plot': offline.plot(fig, output_type='div', show_link=False)
     }
 
+@register.inclusion_tag('tom_dataproducts/partials/photometry_datalist_for_target.html', takes_context=True)
+def get_photometry_data(context, target, target_share=False):
+    """
+    Displays a table of the all photometric points for a target.
+    """
+
+    photometry = ReducedDatum.objects.filter(data_type='photometry', target=target).order_by('-timestamp')
+    if not settings.TARGET_PERMISSIONS_ONLY:
+        photometry = get_objects_for_user(
+            context["request"].user,
+            "tom_dataproducts.view_reduceddatum",
+            klass=photometry,
+        )
+    
+
+    # Possibilities for reduced_datums from ZTF/MARS:
+    # reduced_datum.value: {'error': 0.0929680392146111, 'filter': 'r', 'magnitude': 18.2364940643311}
+    # reduced_datum.value: {'limit': 20.1023998260498, 'filter': 'g'}
+
+    # for limit magnitudes, set the value of the limit key to True and
+    # the value of the magnitude key to the limit so the template and
+    # treat magnitudes as such and prepend a '>' to the limit magnitudes
+    # see recent_photometry.html
+    data = []
+    for reduced_datum in photometry:
+        rd_data = {'id': reduced_datum.pk,
+                   'timestamp': reduced_datum.timestamp,
+                   'source': reduced_datum.source_name,
+                   'filter': reduced_datum.value.get('filter', ''),
+                   'telescope': reduced_datum.value.get('telescope', ''),
+                   'error': reduced_datum.value.get('error', reduced_datum.value.get('magnitude_error', ''))
+                   }
+
+        if 'limit' in reduced_datum.value.keys():
+            rd_data['magnitude'] = reduced_datum.value['limit']
+            rd_data['limit'] = True
+        else:
+            rd_data['magnitude'] = reduced_datum.value['magnitude']
+            rd_data['limit'] = False
+        data.append(rd_data)
+
+    band_filters = np.unique([phot_dict["filter"] for phot_dict in data])
+
+    initial = {'submitter': context['request'].user,
+               'target': target,
+               'data_type': 'photometry',
+               'share_title': f"Updated data for {target.name} from {getattr(settings, 'TOM_NAME', 'TOM Toolkit')}.",
+               }
+    form = DataShareForm(initial=initial)
+    form.fields['data_type'].widget = forms.HiddenInput()
+
+    sharing = getattr(settings, "DATA_SHARING", None)
+    hermes_sharing = sharing and sharing.get('hermes', {}).get('HERMES_API_KEY')
+
+    context = {
+        'data': data,
+        'target': target,
+        'target_data_share_form': form,
+        'sharing_destinations': form.fields['share_destination'].choices,
+        'hermes_sharing': hermes_sharing,
+        'target_share': target_share,
+        'band_filters': band_filters
+    }
+    return context
+
+
 @register.filter
 def format_mag(datum, d=2):
     try:

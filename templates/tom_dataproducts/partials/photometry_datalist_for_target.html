@@ -16,11 +16,9 @@
               <label for="bandFilter" class="font-weight-bold">Band Filter</label>
               <select class="form-control form-control-sm" id="bandFilter" onchange="applyFilters()">
                 <option value="">All bands</option>
-                <option value="g">g</option>
-                <option value="r">r</option>
-                <option value="i">i</option>
-                <option value="V">V</option>
-                <option value="o">o</option>
+                {% for filter_val in band_filters %}
+                <option value="{{ filter_val }}">{{ filter_val }}</option>
+                {% endfor %}
               </select>
             </div>
             <div class="form-group col-md-4">
@@ -194,8 +192,19 @@
             const num = parseFloat(value.replace(/[^0-9.+-]/g, ''));
             return Number.isFinite(num) ? num : 0;
         }
+
         if(type == 'date') {
-            return Date.parse(value) || 0;
+              const normalized = value
+                // Remove period after abbreviated month names
+                .replace(/\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\./g, "$1")
+                // Convert a.m./p.m.
+                .replace(/a\.m\./gi, "AM")
+                .replace(/p\.m\./gi, "PM")
+                // Handle midnight/noon
+                .replace(/,\s*midnight$/i, ", 12:00 AM")
+                .replace(/,\s*noon$/i, ", 12:00 PM");
+
+            return new Date(normalized);
         }
         return value.toLowerCase();
     }
@@ -205,9 +214,7 @@
         const photData = document.getElementById('photData');
         if(!tbody || !photData) return;
 
-        // Still need to fix the date filtering
-
-        // determine ascending if not provided: toggle when clicking same column
+        // toggles between ascending and descending
         if (typeof ascending === 'undefined') {
             const last = photData.dataset.lastSort ? parseInt(photData.dataset.lastSort) : null;
             const lastAsc = photData.dataset.lastAscending === 'true';
@@ -219,12 +226,13 @@
         }
 
         let rows = Array.from(tbody.querySelectorAll('tr'));
-        // keep only data rows (ignore empty/message rows)
+        // ignore message rows
         rows = rows.filter(r => r.querySelector('td'));
 
         rows.sort((a,b) => {
             const a_val = parseValue(getCell(a, colIndex), type);
             const b_val = parseValue(getCell(b, colIndex), type);
+
             if (a_val < b_val) return ascending ? -1 : 1;
             if (a_val > b_val) return ascending ? 1 : -1;
             return 0;
