@@ -51,21 +51,39 @@ else:
 
 class AsymmetricGaussian(rv_continuous):
     """
-    Custom Asymmetric Gaussian distribution.
-    Use loc for the mean, and unc_minus/unc_plus as shape parameters.
+    Custom Asymmetric Gaussian distribution for uneven uncertainties
     """
 
-    def _pdf(self, x, unc_minus, unc_plus):
-        """x is already shifted by loc internally by scipy, so we don't need to pass
-        the mean"""
-        pdf = np.where(
-            x < 0,
-            np.exp(-0.5 * (x / unc_minus) ** 2),
-            np.exp(-0.5 * (x / unc_plus) ** 2),
-        )
+    def _pdf_unnorm(self, x, mean, unc_minus, unc_plus):
+        """**Unnormalized** asymmetric Gaussian PDF"""
+        # piecewise return a Gaussian depending on the side of the mean you are on
+        where_minus = np.where(x < mean)[0]
+        where_plus = np.where(x >= mean)[0]
 
-        norm = np.sqrt(2 / (np.pi * (unc_plus + unc_minus) ** 2))
-        return norm * pdf
+        minus_dist = np.exp(
+            -0.5 * ((x[where_minus] - mean[where_minus]) / unc_minus[where_minus]) ** 2
+        )  # Left side Gaussian-like
+        plus_dist = np.exp(
+            -0.5 * ((x[where_plus] - mean[where_plus]) / unc_plus[where_plus]) ** 2
+        )  # Right side Gaussian-like
+
+        return np.concatenate((minus_dist, plus_dist))
+
+    def _pdf(self, x, mean, unc_minus, unc_plus, integ_a, integ_b):
+        """**Normalized** asymmetric Gaussian PDF"""
+        # unclear why, but even when floats are passed to this function for
+        # args mean, unc_minus, unc_plus, integ_a, integ_b, they become lists
+        # of the same value repeated len(x) times
+
+        # numerically integrate asymmetric Gaussian, for normalization
+        integ_x = np.linspace(integ_a[0], integ_b[0], x.shape[0])
+        integ = np_trapz_fn(
+            y=self._pdf_unnorm(integ_x, mean, unc_minus, unc_plus), x=integ_x
+        )
+        integ_norm = 1 / integ
+
+        # return unnormalized PDF multiplied by normalization factor
+        return self._pdf_unnorm(x, mean, unc_minus, unc_plus) * integ_norm
 
 
 def update_score_factor(event_candidate, key, value):
@@ -82,6 +100,29 @@ def delete_score_factor(event_candidate, key):
 
     if matches.count():
         matches.delete()
+
+
+def _get_nle_distance_pdf(
+    lumdist_array: np.ndarray,
+    nonlocalized_event_name: str,
+    target_id,
+    max_time=Time.now(),
+):
+    # find the distance at the healpix
+    dist, dist_err = _distance_at_healpix(
+        nonlocalized_event_name, target_id, max_time=max_time
+    )
+
+    # let user know about hard-coded bounds on luminosity distance array
+    warnings.warn(
+        f"Using hard-coded D_LIM_LOWER = {D_LIM_LOWER} and "
+        + f"D_LIM_UPPER = {D_LIM_UPPER} to construct log-spaced "
+        + "distance array for calculating distance probability "
+        + "distribution functions"
+    )
+
+    test_pdf = norm.pdf(lumdist_array, loc=dist, scale=dist_err)
+    return test_pdf
 
 
 def host_distance_match(
@@ -122,66 +163,30 @@ def host_distance_match(
     # now crossmatch this distance to the host galaxy dataframe
     _lumdist = np.linspace(D_LIM_LOWER, D_LIM_UPPER, int(10 * D_LIM_UPPER))
 
-    nle_dist, nle_dist_err = _distance_at_healpix(
-        nonlocalized_event_name, target_id, max_time=max_time
+    test_pdf = _get_nle_distance_pdf(
+        _lumdist, nonlocalized_event_name, target_id, max_time=max_time
     )
+    host_pdfs = np.array(
+        [
+            AsymmetricGaussian().pdf(
+                _lumdist,
+                mean=row.lumdist,
+                unc_minus=row.lumdist_neg_err,
+                unc_plus=row.lumdist_pos_err,
+                integ_a=1e-9,
+                integ_b=_lumdist[-1],
+            )
+            for _, row in host_df.iterrows()
+        ]
+    )
+    joint_prob = host_pdfs * test_pdf
 
-    # finally, compute the *normalized* Bhattacharyya coefficient for the overlap of
-    # these two distributions. https://en.wikipedia.org/wiki/Bhattacharyya_distance
+    # finally, compute the Bhattacharyya coefficient for the overlap of these
+    # two distributions. https://en.wikipedia.org/wiki/Bhattacharyya_distance
     # This coefficient is non-parametric which is good for our Asymmetric Gaussian
     # Original paper: http://www.jstor.org/stable/25047806
-    host_df["dist_norm_joint_prob"] = [
-        bc_norm_median(
-            x=_lumdist,  # x to define the PDFs over
-            nle_dist=nle_dist,
-            nle_dist_err=nle_dist_err,
-            galaxy_dist=row.lumdist,
-            galaxy_unc_minus=row.lumdist_neg_err,
-            galaxy_unc_plus=row.lumdist_pos_err,
-        )
-        for _, row in host_df.iterrows()
-    ]
+    host_df["dist_norm_joint_prob"] = trapezoid(np.sqrt(joint_prob), x=_lumdist, axis=1)
     return host_df
-
-
-def bc(x, pdf1, pdf2):
-    """The bhattacharyya coefficient of PDF1 and PDF2, defined over x"""
-    return trapezoid(np.sqrt(pdf1 * pdf2), x=x)
-
-
-def bc_norm_median(
-    x, nle_dist, nle_dist_err, galaxy_dist, galaxy_unc_minus, galaxy_unc_plus
-):
-
-    # compute the observed PDFs
-    gw_pdf = norm.pdf(x, loc=nle_dist, scale=nle_dist_err)
-    galaxy_pdf = AsymmetricGaussian().pdf(
-        x, loc=galaxy_dist, unc_minus=galaxy_unc_minus, unc_plus=galaxy_unc_plus
-    )
-
-    # For normalization purposes, we can then compute the maximum theoretical
-    # Bhatacharyya coefficient for the overlap of these two distributions.
-    # Although, to truly do this we would need to compute the BC values over a grid,
-    # which is slow. This anlytic expression is *nearly* the theoretical maximum of a
-    # Gaussian or Asymmetric Gaussian PDF. But, it's an analytic approximation which is
-    # why we later return the min(1, bc_true/bc_max).
-    # For reference, in extremely asymmetric cases, testing shows that this analytic
-    # approximation can give scores around ~1.02, so it's actually pretty good!
-    shift_from_mean = (galaxy_unc_plus - galaxy_unc_minus) / 2
-    max_bc_pdf = AsymmetricGaussian().pdf(
-        x,
-        loc=nle_dist - shift_from_mean,
-        unc_minus=galaxy_unc_minus,
-        unc_plus=galaxy_unc_plus,
-    )
-
-    # get the true Bhatacharyya coefficient
-    bc_true = bc(x, gw_pdf, galaxy_pdf)
-
-    # and then get an approximation of the maximum Bhatacharyya coefficient
-    bc_max = bc(x, gw_pdf, max_bc_pdf)
-
-    return min(1, bc_true / bc_max)
 
 
 def get_distance_score(host_df, target_id, nonlocalized_event_name):
@@ -195,19 +200,18 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     targ = Target.objects.get(id=target_id)
     if targ.redshift is not None and not np.isnan(targ.redshift):
         _lumdist = np.linspace(D_LIM_LOWER, D_LIM_UPPER, int(10 * D_LIM_UPPER))
-        nle_dist, nle_dist_err = _distance_at_healpix(
-            nonlocalized_event_name, target_id
-        )
+        nle_pdf = _get_nle_distance_pdf(_lumdist, nonlocalized_event_name, target_id)
         targ_dist = cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
         targ_dist_err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
-        return bc_norm_median(
-            _lumdist,
-            nle_dist=nle_dist,
-            nle_dist_err=nle_dist_err,
-            galaxy_dist=targ_dist,
-            galaxy_unc_minus=targ_dist_err,
-            galaxy_unc_plus=targ_dist_err,
+        targ_pdf = norm.pdf(_lumdist, loc=targ_dist, scale=targ_dist_err)
+        return trapezoid(
+            np.sqrt(targ_pdf * nle_pdf), x=_lumdist
         ), None  # None because there is no host name
+
+    # if not, look at potential hosts; need to do quick cleanup of host_df
+    host_df = host_df[host_df.z != -999.0] ### TODO: This is for PS1-STRM. We should just change these filler values to nulls or something...
+    host_df = host_df[host_df.z != -9999.0] ### TODO: This is for SDSS DR12 photo-zs. We should jusdt change these filler values to nulls or something...
+    host_df = host_df[~np.isnan(host_df.z)]
 
     # then use the redshift of user-uploaded host galaxies
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
@@ -308,6 +312,11 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
         return _distance_at_healpix(nonlocalized_event_name, target_id)
 
     # if we've gotten to this point then the target has host galaxies associated with it!
+    # zeroth thing to do: clean up dataframe
+    host_df = host_df[host_df.z != -999.0] ### TODO: This is for PS1-STRM. We should just change these filler values to nulls or something...
+    host_df = host_df[host_df.z != -9999.0] ### TODO: This is for SDSS DR12 photo-zs. We should jusdt change these filler values to nulls or something...
+    host_df = host_df[~np.isnan(host_df.z)]
+
     # first thing we need to do is assign a rank ordering to the various catalogs,
     # this will help later
     host_df["_rank_order"] = host_df.Source.replace(GALAXY_CATALOG_RANKING)
