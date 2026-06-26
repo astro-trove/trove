@@ -37,6 +37,7 @@ skypatrol==0.6.21
 slack_sdk==3.42.0
 specutils==1.20.3
 sphinx==9.0.4
+candidate_vetting @ git+https://github.com/astro-trove/candidate_vetting.git@alpha
 sphinx_book_theme==1.2.0
 sphinx_design==0.7.0
 SQLAlchemy==2.0.50

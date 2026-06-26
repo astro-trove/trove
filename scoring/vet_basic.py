@@ -1,5 +1,5 @@
 """
-Basic vetting , possible even if no nonlocalized event associated with a 
+Basic vetting , possible even if no nonlocalized event associated with a
 target. Does the following:
 0. Checks for new photometry
 1. AGN crossmatching
@@ -9,7 +9,7 @@ target. Does the following:
 
 But without any direct scoring!
 
-Steps 3 and 4 are not carried out if no new photometry and user has said 
+Steps 3 and 4 are not carried out if no new photometry and user has said
 not to carry out those steps in absence of new photometry.
 
 This should also be called before any photometry vetting in the NLE-related
@@ -24,7 +24,7 @@ import time
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
-from .vet import (
+from candidate_vetting.vet import (
     point_source_association,
     host_association,
     agn_association_2d,
@@ -75,8 +75,8 @@ def vet_basic(
     # stop here and return if no further vetting needed
     if skip_vet_if_no_new_phot and not created_new_phot:
         logger.info(
-            "Skipping point source and minor planet vetting because no new "+
-            "photometry and skip_vet_if_no_new_phot=True"
+            "Skipping point source and minor planet vetting because no new "
+            + "photometry and skip_vet_if_no_new_phot=True"
         )
         return host_df, agn_df
 
@@ -85,7 +85,8 @@ def vet_basic(
         logger.info("Running Point Source Matching...")
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            ps_score = point_source_association(target_id)
+            ps_matches = point_source_association(target_id)
+            ps_score = int(len(ps_matches) < 1)  # 1 if no ps_matches, 0 otherwise
             save_score_to_targetextra(target, "ps_score", ps_score)
 
     # run the minor planet checker

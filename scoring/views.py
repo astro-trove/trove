@@ -22,13 +22,13 @@ from tom_nonlocalizedevents.models import (
 )
 from .forms import VettingChoiceForm, RedshiftUpdateForm
 from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
-
-from .vet import host_association, localization_sequence_from_name
 from .tasks import vet_all_async
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
-from .public_catalogs.phot_catalogs import ZTF_Forced_Phot
-from .public_catalogs.dynamic_catalogs import UserGalaxy
+
+from candidate_vetting.vet import host_association, localization_sequence_from_name
+from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
+from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
@@ -36,7 +36,7 @@ from dal import autocomplete
 
 
 class TargetVettingFormView(FormView):
-    template_name = "candidate_vetting/vetting_form.html"
+    template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
     # TODO: Only give the user the form if there is a non-localized event associated
@@ -85,9 +85,7 @@ class TargetVettingFormView(FormView):
         vetting_mode = form.cleaned_data["vetting_method"]
 
         # generate the base url
-        base_url = reverse(
-            "candidate_vetting:vet", kwargs=dict(pk=pk, vetting_mode=vetting_mode)
-        )
+        base_url = reverse("scoring:vet", kwargs=dict(pk=pk, vetting_mode=vetting_mode))
 
         # then also preserve the query parameters
         query_str = self.request.session.pop("nle_id", "")
@@ -177,7 +175,7 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
 
 
 class TargetRedshiftUpdateFormView(FormView):
-    template_name = "candidate_vetting/update_redshift_form.html"
+    template_name = "scoring/update_redshift_form.html"
     form_class = RedshiftUpdateForm
 
     # overriding the get_form function
@@ -279,7 +277,7 @@ class TargetRedshiftUpdateFormView(FormView):
 
 
 class TargetVettingAllFormView(FormView):
-    template_name = "candidate_vetting/vetting_form.html"
+    template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
     # overriding the get_form function
@@ -314,7 +312,7 @@ class TargetVettingAllFormView(FormView):
 
         # generate the base url
         base_url = reverse(
-            "candidate_vetting:vet_all", kwargs=dict(pk=pk, vetting_mode=vetting_mode)
+            "scoring:vet_all", kwargs=dict(pk=pk, vetting_mode=vetting_mode)
         )
 
         # then also preserve the query parameters

@@ -12,8 +12,8 @@ from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
-from candidate_vetting.models import ScoreFactor
-from candidate_vetting.util import get_event_candidate_scores
+from scoring.models import ScoreFactor
+from scoring.util import get_event_candidate_scores
 from tom_dataproducts.models import ReducedDatum
 
 from astropy.coordinates import SkyCoord
@@ -219,25 +219,26 @@ Below, we report the top {ncands} candidates that remain viable after running ou
             import pdb
 
             pdb.set_trace()
-            
+
         # get photometry info
         first_phot = ReducedDatum.objects.filter(
-            target_id=t.id, 
-            value__magnitude__isnull=False, 
-            value__error__isnull=False).first()
+            target_id=t.id, value__magnitude__isnull=False, value__error__isnull=False
+        ).first()
         if first_phot:
             v = first_phot.value
-            src_first = first_phot.source_name            
+            src_first = first_phot.source_name
             if "instrument" in v:
                 src_str_first = f"{src_first}; {v['instrument']} {v['filter']}"
             elif "telescope" in v:
                 src_str_first = f"{src_first}; {v['telescope']} {v['filter']}"
             else:
                 src_str_first = f"{src_first}; {v['filter']}"
-            src_str_first = src_str_first.replace(' (TNS)', '') # strip (TNS) if present
+            src_str_first = src_str_first.replace(
+                " (TNS)", ""
+            )  # strip (TNS) if present
         else:
             src_str_first = None
-        
+
         latest_phot = ReducedDatum.objects.filter(target_id=t.id).latest()
         if latest_phot:
             v = latest_phot.value
@@ -250,14 +251,16 @@ Below, we report the top {ncands} candidates that remain viable after running ou
             else:
                 src_str_latest = f"({v['filter']}; {src_latest})"
 
-            if "magnitude" in v: # detection
-                phot_str_latest = f"{v['magnitude']:.2f} +/- {v['error']:.2f} {src_str_latest}"
-            else: # non-detection
+            if "magnitude" in v:  # detection
+                phot_str_latest = (
+                    f"{v['magnitude']:.2f} +/- {v['error']:.2f} {src_str_latest}"
+                )
+            else:  # non-detection
                 phot_str_latest = f">{v['limit']:.2f} {src_str_latest}"
-            
+
             epoch_latest = Time(latest_phot.timestamp).mjd
             epoch_str_latest = f"{float(epoch_latest):.5f}"
-            
+
         else:
             phot_str_latest = None
             epoch_str_latest = None

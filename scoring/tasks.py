@@ -8,8 +8,8 @@ import logging
 from django_tasks import task
 from django.conf import settings
 
-from .public_catalogs.phot_catalogs import ATLAS_Forced_Phot
-from .vet import run_mpc
+from candidate_vetting.public_catalogs.phot_catalogs import ATLAS_Forced_Phot
+from candidate_vetting.vet import run_mpc
 from trove_targets.models import Target
 
 logger = logging.getLogger(__name__)
