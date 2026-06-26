@@ -21,8 +21,10 @@ class TestAsymmetricGaussian:
         x = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
         mean = np.array([1.0] * 5)
         unc = np.array([0.5] * 5)
+        integ_a = np.array([1e-9] * 5)
+        integ_b = np.array([5.0] * 5)
 
-        pdf_vals = ag.pdf(x, unc, unc, loc=mean)
+        pdf_vals = ag._pdf(x, mean, unc, unc, integ_a, integ_b)
         norm_vals = norm.pdf(x, loc=1.0, scale=0.5)
 
         assert len(pdf_vals) == len(norm_vals)
@@ -36,8 +38,10 @@ class TestAsymmetricGaussian:
         mean = np.array([1.0])
         unc_minus = np.array([0.3])
         unc_plus = np.array([0.5])
+        integ_a = np.array([1e-9])
+        integ_b = np.array([5.0])
 
-        pdf_val = ag.pdf(x, unc_minus, unc_plus, loc=mean)
+        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
         assert len(pdf_val) == 1
         assert pdf_val[0] > 0
 
@@ -50,8 +54,10 @@ class TestAsymmetricGaussian:
         mean = np.array([1.0])
         unc_minus = np.array([0.3])
         unc_plus = np.array([0.5])
+        integ_a = np.array([1e-9])
+        integ_b = np.array([5.0])
 
-        pdf_val = ag.pdf(x, unc_minus, unc_plus, loc=mean)
+        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
         assert len(pdf_val) == 1
         assert pdf_val[0] > 0
 
@@ -64,8 +70,10 @@ class TestAsymmetricGaussian:
         mean = np.array([1.0, 1.0])
         unc_minus = np.array([0.3, 0.3])
         unc_plus = np.array([0.5, 0.5])
+        integ_a = np.array([1e-9, 1e-9])
+        integ_b = np.array([5.0, 5.0])
 
-        pdf_vals = ag.pdf(x, unc_minus, unc_plus, loc=mean)
+        pdf_vals = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
         assert len(pdf_vals) == 2
         assert all(p > 0 for p in pdf_vals)
 
