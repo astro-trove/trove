@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm, rv_continuous
 from scipy.integrate import trapezoid
+from scipy.special import erf
 
 from astropy.utils.introspection import minversion
 
@@ -161,14 +162,51 @@ GALAXY_TARGETMATCH_DICT = dict(
 
 class AsymmetricGaussian(rv_continuous):
     """
-    Custom Asymmetric Gaussian distribution for uneven uncertainties
+    Piecewise Gaussian PDF for asymmetric distance errors.
+
+    Uses ``unc_minus`` for ``x < mean`` and ``unc_plus`` for ``x >= mean``. The
+    unnormalized shape is continuous at ``x == mean`` (peak value 1) and has
+    continuous first derivative there; normalization over ``[integ_a, integ_b]`` is
+    computed analytically with ``erf`` so it does not depend on query-point count
+    or on a coarse numerical quadrature grid.
     """
 
-    # Number of grid points used for the normalization integral. Fixed so the
-    # normalization does not depend on how many query points happen to be passed
-    # to _pdf (passing a single point previously yielded a zero-width grid and a
-    # divide-by-zero in the normalization).
-    _N_INTEG = 1000
+    @staticmethod
+    def _norm_integral(mean, unc_minus, unc_plus, a, b):
+        """
+        ∫_a^b g(x) dx for the piecewise Gaussian ``g``.
+
+        Left segment (x < mean): σ₋ √(π/2) [erf((μ-a)/(√2 σ₋)) - erf((μ-x_hi)/(√2 σ₋))]
+        Right segment (x ≥ mean): σ₊ √(π/2) [erf((x_hi-μ)/(√2 σ₊)) - erf((x_lo-μ)/(√2 σ₊))]
+        """
+        if b <= a:
+            return 0.0
+
+        sqrt2 = np.sqrt(2.0)
+        sqrt_pi_2 = np.sqrt(np.pi / 2.0)
+        mean = float(mean)
+        unc_minus = float(unc_minus)
+        unc_plus = float(unc_plus)
+        a = float(a)
+        b = float(b)
+
+        total = 0.0
+
+        left_b = min(b, mean)
+        if left_b > a and unc_minus > 0:
+            total += sqrt_pi_2 * unc_minus * (
+                erf((mean - a) / (sqrt2 * unc_minus))
+                - erf((mean - left_b) / (sqrt2 * unc_minus))
+            )
+
+        right_a = max(a, mean)
+        if b > right_a and unc_plus > 0:
+            total += sqrt_pi_2 * unc_plus * (
+                erf((b - mean) / (sqrt2 * unc_plus))
+                - erf((right_a - mean) / (sqrt2 * unc_plus))
+            )
+
+        return total
 
     def _pdf_unnorm(self, x, mean, unc_minus, unc_plus):
         """**Unnormalized** asymmetric Gaussian PDF (order-preserving, broadcastable)."""
@@ -177,28 +215,33 @@ class AsymmetricGaussian(rv_continuous):
         unc_minus = np.broadcast_to(unc_minus, x.shape)
         unc_plus = np.broadcast_to(unc_plus, x.shape)
 
-        # choose the relevant uncertainty per element depending on the side of the mean
         unc = np.where(x < mean, unc_minus, unc_plus)
-        return np.exp(-0.5 * ((x - mean) / unc) ** 2)
+        at_mean = x == mean
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            exponent = -0.5 * np.square((x - mean) / np.where(unc > 0, unc, np.nan))
+            out = np.exp(exponent)
+
+        # Peak always 1 at x == mean; zero-width side (unc == 0) contributes no off-peak mass.
+        return np.where(at_mean, 1.0, np.where(unc > 0, out, 0.0))
 
     def _pdf(self, x, mean, unc_minus, unc_plus, integ_a, integ_b):
-        """**Normalized** asymmetric Gaussian PDF"""
-        # scipy passes mean, unc_minus, unc_plus, integ_a, integ_b as arrays of the
-        # same scalar value repeated len(x) times; the distribution parameters are
-        # constant across x, so take the scalar value from the first element.
+        """**Normalized** asymmetric Gaussian PDF over ``[integ_a, integ_b]``."""
         mean_s = np.asarray(mean).ravel()[0]
         unc_minus_s = np.asarray(unc_minus).ravel()[0]
         unc_plus_s = np.asarray(unc_plus).ravel()[0]
+        a = float(np.asarray(integ_a).ravel()[0])
+        b = float(np.asarray(integ_b).ravel()[0])
 
-        # numerically integrate asymmetric Gaussian, for normalization, on a fixed
-        # grid that is independent of the number of query points in x
-        integ_x = np.linspace(integ_a[0], integ_b[0], self._N_INTEG)
-        integ = np_trapz_fn(
-            y=self._pdf_unnorm(integ_x, mean_s, unc_minus_s, unc_plus_s), x=integ_x
-        )
+        integ = self._norm_integral(mean_s, unc_minus_s, unc_plus_s, a, b)
+        if integ <= 0:
+            return np.zeros_like(np.asarray(x, dtype=float))
 
-        # return unnormalized PDF divided by the normalization integral
         return self._pdf_unnorm(x, mean, unc_minus, unc_plus) / integ
+
+    def pdf(self, x, mean, unc_minus, unc_plus, integ_a, integ_b):
+        """Evaluate the normalized PDF (bypasses ``rv_continuous.pdf`` quirks)."""
+        return self._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
 
 
 def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):

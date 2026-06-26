@@ -38,6 +38,18 @@ from ..models import (
 
 cosmo = settings.COSMO
 
+# GLADE+ dist_flag: distance computed from redshift (photo-z or spec-z).
+_GLADE_REDSHIFT_DERIVED_DIST_FLAGS = {1, 3}
+
+
+def _lumdist_err_from_dz(z, dz):
+    """Propagate heliocentric redshift uncertainty to luminosity distance (Mpc)."""
+    z = np.asarray(z, dtype=float)
+    dz = np.asarray(dz, dtype=float)
+    d0 = cosmo.luminosity_distance(z).to(u.Mpc).value
+    dp = cosmo.luminosity_distance(z + dz).to(u.Mpc).value
+    return np.abs(dp - d0)
+
 
 class _Log10(Func):
     function = "LOG10"
@@ -244,14 +256,27 @@ class GladePlus(StaticCatalog):
 
         df["z_type"] = df.apply(_parse_dist_flag_col, axis=1)
 
+        rs_derived = df.dist_flag.isin(_GLADE_REDSHIFT_DERIVED_DIST_FLAGS)
+        if rs_derived.any():
+            idx = rs_derived[rs_derived].index
+            dz = np.hypot(
+                df.loc[idx, "v_err"].fillna(0.0),
+                df.loc[idx, "z_err"].fillna(0.0),
+            )
+            df.loc[idx, "d_l_err"] = _lumdist_err_from_dz(
+                df.loc[idx, "z_helio"].values, dz.values
+            )
+
         df = self._standardize_df(df)
         df["z_neg_err"] = df.z_err
         df["z_pos_err"] = df.z_err
 
-        lumdist_err = pd.Series(
-            cosmo.luminosity_distance(df.z_err).to(u.Mpc).value, index=df.index
-        )
-        df.lumdist_err = df.lumdist_err.fillna(lumdist_err)
+        missing = df.lumdist_err.isna()
+        if missing.any():
+            df.loc[missing, "lumdist_err"] = _lumdist_err_from_dz(
+                df.loc[missing, "z"].values,
+                df.loc[missing, "z_err"].fillna(0.0).values,
+            )
         df["lumdist_neg_err"] = df.lumdist_err
         df["lumdist_pos_err"] = df.lumdist_err
         df["submitter"] = ""
