@@ -17,7 +17,7 @@ def galaxy_table(target):
     """
 
     SOURCE_DISPLAY_NAMES = {
-        "GLADE": "GLADE",
+        "GLADE": "GLADE+",
         "GladePlus": "GLADE+",
 
         "DESI": "DESI",
