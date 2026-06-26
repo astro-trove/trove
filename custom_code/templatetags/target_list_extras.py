@@ -28,10 +28,7 @@ def galaxy_table(target):
                 # If zErr is a float
                 places = -math.floor(math.log10(z_err))
                 galaxy['z'] = f"{z:.{places}f}"
-                if places <= 3:
-                    galaxy['zErr'] = f'{z_err:.{places+1}f}'
-                else:
-                    galaxy['zErr'] = f'{z_err:.{2}e}'
+                galaxy['zErr'] = f'{z_err:.{places}f}'
             except:
                 # If zErr is a list of upper and lower error
                 places_l = []
@@ -40,13 +37,11 @@ def galaxy_table(target):
                     for z_err_bound in z_err:
                         place = -math.floor(math.log10(z_err_bound))
                         places_l.append(place)
-                        if place <= 3:
-                            rounded_bounds.append(f'{z_err_bound:.{place+1}f}')
-                        else:
-                            rounded_bounds.append(f'{z_err_bound:.{2}e}')
+                        rounded_bounds.append(f'{z_err_bound:.{place}f}')
                     galaxy['z'] = f"{z:.{min(places_l)}f}"
                     galaxy['zErr'] = rounded_bounds
                 except:
+                    # Considers case when NaN, does nothing
                     pass
 
     else:
