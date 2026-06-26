@@ -18,10 +18,12 @@ saguaro_tom.egg-info/SOURCES.txt
 .DS_Store
 *.DAT
 venv/
-candidate_vetting/vetting_app/vetting_app/settings_local.py
+scoring/vetting_app/vetting_app/settings_local.py
 MPCORB.csv
 .venv_readme_test/
 .venv_test/
 test.py
 ztf-forced-phot-logs/
 ztf-forced-phot-logs-backup/
+build/
+trove.egg-info/
