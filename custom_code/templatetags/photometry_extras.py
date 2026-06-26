@@ -1,4 +1,4 @@
-from django import template
+from django import forms, template
 from django.conf import settings
 from guardian.shortcuts import get_objects_for_user
 from plotly import offline
@@ -8,6 +8,8 @@ from tom_dataproducts.models import ReducedDatum
 import numpy as np
 from datetime import datetime
 import re
+
+from tom_dataproducts.forms import DataShareForm
 
 register = template.Library()
 
@@ -297,20 +299,21 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
         'plot': offline.plot(fig, output_type='div', show_link=False)
     }
 
-
 @register.filter
 def format_mag(datum, d=2):
-    if datum.get('magnitude'):
-        datum['magnitude'] = float(datum['magnitude'])
-        if datum.get('error'):
-            datum['error'] = float(datum['error'])
-            display_str = f'{{magnitude:.{d}f}} ± {{error:.{d}f}}'
-        elif datum.get('limit'):
-            display_str = f'> {{magnitude:.{d}f}}'
-        else:
-            display_str = f'{{magnitude:.{d}f}}'
-        return display_str.format(**datum)
-
+    try:
+        if datum.get('magnitude'):
+            datum['magnitude'] = float(datum['magnitude'])
+            if datum.get('error'):
+                datum['error'] = float(datum['error'])
+                display_str = f'{{magnitude:.{d}f}} ± {{error:.{d}f}}'
+            elif datum.get('limit'):
+                display_str = f'> {{magnitude:.{d}f}}'
+            else:
+                display_str = f'{{magnitude:.{d}f}}'
+            return display_str.format(**datum)
+    except:
+        print("Unable to format magnitude")
 
 @register.filter
 def error_to_snr(error):

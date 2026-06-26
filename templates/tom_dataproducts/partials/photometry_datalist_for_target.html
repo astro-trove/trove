@@ -10,17 +10,52 @@
         <div class="card-header">
           Photometry Data
         </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="bandFilter" class="font-weight-bold">Band Filter</label>
+              <select class="form-control form-control-sm" id="bandFilter" onchange="applyFilters()">
+                <option value="">All bands</option>
+                <option value="g">g</option>
+                <option value="r">r</option>
+                <option value="i">i</option>
+                <option value="V">V</option>
+                <option value="o">o</option>
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="snrFilter" class="font-weight-bold">Minimum S/N</label>
+              <input class="form-control form-control-sm" id="snrFilter" type="number" min="0" placeholder="0" onchange="applyFilters()">
+            </div>
+            <div class="form-group col-md-4 d-flex align-items-end">
+              <button type="button" class="btn btn-outline-secondary btn-sm btn-block" onclick="resetFilters()">Reset filters</button>
+            </div>
+          </div>
+        </div>
         <table id="photData" class="table table-striped table-hover table-sm" cellspacing="0" width="100%">
             <thead>
-                <tr><th><div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="share-all" onclick="select_all()" value=""/>
-                    <label class="form-check-label" for="share-all">Share</label>
-                    </div></th>
-                    <th>Timestamp</th>
-                    <th>Filter</th>
-                    <th>Magnitude</th>
-                    <th>S/N</th>
-                    <th>Source</th>
+                <tr>
+                    <th class="text-center align-middle">
+                      <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="share-all" onclick="select_all()" value=""/>
+                        <label class="form-check-label" for="share-all">Share</label>
+                      </div>
+                    </th>
+                    <th class="text-center align-middle">
+                        <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(1, 'date')">Timestamp</button>
+                    </th>
+                    <th class="text-center align-middle">
+                        <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(2, 'string')">Filter</button>
+                    </th>
+                    <th class="text-center align-middle">
+                        <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(3, 'number')">Magnitude</button>
+                    </th>
+                    <th class="text-center align-middle">
+                        <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(4, 'number')">S/N</button>
+                    </th>
+                    <th class="text-center align-middle">
+                        <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(5, 'string')">Source</button>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -118,4 +153,86 @@
     }
     submit_btn.disabled = true;
   }
+
+    function getRowValue(tr, colIndex) {
+        return tr.children[colIndex]?.innerText.trim() || '';
+    }
+
+    function parseSNR(text) {
+        text = text.trim();
+        if (!text || text === '< 3') return 0;
+        return parseFloat(text) || 0;
+    }
+
+    function applyFilters() {
+        const band = document.getElementById('bandFilter').value;
+        const minSNR = parseFloat(document.getElementById('snrFilter').value) || 0;
+
+        document.querySelectorAll('#photData tbody tr').forEach(tr => {
+            const rowBand = getRowValue(tr, 2);
+            const rowSNR = parseSNR(getRowValue(tr, 4));
+
+            const bandMatches = !band || rowBand === band;
+            const snrMatches = rowSNR >= minSNR;
+
+            tr.style.display = bandMatches && snrMatches ? '' : 'none';
+        });
+    }
+
+    function resetFilters() {
+        document.querySelectorAll('#photData tbody tr').forEach(tr => {
+            tr.style.display = ''
+        })
+    }
+
+    function getCell(tr, id) {
+        return tr.children[id]?.innerText.trim() || '';
+    }
+
+    function parseValue(value, type) {
+        if(type == 'number') {
+            const num = parseFloat(value.replace(/[^0-9.+-]/g, ''));
+            return Number.isFinite(num) ? num : 0;
+        }
+        if(type == 'date') {
+            return Date.parse(value) || 0;
+        }
+        return value.toLowerCase();
+    }
+
+    function sortTable(colIndex, type, ascending) {
+        const tbody = document.querySelector('#photData tbody');
+        const photData = document.getElementById('photData');
+        if(!tbody || !photData) return;
+
+        // Still need to fix the date filtering
+
+        // determine ascending if not provided: toggle when clicking same column
+        if (typeof ascending === 'undefined') {
+            const last = photData.dataset.lastSort ? parseInt(photData.dataset.lastSort) : null;
+            const lastAsc = photData.dataset.lastAscending === 'true';
+            if (last === colIndex) {
+                ascending = !lastAsc;
+            } else {
+                ascending = true;
+            }
+        }
+
+        let rows = Array.from(tbody.querySelectorAll('tr'));
+        // keep only data rows (ignore empty/message rows)
+        rows = rows.filter(r => r.querySelector('td'));
+
+        rows.sort((a,b) => {
+            const a_val = parseValue(getCell(a, colIndex), type);
+            const b_val = parseValue(getCell(b, colIndex), type);
+            if (a_val < b_val) return ascending ? -1 : 1;
+            if (a_val > b_val) return ascending ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+
+        photData.dataset.lastSort = colIndex;
+        photData.dataset.lastAscending = ascending;
+    }
 </script>
