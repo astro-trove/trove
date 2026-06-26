@@ -2,6 +2,7 @@
 Some functions for accessing the EventCandidate table inside a django template
 """
 
+import numpy as np
 from collections import OrderedDict
 from functools import partial
 from django import template
@@ -111,11 +112,14 @@ def display_score_details(target_id):
             else:
                 label = score_factor.key
                 fmter = _float_format
-            res[nle] += (
-                f"&emsp;{label}: {fmter(score_factor.value)}\n"
-                if label == "Host Galaxy Name"
-                else f"&emsp;{label}: {fmter(float(score_factor.value))}\n"
-            )
+            if score_factor.value in (None, np.nan, "nan"):
+                res[nle] += f"&emsp;{label}: {score_factor.value}\n"
+            else:
+                res[nle] += (
+                    f"&emsp;{label}: {fmter(score_factor.value)}\n"
+                    if label == "Host Galaxy Name"
+                    else f"&emsp;{label}: {fmter(float(score_factor.value))}\n"
+                )
 
     out = ""
     for key, s in res.items():
