@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     "candidate_vetting",
     "trove_targets",
     "trove_nonlocalizedevents",
+    "sphinx_docs",
     "dal",
     "dal_select2",
     "django_tables2",
@@ -441,3 +442,6 @@ ZTFTMPDIR = os.path.join(os.getcwd(), "ztf-forced-phot-logs")
 PRIORITY_HIGH = 100
 PRIORITY_MID = 10
 PRIORITY_LOW = 0
+
+# skymap probability contour within which we may consider a target and nonlocalized event associated
+SKYMAP_PROB_CONTOUR = 0.95

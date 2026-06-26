@@ -11,6 +11,8 @@ tests/data/*
 !tests/data/GW170817-update.json
 !tests/data/GW170817-bayestar.fits.gz
 _static/
+!sphinx_docs/docs/build/html/_static/
+data/
 saguaro_tom/settings_local.py
 saguaro_tom.egg-info/SOURCES.txt
 .DS_Store

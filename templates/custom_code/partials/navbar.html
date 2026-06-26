@@ -1,5 +1,5 @@
-<li class="nav-item {% if request.resolver_match.namespace == '/api/docs' and request.resolver_match.url_name == 'schema-swagger-ui' %}active{% endif %}">
+<li class="nav-item {% if request.resolver_match.namespace == '/docs' %}active{% endif %}">
   {% if request.user.is_authenticated %}
-  <a class="nav-link" href="{% url 'api-1.0.0:openapi-view' %}">API Docs</a>
+  <a class="nav-link" href="{% url 'sphinx_docs:docs' %}">Documentation</a>
   {% endif %}
 </li>

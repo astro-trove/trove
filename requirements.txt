@@ -24,6 +24,7 @@ healpix-alchemy==1.1.0
 healpy==1.19.0
 ligo.skymap==2.4.0
 matplotlib==3.10.9
+nbsphinx==0.9.8
 numpy==1.26.4
 pandas==3.0.3
 paramiko==5.0.0
@@ -35,6 +36,9 @@ scipy==1.17.1
 skypatrol==0.6.21
 slack_sdk==3.42.0
 specutils==1.20.3
+sphinx==9.0.4
+sphinx_book_theme==1.2.0
+sphinx_design==0.7.0
 SQLAlchemy==2.0.50
 tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3
 tom-alertstreams==1.2.1
