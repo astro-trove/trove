@@ -97,7 +97,10 @@ def associate_nle_with_target(
     for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
         seq = nle.sequences.last()
         localization = get_preferred_localization(nle)
-        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        try:
+            nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        except ValueError:
+            nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
         target_ids = []
         first_det = (
             target.reduceddatum_set.filter(

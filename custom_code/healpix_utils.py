@@ -42,7 +42,10 @@ def get_target_ids_in_prob_credible_region(
     """
     
     if target_ids is None:
-        nle_time = datetime.strptime(eventsequence.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        try:
+            nle_time = datetime.strptime(eventsequence.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        except ValueError:
+            nle_time = datetime.strptime(eventsequence.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
         logger.info("Target IDs not provided; filtering for targets created "+
                     f"after {nle_time + timedelta(tdelta)}")
         targets = Target.objects.filter(created__gte=nle_time + timedelta(tdelta))
