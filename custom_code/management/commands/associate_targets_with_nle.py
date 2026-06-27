@@ -73,7 +73,10 @@ class Command(BaseCommand):
         # get the specific NLE and NLE time
         nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
         seq = nle.sequences.last()
-        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        try:
+            nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        except ValueError:
+            nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
         logger.info(f"\nNLE is {nle}, NLE sequence time is {nle_time}")
 
         # get targets within the localization region
@@ -86,7 +89,8 @@ class Command(BaseCommand):
             tdelta=first_det_tmin)
         tids_ls = list(tids)
         tids_ls = [tid[0] for tid in tids_ls]
-        targets = Target.objects.filter(id__in=tids_ls).order_by("name")
+        targets = Target.objects.filter(id__in=tids_ls,
+                                        created__gte=nle_time+timedelta(first_det_tmin)).order_by("name")
         logger.info(f"Found {len(targets)} targets")
 
         # loop through targets
