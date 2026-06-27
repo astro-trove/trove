@@ -14,15 +14,16 @@ from tom_nonlocalizedevents.models import (
 )
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
-from candidate_vetting.models import ScoreFactor
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 
 from candidate_vetting.vet import localization_sequence_from_name
-from candidate_vetting.vet_phot import PHOT_SCORE_MIN
-from candidate_vetting.vet_bns import PARAM_RANGES as KN_PARAM_RANGES
-from candidate_vetting.vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
-from candidate_vetting.vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
+
+from .vet_phot import PHOT_SCORE_MIN
+from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
+from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
+from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
+from .models import ScoreFactor
 
 import time
 

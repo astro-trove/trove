@@ -23,10 +23,10 @@
 <div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
 <br><br>
 <div class="row">
-  <a href="{% url 'candidate_vetting:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
+  <a href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
   &nbsp;&nbsp;
   {% if request.user.is_superuser %}
-    <a href="{% url 'candidate_vetting:nle_associate_targets_form' request.GET.nonlocalizedevent %}" title="Associate targets with the NLE" class="btn btn-success btn-lg">Associate Targets</a>
+    <a href="{% url 'scoring:nle_associate_targets_form' request.GET.nonlocalizedevent %}" title="Associate targets with the NLE" class="btn btn-success btn-lg">Associate Targets</a>
   {% endif %}
   &nbsp;&nbsp;
   {% if request.user.is_superuser %}
