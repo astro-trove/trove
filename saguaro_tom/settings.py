@@ -23,6 +23,7 @@ import warnings
 # tom_nonlocalizedevents still references it (healpix_utils.create_localization_for_skymap),
 # which otherwise breaks skymap/localization ingestion. Restore it for compatibility.
 from django.utils import timezone as _timezone
+
 if not hasattr(_timezone, "utc"):
     _timezone.utc = _datetime.timezone.utc
 
@@ -76,6 +77,7 @@ INSTALLED_APPS = [
     "candidate_vetting",
     "trove_targets",
     "trove_nonlocalizedevents",
+    "scoring",
     "sphinx_docs",
     "dal",
     "dal_select2",
@@ -133,32 +135,49 @@ TASKS = {
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
 
-_db_name = os.getenv('POSTGRES_DB', POSTGRES_DB)
+_db_name = os.getenv("POSTGRES_DB", POSTGRES_DB)
 if _db_name:
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql_psycopg2',
-            'NAME': _db_name,
-            'USER': os.getenv('POSTGRES_USER', POSTGRES_USER),
-            'PASSWORD': os.getenv('POSTGRES_PASSWORD', POSTGRES_PASSWORD),
-            'HOST': os.getenv('POSTGRES_HOST', POSTGRES_HOST),
-            'PORT': os.getenv('POSTGRES_PORT', int(POSTGRES_PORT)),
-        }
+        "default": {
+            "ENGINE": "django.db.backends.postgresql_psycopg2",
+            "NAME": _db_name,
+            "USER": os.getenv("POSTGRES_USER", POSTGRES_USER),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD", POSTGRES_PASSWORD),
+            "HOST": os.getenv("POSTGRES_HOST", POSTGRES_HOST),
+            "PORT": os.getenv("POSTGRES_PORT", int(POSTGRES_PORT)),
+        },
+        "catalogs": {
+            "ENGINE": "django.db.backends.postgresql_psycopg2",
+            "NAME": os.getenv("POSTGRES_DB2", POSTGRES_DB2),
+            "USER": os.getenv("POSTGRES_USER2", POSTGRES_USER2),
+            "PASSWORD": os.getenv("POSTGRES_PASSWORD2", POSTGRES_PASSWORD2),
+            "HOST": os.getenv("POSTGRES_HOST2", POSTGRES_HOST2),
+            "PORT": os.getenv("POSTGRES_PORT2", POSTGRES_PORT2),
+        },
     }
 else:
     # SQLite fallback for local dev when Postgres is not configured.
     # django_tasks' DatabaseBackend requires SQLite to use EXCLUSIVE transactions,
     # otherwise `manage.py check` fails with a SystemCheckError.
-    _sqlite_path = os.path.join(BASE_DIR, 'db.sqlite3')
+    _sqlite_path = os.path.join(BASE_DIR, "db.sqlite3")
+    _sqlite_path_catalogs = os.path.join(BASE_DIR, "catalogdb.sqlite3")
+
     DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': _sqlite_path,
-            'OPTIONS': {'transaction_mode': 'EXCLUSIVE'},
-        }
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": _sqlite_path,
+            "OPTIONS": {"transaction_mode": "EXCLUSIVE"},
+        },
+        "catalogs": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": _sqlite_path_catalogs,
+            "OPTIONS": {"transaction_mode": "EXCLUSIVE"},
+        },
     }
     # tom_nonlocalizedevents builds its engine from DATABASES; use env so it gets SQLite too
-    os.environ.setdefault('SA_DB_CONNECTION_URL', 'sqlite:///' + _sqlite_path)
+    os.environ.setdefault("SA_DB_CONNECTION_URL", "sqlite:///" + _sqlite_path)
+
+DATABASE_ROUTERS = ["candidate_vetting.routers.CatalogRouter"]
 
 DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
@@ -209,9 +228,7 @@ DATE_FORMAT = "Y-m-d"
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
 
-WHITENOISE_STATIC_PREFIX = (
-    "/static/"  # TODO: delete this when whitenoise Issue #271 is resolved
-)
+WHITENOISE_STATIC_PREFIX = "/static/"  # TODO: delete this when whitenoise Issue #271 is resolved
 STATIC_URL = FORCE_SCRIPT_NAME + "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "_static")
 STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
@@ -401,18 +418,20 @@ TOM_API_URL = os.getenv("TOM_API_URL", os.path.join(ALLOWED_HOST, FORCE_SCRIPT_N
 HERMES_API_URL = os.getenv("HERMES_API_URL", "https://hermes.lco.global")
 CREDIBLE_REGION_PROBABILITIES = "[0.25, 0.5, 0.75, 0.9, 0.95]"
 
-TARGET_MODEL_CLASS = os.getenv('TARGET_MODEL_CLASS', 'trove_targets.models.Target')
+TARGET_MODEL_CLASS = os.getenv("TARGET_MODEL_CLASS", "trove_targets.models.Target")
 
 # Choose a consistent cosmology
 COSMO = FlatLambdaCDM(H0=69.6 * _u.km / _u.s / _u.Mpc, Tcmb0=2.725 * _u.K, Om0=0.3)
+
 
 # dust maps for Milky Way extinction (optional for local dev if download fails)
 def _dust_map_noop(*args):
     return 0.0
 
+
 try:
-    os.environ['DUSTMAPS_CONFIG_FNAME'] = os.path.join(BASE_DIR, '.dustmapsrc')
-    with warnings.catch_warnings(action='ignore'):
+    os.environ["DUSTMAPS_CONFIG_FNAME"] = os.path.join(BASE_DIR, ".dustmapsrc")
+    with warnings.catch_warnings(action="ignore"):
         from dustmaps import sfd
     try:
         sfd_query = sfd.SFDQuery()
@@ -422,6 +441,7 @@ try:
 
     def sf11(*args):
         return 0.86 * sfd_query(*args)
+
     DUST_MAP = sf11
 except Exception:
     DUST_MAP = _dust_map_noop

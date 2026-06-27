@@ -52,7 +52,7 @@ Issues = "https://github.com/astro-trove/trove/issues"
 packages = [
     "saguaro_tom",
     "custom_code",
-    "candidate_vetting",
+    "scoring",
     "trove_nonlocalizedevents",
     "trove_targets",
     "tests",

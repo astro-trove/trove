@@ -17,10 +17,8 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
 from trove_targets.models import Target
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
-from candidate_vetting.tasks import async_atlas_query
-
-from .vet import get_eventcandidate_default_distance, _distance_at_healpix
-
+from .tasks import async_atlas_query
+from .scoring import get_eventcandidate_default_distance
 from custom_code.templatetags.photometry_extras import error_to_snr
 
 logger = logging.getLogger(__name__)
@@ -511,7 +509,7 @@ def find_public_phot(
     """
 
     # check TNS for any new photometry
-    created_new_tns_phot = TNS_Phot("tns").query(target, timelimit=10)
+    created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
 
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
@@ -533,15 +531,19 @@ def find_public_phot(
             query_atlas = (
                 days_ago > 3
             )  # otherwise ATLAS probably won't have anything new
-            print(f"ATLAS photometry already exists for {target.name}, most recent at "+
-                  f"{days_ago} days ago")
+            print(
+                f"ATLAS photometry already exists for {target.name}, most recent at "
+                + f"{days_ago} days ago"
+            )
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
 
     if query_atlas:
-        print("Asynchronously obtaining ATLAS forced photometry with "+
-              f"days_ago = {min(days_ago_max, days_ago):.2f}\n\n")
+        print(
+            "Asynchronously obtaining ATLAS forced photometry with "
+            + f"days_ago = {min(days_ago_max, days_ago):.2f}\n\n"
+        )
         async_atlas_query.using(
             priority=queue_priority  # this sets the priority to whatever is passed in
         ).enqueue(
