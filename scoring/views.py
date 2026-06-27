@@ -35,7 +35,7 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      VETTING_FORM_CHOICES,
                      DETECTION_HORIZON_DEFAULTS
                      )
-from .tasks import vet_all_async, associate_targets_with_nle
+from .tasks import vet_all_async, associate_targets_with_nle_async
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 
@@ -443,7 +443,7 @@ class NonLocalizedEventAssociateTargetsFormView(FormView):
             )
 
         # run the association asynchronously
-        associate_targets_with_nle(nle, first_det_tmin, first_det_tmax, snr_min)
+        associate_targets_with_nle_async(nle, first_det_tmin, first_det_tmax, snr_min)
 
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"
