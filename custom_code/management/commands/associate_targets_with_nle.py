@@ -8,9 +8,10 @@ from django.conf import settings
 from tom_nonlocalizedevents.models import NonLocalizedEvent 
 
 from trove_targets.models import Target
-from candidate_vetting.models import TnsQ3C
-from custom_code.healpix_utils import create_candidates_from_targets
-from custom_code.healpix_utils import get_target_ids_in_prob_credible_region
+from custom_code.healpix_utils import (
+    get_target_ids_in_prob_credible_region,
+    create_candidates_from_targets,
+    )
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
@@ -21,7 +22,6 @@ class Command(BaseCommand):
     help = ("Associate targets with specific NLE if based on targets' "+ 
             "cumulative probability at position in localization region, "+
             "time of first detection, and SNR of first detection")
-
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -74,31 +74,29 @@ class Command(BaseCommand):
         nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
         seq = nle.sequences.last()
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
-        
         logger.info(f"\nNLE is {nle}, NLE sequence time is {nle_time}")
 
-        # get all targets created with discovery date in the relevant time window
-        tns_transients = TnsQ3C.objects.filter(
-            discoverydate__gte = nle_time + timedelta(days=first_det_tmin),
-            discoverydate__lte = nle_time + timedelta(days=first_det_tmax)
-        )
-        tns_transients_ls = list(tns_transients)
-        tns_names = [q.name_prefix + q.name for q in tns_transients_ls]
-        targets = Target.objects.filter(name__in=tns_names).order_by("name")
+        # get targets within the localization region
+        logger.info("Getting targets in the "+
+                    f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
+                    f"region of {nle.event_id}")
+        tids = get_target_ids_in_prob_credible_region(
+            seq,
+            prob=settings.SKYMAP_PROB_CONTOUR,
+            tdelta=first_det_tmin)
+        tids_ls = list(tids)
+        tids_ls = [tid[0] for tid in tids_ls]
+        targets = Target.objects.filter(id__in=tids_ls).order_by("name")
+        logger.info(f"Found {len(targets)} targets")
 
-        logger.info(f"\nFound {len(targets):d} targets with discovery date "+
-                    f"between {first_det_tmin} and {first_det_tmax} days of "+
-                    f"{nle.event_id} ({nle_time})")
-        logger.info(f"{targets}")
-        logger.info(f"Now checking if they lie within the {prob} probability "+
-                    "region"+f" and their first detection has SNR > {snr_min}." if snr_min > 0 else "")
-
-        ## loop through targets
+        # loop through targets
         new_candidates = []
         for target in targets:
-            logger.info(f"\nChecking target {target.name}...")
+            logger.info(f"\n{target.name}")
             
-            if snr_min > 0: # if excluding based first detection's SNR and time...
+            # if excluding based on first detection's SNR...
+            # ...is first detection >= SNR minimum?
+            if snr_min > 0:
                 first_det = target.reduceddatum_set.filter(
                     data_type="photometry",
                     value__magnitude__isnull=False,
@@ -110,40 +108,37 @@ class Command(BaseCommand):
                 else:
                     logger.info(f"No SNR >= {snr_min} detections, skipping")
                     continue
-                # is first detection within prescribed time window?
-                if not(
-                    first_det.timestamp > nle_time + timedelta(days=first_det_tmin)  and
-                    first_det.timestamp < nle_time + timedelta(days=first_det_tmax)
-                    ):
-                    logger.info("First detection is outside of "+
-                                f"{nle_time + timedelta(days=first_det_tmin)} to "+
-                                f"{nle_time + timedelta(days=first_det_tmax)} "+
-                                "time window")
-                    continue
-            # is target within the `prob` credible region?
-            tids = get_target_ids_in_prob_credible_region(
-                seq,
-                prob=prob,
-                target_ids=[target.id])
-            try:
-                _ = [Target(id=tid) for tid in tids][0] # IndexError raised if was not within prob region
-                if _:
-                    logger.info(f"Target {target.name} lies within {prob} "+
-                                f"probability region of {nle.event_id}")
-                    # attempt to create the eventcandidate
-                    new_cand = create_candidates_from_targets(
-                        seq,
-                        prob=prob,
-                        target_ids=[target.id])
-                    if len(new_cand):
-                        new_candidates += new_cand
-                        logger.info("New eventcandidate created")
-                    else:
-                        logger.info("Eventcandidate already exists")
-            except IndexError:
-                logger.info(f"Target {target.name} lies OUTSIDE {prob} "+
-                            f"probability region of {nle.event_id}")
+            else:
+                first_det = target.reduceddatum_set.filter(
+                    data_type="photometry",
+                    value__magnitude__isnull=False,
+                    value__error__isnull=False).order_by("timestamp").first()
+
+            # is first detection within prescribed time window?
+            if not(
+                first_det.timestamp > nle_time + timedelta(days=first_det_tmin)  and
+                first_det.timestamp < nle_time + timedelta(days=first_det_tmax)
+                ):
+                logger.info("First detection is outside of "+
+                            f"{nle_time + timedelta(days=first_det_tmin)} to "+
+                            f"{nle_time + timedelta(days=first_det_tmax)} "+
+                            "time window")
                 continue
+            else:
+                logger.info("First detection is within "+
+                            f"{nle_time + timedelta(days=first_det_tmin)} to "+
+                            f"{nle_time + timedelta(days=first_det_tmax)} "+
+                            "time window")
+                # attempt to create the eventcandidate
+                new_cand = create_candidates_from_targets(
+                    seq,
+                    prob=settings.SKYMAP_PROB_CONTOUR,
+                    target_ids=[target.id])
+                if len(new_cand):
+                    logger.info("New eventcandidate created")
+                    new_candidates.append(new_cand)
+                else:
+                    logger.info("Eventcandidate already exists")
                     
         logger.info(f"\nLinked {len(new_candidates)} candidates to event {nle.event_id}")
         
