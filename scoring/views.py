@@ -415,7 +415,10 @@ class NonLocalizedEventAssociateTargetsFormView(FormView):
         # get the nonlocalized event
         nle = NonLocalizedEvent.objects.filter(id=pk)[0]
         seq = nle.sequences.last()
-        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        try:
+            nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        except ValueError:
+            nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
 
         # helpful prints
         first_det_tmin_toprint = (nle_time + timedelta(days=first_det_tmin)).strftime("%Y-%m-%d %H:%M:%S")

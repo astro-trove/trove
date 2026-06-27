@@ -67,7 +67,10 @@ def async_associate_targets_nle(
 
     nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
     seq = nle.sequences.last()
-    nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+    try:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+    except ValueError:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
     for ti in target_ids:
         target = Target.objects.filter(id=ti)[0]
         logger.info(f"\n{target.name}")
@@ -142,6 +145,10 @@ def associate_targets_with_nle_async(
     """
     # get NLE sequence
     seq = nle.sequences.last()
+    try:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+    except ValueError:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
 
     # get targets within the localization region
     logger.info("Getting targets in the "+
@@ -153,7 +160,8 @@ def associate_targets_with_nle_async(
         tdelta=first_det_tmin)
     tids_ls = list(tids)
     tids_ls = [tid[0] for tid in tids_ls]
-    targets = Target.objects.filter(id__in=tids_ls).order_by("name")
+    targets = Target.objects.filter(id__in=tids_ls,
+                                    created__gte=nle_time+timedelta(first_det_tmin)).order_by("name")
     logger.info(f"Found {len(targets)} targets")
 
     # associate, asyncronously!
