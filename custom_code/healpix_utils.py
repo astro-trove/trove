@@ -10,7 +10,7 @@ from trove_targets.models import Target
 import numpy as np
 from scipy.stats import multivariate_normal
 from ligo.skymap.moc import bayestar_adaptive_grid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import hashlib
 import uuid
 import sys
@@ -29,15 +29,23 @@ class SaTarget(Base):
     basetarget_ptr_id = sa.Column(sa.Integer, primary_key=True)
     healpix = sa.Column(sa.BigInteger)
 
-def get_target_ids_in_prob_credible_region(eventsequence, prob=0.95, target_ids=None):
+def get_target_ids_in_prob_credible_region(
+        eventsequence,
+        prob=settings.SKYMAP_PROB_CONTOUR,
+        target_ids=None,
+        tdelta=0
+        ):
     """
     Get target IDs of of targets that fall within the `prob` credible region of the localization region
     associated with `eventsequence`. If no `target_ids` are given, all targets created after the
-    event time are considered.
+    event time + `tdelta` (days) are considered. `tdelta` can be negative.
     """
     
     if target_ids is None:
-        targets = Target.objects.filter(created__gte=eventsequence.details['time'])
+        nle_time = datetime.strptime(eventsequence.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+        logger.info("Target IDs not provided; filtering for targets created "+
+                    f"after {nle_time + timedelta(tdelta)}")
+        targets = Target.objects.filter(created__gte=nle_time + timedelta(tdelta))
         target_ids = list(targets.values_list('pk', flat=True))
 
     with Session(sa_engine) as session:
