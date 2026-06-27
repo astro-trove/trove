@@ -78,7 +78,7 @@ def display_score_details(target_id):
     for event_candidate in target.eventcandidate_set.all():
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
-            + ["mpc_score"]  # exclude keys in TargetExtra + exclude mpc_score
+            + ["mpc_score", "predetection_score"]  # exclude keys in TargetExtra + exclude mpc_score, predetection_score
         ).all()
         # reorder them for user-friendly printing later
         sf_set = sorted(sf_set, key=lambda sf: order.index(sf.key))
