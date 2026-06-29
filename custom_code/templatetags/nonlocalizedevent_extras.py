@@ -269,3 +269,17 @@ def event_id_from_pk(pk):
 @register.filter
 def event_type_from_pk(pk):
     return NonLocalizedEvent.objects.get(pk=pk).event_type
+
+@register.filter
+def gracedb_url_from_pk(pk):
+    return NonLocalizedEvent.objects.get(pk=pk).gracedb_url
+
+@register.filter
+def treasuremap_url_from_pk(pk):
+    return NonLocalizedEvent.objects.get(pk=pk).treasuremap_url
+
+@register.filter
+def hermes_url_from_pk(pk):
+    return NonLocalizedEvent.objects.get(pk=pk).hermes_url
+
+
