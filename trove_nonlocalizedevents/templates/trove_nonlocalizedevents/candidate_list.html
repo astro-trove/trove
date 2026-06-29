@@ -17,7 +17,11 @@
 {% block title %}Candidates{% endblock %}
 {% block content %}
 {% if request.GET.nonlocalizedevent %}
-<h1>Candidates for <a href="{% url 'nonlocalizedevents:detail' request.GET.nonlocalizedevent %}" target="_blank">{{ request.GET.nonlocalizedevent|event_id_from_pk }}</a></h1>
+<h1>
+Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
+{% if request.GET.nonlocalizedevent|event_type_from_pk  == "GW" %}<a href="https://gracedb.ligo.org/superevents/{{ request.GET.nonlocalizedevent|event_id_from_pk }}/" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
+</h1>
+{% endif %}
 {% nonlocalizedevent_details %}
 <br></br>
 <div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
