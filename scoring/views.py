@@ -33,6 +33,7 @@ from .forms import (VettingChoiceForm,
                     )
 from .config import (FORM_CHOICE_FUNC_MAP,
                      VETTING_FORM_CHOICES,
+                     VETTING_FORM_INITIALS,
                      DETECTION_HORIZON_DEFAULTS
                      )
 from .tasks import vet_all_async, associate_targets_with_nle_async
@@ -71,6 +72,7 @@ class TargetVettingFormView(FormView):
             nle_most_likely_class = get_most_likely_class(
                 nle_eventseq.details
             )  # most likely class for the NLE
+            # choices for vetting?
             try:
                 form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
                     nle_most_likely_class
@@ -79,6 +81,15 @@ class TargetVettingFormView(FormView):
                 form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
                     ""
                 ]  # allow all types of vetting if most likely class not recognized
+            # initial option for vetting?
+            try:
+                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
+                    nle_most_likely_class
+                ]
+            except KeyError:
+                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
+                    ""
+                ] # set initial to basic if most likely class not recognized
         else:
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
         return form
@@ -299,6 +310,7 @@ class TargetVettingAllFormView(FormView):
         nle_most_likely_class = get_most_likely_class(
             nle_eventseq.details
         )  # most likely class for the NLE
+        # choices for vetting?
         try:
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
                 nle_most_likely_class
@@ -307,6 +319,15 @@ class TargetVettingAllFormView(FormView):
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
                 ""
             ]  # allow all types of vetting if most likely class not recognized
+        # initial option for vetting?
+        try:
+            form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
+                nle_most_likely_class
+            ]
+        except KeyError:
+            form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
+                ""
+            ] # set initial to basic if most likely class not recognized
         return form
 
     def get(self, request, *args, **kwargs):
