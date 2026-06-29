@@ -4,26 +4,33 @@
 {% block content %}
 <div class="row">
   <div class="col-md-8">
-    <h2 class="text-center">Congratulations!! Welcome to the TROVE!</h2>
-    <p class="text-center"><img src="{% static 'img/trove_logo.jpeg' %}" class="img-fluid mx-auto"></p>
-    <form action="{% url 'custom_code:search' %}" class="text-center">
-      <input type="search" name="name" size=50 placeholder="Search by name" class="text-center">
-    </form>
+    <h2 class="text-center">Congratulations!</h2>
+    <h2 class="text-center">Welcome to the TROVE!</h2>
+    <p class="text-center"><img src="{% static 'img/trove_logo_small.jpeg' %}" class="img-fluid mx-auto"></p>
+    <p class="text-center">The Tool for Rapid Object Vetting and Examination (TROVE) is...</p>
+    </br>
+    <a href="{% url 'sphinx_docs:docs' %}" target="_blank" title="Read the documentation" class="btn btn-success">Documentation</a>
   </div>
   <div class="col-md-4">
     <div class="card">
       <div class="card-header">
-        Latest Comments
+        <b>Latest Non-Localized Events</b>
       </div>
-      {% recent_comments %}
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <b>Latest Targets</b>
+      </div>
+      {% recent_targets %}
     </div>
     <br/>
     <div class="card">
       <div class="card-header">
-        Latest Targets
+        <b>Latest Comments</b>
       </div>
-      {% recent_targets %}
+      {% recent_comments %}
     </div>
+    
   </div>
 </div>
 {% endblock %}
