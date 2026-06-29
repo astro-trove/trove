@@ -265,3 +265,7 @@ def nonlocalizedevent_details(context, localization=None):
 @register.filter
 def event_id_from_pk(pk):
     return NonLocalizedEvent.objects.get(pk=pk).event_id
+
+@register.filter
+def event_type_from_pk(pk):
+    return NonLocalizedEvent.objects.get(pk=pk).event_type
