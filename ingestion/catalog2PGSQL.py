@@ -21,6 +21,12 @@ def parse_and_insert(dbctxt: DBctxt, catalog_path: str, catalog_type: str):
         case catalog_config.Catalogs.FERMI3FHL:
             datain = catalog_config.BasicAstropyConfig(dbctxt, catalog_path)
             datain.insert_all()
+        case catalog_config.Catalogs.HEASARCMASTERRADIO:
+            datain = catalog_config.HeasarcMasterRadioConfig(dbctxt, catalog_path)
+            datain.insert_all()
+        case catalog_config.Catalogs.HEASARCMASTERXRAY:
+            datain = catalog_config.HeasarcMasterXRayConfig(dbctxt, catalog_path)
+            datain.insert_all()
         case catalog_config.Catalogs.HECATE2:
             datain = catalog_config.HecateV2Config(dbctxt, catalog_path)
             datain.insert_all()

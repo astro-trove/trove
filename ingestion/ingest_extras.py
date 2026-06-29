@@ -31,3 +31,5 @@ def q3c_index_table(dbctxt: DBctxt, ra: str, dec: str):
     execute_statement(dbctxt, SQL_statements[0])
     execute_statement(dbctxt, SQL_statements[1])
 
+def sexagesimal2decimal(degrees: int, arcminutes: int, arcseconds: int | float) -> float:
+    return degrees + (arcminutes / 60) + (arcseconds / 3600)

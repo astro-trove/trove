@@ -21,6 +21,8 @@ Catalogs = Enum('Catalogs',
     ('DESIDR1',      'DESI_DR1'),
     ('FERMILPSC',    'Fermi_LPSC'),
     ('FERMI3FHL',    'Fermi_3FHL'),
+    ('HEASARCMASTERXRAY', 'HEASARC_Master_XRay'),
+    ('HEASARCMASTERRADIO', 'HEASARC_Master_Radio'),
     ('HECATE2',      'HECATE2'),
     ('LSDR9',        'LS_DR9'),
     ('NEDLVS',       'NEDLVS'),
@@ -162,7 +164,7 @@ class BasicAstropyConfig(CatalogConfig):
                     value = value.replace('"', '"""') # SQL escapes a quote with another quote
                     value = value.replace("'", "''")
 
-        self.data[i][j] = value
+                self.data[i][j] = value
 
 
 class CosmicFlows4Config(CatalogConfig):
@@ -205,6 +207,7 @@ class CosmicFlows4Config(CatalogConfig):
             "fRel double precision",
             "fracNearby double precision"
         ]
+    
     def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 1000):
         super().__init__(dbctxt, path, chunk_rows)
         self.ra  = "RAJ2000"
@@ -253,6 +256,277 @@ class CosmicFlows4Config(CatalogConfig):
         self.relational_schema = CosmicFlows4Config.relational_schema
         return self._relational_schema
 
+
+class HeasarcMasterRadioConfig(CatalogConfig):
+    bytes_ranges = [
+        range(1, 40),
+        range(41, 55),
+        range(56, 66),
+        range(67, 76),
+        range(77, 86),
+        range(87, 97),
+        range(98, 110),
+        range(111, 119),
+        range(120, 128),
+        range(129, 145),
+        range(147, 161),
+        range(162, 178)
+    ]
+    
+    relational_schema = [
+        "name               text",
+        "database_table     text",
+        "ra                 float8",
+        "dec                float8",
+        "flux_6_cm          float8",
+        "flux_20_cm         float8",
+        "flux_other         float8",
+        "lii                float8",
+        "bii                float8",
+        "flux_20_cm_error   float8",
+        "flux_6_cm_error    float8",
+        "flux_other_error   float8"
+    ]
+
+    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
+        super().__init__(dbctxt, path, chunk_rows)
+        self.bytes_ranges = HeasarcMasterRadioConfig.bytes_ranges
+        self.relational_schema = HeasarcMasterRadioConfig.relational_schema
+
+    def _tabularize(self, path):
+        with open(path, "r") as file:
+            self.data = file.read()
+            self.data = self.data.split("\n")
+            self.data = self.data[3:-1]
+        
+        for i, row in enumerate(self.data):
+            new_val = []
+
+            for r in HeasarcMasterRadioConfig.bytes_ranges:
+                new_val.append(row[r.start:r.stop])
+
+            self.data[i] = new_val
+
+    def _relational_schema(self):
+        self.relational_schema = HeasarcMasterRadioConfig.relational_schema
+        return self.relational_schema
+
+    def _clean_data(self):
+        for i, row in enumerate(self.data):
+            new_row = []
+            tmp = None
+
+            tmp = f"'{row[0].strip()}'"
+            if tmp == '':
+                tmp = 'NULL'
+            new_row.append(str(tmp))
+
+            tmp = f"'{row[1].strip()}'"
+            if tmp == '':
+                tmp = 'NULL'
+            new_row.append(str(tmp))
+            
+            tmp = row[2].split()
+            if tmp == []:
+                tmp = 'NULL'
+                new_row.append(tmp)
+            elif (len(tmp) < 3):        # table contains "<decimal number> !!" where not sexagesimal
+                tmp = tmp[0]
+                new_row.append(str(tmp))
+            else:
+                new_row.append(str(sexagesimal2decimal(int(tmp[0]), int(tmp[1]), float(tmp[2]))))
+
+            tmp = row[3].split()
+            if tmp == []:
+                tmp = 'NULL'
+                new_row.append(tmp)
+            elif (len(tmp) < 3):        # table contains "<decimal number> !!" where not sexagesimal
+                tmp = tmp[0]
+                new_row.append(str(tmp))
+            else:
+                new_row.append(str(sexagesimal2decimal(int(tmp[0]), int(tmp[1]), float(tmp[2]))))
+
+            tmp = row[4].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[5].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[6].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[7].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[8].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[9].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[10].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[11].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            self.data[i] = new_row
+
+
+class HeasarcMasterXRayConfig(CatalogConfig):
+    bytes_ranges = [
+        range(1, 33),
+        range(34, 50),
+        range(51, 65),
+        range(66, 76),
+        range(77, 93),
+        range(94, 104),
+        range(105, 119),
+        range(120, 131),
+        range(132, 141),
+        range(142, 151),
+        range(152, 164),
+        range(165, 173),
+        range(174, 225)
+    ]
+    
+    relational_schema = [
+        "name               text", 
+        "ra                 float8",
+        "dec                float8",
+        "count_rate         float8",
+        "count_rate_error   float8",
+        "flux               float8",
+        "database_table     text",
+        "observatory        text",
+        "lii                float8",
+        "bii                float8",
+        "error_radius       float4",
+        "exposure           integer",
+        "class              text"
+    ]
+
+    def __init__(self, dbctxt: DBctxt, path: str, chunk_rows: int = 100000):
+        super().__init__(dbctxt, path, chunk_rows)
+        self.bytes_ranges = HeasarcMasterXRayConfig.bytes_ranges
+        self.relational_schema = HeasarcMasterXRayConfig.relational_schema
+
+    def _tabularize(self, path):
+        with open(path, "r") as file:
+            self.data = file.read()
+            self.data = self.data.split("\n")
+            self.data = self.data[3:-1]
+        
+        for i, row in enumerate(self.data):
+            new_val = []
+
+            for r in HeasarcMasterXRayConfig.bytes_ranges:
+                new_val.append(row[r.start:r.stop])
+
+            self.data[i] = new_val
+
+    def _relational_schema(self):
+        self.relational_schema = HeasarcMasterXRayConfig.relational_schema
+        return self.relational_schema
+
+    def _clean_data(self):
+        for i, row in enumerate(self.data):
+            new_row = []
+            tmp = None
+
+            tmp = f"'{row[0].strip()}'"
+            if tmp == '':
+                tmp = 'NULL'
+            new_row.append(str(tmp))
+            
+            tmp = row[1].split()
+            if tmp == []:
+                tmp = 'NULL'
+                new_row.append(tmp)
+            elif (len(tmp) < 3):        # table contains "<decimal number> !!" where not sexagesimal
+                tmp = tmp[0]
+                new_row.append(str(tmp))
+            else:
+                new_row.append(str(sexagesimal2decimal(int(tmp[0]), int(tmp[1]), float(tmp[2]))))
+
+            tmp = row[2].split()
+            if tmp == []:
+                tmp = 'NULL'
+                new_row.append(tmp)
+            elif (len(tmp) < 3):        # table contains "<decimal number> !!" where not sexagesimal
+                tmp = tmp[0]
+                new_row.append(str(tmp))
+            else:
+                new_row.append(str(sexagesimal2decimal(int(tmp[0]), int(tmp[1]), float(tmp[2]))))
+
+            tmp = row[3].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[4].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[5].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = f"'{row[6].strip()}'"
+            if tmp == '':
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = f"'{row[7].strip()}'"
+            if tmp == '':
+                tmp = 'NULL'
+            new_row.append(str(tmp))
+
+            tmp = row[8].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[9].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = row[10].strip()
+            if (tmp == ''):
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = f"{row[11].strip()}"
+            if tmp == '':
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            tmp = f"'{row[12].strip()}'"
+            if tmp == '':
+                tmp = 'NULL'
+            new_row.append(tmp)
+
+            self.data[i] = new_row
+                
 
 class HecateV2Config(CatalogConfig):
     bytes_ranges = [
@@ -733,7 +1007,7 @@ class TwoMASSConfig(CatalogConfig):
 
     def _data2SQL(self, rows):
         for rowindex, row in enumerate(self.data):
-            self.data[rowindex] = f"({", ".join(row)})"
+            self.data[rowindex] = f"({', '.join(row)})"
 
     def insert_all(self):
         SQL_statement = ""
