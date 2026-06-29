@@ -296,7 +296,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
 
     return {
         'target': target,
-        'plot': offline.plot(fig, output_type='div', show_link=False)
+        'plot': offline.plot(fig, output_type='div', show_link=False, div_id='photometry_plot')
     }
 
 @register.inclusion_tag('tom_dataproducts/partials/photometry_datalist_for_target.html', takes_context=True)
