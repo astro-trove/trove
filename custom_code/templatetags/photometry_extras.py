@@ -222,10 +222,21 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                 opacity=0.5,
                 marker_color=marker_color,
                 marker_symbol=MARKER_MAP['limit'],
-                name=f'{source_name} {filter_name} limits',
+                name=f'{source_name} {filter_name}',
             )
             plot_data.append(series)
             all_ydata.append(np.array(filter_values['limit'], float))
+
+    # Add a constant legend item for limit markers.
+    plot_data.append(go.Scatter(
+        x=[None],
+        y=[None],
+        mode='markers',
+        marker=dict(color='gray', symbol='triangle-down'),
+        name='limits',
+        showlegend=True,
+        hoverinfo='none',
+    ))
 
     # scale the y-axis manually so that we know the range ahead of time and can scale the secondary y-axis to match
     if all_ydata:
@@ -341,6 +352,7 @@ def get_photometry_data(context, target, target_share=False):
         data.append(rd_data)
 
     band_filters = np.unique([phot_dict["filter"] for phot_dict in data])
+    sources = np.unique([phot_dict["source"] for phot_dict in data])
 
     initial = {'submitter': context['request'].user,
                'target': target,
@@ -360,7 +372,8 @@ def get_photometry_data(context, target, target_share=False):
         'sharing_destinations': form.fields['share_destination'].choices,
         'hermes_sharing': hermes_sharing,
         'target_share': target_share,
-        'band_filters': band_filters
+        'band_filters': band_filters,
+        'sources': sources
     }
     return context
 

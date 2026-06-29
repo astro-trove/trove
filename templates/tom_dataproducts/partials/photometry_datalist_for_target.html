@@ -6,6 +6,7 @@
       {% for hidden in target_data_share_form.hidden_fields %}
         {{ hidden }}
       {% endfor %}
+    {{ data|json_script:"data" }}
     <div class="card">
         <div class="card-header">
           Photometry Data
@@ -18,6 +19,15 @@
                 <option value="">All bands</option>
                 {% for filter_val in band_filters %}
                 <option value="{{ filter_val }}">{{ filter_val }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="sourceFilter" class="font-weight-bold">Source Filter</label>
+              <select class="form-control form-control-sm" id="sourceFilter" onchange="applyFilters()">
+                <option value="">All Sources</option>
+                {% for source_val in sources %}
+                <option value="{{ source_val }}">{{ source_val }}</option>
                 {% endfor %}
               </select>
             </div>
@@ -138,6 +148,9 @@
 <script>
     const photometryShareForm = document.getElementById('photometry-data-share-form');
     const photometryPageSize = document.getElementById('phot-page-size');
+
+    const data = JSON.parse(document.getElementById('data').textContent);
+
     let currentPhotometryPage = 1;
 
     function setTargetOnPhotometryForm(val) {
@@ -217,15 +230,18 @@
 
     function applyFilters() {
         const band = document.getElementById('bandFilter').value;
+        const source = document.getElementById('sourceFilter').value;
         const minSNR = parseFloat(document.getElementById('snrFilter').value) || 0;
 
         getAllPhotometryRows().forEach(tr => {
             const rowBand = getRowValue(tr, 2);
+            const rowSource = getRowValue(tr, 5);
             const rowSNR = parseSNR(getRowValue(tr, 4));
 
             const bandMatches = !band || rowBand === band;
             const snrMatches = rowSNR >= minSNR;
-            tr.dataset.filterVisible = bandMatches && snrMatches ? 'true' : 'false';
+            const sourceMatches = !source || rowSource === source;
+            tr.dataset.filterVisible = bandMatches && snrMatches && sourceMatches ? 'true' : 'false';
         });
 
         currentPhotometryPage = 1;
@@ -237,6 +253,7 @@
     function resetFilters() {
         // Resetting inputs
         document.getElementById('bandFilter').value = '';
+        document.getElementById('sourceFilter').value = '';
         document.getElementById('snrFilter').value = '';
 
         getAllPhotometryRows().forEach(tr => {
@@ -246,7 +263,6 @@
 
         renderPagination();
         updatePlotFromTable();
-
     }
 
     function getCell(tr, id) {
@@ -254,14 +270,17 @@
     }
 
     function parseValue(value, type) {
-        if(type == 'number') {
-            // Does this handle uncertainties?
-            const num = parseFloat(value.replace(/[^0-9.+-]/g, ''));
+        if (type == 'number') {
+            if (value == null) return 0;
+            const text = String(value);
+            const num = parseFloat(text.replace(/[^0-9.+-]/g, ''));
             return Number.isFinite(num) ? num : 0;
         }
 
-        if(type == 'date') {
-                const normalized = value
+        if (type == 'date') {
+            if (value instanceof Date) return value;
+            if (value == null) return new Date(NaN);
+            const normalized = String(value)
                 // Remove period after abbreviated month names
                 .replace(/\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\./g, "$1")
                 // Convert a.m./p.m.
@@ -273,7 +292,8 @@
 
             return new Date(normalized);
         }
-        return value.toLowerCase();
+
+        return String(value || '').toLowerCase();
     }
 
     function sortTable(colIndex, type, ascending) {
@@ -314,42 +334,82 @@
 
     function buildPlotlyTracesFromTable() {
         const rows = getFilteredPhotometryRows();
-        const groups = {}; // key: `${source}||${filter}`
+        const groups = {}; // key: `${source}||${filter}||${type}`
 
         rows.forEach(tr => {
             if (tr.dataset.filterVisible === 'false') return;
-            const tsText = getCell(tr, 1);
-            const filterVal = getCell(tr, 2) || '';
-            const mag = parseValue(getCell(tr, 3), 'number');
-            const sourceVal = getCell(tr, 5) || '';
 
-            const x = parseValue(tsText, 'date');
-            const y = mag;
+            const id = tr.querySelector('input[type="checkbox"]').value;
+            const cur_data = data.find(datum => String(datum.id) === String(id));
+            if (!cur_data) return;
 
-            const key = `${sourceVal}||${filterVal}`;
-            if (!groups[key]) groups[key] = { x: [], y: [], err: [], source: sourceVal, filter: filterVal, limit: [] };
+            const filterVal = cur_data.filter || '';
+            const sourceVal = cur_data.source || '';
+            const isLimit = Boolean(cur_data.limit);
+            const x = parseValue(cur_data.timestamp, 'date');
+            const y = parseValue(cur_data.magnitude, 'number');
+            const err = isLimit ? null : Number.isFinite(Number(cur_data.error)) ? Number(cur_data.error) : 0;
+            const key = `${sourceVal}||${filterVal}||${isLimit ? 'limit' : 'detection'}`;
+
+            if (!groups[key]) {
+                groups[key] = {
+                    x: [],
+                    y: [],
+                    err: [],
+                    source: sourceVal,
+                    filter: filterVal,
+                    isLimit: isLimit
+                };
+            }
+
             groups[key].x.push(x);
             groups[key].y.push(y);
-            // groups[key].err.push(err);
-            // groups[key].limit.push(isLimit);
+            if (!isLimit) {
+                groups[key].err.push(err);
+            }
         });
 
         const traces = [];
-        Object.keys(groups).forEach(key => {
-            const g = groups[key];
+        Object.values(groups).forEach(g => {
             const color = getFallbackColor(g.filter);
-            const symbol = getFallbackMarker(g.source);
-
-            traces.push({
+            const symbol = g.isLimit ? getFallbackMarker('limit') : getFallbackMarker(g.source);
+            const trace = {
                 x: g.x,
                 y: g.y,
                 mode: 'markers',
-                name: `${g.source} ${g.filter}`,
-                marker: { color: color, symbol: symbol }
-            })
+                name: g.isLimit ? `${g.source} ${g.filter} limits` : `${g.source} ${g.filter}`,
+                marker: {
+                    color: color,
+                    symbol: symbol
+                }
+            };
+
+            if (g.isLimit) {
+                trace.opacity = 0.5;
+            } else {
+                trace.error_y = {
+                    type: 'data',
+                    array: g.err,
+                    visible: true
+                };
+            }
+
+            traces.push(trace);
         });
 
-        console.log(traces)
+        // Add a persistent legend-only item for limits.
+        traces.push({
+            x: [0],
+            y: [0],
+            mode: 'markers',
+            name: 'limits',
+            marker: {
+                color: 'gray',
+                symbol: 'triangle-down'
+            },
+            visible: 'legendonly',
+            hoverinfo: 'none'
+        });
 
         return traces;
     }
