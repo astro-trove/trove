@@ -36,13 +36,13 @@
       {% endif %}
       {% if galaxy.z and galaxy.z|floatformat != 'nan'%}
         {% if galaxy.zErr|islist %}
-          <td> {{ galaxy.z|floatformat:2 }}<span class="supsubz"><sup>+{{ galaxy.zErr.1|floatformat:2 }}</sup><sub>-{{ galaxy.zErr.0|floatformat:2 }}</sub></span> </td>
+          <td> {{ galaxy.z }}<span class="supsubz"><sup>+{{ galaxy.zErr.1 }}</sup><sub>-{{ galaxy.zErr.0 }}</sub></span> </td>
           <td> {{ galaxy.z_type }} </td>
 	{% else %}
 	  {% if galaxy.zErr|floatformat == 'nan' %}
 	    <td> {{ galaxy.z|floatformat:2 }} (no err.) </td>
 	  {% else %}
-            <td> {{ galaxy.z|floatformat:2 }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr|floatformat:2 }} </td>
+            <td> {{ galaxy.z }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr }} </td>
 	  {% endif %}
 	  <td> {{ galaxy.z_type }} </td>
 	{% endif %}
