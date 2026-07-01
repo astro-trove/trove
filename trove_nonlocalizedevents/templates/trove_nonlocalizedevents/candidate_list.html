@@ -1,3 +1,17 @@
+<style>
+  .select2-container {
+    width: 100% !important;
+  }
+  .select2-selection {
+    height: auto !important;
+    min-height: 38px;
+    padding: 4px 8px;
+  }
+  .select2-selection__rendered {
+    line-height: 28px !important;
+  }
+</style>
+
 {% extends 'tom_common/base.html' %}
 {% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
 {% block title %}Candidates{% endblock %}
@@ -5,27 +19,88 @@
 {% if request.GET.nonlocalizedevent %}
 <h1>Candidates for <a href="{% url 'nonlocalizedevents:detail' request.GET.nonlocalizedevent %}" target="_blank">{{ request.GET.nonlocalizedevent|event_id_from_pk }}</a></h1>
 {% nonlocalizedevent_details %}
+<br></br>
 <div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
+<br><br>
+<div class="row">
+  <a href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
+  &nbsp;&nbsp;
+  {% if request.user.is_superuser %}
+    <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
+  {% endif %}
+</div>
+<br><br>
 {% else %}
 <h1>Candidates</h1>
 {% endif %}
+
+<!-- Modal -->
+<div class="modal fade" id="summaryModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Candidate Summary</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <textarea id="summaryText" class="form-control" rows="15"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                <button type="button" id="copyBtn" class="btn btn-success" onclick="copyText()">
+                    <i class="fa fa-copy"></i> Copy
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+  <div class="col">
+    <form action="" method="get" class="form">
+      {% bootstrap_form eventcandidate_filter_form %}
+
+      {% buttons %}
+      <button type="submit" class="btn btn-primary">
+	Filter
+      </button>
+      <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" class="btn btn-secondary" title="Reset">Reset</a>
+      {% endbuttons %}
+    </form>
+  </div>
+  <div class="col">
+    <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form">
+      {% csrf_token %}
+      {% bootstrap_form eventcandidate_create_form %}
+      {% buttons %}
+      <button type="submit" class="btn btn-primary">
+	Link Target
+      </button>
+      {% endbuttons %}
+    </form>
+  </div>
+</div>
+
+<br>
+
 <div class="row">
   <div class="col-md-10">
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %} 
     <table class="table table-sm table-hover">
       <thead>
         <tr>
-	  <th>Rank</th>
-	  <th>Target</th>
+          <th>Rank</th>
+          <th>Target</th>
           <th>Event</th>
           <th>Score</th>
         </tr>
       </thead>
       <tbody>
-	{% get_event_candidate_scores object_list as candidates_to_display %}
-	{% for candidate in candidates_to_display %}
+	{% for candidate in page_obj.object_list %}
         <tr>
-	  <td>{{forloop.counter}}</td>
+	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
 	  <td>
             {% if candidate.target is not None %}
               <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
@@ -35,7 +110,7 @@
           </td>
           <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
           <td>
-            {% for transient, score in candidate.score.items %}
+	    {% for transient, score in candidate.score.items %}
             {{ transient }} {{score|floatformat:2}}<br>
             {% endfor %}
           </td>
@@ -55,16 +130,30 @@
     </table>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
   </div>
-  <div class="col-md-2">
-    <form action="" method="get" class="form">
-        {% crispy filter.form %}
-      {% buttons %}
-        <button type="submit" class="btn btn-primary">
-          Filter
-        </button>
-        <a href="{% url 'custom_code:event-candidates' %}" class="btn btn-secondary" title="Reset">Reset</a>
-      {% endbuttons %}
-    </form>
-  </div>
 </div>
+
+<script>
+function openSummaryModal() {
+    const nleId = "{{ request.GET.nonlocalizedevent }}";
+    fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=5`)
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('summaryText').value = data.text;
+            $('#summaryModal').modal('show');
+        });
+}
+
+function copyText() {
+    const text = document.getElementById('summaryText');
+    text.select();
+    navigator.clipboard.writeText(text.value).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.innerHTML = '<i class="fa fa-check"></i> Copied!';
+        setTimeout(() => btn.innerHTML = '<i class="fa fa-copy"></i> Copy', 2000);
+    });
+}
+</script>
+
+{{ eventcandidate_filter_form.media }}
+
 {% endblock %}

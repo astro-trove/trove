@@ -2,7 +2,7 @@
 
 <table class="galaxies table table-hover">
     <tr>
-      <th scope="col">ID</th>
+      <th scope="col"></th>
       <th scope="col">Name</th>
       <th scope="col"><i>P</i><sub>cc</sub></th>
       <th scope="col">Off.  <br/> (")</th>
@@ -11,11 +11,12 @@
       <th scope="col">Distance Type</th>
       <th scope="col">Mag.  <br/> (AB)</th>
       <th scope="col">Source</th>
+      <th scope="col">Submitter [Original Source]</th>
     </tr>
   {% for galaxy in galaxies %}
     <tr>
       <td>{{ forloop.counter }}</td>
-      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&coordinates={{galaxy.RA}}d,{{galaxy.Dec}}d&radius=0.02" target="_blank">{{ galaxy.ID }}</a></td>
+      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&in_csys=Equatorial&in_equinox=J2000&ra={{galaxy.RA}}d&dec={{galaxy.Dec}}d&radius=0.02" target="_blank">{{ galaxy.ID }}</a></td>
       <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
       {% if galaxy.Dist and galaxy.Dist|floatformat != 'nan' %}
@@ -35,13 +36,13 @@
       {% endif %}
       {% if galaxy.z and galaxy.z|floatformat != 'nan'%}
         {% if galaxy.zErr|islist %}
-          <td> {{ galaxy.z|floatformat:2 }}<span class="supsubz"><sup>+{{ galaxy.zErr.1|floatformat:2 }}</sup><sub>-{{ galaxy.zErr.0|floatformat:2 }}</sub></span> </td>
+          <td> {{ galaxy.z }}<span class="supsubz"><sup>+{{ galaxy.zErr.1 }}</sup><sub>-{{ galaxy.zErr.0 }}</sub></span> </td>
           <td> {{ galaxy.z_type }} </td>
 	{% else %}
 	  {% if galaxy.zErr|floatformat == 'nan' %}
 	    <td> {{ galaxy.z|floatformat:2 }} (no err.) </td>
 	  {% else %}
-            <td> {{ galaxy.z|floatformat:2 }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr|floatformat:2 }} </td>
+            <td> {{ galaxy.z }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr }} </td>
 	  {% endif %}
 	  <td> {{ galaxy.z_type }} </td>
 	{% endif %}
@@ -51,6 +52,7 @@
       {% endif %}
       <td><i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{{ galaxy.Mags|floatformat:1 }}</td>
       <td>{{ galaxy.Source }}</td>
+      <td>{{ galaxy.Submitter }}</td>
     </tr>
   {% empty %}
     <tr><td colspan=9>No viable host galaxies stored</td></tr>
