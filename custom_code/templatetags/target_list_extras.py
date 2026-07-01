@@ -16,6 +16,7 @@ def galaxy_table(target):
     """
     Displays the most likely host galaxy matches.
     """
+
     te = TargetExtra.objects.filter(target=target, key='Host Galaxies')
     if te.exists():
         galaxies = json.loads(te.first().value)
