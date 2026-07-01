@@ -2,7 +2,7 @@ from specutils import Spectrum1D
 from tom_dataproducts.processors.data_serializers import SpectrumSerializer
 from tom_dataproducts.processors.spectroscopy_processor import SpectroscopyProcessor as OldSpectroscopyProcessor
 from tom_dataproducts.exceptions import InvalidFileFormatException
-from lightcurve_fitting.speccal import readspec
+from .spectrum_reader import readspec
 import numpy as np
 
 TELESCOPE_ALIASES = {'2m0-01': 'FTN', '2m0-02': 'FTS'}
@@ -14,8 +14,8 @@ class SpectroscopyProcessor(OldSpectroscopyProcessor):
         """
         Routes a spectroscopy processing call to a method specific to a file-format, then serializes the returned data.
 
-        Parsing of the spectrum file is handled by the lightcurve-fitting
-        package: https://griffin-h.github.io/lightcurve_fitting/api.html#lightcurve_fitting.speccal.readspec.
+        Parsing of the spectrum file is handled by the local spectrum_reader module,
+        which supports FITS, ASCII, and JSON (Open Astronomy Catalog) formats.
 
         Serialization removes any NaN values, which cannot be stored in a JSONField.
 

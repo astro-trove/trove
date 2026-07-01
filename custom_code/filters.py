@@ -81,8 +81,8 @@ class NonLocalizedEventFilter(django_filters.FilterSet):
 
 
 class GWFilter(NonLocalizedEventFilter):
-    prefix = django_filters.ChoiceFilter(choices=(('S', 'Real'), ('MS', 'Test')), label='Alert Type',
-                                         field_name='event_id', lookup_expr='startswith')
+    prefix = django_filters.ChoiceFilter(choices=(('GW', 'GWTC'), ('S', 'Real'), ('MS', 'Test')),
+                                         label='Alert Type', field_name='event_id', lookup_expr='startswith')
     state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')))
     inv_far_min = django_filters.NumberFilter('details__far__lte',
                                               method='last_sequence_filter', label='1/FAR', min_value=sys.float_info.epsilon,

@@ -250,7 +250,7 @@ class GWListView(NonLocalizedEventListView):
     formhelper_class = GWFormHelper
 
     def get_queryset(self):
-        qs = NonLocalizedEvent.objects.filter(event_type='GW').order_by('-created')
+        qs = NonLocalizedEvent.objects.filter(event_type='GW').order_by('-event_id')
         return qs
 
 

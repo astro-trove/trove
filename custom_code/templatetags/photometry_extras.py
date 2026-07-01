@@ -8,13 +8,65 @@ from tom_dataproducts.models import ReducedDatum
 import numpy as np
 from datetime import datetime
 import re
-from matplotlib.colors import to_hex
-from lightcurve_fitting.filters import filtdict
 
 register = template.Library()
 
-# any marker colors or shapes that we want to keep static across all pages
-COLOR_MAP = {name: to_hex(fltr.linecolor) for name, fltr in filtdict.items()}
+# Filter color map for photometry plotting
+# Colors chosen to match standard astronomical conventions
+COLOR_MAP = {
+    'u': '#7f00ff',  # violet
+    'U': '#7f00ff',
+    'B': '#0000ff',  # blue
+    'g': '#00ff00',  # green
+    'V': '#008000',  # dark green
+    'r': '#ff0000',  # red
+    'R': '#ff0000',
+    'i': '#8b0000',  # dark red
+    'I': '#8b0000',
+    'z': '#4a0000',  # very dark red
+    'y': '#2a0000',  # near-infrared
+    'Y': '#2a0000',
+    'J': '#1a0000',
+    'H': '#0a0000',
+    'K': '#050000',
+    'c': '#00ffff',  # ATLAS cyan
+    'o': '#ffa500',  # ATLAS orange
+    'G': '#00ff00',  # Gaia G-band
+    'w': '#808080',  # Pan-STARRS w (wide)
+    'Clear': '#808080',
+    'clear': '#808080',
+    'L': '#808080',
+    'F070W': 'C7', # JWST
+    'F090W': 'C0',
+    'F115W': 'C8',
+    'F150W': 'C1',
+    'F182M': 'tomato',
+    'F200W': 'C2',
+    'F250M': 'chocolate',
+    'F277W': 'C3',
+    'F300M': 'maroon',
+    'F335M': 'salmon',
+    'F356W': 'C4',
+    'F360M': 'crimson',
+    'F444W': 'C5',
+    'F560W': 'C9',
+    'F770W': 'C6',
+    'F1000W': 'C7',
+    'F1130W': 'C0',
+    'F1280W': 'C8',
+    'F1500W': 'C1',
+    'F1800W': 'C9',
+    'F2100W': 'C2',
+    'F2550W': 'C3',
+    'F062': '#332288', # Roman; colors = David Nichols' Tol palette https://davidmathlogic.com/colorblind/
+    'F087': '#117733',
+    'F106': '#44AA99',
+    'F129': '#88CCEE',
+    'F146': '#DDCC77',
+    'F158': '#CC6677',
+    'F184': '#AA4499',
+    'F213': '#882255',
+}
 MARKER_MAP = {
     'limit': 50,  # arrow-bar-down
     'ATLAS': 2,  # diamond
