@@ -106,6 +106,8 @@ def millisecondformat(value, d=0):
 
 @register.filter
 def truncate(string, length=5):
+    if string is None:
+        return ""
     if len(string) > length:
         return string[: length - 1] + "."
     else:
