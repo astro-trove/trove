@@ -1,7 +1,6 @@
 from django import forms, template
 from django.conf import settings
 from guardian.shortcuts import get_objects_for_user
-from plotly import offline
 import plotly.io as pio
 import plotly.graph_objs as go
 from plotly import colors
