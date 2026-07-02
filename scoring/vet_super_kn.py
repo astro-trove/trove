@@ -53,7 +53,7 @@ def vet_super_kn(
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
 ):
-
+    print(target_id)
     logger.info("Running super-KN vetting")
 
     # get the correct EventCandidate object for this target_id and nonlocalized event

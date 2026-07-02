@@ -70,6 +70,7 @@ def display_score_details(target_id):
     ) in target.eventcandidate_set.all():  # add MPC score from scorefactor, if present
         sf_set = event_candidate.scorefactor_set.filter(key="mpc_score")
         basic_score_details.append(sf_set)
+    # Potentially just add "agn" here?
     te_set = te.filter(key__in=TARGETEXTRA_KEYS).exclude(key__in=["ps_score"])
     basic_score_details.append(te_set)
 

@@ -72,9 +72,11 @@ class EventCandidateListView(FilterView):
         # Create cache key from filters (excluding page number)
         filter_key = self.request.GET.urlencode().split("&page=")[0]
         cache_key = f"event_candidates_scored_{filter_key}"
+        # Potentially use cache to determine toggle of AGN if want to maintain it as a global state
 
         # Check cache first
-        scored_candidates = cache.get(cache_key)
+        # scored_candidates = cache.get(cache_key)
+        scored_candidates = None
         if scored_candidates is None:
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
