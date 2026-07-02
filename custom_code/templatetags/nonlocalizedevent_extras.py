@@ -1,8 +1,9 @@
 from django import template
-from django.db.models import Max
+from django.db.models import Max, Count
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from custom_code.templatetags.skymap_extras import get_preferred_localization
 import math
+from trove_nonlocalizedevents.permissions import nonlocalizedevents_for_user
 
 register = template.Library()
 
@@ -260,6 +261,25 @@ def nonlocalizedevent_details(context, localization=None):
         details_to_display = []
     print("Finished loading NLE details")
     return {"details": details_to_display}
+
+
+@register.inclusion_tag('trove_nonlocalizedevents/partials/recent_nonlocalizedevents.html', takes_context=True)
+def recent_gw_nonlocalizedevents_withcandidates(context, ncands_min=1, limit=5):
+    """
+    Displays a list of the most recently created GW nonlocalized events in the
+    TOM, with at least `ncands_min` candidates, up to the given limit of rows,
+    or 5 if not specified.
+    """
+    user = context['request'].user
+    nles = NonLocalizedEvent.objects.annotate(candidate_count=Count('candidates'))
+
+    return {
+        'empty_database': not NonLocalizedEvent.objects.exists(),
+        'authenticated': user.is_authenticated,
+        'nonlocalizedevents': nonlocalizedevents_for_user(
+            user,
+            nles.filter(event_type="GW", candidate_count__gte=ncands_min)).order_by('-event_id')[:limit]
+    }
 
 
 @register.filter
