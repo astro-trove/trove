@@ -165,6 +165,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                                       klass=ReducedDatum.objects.filter(
                                         target=target,
                                         data_type=settings.DATA_PRODUCT_TYPES['photometry'][0]))
+    datums = datums.order_by("source_name", "value__filter") # sort data by telescope/filter name
 
     detections = {}
     limits = {}
