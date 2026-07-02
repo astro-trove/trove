@@ -1,36 +1,60 @@
 {% extends 'tom_common/base.html' %}
-{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras %}
+{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras nonlocalizedevent_extras %}
 {% block title %}Home{% endblock %}
 {% block content %}
 <div class="row">
   <div class="col-md-8">
-    <h2 class="text-center">Congratulations!</h2>
-    <h2 class="text-center">Welcome to the TROVE!</h2>
-    <p class="text-center"><img src="{% static 'img/trove_logo_small.jpeg' %}" class="img-fluid mx-auto"></p>
-    <p class="text-center">The Tool for Rapid Object Vetting and Examination (TROVE) is...</p>
-    </br>
-    <a href="{% url 'sphinx_docs:docs' %}" target="_blank" title="Read the documentation" class="btn btn-success">Documentation</a>
-  </div>
-  <div class="col-md-4">
-    <div class="card">
-      <div class="card-header">
-        <b>Latest Non-Localized Events</b>
+    <div class="row">
+      <div class="column" style="width:50%">
+        <img src="{% static 'img/trove_logo_small.jpeg' %}">
+      </div>
+      <div class="column" style="width:50%">
+        <h1 class="text"><b>Welcome to</b></h1>
+        <h1 class="text"><b>the TROVE!</b></h1>
       </div>
     </div>
+    </br>
+    <h5 class="text-align">The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
+    </br>
+    <h5 class="text-align">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
+    </br>
+    <h5 class="text-align"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
+    </br>
+    <div style="text-align:center">
+      <a href="{% url 'sphinx_docs:docs' %}" target="_blank" title="Read the documentation!" class="btn btn-lg btn-info">📜 Documentation</a>
+      <a href="/accounts/register" target="_blank" title="Register for an account!" class="btn btn-lg btn-warning">🌐 Register</a>
+    </div>
+    </br>
+    <div class="card">
+      <div class="card-header">
+        <b>Non-Localized Event Spotlight</b>
+      </div>
+      </br>
+      </br>
+      </br>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <b>Latest Target Comments</b>
+      </div>
+      {% recent_comments %}
+    </div>
+  </div>
+  <div class="col-md-4">
+    <br/>
+    <div class="card">
+      <div class="card-header">
+        <b>Latest GW Non-Localized Events (with Candidates!)</b>
+      </div>
+      {% recent_gw_nonlocalizedevents_withcandidates %}
+    </div>
+    <br/>
     <div class="card">
       <div class="card-header">
         <b>Latest Targets</b>
       </div>
       {% recent_targets %}
     </div>
-    <br/>
-    <div class="card">
-      <div class="card-header">
-        <b>Latest Comments</b>
-      </div>
-      {% recent_comments %}
-    </div>
-    
   </div>
 </div>
 {% endblock %}
