@@ -2,6 +2,7 @@ from django import forms, template
 from django.conf import settings
 from guardian.shortcuts import get_objects_for_user
 from plotly import offline
+import plotly.io as pio
 import plotly.graph_objs as go
 from plotly import colors
 from tom_dataproducts.models import ReducedDatum
@@ -307,7 +308,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
 
     return {
         'target': target,
-        'plot': offline.plot(fig, output_type='div', show_link=False, div_id='photometry_plot')
+        'plot': pio.to_html(fig, full_html=False, div_id='photometry_plot')
     }
 
 @register.inclusion_tag('tom_dataproducts/partials/photometry_datalist_for_target.html', takes_context=True)
