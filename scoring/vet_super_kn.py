@@ -27,7 +27,6 @@ from .vet_phot import (
 )
 
 from trove_targets.models import Target
-from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import (
     EventCandidate,
     NonLocalizedEvent,
@@ -53,7 +52,6 @@ def vet_super_kn(
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
 ):
-
     logger.info("Running super-KN vetting")
 
     # get the correct EventCandidate object for this target_id and nonlocalized event
