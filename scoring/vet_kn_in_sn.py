@@ -7,7 +7,6 @@ import logging
 from typing import Optional
 from astropy.time import Time, TimeDelta
 from astropy import units as u
-import pandas as pd
 import numpy as np
 
 from .scoring import (
@@ -28,7 +27,6 @@ from .vet_phot import (
 )
 
 from trove_targets.models import Target
-from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import (
     EventCandidate,
     NonLocalizedEvent,
@@ -54,7 +52,6 @@ def vet_kn_in_sn(
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
 ):
-
     logger.info("Running KN-in-SN vetting")
 
     # get the correct EventCandidate object for this target_id and nonlocalized event
