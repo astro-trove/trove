@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db.models import IntegerField
 from django.db.models.functions import Cast
 from django_comments.models import Comment
+from datetime import datetime
 from guardian.shortcuts import get_objects_for_user
 
 from tom_targets.models import Target
@@ -36,3 +37,24 @@ def recent_comments(context, limit=10):
             object_pk_as_int__in=targets_for_user
         ).order_by('-submit_date')[:limit]
     }
+
+
+@register.inclusion_tag("custom_code/partials/countdown.html", takes_context=True)
+def countdown_IR1(context):
+    request = context["request"]
+    event_date = datetime.fromisoformat("2026-10-31T00:00:00")
+    time_remaining = event_date - datetime.now()
+    days = time_remaining.days
+    hours = time_remaining.seconds // 3600
+    minutes = (time_remaining.seconds % 3600) // 60
+    seconds = time_remaining.seconds % 60
+
+    data = {
+        'name': "IR1",
+        'days': days,
+        'hours': hours,
+        'minutes': minutes,
+        'seconds': seconds
+    }
+
+    return {"data": data}
