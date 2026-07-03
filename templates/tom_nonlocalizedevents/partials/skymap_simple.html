@@ -3,7 +3,7 @@
 <script type="text/javascript">
     var aladin;
 A.init.then(() => {
-    aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+    aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showLayersControl: false, showFullscreenControl: false, showProjectionControl: false, showReticle: false, showCooGrid: false});
     var candidates = A.catalog({color: '#84f', name: 'Linked Candidates'});
     aladin.addCatalog(candidates);
     {% for candidate in candidates %}
