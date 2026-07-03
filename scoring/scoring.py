@@ -212,9 +212,11 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     # this is already done in vet_bns, vet_kn_in_sn, and vet_super_kn,
     # but we need to account for users calling this function for arbitrary
     # host_df, target, and NLE without prior filtering on host_df
-    host_df = host_df[host_df.z != -999.0] ### TODO: This is for PS1-STRM. We should just change these filler values to nulls or something...
-    host_df = host_df[host_df.z != -9999.0] ### TODO: This is for SDSS DR12 photo-zs. We should just change these filler values to nulls or something...
-    host_df = host_df[~np.isnan(host_df.z)]
+    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -999.0] # PS1-STRM
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[~np.isnan(host_df.z)]
 
     # then use the redshift of user-uploaded host galaxies
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
@@ -320,9 +322,11 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     )  # since we store the host info as a json str in the db
 
     # clean up dataframe
-    host_df = host_df[host_df.z != -999.0] ### TODO: This is for PS1-STRM. We should just change these filler values to nulls or something...
-    host_df = host_df[host_df.z != -9999.0] ### TODO: This is for SDSS DR12 photo-zs. We should jusdt change these filler values to nulls or something...
-    host_df = host_df[~np.isnan(host_df.z)]
+    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -999.0] # PS1-STRM
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[~np.isnan(host_df.z)]
 
     if not len(host_df):
         return _distance_at_healpix(nonlocalized_event_name, target_id)
