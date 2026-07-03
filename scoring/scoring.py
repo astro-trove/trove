@@ -245,7 +245,9 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 
     # then if we don't know the spec-z or have an independent distance measure use the photo-z's
     max_score = host_df.dist_norm_joint_prob.max()
-    max_score_host_name = host_df.iloc[host_df["dist_norm_joint_prob"].idxmax()]["name"]
+    photoz_hosts = host_df[host_df.z_type == "photo-z"]
+    photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
+    max_score_host_name = photoz_hosts.iloc[photoz_hosts["dist_norm_joint_prob"].idxmax()]["name"]
     return max_score, max_score_host_name
 
 
