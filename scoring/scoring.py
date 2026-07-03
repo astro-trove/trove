@@ -250,7 +250,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     photoz_hosts = host_df[host_df.z_type == "photo-z"]
     photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(photoz_hosts):
-        max_score = host_df.dist_norm_joint_prob.max()
+        max_score = photoz_hosts.dist_norm_joint_prob.max()
         max_score_host_name = photoz_hosts.iloc[
             photoz_hosts["dist_norm_joint_prob"].idxmax()
         ]["name"]
