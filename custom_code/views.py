@@ -211,6 +211,7 @@ class TargetClassifyView(PermissionListMixin, TemplateResponseMixin, FormMixin, 
     def get_success_url(self):
         return reverse_lazy('targets:detail', kwargs=self.kwargs)
 
+
 class TargetNameSearchView(OldTargetNameSearchView):
     """
     View for searching by target name. If the search returns one result, the view redirects to the corresponding

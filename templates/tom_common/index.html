@@ -7,10 +7,10 @@
   <div class="col-md-6">
     <!-- Logo and welcome -->
     <div class="row">
-      <div class="column text-align:right" style="width:50%">
+      <div class="column" style="width:50%">
         <p><img src="{% static 'img/trove_logo_small.jpeg' %}"></p>
       </div>
-      <div class="column test-align:left" style="width:50%">
+      <div class="column" style="width:50%">
         <h1 class="text"><b>Welcome to</b></h1>
         <h1 class="text"><b>the TROVE!</b></h1>
       </div>
@@ -18,13 +18,13 @@
     </br>
 
     <!-- Description of TROVE -->
-    <h5 class="text-align:align">The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
+    <h5>The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
     </br>
     {% comment %}
-    <h5 class="text-align:align">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
+    <h5>TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
     </br>
     {% endcomment %}
-    <h5 class="text-align:align"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
+    <h5><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
     </br>
 
     <!-- Documentation and Register buttons -->
@@ -81,12 +81,16 @@
         <b>Non-Localized Event Spotlight</b>
       </div>
       <div class="row align:center">
-        <div class="col-md-12">S251112cm: The first significant candidate merger involving a subsolar mass compact object!</div>
+        <!-- <div class="col-md-12">GW170817: The first and only multimessenger binary neutron star merger!</div> -->
+        <div class="col-md-12">GW190814: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div>
+        <!-- <div class="col-md-12">S251112cm: The first statistically significant candidate GW merger involving one (or two!) subsolar mass compact object!</div> -->
       </div>
       </br>
       <div class="row">
         <div class="col-md-12">
-          {% skymap_nle_id_manual_simple 20113 %}
+          <!-- {% skymap_nle_id_manual_simple 21962 %} --> <!-- 21962 = GW170817 -->
+          {% skymap_nle_id_manual_simple 21085 %} <!-- 21962 = GW190814 -->
+          <!-- {% skymap_nle_id_manual_simple 20113 %} --> <!-- 20113 = S251112cm -->
         </div>
       </div>
       </br>

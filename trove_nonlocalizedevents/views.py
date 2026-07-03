@@ -2,10 +2,12 @@ import json
 from django_filters.views import FilterView
 from django.core.cache import cache
 from django.core.paginator import Paginator
+from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseRedirect
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import RedirectView
 from django.views.generic.base import View
 
 from trove_targets.models import Target
@@ -112,6 +114,23 @@ class EventCandidateListView(FilterView):
             except (EventCandidate.DoesNotExist, ValueError):
                 pass
         return super().get(request, *args, **kwargs)
+
+
+class NonLocalizedEventNameSearchView(RedirectView):
+    """
+    View for searching by nonlocalizedevent name. If the search returns one
+    result, the view redirects to the event candidates list for the
+    NonLocalizedEvent. Otherwise, returns to basic candidates list page.
+    """
+
+    def get(self, request, *args, **kwargs):
+        # get the nonlocalized event name and then NLE from the search
+        nonlocalized_event_name = request.GET.get("name").strip()
+        try:
+            nle = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
+            return HttpResponseRedirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
+        except ObjectDoesNotExist:
+            return HttpResponseRedirect("/eventcandidates/")
 
 
 class EventCandidateCreateFromNLEView(LoginRequiredMixin, View):

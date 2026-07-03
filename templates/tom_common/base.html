@@ -49,6 +49,10 @@
         <form action="{% url 'custom_code:search' %}" class="form-inline">
           <input type="search" name="name" placeholder="Search for target">
         </form>
+        </br>
+        <form action="{% url 'custom_code:event-candidates-nle-search' %}" class="form-inline">
+          <input type="search" name="name" placeholder="Search for NLE">
+        </form>
         <ul class="navbar-nav ml-auto" id="login-buttons">
           {# navbar_login #}
 	  {% include 'tom_common/partials/navbar_login.html' %}
