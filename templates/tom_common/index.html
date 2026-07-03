@@ -1,60 +1,97 @@
 {% extends 'tom_common/base.html' %}
-{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras nonlocalizedevent_extras %}
+{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras nonlocalizedevent_extras skymap_extras %}
 {% block title %}Home{% endblock %}
 {% block content %}
 <div class="row">
-  <div class="col-md-8">
+  <!-- LEFT SIDE OF PAGE -->
+  <div class="col-md-6">
+    <!-- Logo and welcome -->
     <div class="row">
-      <div class="column" style="width:50%">
-        <img src="{% static 'img/trove_logo_small.jpeg' %}">
+      <div class="column text-align:right" style="width:50%">
+        <p><img src="{% static 'img/trove_logo_small.jpeg' %}"></p>
       </div>
-      <div class="column" style="width:50%">
+      <div class="column test-align:left" style="width:50%">
         <h1 class="text"><b>Welcome to</b></h1>
         <h1 class="text"><b>the TROVE!</b></h1>
       </div>
     </div>
     </br>
-    <h5 class="text-align">The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
+
+    <!-- Description of TROVE -->
+    <h5 class="text-align:align">The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
     </br>
-    <h5 class="text-align">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
+    {% comment %}
+    <h5 class="text-align:align">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
     </br>
-    <h5 class="text-align"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
+    {% endcomment %}
+    <h5 class="text-align:align"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
     </br>
+
+    <!-- Documentation and Register buttons -->
     <div style="text-align:center">
       <a href="{% url 'sphinx_docs:docs' %}" target="_blank" title="Read the documentation!" class="btn btn-lg btn-info">📜 Documentation</a>
       <a href="/accounts/register" target="_blank" title="Register for an account!" class="btn btn-lg btn-warning">🌐 Register</a>
     </div>
     </br>
+
+    <!-- Latest targets -->
+    {% comment %}
     <div class="card">
       <div class="card-header">
-        <b>Non-Localized Event Spotlight</b>
+        <b>Latest Targets</b>
       </div>
-      </br>
-      </br>
-      </br>
+      {% recent_targets 5 %}
     </div>
+    {% endcomment %}
+
+    <!-- Latest comments on targets -->
     <div class="card">
       <div class="card-header">
         <b>Latest Target Comments</b>
       </div>
       {% recent_comments %}
     </div>
-  </div>
-  <div class="col-md-4">
-    <br/>
+
+  </div> <!-- END OF LEFT SIDE OF PAGE -->
+
+
+  <!-- RIGHT SIDE OF PAGE -->
+  <div class="col-md-6">
+    <!-- Countdown to IR1, O5, end of O5, etc. -->
     <div class="card">
       <div class="card-header">
-        <b>Latest GW Non-Localized Events (with Candidates!)</b>
+        {% countdown_IR1 %}
+      </br>
       </div>
-      {% recent_gw_nonlocalizedevents_withcandidates %}
     </div>
-    <br/>
+    </br>
+
+    <!-- Latest GW NLEs -->
     <div class="card">
       <div class="card-header">
-        <b>Latest Targets</b>
+        <b>Latest GW Non-Localized Events</b>
       </div>
-      {% recent_targets %}
+      {% recent_gw_nonlocalizedevents_withcandidates 1 5 %}
     </div>
-  </div>
+    <br/>
+
+    <!-- NLE Spotlight -->
+    <div class="card">
+      <div class="card-header">
+        <b>Non-Localized Event Spotlight</b>
+      </div>
+      <div class="row align:center">
+        <div class="col-md-12">S251112cm: The first significant candidate merger involving a subsolar mass compact object!</div>
+      </div>
+      </br>
+      <div class="row">
+        <div class="col-md-12">{% skymap_nle_id_manual_simple 21962 %}</div>
+      </div>
+      </br>
+    </div>
+    </br>
+
+  </div> <!-- END OF RIGHT SIDE OF PAGE -->
+
 </div>
 {% endblock %}
