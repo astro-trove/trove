@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda env *)",
+      "Bash(/home/sopanda25/miniconda3/envs/t-env/bin/python -)"
+    ]
+  }
+}

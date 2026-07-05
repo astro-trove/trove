@@ -93,7 +93,7 @@ def get_event_candidate_scores(
     event_candidates,
     dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
     subscore_names=SUBSCORE_NAMES,
-    agn_include=True
+    agn_toggle=True
 ):
     """Get the event candidate scores for everything in subscore_names
 
@@ -103,7 +103,7 @@ def get_event_candidate_scores(
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
     
-    if agn_include:
+    if agn_toggle:
         pass
     else:
         # Determine actual key for AGN_Score
@@ -159,6 +159,7 @@ def get_event_candidate_scores(
         # for object; need to re-do this per transient because of step
         # below where we exclude certain scores from the queryset
         sf_dict = score_factors_by_ec.get(ec.id, {})
+        print(sf_dict)
 
         # Extract values that need special handling
         val_dict = {

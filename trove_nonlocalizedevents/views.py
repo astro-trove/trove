@@ -69,18 +69,21 @@ class EventCandidateListView(FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Create cache key from filters (excluding page number)
-        filter_key = self.request.GET.urlencode().split("&page=")[0]
-        cache_key = f"event_candidates_scored_{filter_key}"
-        # Potentially use cache to determine toggle of AGN if want to maintain it as a global state
+        agn_toggle = cache.get("agn_toggle", True)
 
-        # Check cache first
-        # scored_candidates = cache.get(cache_key)
-        scored_candidates = None
+        # Create cache key from filters (excluding page number)
+        query_params = self.request.GET.copy()
+        query_params.pop("page", None)
+        filter_key = query_params.urlencode()
+        cache_key = f"event_candidates_scored_{filter_key}_{agn_toggle}"
+
+        # Check cache first (ToggleAgnCacheView pre-warms this key for the
+        # current NLE when the AGN toggle is flipped)
+        scored_candidates = cache.get(cache_key)
         if scored_candidates is None:
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
-            scored_candidates = get_event_candidate_scores(all_candidates)
+            scored_candidates = get_event_candidate_scores(all_candidates, agn_toggle=agn_toggle)
             # Cache for 5 minutes
             cache.set(cache_key, scored_candidates, 60 * 5)
 
@@ -91,6 +94,7 @@ class EventCandidateListView(FilterView):
 
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
+        context["agn_toggle"] = agn_toggle
 
         nle_id = self.request.GET.get("nonlocalizedevent")
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
@@ -152,11 +156,13 @@ def generate_report(request):
     except ValueError:
         ncands = 10  # this means the user didn't pass an integer to the n param
 
+    agn_toggle = cache.get("agn_toggle", False)
+
     candidates = EventCandidate.objects.filter(
         nonlocalizedevent_id=nle_id
     ).select_related("target", "nonlocalizedevent")
 
-    candidates = list(get_event_candidate_scores(candidates))  # [:ncands]
+    candidates = list(get_event_candidate_scores(candidates, agn_toggle=False))  # [:ncands]
 
     nle_name = NonLocalizedEvent.objects.get(id=nle_id)
 
@@ -278,3 +284,46 @@ We encourage additional follow up of these candidates to determine whether they 
     )
 
     return JsonResponse({"text": "\n".join(lines)})
+
+
+class ToggleAgnCacheView(LoginRequiredMixin, View):
+    """
+    Flips the site-wide, cache-backed agn_toggle flag and immediately
+    rescores affected candidates (rather than waiting for the next page
+    view to lazily recompute them).
+    """
+
+    def get(self, request, *args, **kwargs):
+        from django.contrib import messages
+
+        # Toggle the persistent, site-wide AGN inclusion flag. Note: we must
+        # not call cache.clear() here, since it would also wipe the key we
+        # just set (this previously made the toggle never actually persist).
+        new_val = not cache.get("agn_toggle", True)
+        cache.set("agn_toggle", new_val)
+
+        nle_id = request.GET.get("nonlocalizedevent")
+        if nle_id:
+            candidates = EventCandidate.objects.filter(
+                nonlocalizedevent_id=nle_id
+            ).select_related("target", "nonlocalizedevent")
+            scored_candidates = get_event_candidate_scores(candidates, agn_toggle=new_val)
+
+            # Warm the cache under the same key EventCandidateListView will look
+            # up, so candidates are already rescored by the time the redirect below lands.
+            cache_key = f"event_candidates_scored_nonlocalizedevent={nle_id}_{new_val}"
+            cache.set(cache_key, scored_candidates, 60 * 5)
+
+            messages.info(
+                request,
+                f"Rescored all {len(scored_candidates)} candidates with AGN score "
+                f"{'included' if new_val else 'excluded'}.",
+            )
+            return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
+
+        messages.info(
+            request,
+            f"AGN score {'included' if new_val else 'excluded'} in scoring. "
+            "Candidates will be rescored as you view them.",
+        )
+        return redirect(reverse("custom_code:event-candidates"))

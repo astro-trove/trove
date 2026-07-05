@@ -87,7 +87,9 @@
 
 <div class="row">
   <div class="col-md-10">
-    <button>AGN Toggle</button>
+    <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-primary{% else %}btn-secondary{% endif %} mb-2">
+      {% if agn_toggle %}AGN Score: Included{% else %}AGN Score: Excluded{% endif %}
+    </a>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %} 
     <table class="table table-sm table-hover">
       <thead>
