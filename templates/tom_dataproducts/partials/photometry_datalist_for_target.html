@@ -6,21 +6,79 @@
       {% for hidden in target_data_share_form.hidden_fields %}
         {{ hidden }}
       {% endfor %}
+    {{ data|json_script:"data" }}
     <div class="card">
         <div class="card-header">
           Photometry Data
         </div>
+        <div class="card-body">
+          <div class="form-row">
+            <div class="form-group col-md-4">
+              <label for="bandFilter" class="font-weight-bold">Band Filter</label>
+              <select class="form-control form-control-sm" id="bandFilter" onchange="applyFilters()">
+                <option value="">All bands</option>
+                {% for filter_val in band_filters %}
+                <option value="{{ filter_val }}">{{ filter_val }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="sourceFilter" class="font-weight-bold">Source Filter</label>
+              <select class="form-control form-control-sm" id="sourceFilter" onchange="applyFilters()">
+                <option value="">All Sources</option>
+                {% for source_val in sources %}
+                <option value="{{ source_val }}">{{ source_val }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="form-group col-md-4">
+              <label for="snrFilter" class="font-weight-bold">Minimum S/N</label>
+              <input class="form-control form-control-sm" id="snrFilter" type="number" min="0" placeholder="0" onchange="applyFilters()">
+            </div>
+            <div class="form-group col-md-4 d-flex align-items-end">
+              <button type="button" class="btn btn-outline-secondary btn-sm btn-block" onclick="resetFilters()">Reset filters</button>
+            </div>
+          </div>
+        </div>
+        <div class="form-row align-items-center mb-2">
+            <div class="col-md-3">
+              <label for="phot-page-size" class="font-weight-bold">Rows per page</label>
+              <select class="form-control form-control-sm" id="phot-page-size" onchange="renderPagination()">
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div class="col-md-9 text-right">
+              <nav aria-label="Photometry pagination">
+                <ul class="pagination justify-content-end mb-0" id="photDataPagination"></ul>
+              </nav>
+            </div>
+        </div>
         <table id="photData" class="table table-striped table-hover table-sm" cellspacing="0" width="100%">
             <thead>
-                <tr><th><div class="form-check">
-                    <input type="checkbox" class="form-check-input" id="share-all" onclick="select_all()" value=""/>
-                    <label class="form-check-label" for="share-all">Share</label>
-                    </div></th>
-                    <th>Timestamp</th>
-                    <th>Filter</th>
-                    <th>Magnitude</th>
-                    <th>S/N</th>
-                    <th>Source</th>
+                <tr>
+                    <th>
+                      <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="share-all" onclick="select_all()" value=""/>
+                        <label class="form-check-label" for="share-all">Share</label>
+                      </div>
+                    </th>
+                    <th>
+                        Timestamp <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(1, 'date')">⬘</button>
+                    </th>
+                    <th>
+                        Filter <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(2, 'string')">⬘</button>
+                    </th>
+                    <th>
+                        Magnitude <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(3, 'number')">⬘</button>
+                    </th>
+                    <th>
+                        S/N <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(4, 'number')">⬘</button>
+                    </th>
+                    <th>
+                        Source <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(5, 'string')">⬘</button>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -88,34 +146,363 @@
     </div>
 </form>
 <script>
-  const photometryShareForm = document.getElementById('photometry-data-share-form');
-  function setTargetOnPhotometryForm(val) {
-      if (val && val != '') {
-      photometryShareForm.setAttribute('target', val);
-      }
-      else{
-      photometryShareForm.removeAttribute('target');
-      }
-      return true;
-  };
-  function select_all()  {
-  var share_all = document.getElementById("share-all");
-     if(share_all.checked == true){
-        $('input[name=share-box]').prop('checked', true);
-     } else {
-        $('input[name=share-box]').prop('checked', false);
-     }
-     check_selected()
-  }
-  function check_selected()  {
-  var share_boxes = document.getElementsByName("share-box");
-  var submit_btn = document.getElementById('submit_selected');
-    for (const box of share_boxes) {
-        if(box.checked == true) {
-            submit_btn.disabled = false;
-            return;
+    const photometryShareForm = document.getElementById('photometry-data-share-form');
+    const photometryPageSize = document.getElementById('phot-page-size');
+
+    const data = JSON.parse(document.getElementById('data').textContent);
+
+    let currentPhotometryPage = 1;
+
+    const initialTraceStyles = {};
+
+    function captureInitialTraceStyles() {
+        const plotDiv = document.querySelector('.plotly-graph-div');
+        if (!plotDiv || !plotDiv.data) return;
+        plotDiv.data.forEach(trace => {
+            if (trace.name && trace.marker) {
+                initialTraceStyles[trace.name] = {
+                    color: trace.marker.color,
+                    symbol: trace.marker.symbol
+                };
+            }
+        });
+    }
+
+    captureInitialTraceStyles();
+
+    function setTargetOnPhotometryForm(val) {
+        console.log(val)
+        if (val && val != '') {
+            photometryShareForm.setAttribute('target', val);
+        }
+        else{
+            photometryShareForm.removeAttribute('target');
+        }
+        return true;
+    };
+
+    function select_all()  {
+        var share_all = document.getElementById("share-all");
+        if(share_all.checked == true){
+            getFilteredPhotometryRows().forEach(tr => {
+                const checkbox = tr.querySelector('input[type="checkbox"]');
+                if(checkbox) {
+                    checkbox.checked = true;
+                }
+            });
+        } else {
+            $('input[name=share-box]').prop('checked', false);
+        }
+        check_selected()
+    }
+
+    function check_selected()  {
+        var share_boxes = document.getElementsByName("share-box");
+        var submit_btn = document.getElementById('submit_selected');
+        for (const box of share_boxes) {
+            if(box.checked == true) {
+                submit_btn.disabled = false;
+                return;
+            }
+        }
+        submit_btn.disabled = true;
+    }
+
+    function getRowValue(tr, colIndex) {
+        return tr.children[colIndex]?.innerText.trim() || '';
+    }
+
+    function parseSNR(text) {
+        text = text.trim();
+        if (!text || text === '< 3') return 0;
+        return parseFloat(text) || 0;
+    }
+
+    function getAllPhotometryRows() {
+        return Array.from(document.querySelectorAll('#photData tbody tr')).filter(tr => tr.querySelector('td'));
+    }
+
+    function getFallbackColor(filter) {
+        const COLOR_MAP = {
+            'u':'#7f00ff','U':'#7f00ff','B':'#0000ff','g':'#00ff00','V':'#008000','r':'#ff0000','R':'#ff0000',
+            'i':'#8b0000','I':'#8b0000','z':'#4a0000','y':'#2a0000','Y':'#2a0000','J':'#1a0000','H':'#0a0000','K':'#050000',
+            'c':'#00ffff','o':'#ffa500','G':'#00ff00','w':'#808080','Clear':'#808080','clear':'#808080','L':'#808080'
+        };
+        return COLOR_MAP[filter] || '#444444';
+    }
+
+    function getFallbackMarker(label) {
+        const MARKER_MAP = {
+            'limit': 50,
+            'ATLAS': 2,
+            'MARS': 1,
+            'SAGUARO pipeline': 0,
+            'ZTF': 1,
+            'P48': 1,
+        };
+        if (MARKER_MAP[label]) return MARKER_MAP[label];
+        const base = label.split(/\(|-|_/)[0];
+        return MARKER_MAP[base] || 0;
+    }
+
+    function applyFilters() {
+        const band = document.getElementById('bandFilter').value;
+        const source = document.getElementById('sourceFilter').value;
+        const minSNR = parseFloat(document.getElementById('snrFilter').value) || 0;
+
+        getAllPhotometryRows().forEach(tr => {
+            const rowBand = getRowValue(tr, 2);
+            const rowSource = getRowValue(tr, 5);
+            const rowSNR = parseSNR(getRowValue(tr, 4));
+
+            const bandMatches = !band || rowBand === band;
+            const snrMatches = rowSNR >= minSNR;
+            const sourceMatches = !source || rowSource === source;
+            tr.dataset.filterVisible = bandMatches && snrMatches && sourceMatches ? 'true' : 'false';
+        });
+
+        currentPhotometryPage = 1;
+
+        renderPagination();
+        updatePlotFromTable();
+    }
+
+    function resetFilters() {
+        // Resetting inputs
+        document.getElementById('bandFilter').value = '';
+        document.getElementById('sourceFilter').value = '';
+        document.getElementById('snrFilter').value = '';
+
+        getAllPhotometryRows().forEach(tr => {
+            tr.dataset.filterVisible = 'true';
+        });
+        currentPhotometryPage = 1;
+
+        renderPagination();
+        updatePlotFromTable();
+    }
+
+    function getCell(tr, id) {
+        return tr.children[id]?.innerText.trim() || '';
+    }
+
+    function parseValue(value, type) {
+        if (type == 'number') {
+            if (value == null) return 0;
+            const text = String(value);
+            const num = parseFloat(text.replace(/[^0-9.+-]/g, ''));
+            return Number.isFinite(num) ? num : 0;
+        }
+
+        if (type == 'date') {
+            if (value instanceof Date) return value;
+            if (value == null) return new Date(NaN);
+            const normalized = String(value)
+                // Remove period after abbreviated month names
+                .replace(/\b(Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\./g, "$1")
+                // Convert a.m./p.m.
+                .replace(/a\.m\./gi, "AM")
+                .replace(/p\.m\./gi, "PM")
+                // Handle midnight/noon
+                .replace(/,\s*midnight$/i, ", 12:00 AM")
+                .replace(/,\s*noon$/i, ", 12:00 PM");
+
+            return new Date(normalized);
+        }
+
+        return String(value || '').toLowerCase();
+    }
+
+    function sortTable(colIndex, type, ascending) {
+        const tbody = document.querySelector('#photData tbody');
+        const photData = document.getElementById('photData');
+        if(!tbody || !photData) return;
+
+        // toggles between ascending and descending
+        if (typeof ascending === 'undefined') {
+            const last = photData.dataset.lastSort ? parseInt(photData.dataset.lastSort) : null;
+            const lastAsc = photData.dataset.lastAscending === 'true';
+            if (last === colIndex) {
+                ascending = !lastAsc;
+            } else {
+                ascending = true;
+            }
+        }
+
+        let rows = Array.from(tbody.querySelectorAll('tr'));
+        // ignore message rows
+        rows = rows.filter(r => r.querySelector('td'));
+
+        rows.sort((a,b) => {
+            const a_val = parseValue(getCell(a, colIndex), type);
+            const b_val = parseValue(getCell(b, colIndex), type);
+
+            if (a_val < b_val) return ascending ? -1 : 1;
+            if (a_val > b_val) return ascending ? 1 : -1;
+            return 0;
+        });
+
+        rows.forEach(row => tbody.appendChild(row));
+
+        photData.dataset.lastSort = colIndex;
+        photData.dataset.lastAscending = ascending;
+        renderPagination();
+    }
+
+    function buildPlotlyTracesFromTable() {
+        const rows = getFilteredPhotometryRows();
+        const groups = {}; // key: `${source}||${filter}||${type}`
+
+        rows.forEach(tr => {
+            if (tr.dataset.filterVisible === 'false') return;
+
+            const id = tr.querySelector('input[type="checkbox"]').value;
+            const cur_data = data.find(datum => String(datum.id) === String(id));
+            if (!cur_data) return;
+
+            const filterVal = cur_data.filter || '';
+            const sourceVal = cur_data.source || '';
+            const isLimit = Boolean(cur_data.limit);
+            const x = parseValue(cur_data.timestamp, 'date');
+            const y = parseValue(cur_data.magnitude, 'number');
+            const err = isLimit ? null : Number.isFinite(Number(cur_data.error)) ? Number(cur_data.error) : 0;
+            const key = `${sourceVal}||${filterVal}||${isLimit ? 'limit' : 'detection'}`;
+
+            if (!groups[key]) {
+                groups[key] = {
+                    x: [],
+                    y: [],
+                    err: [],
+                    source: sourceVal,
+                    filter: filterVal,
+                    isLimit: isLimit
+                };
+            }
+
+            groups[key].x.push(x);
+            groups[key].y.push(y);
+            if (!isLimit) {
+                groups[key].err.push(err);
+            }
+        });
+
+        const traces = [];
+        Object.values(groups).forEach(g => {
+            const traceName = g.isLimit ? `${g.source} ${g.filter} limits` : `${g.source} ${g.filter}`;
+            const style = initialTraceStyles[traceName];
+            const color = style ? style.color : getFallbackColor(g.filter);
+            const symbol = style ? style.symbol : (g.isLimit ? getFallbackMarker('limit') : getFallbackMarker(g.source));
+            const trace = {
+                x: g.x,
+                y: g.y,
+                mode: 'markers',
+                name: traceName,
+                marker: {
+                    color: color,
+                    symbol: symbol
+                }
+            };
+
+            if (g.isLimit) {
+                trace.opacity = 0.5;
+            } else {
+                trace.error_y = {
+                    type: 'data',
+                    array: g.err,
+                    visible: true
+                };
+            }
+
+            traces.push(trace);
+        });
+
+        // Add a persistent legend-only item for limits.
+        traces.push({
+            x: [0],
+            y: [0],
+            mode: 'markers',
+            name: 'limits',
+            marker: {
+                color: 'gray',
+                symbol: 'triangle-down'
+            },
+            visible: 'legendonly',
+            hoverinfo: 'none'
+        });
+
+        return traces;
+    }
+
+    function updatePlotFromTable() {
+        const plotDiv = document.querySelector('.plotly-graph-div');
+        if (!plotDiv || !window.Plotly) return;
+        const traces = buildPlotlyTracesFromTable();
+        // preserve layout if present
+        const layout = plotDiv.layout || {};
+        try {
+            Plotly.react(plotDiv, traces, layout);
+        } catch (e) {
+            console.warn('Plotly.react failed', e);
         }
     }
-    submit_btn.disabled = true;
-  }
+
+    function getFilteredPhotometryRows() {
+        return getAllPhotometryRows().filter(tr => tr.dataset.filterVisible !== 'false');
+    }
+
+    function renderPagination() {
+        const rows = getFilteredPhotometryRows();
+        const pageSize = parseInt(photometryPageSize.value, 10) || 50;
+        const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+        if (currentPhotometryPage > totalPages) {
+            currentPhotometryPage = totalPages;
+        }
+
+        const pagination = document.getElementById('photDataPagination');
+        pagination.innerHTML = '';
+
+        const addPageButton = (label, page, disabled, active) => {
+            const li = document.createElement('li');
+            li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.className = 'page-link btn btn-sm';
+            link.textContent = label;
+            if (!disabled) {
+                link.addEventListener('click', () => {
+                    currentPhotometryPage = page;
+                    renderPagination();
+                });
+            }
+            li.appendChild(link);
+            pagination.appendChild(li);
+        };
+
+        addPageButton('Previous', Math.max(1, currentPhotometryPage - 1), currentPhotometryPage === 1, false);
+
+        // Only showing a limited number of pages
+        const startPage = Math.max(1, currentPhotometryPage - 3);
+        const endPage = Math.min(totalPages, startPage + 4);
+        for (let page = startPage; page <= endPage; page += 1) {
+            addPageButton(page, page, false, page === currentPhotometryPage);
+        }
+
+        addPageButton('Next', Math.min(totalPages, currentPhotometryPage + 1), currentPhotometryPage === totalPages, false);
+
+        const startIndex = (currentPhotometryPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        rows.forEach((tr, index) => {
+            tr.style.display = (index >= startIndex && index < endIndex) ? '' : 'none';
+        });
+
+        getAllPhotometryRows().forEach(tr => {
+            if (tr.dataset.filterVisible === 'false') {
+                tr.style.display = 'none';
+            }
+        });
+        // Update plot after pagination/filter change
+        // if (typeof updatePlotFromTable === 'function') updatePlotFromTable();
+    }
+
+    renderPagination();
 </script>

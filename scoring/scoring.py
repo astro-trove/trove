@@ -191,7 +191,7 @@ def host_distance_match(
 
 def get_distance_score(host_df, target_id, nonlocalized_event_name):
     """
-    This get's the host score from the input host_df by first prioritizing target specific redshifts,
+    This gets the host score from the input host_df by first prioritizing target specific redshifts,
     then spec-z's, and then photo-z's. It assumes that any potential host within a
     Pcc < PCC_THRESHOLD is equally probable. It also uses the maximum probability galaxy
     to soften the effects of poor distance associations.
@@ -208,10 +208,15 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
             np.sqrt(targ_pdf * nle_pdf), x=_lumdist
         ), None  # None because there is no host name
 
-    # if not, look at potential hosts; need to do quick cleanup of host_df
-    host_df = host_df[host_df.z != -999.0] ### TODO: This is for PS1-STRM. We should just change these filler values to nulls or something...
-    host_df = host_df[host_df.z != -9999.0] ### TODO: This is for SDSS DR12 photo-zs. We should jusdt change these filler values to nulls or something...
-    host_df = host_df[~np.isnan(host_df.z)]
+    # first, some cleanup
+    # this is already done in vet_bns, vet_kn_in_sn, and vet_super_kn,
+    # but we need to account for users calling this function for arbitrary
+    # host_df, target, and NLE without prior filtering on host_df
+    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -999.0] # PS1-STRM
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[~np.isnan(host_df.z)]
 
     # then use the redshift of user-uploaded host galaxies
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
@@ -244,11 +249,17 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         return max_score, max_score_host_name
 
     # then if we don't know the spec-z or have an independent distance measure use the photo-z's
-    max_score = host_df.dist_norm_joint_prob.max()
     photoz_hosts = host_df[host_df.z_type == "photo-z"]
     photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
-    max_score_host_name = photoz_hosts.iloc[photoz_hosts["dist_norm_joint_prob"].idxmax()]["name"]
-    return max_score, max_score_host_name
+    if len(photoz_hosts):
+        max_score = photoz_hosts.dist_norm_joint_prob.max()
+        max_score_host_name = photoz_hosts.iloc[
+            photoz_hosts["dist_norm_joint_prob"].idxmax()
+        ]["name"]
+        return max_score, max_score_host_name
+
+    # no potential host
+    return 1.0, None # None because there is no host name
 
 
 def skymap_association(
@@ -306,19 +317,21 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
     if not hosts.count():
         return _distance_at_healpix(nonlocalized_event_name, target_id)
-
     host_df = pd.read_json(
         io.StringIO(hosts[0].value)
     )  # since we store the host info as a json str in the db
+
+    # clean up dataframe
+    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -999.0] # PS1-STRM
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[~np.isnan(host_df.z)]
+
     if not len(host_df):
         return _distance_at_healpix(nonlocalized_event_name, target_id)
 
     # if we've gotten to this point then the target has host galaxies associated with it!
-    # zeroth thing to do: clean up dataframe
-    host_df = host_df[host_df.z != -999.0] ### TODO: This is for PS1-STRM. We should just change these filler values to nulls or something...
-    host_df = host_df[host_df.z != -9999.0] ### TODO: This is for SDSS DR12 photo-zs. We should jusdt change these filler values to nulls or something...
-    host_df = host_df[~np.isnan(host_df.z)]
-
     # first thing we need to do is assign a rank ordering to the various catalogs,
     # this will help later
     host_df["_rank_order"] = host_df.Source.replace(GALAXY_CATALOG_RANKING)

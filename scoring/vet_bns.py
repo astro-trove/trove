@@ -80,8 +80,14 @@ def vet_bns(
     if skymap_score < 1e-2:
         return
 
-    ## compute the basic scores, return dataframes of potential hosts / AGN
+    ## get dataframes of potential hosts / AGN
     host_df, agn_df = vet_basic(event_candidate.target.id)
+    # some cleanup
+    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -999.0] # PS1-STRM
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[~np.isnan(host_df.z)]
 
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
