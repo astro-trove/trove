@@ -153,6 +153,23 @@
 
     let currentPhotometryPage = 1;
 
+    const initialTraceStyles = {};
+
+    function captureInitialTraceStyles() {
+        const plotDiv = document.querySelector('.plotly-graph-div');
+        if (!plotDiv || !plotDiv.data) return;
+        plotDiv.data.forEach(trace => {
+            if (trace.name && trace.marker) {
+                initialTraceStyles[trace.name] = {
+                    color: trace.marker.color,
+                    symbol: trace.marker.symbol
+                };
+            }
+        });
+    }
+
+    captureInitialTraceStyles();
+
     function setTargetOnPhotometryForm(val) {
         console.log(val)
         if (val && val != '') {
@@ -371,13 +388,15 @@
 
         const traces = [];
         Object.values(groups).forEach(g => {
-            const color = getFallbackColor(g.filter);
-            const symbol = g.isLimit ? getFallbackMarker('limit') : getFallbackMarker(g.source);
+            const traceName = g.isLimit ? `${g.source} ${g.filter} limits` : `${g.source} ${g.filter}`;
+            const style = initialTraceStyles[traceName];
+            const color = style ? style.color : getFallbackColor(g.filter);
+            const symbol = style ? style.symbol : (g.isLimit ? getFallbackMarker('limit') : getFallbackMarker(g.source));
             const trace = {
                 x: g.x,
                 y: g.y,
                 mode: 'markers',
-                name: g.isLimit ? `${g.source} ${g.filter} limits` : `${g.source} ${g.filter}`,
+                name: traceName,
                 marker: {
                     color: color,
                     symbol: symbol
