@@ -23,12 +23,14 @@ python manage.py check_distance_scores --event S251112cm --target-name AT2025add
 
 import warnings
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
 from django.core.management.base import BaseCommand, CommandError
+from django.db import connections
 
 from trove_targets.models import Target
 from tom_nonlocalizedevents.models import EventCandidate, NonLocalizedEvent
@@ -70,19 +72,8 @@ METRIC_ORDER = [
 ]
 
 
-def _plot_metric_histograms(plotting_data, output_path, event, n_bins=25, log_floor=1e-30):
-    """
-    One histogram per metric (small multiples), stacked bars colored by the
-    type of distance measurement (redshift, spec-z, photo-z, z-ind, ...).
-
-    Scores span many orders of magnitude (down to ~1e-200 for badly-mismatched
-    hosts), so a linear-scale histogram would just show one giant bar at zero.
-    We histogram log10(score) instead, with a shared floor for any score below
-    log_floor, so the spread is actually visible and every panel is on the
-    same scale for direct comparison.
-    """
+def _plot_metric_boxplots(plotting_data, output_path, event, log_floor=1e-30):
     metrics_present = [m for m in METRIC_ORDER if m in plotting_data]
-    bins = np.linspace(np.log10(log_floor), 0, n_bins + 1)
 
     n_cols = 2
     n_rows = -(-len(metrics_present) // n_cols)  # ceil division
@@ -98,37 +89,32 @@ def _plot_metric_histograms(plotting_data, output_path, event, n_bins=25, log_fl
             continue
 
         data = [np.log10(np.clip(by_category[c], log_floor, 1.0)) for c in cats_present]
-        colors = [CATEGORY_COLORS[c] for c in cats_present]
-        ax.hist(data, bins=bins, stacked=True, color=colors, edgecolor="white", linewidth=0.5)
+        bp = ax.boxplot(
+            data, patch_artist=True, widths=0.6,
+            medianprops=dict(color="#0b0b0b", linewidth=1.5),
+            flierprops=dict(marker="o", markersize=3, markerfacecolor="#898781", markeredgecolor="none"),
+        )
+        for patch, cat in zip(bp["boxes"], cats_present):
+            patch.set_facecolor(CATEGORY_COLORS[cat])
+            patch.set_alpha(0.85)
+
+        ax.set_xticks(range(1, len(cats_present) + 1))
+        ax.set_xticklabels(cats_present, rotation=20, ha="right", fontsize=7)
         ax.set_title(metric, fontsize=10)
-        ax.set_xlabel("log10(score)", fontsize=8)
-        ax.set_ylabel("count", fontsize=8)
+        ax.set_ylabel("log10(score)", fontsize=8)
         ax.tick_params(labelsize=7)
 
-    # turn off any unused trailing panels (metric count isn't always a multiple of n_cols)
     for j in range(len(metrics_present), n_rows * n_cols):
         axes[j // n_cols][j % n_cols].axis("off")
 
-    # one shared legend for the whole figure, in the same fixed category order
-    # used for color assignment everywhere else
-    handles = [plt.Rectangle((0, 0), 1, 1, color=color) for color in CATEGORY_COLORS.values()]
-    fig.legend(
-        handles, CATEGORY_COLORS.keys(), loc="lower center",
-        ncol=len(CATEGORY_COLORS), frameon=False,
-    )
-
-    fig.suptitle(f"Distance-metric scores by host redshift type -- {event}", fontsize=13)
-    fig.tight_layout(rect=[0, 0.05, 1, 0.96])
+    fig.suptitle(f"Distance-metric score distributions by host redshift type -- {event}", fontsize=13)
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
     return output_path
 
 
 def check_target_distance_score(target_id: int, nonlocalized_event_name: str):
-    """
-    Run the same distance-scoring path vet_kn_in_sn takes for a single target,
-    and return (score, host_name, note) for reporting.
-    """
     target = Target.objects.get(id=target_id)
 
     if target.redshift is not None and not np.isnan(target.redshift):
@@ -143,11 +129,32 @@ def check_target_distance_score(target_id: int, nonlocalized_event_name: str):
     host_df = _clean_host_df(host_df)
 
     if not len(host_df):
-        return 1.0, None, "no host candidates after cleanup"
+        # nothing to compare against -- no bias data point, not a fake category
+        return {}
 
     host_df = host_distance_match(host_df, target_id, nonlocalized_event_name)
     ret_scores = get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name)
     return ret_scores
+
+
+def _score_one_candidate(ec, event):
+    """
+    Thread-pool worker: each candidate's cost is almost entirely network wait
+    (host_association queries ~12 external galaxy catalogs sequentially), so
+    running candidates concurrently gives a near-linear speedup instead of
+    burning wall-clock time on I/O one candidate at a time.
+    """
+    try:
+        diag_scores = check_target_distance_score(ec.target_id, event)
+        return ec.target.name, diag_scores, None
+    except Exception as e:
+        return ec.target.name, None, str(e)
+    finally:
+        # each thread lazily opens its own DB connections (default + catalogs
+        # aliases); close them here so a big candidate list doesn't leave
+        # hundreds of connections open on the shared DB tunnel
+        for conn in connections.all():
+            conn.close()
 
 
 class Command(BaseCommand):
@@ -172,33 +179,51 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--output",
-            help="Path to save the histogram figure",
+            help="Base path to save the figures (heatmap/boxplot suffixes added)",
             type=str,
-            default="distance_metric_histograms.png",
+            default="distance_metric_bias",
+        )
+        parser.add_argument(
+            "--workers",
+            help="Number of candidates to score concurrently (default 8). Each "
+            "candidate is almost all network wait, so this is a big speedup, "
+            "but keep it moderate -- too high adds load to the shared DB tunnel",
+            type=int,
+            default=8,
         )
 
-    def handle(self, event, limit=15, target_name=None, output="distance_metric_histograms.png", **kwargs):
+    def handle(self, event, limit=None, target_name=None, output="distance_metric_bias", workers=8, **kwargs):
         try:
             nle = NonLocalizedEvent.objects.get(event_id=event)
         except NonLocalizedEvent.DoesNotExist:
             raise CommandError(f"No NonLocalizedEvent found with event_id={event!r}")
 
         candidates = EventCandidate.objects.filter(nonlocalizedevent_id=nle.id)
+        if target_name:
+            candidates = candidates.filter(target__name=target_name)
+            if not candidates.exists():
+                raise CommandError(f"No candidate named {target_name!r} found for {event}")
+        elif limit:
+            candidates = candidates[:limit]
+
+        candidates = list(candidates)
+        total = len(candidates)
 
         plotting_data = defaultdict(lambda: defaultdict(list))
-        for ec in candidates:
-            try:
-                diag_scores = check_target_distance_score(
-                    ec.target_id, event
-                )
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(_score_one_candidate, ec, event) for ec in candidates]
+            for i, future in enumerate(as_completed(futures), start=1):
+                name, diag_scores, error = future.result()
+                if error:
+                    print(f"[{i}/{total}] {name}: FAILED - {error}")
+                    continue
                 for key, val in diag_scores.items():
                     if len(val) == 3 and val[2]:
                         plotting_data[key][val[2]].append(val[0])
-            except Exception as e:
-                print(f"  {ec.target_id}: FAILED - {e}")
+                print(f"[{i}/{total}] {name}: done")
 
         if plotting_data:
-            path = _plot_metric_histograms(plotting_data, output, event)
-            print(f"Saved histogram figure to {path}")
+            boxplot_path = _plot_metric_boxplots(plotting_data, f"{output}_boxplots.png", event)
+            print(f"Saved boxplots to {boxplot_path}")
         else:
             print("No plotting data collected.")
