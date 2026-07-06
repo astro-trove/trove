@@ -1,4 +1,5 @@
 from .models import ScoreFactor
+from .dynamic_catalogs import UserGalaxy
 from .healpix_utils import SaTarget
 
 from candidate_vetting.vet import GALAXY_CATALOGS
@@ -24,7 +25,7 @@ from tom_nonlocalizedevents.healpix_utils import (
     # update_all_credible_region_percents_for_candidates
 )
 
-from dynamic_catalogs import UserGalaxy
+
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
 from tom_targets.models import TargetExtra
 

@@ -24,7 +24,7 @@ import time
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
-from dynamic_catalogs import UserGalaxy
+
 
 from candidate_vetting.vet import (
     GALAXY_CATALOGS,
@@ -34,6 +34,8 @@ from candidate_vetting.vet import (
     save_score_to_targetextra,
     run_mpc,
 )
+
+from .dynamic_catalogs import UserGalaxy
 from .vet_phot import find_public_phot
 from .tasks import async_mpc
 
