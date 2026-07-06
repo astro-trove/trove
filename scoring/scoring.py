@@ -1,3 +1,5 @@
+from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, improved_cons_prob, information_metric, resampled_zscore, zscore
+
 from .models import ScoreFactor
 from .healpix_utils import SaTarget
 
@@ -43,49 +45,6 @@ GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate(GALAXY_CATALOGS)}
 D_LIM_LOWER = 1e-5  # 0.00001 Mpc
 D_LIM_UPPER = 1e4  # 10,000 Mpc
 
-if minversion(np, "2.0.0"):
-    np_trapz_fn = np.trapezoid
-else:
-    np_trapz_fn = np.trapz  # np.trapz is deprecated in numpy >2.0.0
-
-
-class AsymmetricGaussian(rv_continuous):
-    """
-    Custom Asymmetric Gaussian distribution for uneven uncertainties
-    """
-
-    def _pdf_unnorm(self, x, mean, unc_minus, unc_plus):
-        """**Unnormalized** asymmetric Gaussian PDF"""
-        # piecewise return a Gaussian depending on the side of the mean you are on
-        where_minus = np.where(x < mean)[0]
-        where_plus = np.where(x >= mean)[0]
-
-        minus_dist = np.exp(
-            -0.5 * ((x[where_minus] - mean[where_minus]) / unc_minus[where_minus]) ** 2
-        )  # Left side Gaussian-like
-        plus_dist = np.exp(
-            -0.5 * ((x[where_plus] - mean[where_plus]) / unc_plus[where_plus]) ** 2
-        )  # Right side Gaussian-like
-
-        return np.concatenate((minus_dist, plus_dist))
-
-    def _pdf(self, x, mean, unc_minus, unc_plus, integ_a, integ_b):
-        """**Normalized** asymmetric Gaussian PDF"""
-        # unclear why, but even when floats are passed to this function for
-        # args mean, unc_minus, unc_plus, integ_a, integ_b, they become lists
-        # of the same value repeated len(x) times
-
-        # numerically integrate asymmetric Gaussian, for normalization
-        integ_x = np.linspace(integ_a[0], integ_b[0], x.shape[0])
-        integ = np_trapz_fn(
-            y=self._pdf_unnorm(integ_x, mean, unc_minus, unc_plus), x=integ_x
-        )
-        integ_norm = 1 / integ
-
-        # return unnormalized PDF multiplied by normalization factor
-        return self._pdf_unnorm(x, mean, unc_minus, unc_plus) * integ_norm
-
-
 def update_score_factor(event_candidate, key, value):
     ScoreFactor.objects.update_or_create(
         event_candidate=event_candidate, key=key, defaults=dict(value=value)
@@ -123,7 +82,6 @@ def _get_nle_distance_pdf(
 
     test_pdf = norm.pdf(lumdist_array, loc=dist, scale=dist_err)
     return test_pdf
-
 
 def host_distance_match(
     host_df: pd.DataFrame,
@@ -166,28 +124,174 @@ def host_distance_match(
     test_pdf = _get_nle_distance_pdf(
         _lumdist, nonlocalized_event_name, target_id, max_time=max_time
     )
-    host_pdfs = np.array(
-        [
-            AsymmetricGaussian().pdf(
-                _lumdist,
-                mean=row.lumdist,
-                unc_minus=row.lumdist_neg_err,
-                unc_plus=row.lumdist_pos_err,
-                integ_a=1e-9,
-                integ_b=_lumdist[-1],
-            )
-            for _, row in host_df.iterrows()
-        ]
-    )
-    joint_prob = host_pdfs * test_pdf
 
-    # finally, compute the Bhattacharyya coefficient for the overlap of these
-    # two distributions. https://en.wikipedia.org/wiki/Bhattacharyya_distance
-    # This coefficient is non-parametric which is good for our Asymmetric Gaussian
-    # Original paper: http://www.jstor.org/stable/25047806
-    host_df["dist_norm_joint_prob"] = trapezoid(np.sqrt(joint_prob), x=_lumdist, axis=1)
+    test_mean, test_std = _distance_at_healpix(
+        nonlocalized_event_name, target_id, max_time=max_time
+    )
+
+    bc_ret = []
+    zscore_ret = []
+    resampled_zscore_ret = []
+    bc_norm_ret = []
+    cond_ret = []
+    prob_cons_ret = []
+    weighted_prob_cons_ret = []
+    for _, row in host_df.iterrows():
+        cur_pdf = AsymmetricGaussian().pdf(
+            _lumdist,
+            mean=row.lumdist,
+            unc_minus=row.lumdist_neg_err,
+            unc_plus=row.lumdist_pos_err,
+            integ_a=1e-9,
+            integ_b=_lumdist[-1],
+        )
+
+        bc_ret.append(bc(cur_pdf, test_pdf, _lumdist))
+        bc_norm_ret.append(bc_norm_median_asymmetric(test_pdf, cur_pdf, test_mean, row.lumdist_neg_err, row.lumdist_pos_err, _lumdist))
+        zscore_ret.append(zscore(row.lumdist, test_mean, test_std))
+        resampled_zscore_ret.append(resampled_zscore(row.lumdist, test_mean, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+        cond_ret.append(conditional_scoring(cur_pdf, test_pdf, test_mean, row.lumdist, test_std))
+        prob_cons_ret.append(consistency_probability(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+        weighted_prob_cons_ret.append(improved_cons_prob(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+
+    host_df["bc"] = bc_ret
+    host_df["bc_norm"] = bc_norm_ret
+    host_df["zscore"] = zscore_ret
+    host_df["Resampled zscore"] = resampled_zscore_ret
+    host_df["Conditional JSD Metric"] = cond_ret
+    host_df['Consistent Probability'] = prob_cons_ret
+    host_df['Improved Consistent Probability'] = weighted_prob_cons_ret
+    
     return host_df
 
+metrics = [
+    'bc',
+    'bc_norm',
+    'zscore',
+    'Resampled zscore',
+    'Conditional JSD Metric',
+    'Consistent Probability',
+    'Improved Consistent Probability',
+]
+
+def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):
+    """
+    This gets the host score from the input host_df by first prioritizing target specific redshifts,
+    then spec-z's, and then photo-z's. It assumes that any potential host within a
+    Pcc < PCC_THRESHOLD is equally probable. It also uses the maximum probability galaxy
+    to soften the effects of poor distance associations.
+    """
+    # first check if this target has a measured redshift
+    targ = Target.objects.get(id=target_id)
+    if targ.redshift is not None and not np.isnan(targ.redshift):
+        _lumdist = np.linspace(D_LIM_LOWER, D_LIM_UPPER, int(10 * D_LIM_UPPER))
+        nle_pdf = _get_nle_distance_pdf(_lumdist, nonlocalized_event_name, target_id)
+        test_mean, test_std = _distance_at_healpix(nonlocalized_event_name, target_id)
+
+        targ_dist = cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
+        targ_dist_err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
+
+        targ_pdf = AsymmetricGaussian().pdf(
+            _lumdist,
+            mean=targ_dist,
+            unc_minus=targ_dist_err,
+            unc_plus=targ_dist_err,
+            integ_a=1e-9,
+            integ_b=_lumdist[-1],
+        )
+
+        return {
+            "bc": (bc(targ_pdf, nle_pdf, _lumdist), None, 'redshift'),
+            "bc_norm": (
+                bc_norm_median_asymmetric(
+                    nle_pdf, targ_pdf, test_mean, targ_dist_err, targ_dist_err, _lumdist
+                ),
+                None,
+                "redshift"
+            ),
+            "zscore": (zscore(targ_dist, test_mean, test_std), None, "redshift"),
+            "Resampled zscore": (
+                resampled_zscore(targ_dist, test_mean, test_std, targ_dist_err, targ_dist_err),
+                None,
+                "redshift"
+            ),
+            "Conditional JSD Metric": (
+                conditional_scoring(targ_pdf, nle_pdf, test_mean, targ_dist, test_std),
+                None,
+                "redshift"
+            ),
+            "Consistent Probability": (
+                consistency_probability(test_mean, targ_dist, test_std, targ_dist_err, targ_dist_err),
+                None,
+                "redshift"
+            ),
+            "Improved Consistent Probability": (
+                improved_cons_prob(test_mean, targ_dist, test_std, targ_dist_err, targ_dist_err),
+                None,
+                "redshift"
+            ),
+        }
+
+    # first, some cleanup
+    # this is already done in vet_bns, vet_kn_in_sn, and vet_super_kn,
+    # but we need to account for users calling this function for arbitrary
+    # host_df, target, and NLE without prior filtering on host_df
+    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -999.0] # PS1-STRM
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[~np.isnan(host_df.z)]
+
+    # then use the redshift of user-uploaded host galaxies
+    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
+    userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
+
+    return_scores = {}
+
+    for metric in metrics:
+        if len(userz_distance_hosts):
+            max_score = userz_distance_hosts.bc.max()
+            max_score_host_name = userz_distance_hosts.iloc[
+                userz_distance_hosts[metric].idxmax()
+            ]["name"]
+            return_scores[metric] =  (max_score, max_score_host_name, "user-redshift")
+            continue
+
+        # then use the redshift independent measurements of distances
+        ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+        ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
+        if len(ind_distance_hosts):
+            max_score = ind_distance_hosts[metric].max()
+            max_score_host_name = ind_distance_hosts.iloc[
+                ind_distance_hosts[metric].idxmax()
+            ]["name"]
+            return_scores[metric]  = (max_score, max_score_host_name, 'ind')
+            continue
+
+        # then use the specz hosts
+        specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
+        specz_hosts.reset_index(inplace=True)  # avoid iloc exception
+        if len(specz_hosts):
+            max_score = specz_hosts[metric].max()
+            max_score_host_name = specz_hosts.iloc[
+                specz_hosts[metric].idxmax()
+            ]["name"]
+            return_scores[metric] = (max_score, max_score_host_name, "spec-z")
+            continue
+
+        # then if we don't know the spec-z or have an independent distance measure use the photo-z's
+        photoz_hosts = host_df[host_df.z_type == "photo-z"]
+        photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
+        if len(photoz_hosts):
+            max_score = photoz_hosts[metric].max()
+            max_score_host_name = photoz_hosts.iloc[
+                photoz_hosts[metric].idxmax()
+            ]["name"]
+            return_scores[metric] = (max_score, max_score_host_name, "photo-z")
+            continue
+
+    # no potential host
+    return return_scores # None because there is no host name 
 
 def get_distance_score(host_df, target_id, nonlocalized_event_name):
     """
@@ -222,9 +326,9 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
     userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(userz_distance_hosts):
-        max_score = userz_distance_hosts.dist_norm_joint_prob.max()
+        max_score = userz_distance_hosts.bc.max()
         max_score_host_name = userz_distance_hosts.iloc[
-            userz_distance_hosts["dist_norm_joint_prob"].idxmax()
+            userz_distance_hosts["bc"].idxmax()
         ]["name"]
         return max_score, max_score_host_name
 
@@ -232,9 +336,9 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
     ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(ind_distance_hosts):
-        max_score = ind_distance_hosts.dist_norm_joint_prob.max()
+        max_score = ind_distance_hosts.bc.max()
         max_score_host_name = ind_distance_hosts.iloc[
-            ind_distance_hosts["dist_norm_joint_prob"].idxmax()
+            ind_distance_hosts["bc"].idxmax()
         ]["name"]
         return max_score, max_score_host_name
 
@@ -242,9 +346,9 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
     specz_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(specz_hosts):
-        max_score = specz_hosts.dist_norm_joint_prob.max()
+        max_score = specz_hosts.bc.max()
         max_score_host_name = specz_hosts.iloc[
-            specz_hosts["dist_norm_joint_prob"].idxmax()
+            specz_hosts["bc"].idxmax()
         ]["name"]
         return max_score, max_score_host_name
 
@@ -252,9 +356,9 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     photoz_hosts = host_df[host_df.z_type == "photo-z"]
     photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
     if len(photoz_hosts):
-        max_score = photoz_hosts.dist_norm_joint_prob.max()
+        max_score = photoz_hosts.bc.max()
         max_score_host_name = photoz_hosts.iloc[
-            photoz_hosts["dist_norm_joint_prob"].idxmax()
+            photoz_hosts["bc"].idxmax()
         ]["name"]
         return max_score, max_score_host_name
 
