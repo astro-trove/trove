@@ -24,7 +24,10 @@ import time
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
+from dynamic_catalogs import UserGalaxy
+
 from candidate_vetting.vet import (
+    GALAXY_CATALOGS,
     point_source_association,
     host_association,
     agn_association_2d,
@@ -70,7 +73,9 @@ def vet_basic(
         agn_df = agn_association_2d(target_id)
 
         # do the Pcc analysis and find a host
-        host_df = host_association(target_id)
+        galaxy_catalogs = [UserGalaxy] + GALAXY_CATALOGS
+        host_df = host_association(target_id,
+                                   galaxy_catalogs=galaxy_catalogs)
 
     # stop here and return if no further vetting needed
     if skip_vet_if_no_new_phot and not created_new_phot:
