@@ -3,6 +3,7 @@ from .views import (
     EventCandidateCreateFromNLEView,
     generate_report,
     ToggleAgnCacheView,
+    ToggleAgnCacheSimpleView,
 )
 
 app_name = "trove_nonlocalizedevents"
@@ -18,5 +19,10 @@ urlpatterns = [
         "toggle-agn-cache/",
         ToggleAgnCacheView.as_view(),
         name="toggle-agn-cache",
+    ),
+    path(
+        "toggle-agn-cache-simple/",
+        ToggleAgnCacheSimpleView.as_view(),
+        name="toggle-agn-cache-simple",
     ),
 ]

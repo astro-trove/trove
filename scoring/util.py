@@ -106,7 +106,6 @@ def get_event_candidate_scores(
     if agn_toggle:
         pass
     else:
-        # Determine actual key for AGN_Score
         exclude_keys.add('agn_score')
 
     # only evaluate this once since it is time consuming
@@ -159,7 +158,6 @@ def get_event_candidate_scores(
         # for object; need to re-do this per transient because of step
         # below where we exclude certain scores from the queryset
         sf_dict = score_factors_by_ec.get(ec.id, {})
-        print(sf_dict)
 
         # Extract values that need special handling
         val_dict = {

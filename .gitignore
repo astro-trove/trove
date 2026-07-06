@@ -28,3 +28,4 @@ ztf-forced-phot-logs-backup/
 .vscode/
 build/
 trove.egg-info/
+.claude/

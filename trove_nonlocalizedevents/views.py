@@ -6,6 +6,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.http import JsonResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.base import View
 
 from trove_targets.models import Target
@@ -66,6 +67,11 @@ class EventCandidateListView(FilterView):
 
         return qs
 
+    def get_template_names(self):
+        if self.request.htmx:
+            return ["trove_nonlocalizedevents/_candidate_table.html"]
+        return [self.template_name]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -79,6 +85,7 @@ class EventCandidateListView(FilterView):
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
         # current NLE when the AGN toggle is flipped)
+        # Is this the best way to do this? If cache_key was false but not None, the candidates would not get rescored
         scored_candidates = cache.get(cache_key)
         if scored_candidates is None:
             # Not in cache—score all candidates
@@ -287,18 +294,7 @@ We encourage additional follow up of these candidates to determine whether they 
 
 
 class ToggleAgnCacheView(LoginRequiredMixin, View):
-    """
-    Flips the site-wide, cache-backed agn_toggle flag and immediately
-    rescores affected candidates (rather than waiting for the next page
-    view to lazily recompute them).
-    """
-
     def get(self, request, *args, **kwargs):
-        from django.contrib import messages
-
-        # Toggle the persistent, site-wide AGN inclusion flag. Note: we must
-        # not call cache.clear() here, since it would also wipe the key we
-        # just set (this previously made the toggle never actually persist).
         new_val = not cache.get("agn_toggle", True)
         cache.set("agn_toggle", new_val)
 
@@ -309,21 +305,21 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             ).select_related("target", "nonlocalizedevent")
             scored_candidates = get_event_candidate_scores(candidates, agn_toggle=new_val)
 
-            # Warm the cache under the same key EventCandidateListView will look
-            # up, so candidates are already rescored by the time the redirect below lands.
+            # Re-sores all candidates after AGN-toggle change and saves to cache
             cache_key = f"event_candidates_scored_nonlocalizedevent={nle_id}_{new_val}"
             cache.set(cache_key, scored_candidates, 60 * 5)
-
-            messages.info(
-                request,
-                f"Rescored all {len(scored_candidates)} candidates with AGN score "
-                f"{'included' if new_val else 'excluded'}.",
-            )
             return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
-
-        messages.info(
-            request,
-            f"AGN score {'included' if new_val else 'excluded'} in scoring. "
-            "Candidates will be rescored as you view them.",
-        )
         return redirect(reverse("custom_code:event-candidates"))
+
+# Used in the target_detail.html AGN Toggle Button
+class ToggleAgnCacheSimpleView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        new_val = not cache.get("agn_toggle", True)
+        cache.set("agn_toggle", new_val)
+
+        referer = request.META.get("HTTP_REFERER")
+        if referer and url_has_allowed_host_and_scheme(
+            referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        ):
+            return redirect(referer)
+        return redirect(reverse("home"))

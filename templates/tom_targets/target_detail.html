@@ -24,6 +24,10 @@
   <div class="col-md-8">
     <div class="tab-pane" id="score-detail">
       <h4>Score Details</h4>
+      {% get_agn_toggle as agn_toggle %}
+      <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache-simple' %}" class="btn {% if agn_toggle %}btn-primary{% else %}btn-secondary{% endif %} mb-2">
+        {% if agn_toggle %}AGN Score: Included{% else %}AGN Score: Excluded{% endif %}
+      </a>
       {% display_score_details target.id %}
     </div>
     <details>

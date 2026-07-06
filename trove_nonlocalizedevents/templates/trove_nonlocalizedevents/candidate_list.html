@@ -13,7 +13,7 @@
 </style>
 
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
+{% load static bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
 {% block title %}Candidates{% endblock %}
 {% block content %}
 {% if request.GET.nonlocalizedevent %}
@@ -57,106 +57,12 @@
     </div>
 </div>
 
-<div class="row">
-  <div class="col">
-    <form action="" method="get" class="form">
-      {% bootstrap_form eventcandidate_filter_form %}
-
-      {% buttons %}
-      <button type="submit" class="btn btn-primary">
-	Filter
-      </button>
-      <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" class="btn btn-secondary" title="Reset">Reset</a>
-      {% endbuttons %}
-    </form>
-  </div>
-  <div class="col">
-    <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form">
-      {% csrf_token %}
-      {% bootstrap_form eventcandidate_create_form %}
-      {% buttons %}
-      <button type="submit" class="btn btn-primary">
-	Link Target
-      </button>
-      {% endbuttons %}
-    </form>
-  </div>
+<div id="candidate-table-container" hx-boost="true" hx-target="this" hx-push-url="true">
+  {% include 'trove_nonlocalizedevents/candidate_table.html' %}
 </div>
 
-<br>
+{% endblock %}
 
-<div class="row">
-  <div class="col-md-10">
-    <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-primary{% else %}btn-secondary{% endif %} mb-2">
-      {% if agn_toggle %}AGN Score: Included{% else %}AGN Score: Excluded{% endif %}
-    </a>
-  {% bootstrap_pagination page_obj extra=request.GET.urlencode %} 
-    <table class="table table-sm table-hover">
-      <thead>
-        <tr>
-          <th>Rank</th>
-          <th>Target</th>
-          <th>Event</th>
-          <th>Score</th>
-        </tr>
-      </thead>
-      <tbody>
-	{% for candidate in page_obj.object_list %}
-        <tr>
-	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
-	  <td>
-            {% if candidate.target is not None %}
-              <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
-            {% else %}
-              None
-            {% endif %}
-          </td>
-          <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
-          <td>
-	    {% for transient, score in candidate.score.items %}
-            {{ transient }} {{score|floatformat:2}}<br>
-            {% endfor %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="10">
-            {% if target_count == 0 %}
-            No candidates yet.
-            {% else %}
-            No candidates match those filters.
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
-  </div>
-</div>
-
-<script>
-function openSummaryModal() {
-    const nleId = "{{ request.GET.nonlocalizedevent }}";
-    fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=5`)
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('summaryText').value = data.text;
-            $('#summaryModal').modal('show');
-        });
-}
-
-function copyText() {
-    const text = document.getElementById('summaryText');
-    text.select();
-    navigator.clipboard.writeText(text.value).then(() => {
-        const btn = document.getElementById('copyBtn');
-        btn.innerHTML = '<i class="fa fa-check"></i> Copied!';
-        setTimeout(() => btn.innerHTML = '<i class="fa fa-copy"></i> Copy', 2000);
-    });
-}
-</script>
-
-{{ eventcandidate_filter_form.media }}
-
+{% block javascript %}
+<script src="{% static 'tom_common/js/htmx.min.js' %}"></script>
 {% endblock %}
