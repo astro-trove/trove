@@ -52,9 +52,6 @@ def _clean_host_df(host_df):
     host_df = host_df[~np.isnan(host_df.z)]
     return host_df
 
-
-# fixed categorical color per distance-measurement type, kept the same across
-# every subplot so e.g. "spec-z" is always the same color everywhere
 CATEGORY_COLORS = {
     "redshift": "#2a78d6",
     "user-redshift": "#1baf7a",
@@ -95,9 +92,7 @@ def _plot_metric_boxplots(plotting_data, output_path, event, log_floor=1e-30, ex
 
         # drop NaNs per category -- a handful of hosts (mostly photo-z, up to
         # ~5% for bc_norm) produce NaN scores (missing catalog z-uncertainty
-        # propagating through the metric calculation), and matplotlib's
-        # boxplot silently produces an empty/invisible box for the whole
-        # category if even one NaN is present in its data
+        # propagating through the metric calculation)
         data = [
             np.log10(np.clip(np.asarray(by_category[c], dtype=float), log_floor, 1.0))
             for c in cats_present
@@ -106,11 +101,7 @@ def _plot_metric_boxplots(plotting_data, output_path, event, log_floor=1e-30, ex
 
         bp = ax.boxplot(
             data, patch_artist=True, widths=0.6,
-            # 5th-95th percentile whiskers instead of the default 1.5*IQR rule:
-            # these scores are heavily right-skewed (a dense cluster near 0
-            # plus a long tail down to the floor), so Tukey's rule flags huge
-            # numbers of points as "outliers" and the plot turns into a wall
-            # of dots.
+            # 5th-95th percentile whiskers instead of the default 1.5*IQR rule
             whis=(5, 95),
             medianprops=dict(color="#0b0b0b", linewidth=1.5),
             flierprops=dict(marker="o", markersize=2, markerfacecolor="#898781", markeredgecolor="none", alpha=0.4),
@@ -248,23 +239,13 @@ def _collect_host_records(target_id: int, nonlocalized_event_name: str):
         records.append(record)
     return records
 
-
 def _score_one_candidate(ec, event):
-    """
-    Thread-pool worker: each candidate's cost is almost entirely network wait
-    (host_association queries ~12 external galaxy catalogs sequentially), so
-    running candidates concurrently gives a near-linear speedup instead of
-    burning wall-clock time on I/O one candidate at a time.
-    """
     try:
         records = _collect_host_records(ec.target_id, event)
         return ec.target.name, records, None
     except Exception as e:
         return ec.target.name, None, str(e)
     finally:
-        # each thread lazily opens its own DB connections (default + catalogs
-        # aliases); close them here so a big candidate list doesn't leave
-        # hundreds of connections open on the shared DB tunnel
         for conn in connections.all():
             conn.close()
 
