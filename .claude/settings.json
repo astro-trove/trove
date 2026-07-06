@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda env *)",
+      "Read(//home/sopanda25/miniconda3/envs/**)",
+      "Bash(timeout 180 /home/sopanda25/miniconda3/envs/t-env/bin/python manage.py shell -c ' *)",
+      "Bash(timeout 300 /home/sopanda25/miniconda3/envs/t-env/bin/python manage.py shell -c ' *)",
+      "Bash(timeout 120 /home/sopanda25/miniconda3/envs/t-env/bin/python manage.py showmigrations scoring)",
+      "Bash(timeout 300 /home/sopanda25/miniconda3/envs/t-env/bin/python manage.py migrate scoring)"
+    ]
+  }
+}
