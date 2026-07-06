@@ -27,7 +27,6 @@ from .vet_phot import (
 )
 
 from trove_targets.models import Target
-from tom_dataproducts.models import ReducedDatum
 from tom_nonlocalizedevents.models import (
     EventCandidate,
     NonLocalizedEvent,
@@ -53,7 +52,6 @@ def vet_super_kn(
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
 ):
-    print(target_id)
     logger.info("Running super-KN vetting")
 
     # get the correct EventCandidate object for this target_id and nonlocalized event
@@ -82,8 +80,14 @@ def vet_super_kn(
     if skymap_score < 1e-2:
         return
 
-    ## compute the basic scores, return dataframes of potential hosts / AGN
+    ## get dataframes of potential hosts / AGN
     host_df, agn_df = vet_basic(event_candidate.target.id)
+    # some cleanup
+    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -999.0] # PS1-STRM
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[~np.isnan(host_df.z)]
 
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
