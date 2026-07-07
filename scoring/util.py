@@ -103,9 +103,7 @@ def get_event_candidate_scores(
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
     
-    if agn_toggle:
-        pass
-    else:
+    if not agn_toggle:
         exclude_keys.add('agn_score')
 
     # only evaluate this once since it is time consuming
