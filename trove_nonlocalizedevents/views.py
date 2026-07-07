@@ -69,7 +69,7 @@ class EventCandidateListView(FilterView):
 
     def get_template_names(self):
         if self.request.htmx:
-            return ["trove_nonlocalizedevents/_candidate_table.html"]
+            return ["trove_nonlocalizedevents/candidate_table.html"]
         return [self.template_name]
 
     def get_context_data(self, **kwargs):
