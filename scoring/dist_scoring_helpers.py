@@ -178,20 +178,25 @@ def information_metric(test_pdf, base_pdf):
     # Reconsider some of these metrics
     return (1.0 - (uni_comp*jsd_val))
 
-def conditional_scoring(test_pdf, base_pdf, mean1, mean2, base_std):
+def conditional_scoring(
+    test_pdf, base_pdf, mean1, mean2, base_std,
+    uni_thresh=0.2, uni_branch_coef=0.05,
+    z_thresh=0.3, z_branch_weights=(0.95, 0.05),
+    far_branch_weights=(0.9, 0.1),
+):
     z_score = raw_zscore(mean1, mean2, base_std)
 
     # 0 --> Close to each other
     # 1 --> Far from each other
     jsd_val = jsd(test_pdf, base_pdf)
-    # 0 --> Close to uniform 
+    # 0 --> Close to uniform
     # 1 --> Far from uniform
     uni_comp = compare_uniform(test_pdf)
 
     # Currently, information theory metrics alone does not give any information
     # about alignment or spatial relations, so we need to combine these
-    # The main problem is coming from delta functions, which are localized at the mean of the 
-    # target distribution, but because they don't have the target distribution shape, they are 
+    # The main problem is coming from delta functions, which are localized at the mean of the
+    # target distribution, but because they don't have the target distribution shape, they are
     # getting penalized for it
     # Prioritize alignment score, fine_tune these weights
     # Should inform_score be weighted by uni_comp?
@@ -200,19 +205,19 @@ def conditional_scoring(test_pdf, base_pdf, mean1, mean2, base_std):
     zscored = zscore(mean1, mean2, base_std)
 
     # Conditional Scoring
-    if uni_comp < 0.2:
+    if uni_comp < uni_thresh:
         # Should this just be 1 or some small deviation?
-        # No small deviation because if uni_comp is that low, then we don't know anything about
-        # the function
-        # final_score = 1 - uni_comp
-        final_score = 1 - 0.05*(1-zscored)
-    elif abs(z_score) < 0.3:
+        # No small deviation because if uni_comp is that low, then we don't know anything about the function
+        # Potentially depend on the threshold?
+        # Naive implementation for now
+        final_score = 1 - uni_comp
+    elif abs(z_score) < z_thresh:
         # Consider introducing a little bit more information about how the distribution matches the target
         # Currently losing a bit too much
-        final_score = 0.95*(zscored) + 0.05*(inform_score)
+        final_score = z_branch_weights[0]*(zscored) + z_branch_weights[1]*(inform_score)
     else:
-        final_score = 0.9*inform_score + 0.1*zscored
-        
+        final_score = far_branch_weights[0]*inform_score + far_branch_weights[1]*zscored
+
     return final_score
 
 def consistency_probability(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
