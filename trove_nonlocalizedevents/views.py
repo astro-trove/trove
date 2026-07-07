@@ -85,7 +85,7 @@ class EventCandidateListView(FilterView):
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
         # current NLE when the AGN toggle is flipped)
-        # Is this the best way to do this? If cache_key was false but not None, the candidates would not get rescored
+        ### TODO: Is this the best way to do this? If cache_key was false but not None, the candidates would not get rescored
         scored_candidates = cache.get(cache_key)
         if scored_candidates is None:
             # Not in cache—score all candidates
