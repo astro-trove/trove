@@ -25,6 +25,7 @@ python manage.py check_distance_scores --event S251112cm --from-cache /home/sopa
 """
 
 import json
+import os
 import warnings
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -38,18 +39,21 @@ from astropy import units as u
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connections
 
+from scoring.dist_scoring_helpers import AsymmetricGaussian
 from trove_targets.models import Target
 from tom_nonlocalizedevents.models import EventCandidate, NonLocalizedEvent
 
 from candidate_vetting.vet import host_association
 
-from scipy.stats import norm, rankdata
+from scipy.stats import norm, rankdata, spearmanr
 
 from scoring.scoring import (
     cosmo, get_distance_score_diagnostic, host_distance_match,
     _distance_at_healpix
 )
 
+wierd_candidate = {'bc_norm': 0.0, 'Consistent Probability': 2.1122348887109702e-38, 'Improved Consistent Probability': 2.1122348887109702e-38, 'distance': 85.817953, 'uncertainty': 0.73669, 'lumdist_neg_err': 0.73669, 'lumdist_pos_err': 0.73669, 'test_mean': 6.126291683980149, 'test_std': 1.9130271174558564, 'z_type': 'photo-z'}
+# normal_candidate = {'bc_norm': 0.6552634531885003, 'Consistent Probability': 0.6651239049093955, 'Improved Consistent Probability': 0.6651239049093955, 'distance': 154.4183, 'uncertainty': 36.4332, 'lumdist_neg_err': 36.4332, 'lumdist_pos_err': 36.4332, 'test_mean': 94.78686486087885, 'test_std': 27.953770250136436, 'z_type': 'ind'}
 
 def _clean_host_df(host_df):
     """Same filler-value / NaN cleanup used in vet_kn_in_sn before scoring."""
@@ -271,6 +275,7 @@ def _plot_score_vs_dist(records, output_path, event, log_floor=1e-30, metric_ord
             xs = np.array([r["distance"] for r in cat_records])
             ys = np.clip([r[metric] for r in cat_records], log_floor, 1.0)
             cs = np.clip([r["uncertainty"] for r in cat_records], 1e-2, None)
+
             mappable = ax.scatter(
                 xs, ys, c=cs, cmap=cmap, norm=color_norm, marker=marker,
                 s=8, alpha=0.5, edgecolor="none", zorder=2,
@@ -441,6 +446,85 @@ def _plot_score_vs_uncertainty(records, output_path, event, log_floor=1e-30, met
     return output_path
 
 
+# distinct from CATEGORY_COLORS (which colors z-type, not metric identity) so
+# the two never get read as the same encoding across different figures
+METRIC_COLORS = {
+    "bc_norm": "#2a78d6",
+    "Consistent Probability": "#e34948",
+    "Improved Consistent Probability": "#eb6834",
+}
+
+def _plot_uncertainty_score_corr_vs_dist(
+    records, output_path, event, log_floor=1e-30, metric_order=None,
+    n_bins=8, min_points=15,
+):
+    """
+    Spearman rho(uncertainty, score) computed within distance bins, one line
+    per metric.
+
+    Spearman is rank-based and invariant to monotonic transforms, so
+    correlating uncertainty against log10(score) gives the exact same rho as
+    against the raw score -- the log is only here so the "score" axis label
+    matches the other plots, it doesn't change the numbers.
+
+    Bin edges are fixed log-spaced steps across the full distance range
+    (shared across metrics, so panels/lines are directly comparable), rather
+    than quantile bins -- this keeps bin position tied to physical distance,
+    at the cost of some bins near the sparse ends having too few points to
+    plot (skipped via min_points).
+    """
+    metrics_present = [m for m in (metric_order or METRIC_ORDER) if any(m in r for r in records)]
+
+    all_distances = np.array([r["distance"] for r in records if "distance" in r], dtype=float)
+    all_distances = all_distances[all_distances > 0]
+    edges = np.geomspace(all_distances.min(), all_distances.max(), n_bins + 1)
+
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+
+    for metric in metrics_present:
+        usable = [r for r in records if metric in r and "distance" in r and "uncertainty" in r]
+        distances = np.array([r["distance"] for r in usable], dtype=float)
+        uncertainties = np.array([r["uncertainty"] for r in usable], dtype=float)
+        scores = np.array([r[metric] for r in usable], dtype=float)
+
+        valid = (distances > 0) & ~np.isnan(uncertainties) & ~np.isnan(scores)
+        distances, uncertainties, scores = distances[valid], uncertainties[valid], scores[valid]
+        if not len(distances):
+            continue
+
+        log_scores = np.log10(np.clip(scores, log_floor, 1.0))
+        bin_idx = np.digitize(distances, edges[1:-1])
+
+        xs, ys = [], []
+        for b in range(n_bins):
+            mask = bin_idx == b
+            if mask.sum() < min_points:
+                continue
+            rho, _ = spearmanr(uncertainties[mask], log_scores[mask])
+            xs.append(np.sqrt(edges[b] * edges[b + 1]))  # geometric bin center
+            ys.append(rho)
+
+        if not xs:
+            continue
+
+        color = METRIC_COLORS.get(metric, "#52514e")
+        ax.plot(xs, ys, marker="o", color=color, label=metric, linewidth=1.8, markersize=5)
+
+    ax.axhline(0, color="#898781", linewidth=1, linestyle="--", zorder=1)
+    ax.set_xscale("log")
+    ax.set_ylim(-1.05, 1.05)
+    ax.set_xlabel("host distance (Mpc, bin center)", fontsize=10)
+    ax.set_ylabel("Spearman ρ (uncertainty vs. log score)", fontsize=10)
+    ax.set_title(f"Uncertainty-score correlation by distance range -- {event}", fontsize=12)
+    ax.tick_params(labelsize=8)
+    ax.legend(fontsize=8, loc="best", frameon=False)
+
+    fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    return output_path
+
+
 def _bucket_z_type(raw_z_type):
     """
     Mirror the z-type priority buckets get_distance_score_diagnostic uses, so
@@ -455,6 +539,96 @@ def _bucket_z_type(raw_z_type):
     if raw_z_type == "photo-z":
         return "photo-z"
     return None
+
+def plot_pdfs():
+    import matplotlib.pyplot as plt
+
+    ## constants
+    HOSTS_CSV = "/home/nvieira/Documents/TROVE_2026/S251112cm/hosts/S251112cm_candidates_2026-05-24_hosts.csv"
+    OUTDIR = "/home/nvieira/Documents/TROVE_2026/S251112cm/hosts/"
+    LUMDIST_S251112cm = 93 
+    LUMDIST_ERR_S251112cm = 27
+
+    ## load in csv of hosts
+    df_hosts = pd.read_csv(HOSTS_CSV)
+
+    ## for different z types, get luminosity distance distributions and compare to 
+    ## S251112cm
+    for z_type in ("photo-z", "spec-z"):
+        print(z_type)
+        host_z = df_hosts["host_z"]
+        host_z_pos_err = df_hosts["host_z_pos_err"]
+        host_z_neg_err = df_hosts["host_z_neg_err"]
+        
+        mask = (df_hosts["host_z_type"] == z_type).values & ~np.isnan(host_z_pos_err).values
+        host_z = host_z[mask]
+        host_z_pos_err = host_z_pos_err[mask]
+        host_z_neg_err = host_z_neg_err[mask]
+        
+        host_dist = [cosmo.luminosity_distance(z).value for z in host_z]
+        host_dist_pos_err = [cosmo.luminosity_distance(z).value for z in host_z_pos_err]
+        host_dist_neg_err = [cosmo.luminosity_distance(z).value for z in host_z_neg_err]
+        
+        print(len(host_dist))
+        
+        ## construct asymmetric Gaussian PDFs
+        lumdist = np.logspace(-1, 5, 1000)
+        
+        
+        # S251112cm luminosity distance
+        test_pdf = AsymmetricGaussian().pdf(
+            lumdist, 
+            mean=LUMDIST_S251112cm,
+            unc_minus=LUMDIST_ERR_S251112cm,
+            unc_plus=LUMDIST_ERR_S251112cm,
+            integ_a=lumdist[0],
+            integ_b=lumdist[-1])
+        
+        # host galaxies
+        host_pdfs = np.array(
+            [
+                AsymmetricGaussian().pdf(
+                    lumdist,
+                    mean=host_dist[i],
+                    unc_minus=host_dist_neg_err[i],
+                    unc_plus=host_dist_pos_err[i],
+                    integ_a=lumdist[0],
+                    integ_b=lumdist[-1],
+                )
+                for i in range(len(host_dist))
+            ]
+        )
+        
+        # arbitrary normalization so distributions peak at 1.0
+        test_pdf = test_pdf/np.max(test_pdf)
+        host_pdfs = [host_pdfs[i]/np.max(host_pdfs[i]) for i in range(len(host_pdfs))]
+        
+        
+        ## plot!
+        fig = plt.figure(figsize=(10,10))
+        
+        plt.plot(lumdist, test_pdf, color="green", lw=3.0, label="S251112cm")
+        plt.plot(lumdist, host_pdfs[0], color="k", alpha=0.1, label="host")
+        if z_type == "photo-z":
+            for i in range(1, len(host_pdfs))[::10]:
+                plt.plot(lumdist, host_pdfs[i], alpha=0.2)
+        else:
+            for i in range(1, len(host_pdfs)):
+                plt.plot(lumdist, host_pdfs[i], alpha=0.2)
+            
+        # pretty plotting
+        plt.xscale("log")
+        plt.xlim(10, 1e5)
+            
+        plt.xticks(fontsize=28)
+        plt.yticks(fontsize=28)
+        plt.xlabel("distance [Mpc]", fontsize=28)
+        plt.ylabel("probability (arbitrarily normalized)", fontsize=28)
+        
+        plt.legend(fontsize=28, loc=[0.5, 1.01])
+        
+        outputf = HOSTS_CSV.replace(".csv", f"_host_dist_distribs_{z_type}.png")
+        plt.savefig(outputf, bbox_inches="tight")
 
 
 def _collect_host_records(target_id: int, nonlocalized_event_name: str):
@@ -479,6 +653,7 @@ def _collect_host_records(target_id: int, nonlocalized_event_name: str):
             pd.DataFrame(), target_id, nonlocalized_event_name
         )
         record = {metric: val[0] for metric, val in diag_scores.items()}
+        record['id'] = target_id
         record["distance"] = targ_dist
         record["uncertainty"] = targ_dist_err
         # raw ingredients needed to rebuild this record's two PDFs locally
@@ -530,7 +705,6 @@ def _score_one_candidate(ec, event):
         for conn in connections.all():
             conn.close()
 
-
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument(
@@ -572,10 +746,16 @@ class Command(BaseCommand):
             type=str,
             default=None,
         )
+        parser.add_argument(
+            "--force",
+            help="Allow overwriting an existing *_records.json cache with a "
+            "run that collected fewer records (e.g. a smaller --limit)",
+            action="store_true",
+        )
 
     def handle(
         self, event, limit=None, target_name=None, output="distance_metric_bias",
-        workers=8, from_cache=None, **kwargs,
+        workers=8, from_cache=None, force=False, **kwargs,
     ):
         if from_cache:
             with open(from_cache) as f:
@@ -614,6 +794,16 @@ class Command(BaseCommand):
                 return
 
             cache_path = f"{output}_records.json"
+            if os.path.exists(cache_path) and not force:
+                with open(cache_path) as f:
+                    old_count = len(json.load(f))
+                if len(all_records) < old_count:
+                    raise CommandError(
+                        f"{cache_path} already has {old_count} records; this run only "
+                        f"collected {len(all_records)} (did you forget --limit 0 or "
+                        f"--from-cache?). Refusing to overwrite a larger cache with a "
+                        f"smaller one -- pass --force if this is intentional."
+                    )
             with open(cache_path, "w") as f:
                 json.dump(all_records, f)
             print(f"Cached {len(all_records)} host records to {cache_path}")
@@ -639,8 +829,12 @@ class Command(BaseCommand):
         percentile_dist_path = _plot_score_percentile_vs_dist(
             all_records, f"{output}_percentile_score_vs_distance.png", event
         )
+        corr_path = _plot_uncertainty_score_corr_vs_dist(
+            all_records, f"{output}_uncertainty_score_corr_vs_distance.png", event
+        )
         print(f"Saved boxplots to {boxplot_path}")
         print(f"Saved score-vs-uncertainty plot to {scatter_path}")
         print(f"Saved score-vs-distance plot to {dist_path}")
         print(f"Saved Log_score-vs-distance plot to {log_dist_path}")
         print(f"Saved percentile-score-vs-distance plot to {percentile_dist_path}")
+        print(f"Saved uncertainty-score correlation plot to {corr_path}")
