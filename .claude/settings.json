@@ -1,9 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(timeout 60 docker ps --format '{{.Names}} {{.Image}} {{.Ports}}')",
-      "Bash(timeout 60 docker ps)",
-      "Bash(timeout 60 docker ps -a --format '{{.Names}}  {{.Image}}  {{.Ports}}  {{.Status}}')"
-    ]
-  }
-}

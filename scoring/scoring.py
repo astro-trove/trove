@@ -154,11 +154,7 @@ def host_distance_match(
         prob_cons_ret.append(consistency_probability(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
         weighted_prob_cons_ret.append(improved_cons_prob(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
 
-    host_df["bc"] = bc_ret
     host_df["bc_norm"] = bc_norm_ret
-    host_df["zscore"] = zscore_ret
-    host_df["Resampled zscore"] = resampled_zscore_ret
-    host_df["Conditional JSD Metric"] = cond_ret
     host_df['Consistent Probability'] = prob_cons_ret
     host_df['Improved Consistent Probability'] = weighted_prob_cons_ret
     
@@ -167,9 +163,6 @@ def host_distance_match(
 metrics = [
     'bc',
     'bc_norm',
-    'zscore',
-    'Resampled zscore',
-    'Conditional JSD Metric',
     'Consistent Probability',
     'Improved Consistent Probability',
 ]
