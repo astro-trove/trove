@@ -34,6 +34,51 @@
     </div>
     </br>
 
+    <!-- Countdown to IR1, O5, end of O5, etc. -->
+    <div class="card">
+      <div class="card-header">
+        {% countdown_IR1 %}
+      </br>
+      </div>
+    </div>
+    </br>
+
+  </div> <!-- END OF LEFT SIDE OF PAGE -->
+
+
+  <!-- RIGHT SIDE OF PAGE -->
+  <div class="col-md-6">
+    <!-- Latest GW NLEs -->
+    <div class="card">
+      <div class="card-header">
+        <b>Latest GW Non-Localized Events</b>
+      </div>
+      {% recent_gw_nonlocalizedevents_withcandidates 1 5 %}
+    </div>
+    <br/>
+
+    <!-- NLE Spotlight -->
+    <div class="card">
+      <div class="card-header">
+        <b>Non-Localized Event Spotlight</b>
+      </div>
+      <div class="row align:center">
+        <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
+        <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div>
+        <!-- <div class="col-md-12"><div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving one (or two!) subsolar mass compact object!</div> -->
+      </div>
+      </br>
+      <div class="row">
+        <div class="col-md-12">
+          <!-- {% skymap_nle_id_manual_simple 21962 %} --> <!-- 21962 = GW170817 -->
+          {% skymap_nle_id_manual_simple 21085 %} <!-- 21962 = GW190814 -->
+          <!-- {% skymap_nle_id_manual_simple 20113 %} --> <!-- 20113 = S251112cm -->
+        </div>
+      </div>
+      </br>
+    </div>
+    </br>
+
     <!-- Latest targets -->
     {% comment %}
     <div class="card">
@@ -51,51 +96,6 @@
       </div>
       {% recent_comments %}
     </div>
-
-  </div> <!-- END OF LEFT SIDE OF PAGE -->
-
-
-  <!-- RIGHT SIDE OF PAGE -->
-  <div class="col-md-6">
-    <!-- Countdown to IR1, O5, end of O5, etc. -->
-    <div class="card">
-      <div class="card-header">
-        {% countdown_IR1 %}
-      </br>
-      </div>
-    </div>
-    </br>
-
-    <!-- Latest GW NLEs -->
-    <div class="card">
-      <div class="card-header">
-        <b>Latest GW Non-Localized Events</b>
-      </div>
-      {% recent_gw_nonlocalizedevents_withcandidates 1 5 %}
-    </div>
-    <br/>
-
-    <!-- NLE Spotlight -->
-    <div class="card">
-      <div class="card-header">
-        <b>Non-Localized Event Spotlight</b>
-      </div>
-      <div class="row align:center">
-        <!-- <div class="col-md-12">GW170817: The first and only multimessenger binary neutron star merger!</div> -->
-        <div class="col-md-12">GW190814: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div>
-        <!-- <div class="col-md-12">S251112cm: The first statistically significant candidate GW merger involving one (or two!) subsolar mass compact object!</div> -->
-      </div>
-      </br>
-      <div class="row">
-        <div class="col-md-12">
-          <!-- {% skymap_nle_id_manual_simple 21962 %} --> <!-- 21962 = GW170817 -->
-          {% skymap_nle_id_manual_simple 21085 %} <!-- 21962 = GW190814 -->
-          <!-- {% skymap_nle_id_manual_simple 20113 %} --> <!-- 20113 = S251112cm -->
-        </div>
-      </div>
-      </br>
-    </div>
-    </br>
 
   </div> <!-- END OF RIGHT SIDE OF PAGE -->
 
