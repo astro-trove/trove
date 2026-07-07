@@ -1,4 +1,4 @@
-from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, improved_cons_prob, information_metric, resampled_zscore, zscore
+from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3, information_metric, resampled_zscore, zscore
 
 from .models import ScoreFactor
 from .healpix_utils import SaTarget
@@ -135,7 +135,7 @@ def host_distance_match(
     bc_norm_ret = []
     cond_ret = []
     prob_cons_ret = []
-    weighted_prob_cons_ret = []
+    cons_prob_3_ret = []
     for _, row in host_df.iterrows():
         cur_pdf = AsymmetricGaussian().pdf(
             _lumdist,
@@ -152,11 +152,11 @@ def host_distance_match(
         resampled_zscore_ret.append(resampled_zscore(row.lumdist, test_mean, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
         cond_ret.append(conditional_scoring(cur_pdf, test_pdf, test_mean, row.lumdist, test_std))
         prob_cons_ret.append(consistency_probability(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
-        weighted_prob_cons_ret.append(improved_cons_prob(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+        cons_prob_3_ret.append(cons_prob_3(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
 
     host_df["bc_norm"] = bc_norm_ret
     host_df['Consistent Probability'] = prob_cons_ret
-    host_df['Improved Consistent Probability'] = weighted_prob_cons_ret
+    host_df['Improved Consistent Probability'] = cons_prob_3_ret
     
     return host_df
 
@@ -219,7 +219,7 @@ def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):
                 "redshift"
             ),
             "Improved Consistent Probability": (
-                improved_cons_prob(test_mean, targ_dist, test_std, targ_dist_err, targ_dist_err),
+                cons_prob_3(test_mean, targ_dist, test_std, targ_dist_err, targ_dist_err),
                 None,
                 "redshift"
             ),

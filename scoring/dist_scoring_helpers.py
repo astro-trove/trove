@@ -231,30 +231,15 @@ def consistency_probability(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
     mean_diff = np.abs(mean1 - mean2)
     return erfc(mean_diff/sigma_diff)
 
-def improved_cons_prob(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
-    # Use the z-score sign to decide which tail is more relevant, while letting
-    # the uncertainty imbalance modulate that preference.
+def cons_prob_3(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
+    mean_diff = mean2 - mean1
+    host_scale = np.sqrt(unc_minus**2 + unc_plus**2)
+    z_host = mean_diff / host_scale
 
-    mean_diff = np.abs(mean1 - mean2)
+    w_minus = 0.5 * erfc(-z_host / np.sqrt(2))
+    w_plus = 1 - w_minus
 
-    naive_zscore = (mean2 - mean1) / std1
+    var2 = w_minus * unc_minus**2 + w_plus * unc_plus**2
 
-    sigma_diff_right = wt*np.sqrt(2*(std1**2 + unc_plus**2))
-    sigma_diff_left = wt*np.sqrt(2*(std1**2 + unc_minus**2))
-
-    right_score = erfc(mean_diff/sigma_diff_right)
-    left_score = erfc(mean_diff/sigma_diff_left)
-
-    # Positive when the left tail is wider than the right tail.
-    imbalance = (unc_minus - unc_plus) / (unc_plus + unc_minus)
-
-    # When the z-score is large, its sign dominates the preference.
-    # When the z-score is near zero, the uncertainty imbalance takes over.
-    z_strength = np.tanh(np.abs(naive_zscore))
-    preference = z_strength * np.sign(naive_zscore) + (1 - z_strength) * imbalance
-    preference = np.clip(preference, -1.0, 1.0)
-
-    left_weight = 0.5 * (1 + preference)
-    right_weight = 0.5 * (1 - preference)
-
-    return right_weight*right_score + left_weight*left_score
+    sigma_diff = wt * np.sqrt(2 * (std1**2 + var2))
+    return erfc((np.abs(mean_diff) / sigma_diff) / np.sqrt(2))
