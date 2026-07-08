@@ -78,6 +78,15 @@ METRIC_ORDER = [
     "bc_norm",
     "Consistent Probability",
     "Improved Consistent Probability",
+    "Hybrid Consistent Probability",
+]
+
+# score-vs-distance / correlation-vs-distance figures only compare the erfc-
+# based probability metrics (not bc/bc_norm's numerical overlap approach)
+PROB_METRIC_ORDER = [
+    "Consistent Probability",
+    "Improved Consistent Probability",
+    "Hybrid Consistent Probability",
 ]
 
 
@@ -454,6 +463,7 @@ METRIC_COLORS = {
     "bc_norm": "#2a78d6",
     "Consistent Probability": "#e34948",
     "Improved Consistent Probability": "#eb6834",
+    "Hybrid Consistent Probability": "#008300",
 }
 
 def _plot_uncertainty_score_corr_vs_dist(
@@ -823,16 +833,16 @@ class Command(BaseCommand):
             all_records, f"{output}_raw_score_vs_uncertainty.png", event
         )
         dist_path = _plot_score_vs_dist(
-            all_records, f"{output}_raw_score_vs_distance.png", event
+            all_records, f"{output}_raw_score_vs_distance.png", event, metric_order=PROB_METRIC_ORDER
         )
         log_dist_path = _plot_log_score_vs_dist(
-            all_records, f"{output}_log_score_vs_distance.png", event
+            all_records, f"{output}_log_score_vs_distance.png", event, metric_order=PROB_METRIC_ORDER
         )
         percentile_dist_path = _plot_score_percentile_vs_dist(
-            all_records, f"{output}_percentile_score_vs_distance.png", event
+            all_records, f"{output}_percentile_score_vs_distance.png", event, metric_order=PROB_METRIC_ORDER
         )
         corr_path = _plot_uncertainty_score_corr_vs_dist(
-            all_records, f"{output}_uncertainty_score_corr_vs_distance.png", event
+            all_records, f"{output}_uncertainty_score_corr_vs_distance.png", event, metric_order=PROB_METRIC_ORDER
         )
         print(f"Saved boxplots to {boxplot_path}")
         print(f"Saved score-vs-uncertainty plot to {scatter_path}")

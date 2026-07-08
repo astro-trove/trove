@@ -220,7 +220,7 @@ def conditional_scoring(
 
     return final_score
 
-def consistency_probability(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
+def consistency_probability(mean1, mean2, std1, unc_minus, unc_plus, wt=2):
     if mean2 < mean1:
         # then the relevant tail is the upper side of the asymmetric distribution
         std2 = unc_plus
@@ -231,7 +231,7 @@ def consistency_probability(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
     mean_diff = np.abs(mean1 - mean2)
     return erfc(mean_diff/sigma_diff)
 
-def cons_prob_3(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
+def cons_prob_3(mean1, mean2, std1, unc_minus, unc_plus, wt=2):
     mean_diff = mean2 - mean1
     host_scale = np.sqrt(unc_minus**2 + unc_plus**2)
     z_host = mean_diff / host_scale
@@ -243,3 +243,23 @@ def cons_prob_3(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
 
     sigma_diff = wt * np.sqrt(2 * (std1**2 + var2))
     return erfc((np.abs(mean_diff) / sigma_diff))
+
+def hybrid_cons_prob(mean1, mean2, std1, unc_minus, unc_plus, wt=2, z_thresh=1.1, width_thresh=0.5):
+    mean_diff = mean2 - mean1
+    host_scale = np.sqrt(unc_minus**2 + unc_plus**2)
+    z_gw = mean_diff / std1
+
+    if np.abs(z_gw) < z_thresh and host_scale < width_thresh * std1:
+        # Score depends only on the z-score, rescaled into [0.9, 1.0]
+        print("Z Score only")
+        return 1.0 - 0.1 * (np.abs(z_gw) / z_thresh)
+
+    w_minus = 0.5 * erfc(-z_gw / np.sqrt(2))
+    w_plus = 1 - w_minus
+
+    sigma_minus = wt * np.sqrt(2 * (std1**2 + unc_minus**2))
+    sigma_plus = wt * np.sqrt(2 * (std1**2 + unc_plus**2))
+    score_minus = erfc(np.abs(mean_diff) / sigma_minus)
+    score_plus = erfc(np.abs(mean_diff) / sigma_plus)
+
+    return w_minus * score_minus + w_plus * score_plus

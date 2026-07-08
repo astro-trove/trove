@@ -1,7 +1,8 @@
 """
-Diagnostic: compare per-call execution time of the three distance-scoring
-metrics (bc_norm, Consistent Probability, Improved Consistent Probability)
-on real host data, without touching the DB or SSH tunnels.
+Diagnostic: compare per-call execution time of the distance-scoring metrics
+(bc, bc_norm, Consistent Probability, Improved Consistent Probability, Hybrid
+Consistent Probability) on real host data, without touching the DB or SSH
+tunnels.
 
 Reuses a *_records.json cache (from check_distance_scores) since it already
 holds everything needed to rebuild each host's two distance PDFs locally:
@@ -18,6 +19,8 @@ python manage.py time_distance_metrics \
     --n 40 --repeats 20
 """
 
+import contextlib
+import io
 import json
 import random
 import timeit
@@ -29,12 +32,14 @@ from scipy.stats import norm
 from django.core.management.base import BaseCommand, CommandError
 
 from scoring.dist_scoring_helpers import (
-    AsymmetricGaussian, bc_norm_median_asymmetric, consistency_probability, cons_prob_3,
+    AsymmetricGaussian, bc, bc_norm_median_asymmetric, consistency_probability, cons_prob_3, hybrid_cons_prob,
 )
 from scoring.scoring import D_LIM_LOWER, D_LIM_UPPER
 from scoring.management.commands.check_distance_scores import METRIC_COLORS
 
-METRICS = ["bc_norm", "Consistent Probability", "Improved Consistent Probability"]
+METRICS = [
+    "bc", "bc_norm", "Consistent Probability", "Improved Consistent Probability", "Hybrid Consistent Probability",
+]
 
 REQUIRED_FIELDS = ("distance", "uncertainty", "lumdist_neg_err", "lumdist_pos_err", "test_mean", "test_std")
 
@@ -137,6 +142,9 @@ class Command(BaseCommand):
                 integ_b=_lumdist[-1],
             )
 
+            timed_fns["bc"].append(
+                lambda test_pdf=test_pdf, cur_pdf=cur_pdf: bc(cur_pdf, test_pdf, _lumdist)
+            )
             timed_fns["bc_norm"].append(
                 lambda test_pdf=test_pdf, cur_pdf=cur_pdf, rec=rec: bc_norm_median_asymmetric(
                     test_pdf, cur_pdf, rec["test_mean"], rec["lumdist_neg_err"], rec["lumdist_pos_err"], _lumdist
@@ -152,15 +160,24 @@ class Command(BaseCommand):
                     rec["test_mean"], rec["distance"], rec["test_std"], rec["lumdist_neg_err"], rec["lumdist_pos_err"]
                 )
             )
+            timed_fns["Hybrid Consistent Probability"].append(
+                lambda rec=rec: hybrid_cons_prob(
+                    rec["test_mean"], rec["distance"], rec["test_std"], rec["lumdist_neg_err"], rec["lumdist_pos_err"]
+                )
+            )
 
         print(f"Timing {len(METRICS)} metrics over {n} sampled host records, {repeats} repeats each...\n")
 
         results = {}
         for metric in METRICS:
             per_call_times = []
-            for fn in timed_fns[metric]:
-                total = timeit.timeit(fn, number=repeats)
-                per_call_times.append(total / repeats)
+            # hybrid_cons_prob has a leftover debug print() on one of its
+            # branches -- suppress it here so timing this metric doesn't
+            # flood stdout or pick up print()'s own I/O latency per call
+            with contextlib.redirect_stdout(io.StringIO()):
+                for fn in timed_fns[metric]:
+                    total = timeit.timeit(fn, number=repeats)
+                    per_call_times.append(total / repeats)
             results[metric] = np.array(per_call_times)
 
         fastest_mean = min(np.mean(v) for v in results.values())
