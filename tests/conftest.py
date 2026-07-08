@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'saguaro_tom.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trove_tom.settings')
 
 
 @pytest.fixture(scope='session', autouse=True)

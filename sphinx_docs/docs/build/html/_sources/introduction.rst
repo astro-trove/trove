@@ -9,11 +9,11 @@ Quickstart
 
 1. Navigate to https://datatrove.as.arizona.edu
 2. Login or register for an account (Note that registration may take 1-2 days to be approved)
-3. You can see GW events by clicking "Nonlocalized Events" → "Gravitational Waves"
-4. You can click on any of the GW event names to navigate to an "Event Candidate" page that contains a ranked list of scores
+3. See GW events by clicking "Nonlocalized Events" → "Gravitational Waves".
+4. Click on any of the GW event names to navigate to an "Event Candidate" page that contains a ranked list of scores 
    for all event candidates associated with a particular event.
-5. From the "Event Candidate" page, you can click on individual targets to see more details.
-6. You can also see a full list of targets by clicking the "Targets" tab in the navigation bar at the top of the website
+5. From the "Event Candidate" page, click on individual targets to see more details.
+6. See a full list of targets by clicking the "Targets" tab in the navigation bar at the top of the website.
 
 Getting Additional Help
 -----------------------
