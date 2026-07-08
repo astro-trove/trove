@@ -20,7 +20,7 @@ print(f'TROVE-TOM> Python Info: {sys.version_info}')
 # +
 # setup / path(s)
 # -
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trove.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'trove_tom.settings')
 
 
 # +
