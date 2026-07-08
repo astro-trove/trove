@@ -10,7 +10,7 @@ Welcome to the Treasure TROVE: a Tool for Rapid Object Vetting and Examination!
 
 ## Installation (for development)
 
-  **Prerequisites:** Python 3.11 or 3.12 (`django-autocomplete-light==4.0.0` requires 3.11+, and the `tom-nonlocalizedevents` dependency does not support 3.13+). A PostgreSQL database is required for the application.
+  **Prerequisites:** Python 3.11 or 3.12 (`django-autocomplete-light==4.0.0` requires 3.11+, and the `tom-nonlocalizedevents` dependency does not support 3.13+). A database connection is required for the application (reach out to existing developers or create a local PostgreSQL or SQLite database with sample data).
 
  1. Clone the repository:
 
@@ -19,7 +19,7 @@ Welcome to the Treasure TROVE: a Tool for Rapid Object Vetting and Examination!
     % git clone https://github.com/astro-trove/trove.git
   ```
 
- 2. Copy settings_local.template.py to settings_local.py and edit as needed. At minimum, set `SECRET_KEY`, and the `POSTGRES_*` database settings so the app can connect. For local development you may set `DEBUG = True`. For certain functionality, you will need to talk to the TROVE team to find out how to set certain environmental variables.
+ 2. Copy settings_local.template.py to settings_local.py and edit as needed. At minimum, set `SECRET_KEY`, and the `POSTGRES_*` database settings so the app can connect. For local development you may set `DEBUG = True`. For certain functionality, you will need to talk to the TROVE team to find out how to set certain environmental variables (if you want to connect to a mirror of the production database).
 
   ```bash
     % cd /var/www/trove/trove_tom
@@ -65,6 +65,8 @@ Welcome to the Treasure TROVE: a Tool for Rapid Object Vetting and Examination!
   Then open **http://127.0.0.1:8000/** or **http://localhost:8000/** in your browser to view the TROVE. If you use PostgreSQL, create the database first (e.g. `createdb trove`) and set the `POSTGRES_*` values in `settings_local.py` to match.
 
 ## Enabling WSGI under Apache2
+
+This is basically only necessary for a production environment.
 
 Enable WSGI within Apache2 in the usual way (there are plenty of web tutorials on this).
 
