@@ -1,4 +1,4 @@
-# Conda environment for TROVE / SAGUARO TOM
+# Conda environment for TROVE
 # Python 3.11 or 3.12 required (django-autocomplete-light==4.0.0 needs 3.11+; tom-nonlocalizedevents does not support 3.13+)
 name: trove
 channels:
