@@ -4,7 +4,7 @@ from django import template
 from django.conf import settings
 from datetime import datetime
 from guardian.shortcuts import get_objects_for_user
-from plotly import offline
+import plotly.io as pio
 import plotly.graph_objs as go
 
 from tom_dataproducts.forms import DataShareForm
@@ -58,10 +58,13 @@ def spectroscopy_for_target(context, target, dataproduct=None):
             tickformat=".1g"
         )
     )
+
+    fig = go.Figure(data=plot_data, layout=layout)
+
     return {
         'target': target,
         'products': datums,
-        'plot': offline.plot(go.Figure(data=plot_data, layout=layout), output_type='div', show_link=False)
+        'plot': pio.to_html(fig, full_html=False)
     }
 
 

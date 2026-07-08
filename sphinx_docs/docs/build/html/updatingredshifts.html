@@ -8,7 +8,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Getting Started &#8212; TROVE</title>
+    <title>Submitting Galaxy Spec-z’s &#8212; TROVE</title>
   
   
   
@@ -32,6 +32,7 @@
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
   
   <!-- So that users can add custom icons -->
   <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
@@ -43,13 +44,15 @@
     <script src="_static/doctools.js?v=fd6eb6e6"></script>
     <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
-    <script>DOCUMENTATION_OPTIONS.pagename = 'quick-start';</script>
-    <link rel="canonical" href="https://astro-otter.readthedocs.io/en/latest/quick-start.html" />
+    <script src="_static/design-tabs.js?v=f930bc37"></script>
+    <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'updatingredshifts';</script>
+    <link rel="canonical" href="https://datatrove.as.arizona.edu/updatingredshifts.html" />
     <link rel="icon" href="_static/favicon.ico"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="API Reference" href="api.html" />
-    <link rel="prev" title="Welcome to TROVE’s documentation!" href="index.html" />
+    <link rel="next" title="API Docs" href="api.html" />
+    <link rel="prev" title="How Scoring Works" href="scoringexplained.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -145,13 +148,23 @@
 </button></div>
         <div class="sidebar-primary-item"><nav class="bd-links bd-docs-nav" aria-label="Main">
     <div class="bd-toc-item navbar-nav active">
-        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+        <p aria-level="2" class="caption" role="heading"><span class="caption-text">Home</span></p>
 <ul class="current nav bd-sidenav">
-<li class="toctree-l1 current active"><a class="current reference internal" href="#">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Welcome to TROVE’s documentation!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="details.html">Web App Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scoringexplained.html">How Scoring Works</a></li>
+<li class="toctree-l1 current active"><a class="current reference internal" href="#">Submitting Galaxy Spec-z’s</a></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="api.html">API Docs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="nbs/basic_usage.html">Example Notebook</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/api/docs">API Reference</a></li>
 </ul>
-<p aria-level="2" class="caption" role="heading"><span class="caption-text">Django Application</span></p>
-<ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="dev.html">Developer Documentation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="codeofconductdevs.html">Code of Conduct for Developers</a></li>
+</ul>
+</details></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ &amp; Glossary</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citations.html">Citing TROVE</a></li>
 </ul>
 
     </div>
@@ -211,7 +224,7 @@
       
       
       
-      <li><a href="https://github.com/astro-otter/otter" target="_blank"
+      <li><a href="https://github.com/astro-trove/trove" target="_blank"
    class="btn btn-sm btn-source-repository-button dropdown-item"
    title="Source repository"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -228,24 +241,7 @@
       
       
       
-      <li><a href="https://github.com/astro-otter/otter/edit/main/sphinx_docs/docs/source/quick-start.rst" target="_blank"
-   class="btn btn-sm btn-source-edit-button dropdown-item"
-   title="Suggest edit"
-   data-bs-placement="left" data-bs-toggle="tooltip"
->
-  
-
-<span class="btn__icon-container">
-  <i class="fas fa-pencil-alt"></i>
-  </span>
-<span class="btn__text-container">Suggest edit</span>
-</a>
-</li>
-      
-      
-      
-      
-      <li><a href="https://github.com/astro-otter/otter/issues/new?title=Issue%20on%20page%20%2Fquick-start.html&body=Your%20issue%20content%20here." target="_blank"
+      <li><a href="https://github.com/astro-trove/trove/issues/new?title=Issue%20on%20page%20%2Fupdatingredshifts.html&body=Your%20issue%20content%20here." target="_blank"
    class="btn btn-sm btn-source-issues-button dropdown-item"
    title="Open an issue"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -275,7 +271,7 @@
       
       
       
-      <li><a href="_sources/quick-start.rst" target="_blank"
+      <li><a href="_sources/updatingredshifts.rst" target="_blank"
    class="btn btn-sm btn-download-source-button dropdown-item"
    title="Download source file"
    data-bs-placement="left" data-bs-toggle="tooltip"
@@ -349,7 +345,7 @@
               
 
 <div id="jb-print-docs-body" class="onlyprint">
-    <h1>Getting Started</h1>
+    <h1>Submitting Galaxy Spec-z’s</h1>
     <!-- Table of contents -->
     <div id="print-main-content">
         <div id="jb-print-toc">
@@ -363,9 +359,41 @@
 <div id="searchbox"></div>
                 <article class="bd-article">
                   
-  <section id="getting-started">
-<h1>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">#</a></h1>
-<p>TROVE is located at <a class="reference external" href="https://datatrove.as.arizona.edu">https://datatrove.as.arizona.edu</a>. When you first arrive at the page you will likely see</p>
+  <section id="submitting-galaxy-spec-z-s">
+<h1>Submitting Galaxy Spec-z’s<a class="headerlink" href="#submitting-galaxy-spec-z-s" title="Link to this heading">#</a></h1>
+<p>During a follow-up campaign, if a potential host galaxy for some candidate has only a
+photometric redshift, you might measure the host’s spectroscopic redshift.
+This is incredibly useful to the community, so we encourage you to submit that
+redshift to TROVE so it may be used in vetting/scoring by the rest of the
+community.</p>
+<p>Note that while TNS accepts redshifts for targets, it does not for galaxies!</p>
+<p>We’ll walk through an example here. Imagine we’re curious about target
+AT2025adhg and its association with GW event S251112cm. Here is the page for
+the target:</p>
+<img alt="_images/adhg-before.png" src="_images/adhg-before.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>When the candidate was vetted, it was associated with galaxy
+WISEA J002827.13-361543.4, with a spectroscopic redshift of 0.044 ± 0.001. Because
+S251112cm lies at 93 Mpc (z ~ 0.02), the distance association score for AT2025adhg is
+quite low.</p>
+<p>Perhaps you believed that the LS DR10 galaxy with a photometric redshift was
+the real host, and acquired a spectrum of it, finding it lies at a spectroscopic
+redshift of 0.021 ± 0.001. Clicking on the Update Host z button, you are taken to a form.
+You fill it out as such:</p>
+<img alt="_images/redshift-form.png" src="_images/redshift-form.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Upon clicking Update Selected Galaxy Redshift, that LS DR10 galaxy will
+essentially be duplicated in our database, <em>but</em>, with the redshift you provided!
+That galaxy will be assigned a “user spec-z” for its distance type, which has highest
+priority after a direct measurement of the distance to the candidate. Finally,
+the candidate will be re-vet. When the page finishes reloading:</p>
+<img alt="_images/adhg-after.png" src="_images/adhg-after.png" />
+<p>The galaxy whose redshift you measured is now designated the most likely host,
+and the distance score is increased!</p>
 </section>
 
 
@@ -380,12 +408,12 @@
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="index.html"
+       href="scoringexplained.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Welcome to TROVE’s documentation!</p>
+        <p class="prev-next-title">How Scoring Works</p>
       </div>
     </a>
     <a class="right-next"
@@ -393,7 +421,7 @@
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">API Reference</p>
+        <p class="prev-next-title">API Docs</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
