@@ -4,6 +4,7 @@ from .views import (
     generate_report,
     ToggleAgnCacheView,
     ToggleAgnCacheSimpleView,
+    RefreshCandidateList,
 )
 
 app_name = "trove_nonlocalizedevents"
@@ -25,4 +26,9 @@ urlpatterns = [
         ToggleAgnCacheSimpleView.as_view(),
         name="toggle-agn-cache-simple",
     ),
+    path(
+        "refresh-candidate-list",
+        RefreshCandidateList.as_view(),
+        name="refresh-candidate-list"
+    )
 ]

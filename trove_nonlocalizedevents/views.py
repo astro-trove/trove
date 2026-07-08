@@ -323,3 +323,10 @@ class ToggleAgnCacheSimpleView(LoginRequiredMixin, View):
         ):
             return redirect(referer)
         return redirect(reverse("home"))
+
+class RefreshCandidateList(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        nle_id = request.GET.get("nonlocalizedevent")
+        if nle_id:
+            return redirect(reverse('custom_code:event-candidates') + f'?nonlocalizedevent={nle_id}')
+        return redirect(reverse('curstom_code:event-candidates'))

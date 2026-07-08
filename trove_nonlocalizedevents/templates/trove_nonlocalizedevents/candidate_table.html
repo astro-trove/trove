@@ -32,6 +32,9 @@
     <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
       {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
     </a>
+    <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn btn-outline-secondary btn-sm mb-2">
+      <i class="fa fa-refresh"></i> Refresh
+    </a>
     </br>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     <table class="table table-sm table-hover">
