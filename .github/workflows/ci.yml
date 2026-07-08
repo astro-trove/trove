@@ -40,7 +40,7 @@ jobs:
 
       - name: Create settings_local.py for CI
         run: |
-          cat > saguaro_tom/settings_local.py << 'EOF'
+          cat > trove_tom/settings_local.py << 'EOF'
           ALLOWED_HOST = 'localhost'
           ATLAS_API_KEY = ''
           DEBUG = True
@@ -80,7 +80,7 @@ jobs:
       - name: Verify installation
         run: |
           python -c "import django; print(f'Django {django.VERSION}')"
-          python -c "import saguaro_tom; print('saguaro_tom imported successfully')"
+          python -c "import trove_tom; print('trove_tom imported successfully')"
           python -c "import custom_code; print('custom_code imported successfully')"
           python -c "import candidate_vetting; print('candidate_vetting imported successfully')"
 
