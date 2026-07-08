@@ -25,10 +25,10 @@ from .config import FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES
 from .tasks import vet_all_async
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
+from .dynamic_catalogs import UserGalaxy
 
 from candidate_vetting.vet import host_association, localization_sequence_from_name
 from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
-from candidate_vetting.public_catalogs.dynamic_catalogs import UserGalaxy
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
