@@ -7,24 +7,23 @@
   <div class="col-md-6">
     <!-- Logo and welcome -->
     <div class="row">
-      <div class="column" style="width:50%">
-        <p><img src="{% static 'img/trove_logo_small.jpeg' %}"></p>
-      </div>
-      <div class="column" style="width:50%">
-        <h1 class="text"><b>Welcome to</b></h1>
-        <h1 class="text"><b>the TROVE!</b></h1>
-      </div>
+        <div style="display:flex; gap:16px; align-items:flex-start;">
+            <img src="{% static 'img/trove_logo_small.jpeg' %}" style="flex:0 0 auto">
+            <div style="flex:1 1 auto;">
+                <h1 style="text-align:justify flex: 1 1 auto"><b>Welcome to the TROVE!</b></h1>
+            </div>
+        </div>
     </div>
     </br>
 
     <!-- Description of TROVE -->
-    <h5>The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
+    <h5 style="text-align:justify">The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
     </br>
     {% comment %}
-    <h5>TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
+    <h5 style="text-align:justify">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
     </br>
     {% endcomment %}
-    <h5><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
+    <h5 style="text-align:justify"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
     </br>
 
     <!-- Documentation and Register buttons -->
@@ -51,16 +50,17 @@
     <!-- Latest GW NLEs -->
     <div class="card">
       <div class="card-header">
-        <b>Latest GW Non-Localized Events</b>
+        <b>Latest GW Events</b>
       </div>
       {% recent_gw_nonlocalizedevents_withcandidates 1 5 %}
     </div>
     <br/>
 
     <!-- NLE Spotlight -->
+    {% comment %}
     <div class="card">
       <div class="card-header">
-        <b>Non-Localized Event Spotlight</b>
+        <b>Event Spotlight</b>
       </div>
       <div class="row align:center">
         <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
@@ -78,6 +78,7 @@
       </br>
     </div>
     </br>
+    {% endcomment %}
 
     <!-- Latest targets -->
     {% comment %}
