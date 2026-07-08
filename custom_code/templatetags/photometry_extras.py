@@ -1,13 +1,15 @@
-from django import template
+from django import forms, template
 from django.conf import settings
 from guardian.shortcuts import get_objects_for_user
-from plotly import offline
+import plotly.io as pio
 import plotly.graph_objs as go
 from plotly import colors
 from tom_dataproducts.models import ReducedDatum
 import numpy as np
 from datetime import datetime
 import re
+
+from tom_dataproducts.forms import DataShareForm
 
 register = template.Library()
 
@@ -163,6 +165,7 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                                       klass=ReducedDatum.objects.filter(
                                         target=target,
                                         data_type=settings.DATA_PRODUCT_TYPES['photometry'][0]))
+    datums = datums.order_by("source_name", "value__filter") # sort data by telescope/filter name
 
     detections = {}
     limits = {}
@@ -220,10 +223,21 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
                 opacity=0.5,
                 marker_color=marker_color,
                 marker_symbol=MARKER_MAP['limit'],
-                name=f'{source_name} {filter_name} limits',
+                name=f'{source_name} {filter_name}',
             )
             plot_data.append(series)
             all_ydata.append(np.array(filter_values['limit'], float))
+
+    # Add a constant legend item for limit markers.
+    plot_data.append(go.Scatter(
+        x=[None],
+        y=[None],
+        mode='markers',
+        marker=dict(color='gray', symbol='triangle-down'),
+        name='limits',
+        showlegend=True,
+        hoverinfo='none',
+    ))
 
     # scale the y-axis manually so that we know the range ahead of time and can scale the secondary y-axis to match
     if all_ydata:
@@ -294,23 +308,92 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
 
     return {
         'target': target,
-        'plot': offline.plot(fig, output_type='div', show_link=False)
+        'plot': pio.to_html(fig, full_html=False, div_id='photometry_plot')
     }
+
+@register.inclusion_tag('tom_dataproducts/partials/photometry_datalist_for_target.html', takes_context=True)
+def get_photometry_data(context, target, target_share=False):
+    """
+    Displays a table of the all photometric points for a target.
+    """
+
+    photometry = ReducedDatum.objects.filter(data_type='photometry', target=target).order_by('-timestamp')
+    if not settings.TARGET_PERMISSIONS_ONLY:
+        photometry = get_objects_for_user(
+            context["request"].user,
+            "tom_dataproducts.view_reduceddatum",
+            klass=photometry,
+        )
+    
+
+    # Possibilities for reduced_datums from ZTF/MARS:
+    # reduced_datum.value: {'error': 0.0929680392146111, 'filter': 'r', 'magnitude': 18.2364940643311}
+    # reduced_datum.value: {'limit': 20.1023998260498, 'filter': 'g'}
+
+    # for limit magnitudes, set the value of the limit key to True and
+    # the value of the magnitude key to the limit so the template and
+    # treat magnitudes as such and prepend a '>' to the limit magnitudes
+    # see recent_photometry.html
+    data = []
+    for reduced_datum in photometry:
+        rd_data = {'id': reduced_datum.pk,
+                   'timestamp': reduced_datum.timestamp,
+                   'source': reduced_datum.source_name,
+                   'filter': reduced_datum.value.get('filter', ''),
+                   'telescope': reduced_datum.value.get('telescope', ''),
+                   'error': reduced_datum.value.get('error', reduced_datum.value.get('magnitude_error', ''))
+                   }
+
+        if 'limit' in reduced_datum.value.keys():
+            rd_data['magnitude'] = reduced_datum.value['limit']
+            rd_data['limit'] = True
+        else:
+            rd_data['magnitude'] = reduced_datum.value['magnitude']
+            rd_data['limit'] = False
+        data.append(rd_data)
+
+    band_filters = np.unique([phot_dict["filter"] for phot_dict in data])
+    sources = np.unique([phot_dict["source"] for phot_dict in data])
+
+    initial = {'submitter': context['request'].user,
+               'target': target,
+               'data_type': 'photometry',
+               'share_title': f"Updated data for {target.name} from {getattr(settings, 'TOM_NAME', 'TOM Toolkit')}.",
+               }
+    form = DataShareForm(initial=initial)
+    form.fields['data_type'].widget = forms.HiddenInput()
+
+    sharing = getattr(settings, "DATA_SHARING", None)
+    hermes_sharing = sharing and sharing.get('hermes', {}).get('HERMES_API_KEY')
+
+    context = {
+        'data': data,
+        'target': target,
+        'target_data_share_form': form,
+        'sharing_destinations': form.fields['share_destination'].choices,
+        'hermes_sharing': hermes_sharing,
+        'target_share': target_share,
+        'band_filters': band_filters,
+        'sources': sources
+    }
+    return context
 
 
 @register.filter
 def format_mag(datum, d=2):
-    if datum.get('magnitude'):
-        datum['magnitude'] = float(datum['magnitude'])
-        if datum.get('error'):
-            datum['error'] = float(datum['error'])
-            display_str = f'{{magnitude:.{d}f}} ± {{error:.{d}f}}'
-        elif datum.get('limit'):
-            display_str = f'> {{magnitude:.{d}f}}'
-        else:
-            display_str = f'{{magnitude:.{d}f}}'
-        return display_str.format(**datum)
-
+    try:
+        if datum.get('magnitude'):
+            datum['magnitude'] = float(datum['magnitude'])
+            if datum.get('error'):
+                datum['error'] = float(datum['error'])
+                display_str = f'{{magnitude:.{d}f}} ± {{error:.{d}f}}'
+            elif datum.get('limit'):
+                display_str = f'> {{magnitude:.{d}f}}'
+            else:
+                display_str = f'{{magnitude:.{d}f}}'
+            return display_str.format(**datum)
+    except:
+        print("Unable to format magnitude")
 
 @register.filter
 def error_to_snr(error):
