@@ -74,6 +74,7 @@ CATEGORY_COLORS = {
 }
 
 METRIC_ORDER = [
+    "bc",
     "bc_norm",
     "Consistent Probability",
     "Improved Consistent Probability",
@@ -449,6 +450,7 @@ def _plot_score_vs_uncertainty(records, output_path, event, log_floor=1e-30, met
 # distinct from CATEGORY_COLORS (which colors z-type, not metric identity) so
 # the two never get read as the same encoding across different figures
 METRIC_COLORS = {
+    "bc": "#e87ba4",
     "bc_norm": "#2a78d6",
     "Consistent Probability": "#e34948",
     "Improved Consistent Probability": "#eb6834",

@@ -242,4 +242,4 @@ def cons_prob_3(mean1, mean2, std1, unc_minus, unc_plus, wt=3):
     var2 = w_minus * unc_minus**2 + w_plus * unc_plus**2
 
     sigma_diff = wt * np.sqrt(2 * (std1**2 + var2))
-    return erfc((np.abs(mean_diff) / sigma_diff) / np.sqrt(2))
+    return erfc((np.abs(mean_diff) / sigma_diff))
