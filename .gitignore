@@ -27,4 +27,5 @@ ztf-forced-phot-logs/
 ztf-forced-phot-logs-backup/
 .vscode/
 build/
+!sphinx_docs/docs/build/
 trove.egg-info/
