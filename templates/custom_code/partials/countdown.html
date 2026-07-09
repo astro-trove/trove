@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Event Countdown Timer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        
+        h1 {
+            color: #333;
+        }
+        
+        #timer {
+            background-color: #fff;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 5px;
+            margin: 0px auto;
+            max-width: 300px;
+        }
+        
+        #countdown {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e44d26;
+        }
+        
+        #countdown-units {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e44d2660;
+        }
+        
+        #event {
+            font-size: 34px;
+            font-weight: bold;
+            color: #221d1c;
+        }
+    </style>
+</head>
+<body>
+    <h3 style="text-align:center"><b>Countdown to {{ data.name }} </b></h3>
+    <div id="timer">
+        <div id="countdown">
+            {{ data.days|stringformat:"02d" }} : {{ data.hours|stringformat:"02d" }} : {{ data.minutes|stringformat:"02d" }} : {{ data.seconds|stringformat:"02d" }}
+        </div>
+        <div id="countdown-units">
+            dd : hh : mm : ss
+        </div>
+    </div>
+    <p><a href="https://observing.docs.ligo.org/plan/" target="_blank">{{ data.flavortext }}</a></p>
+ 
+    <script>
+        // Function to update the countdown timer
+        function updateTimer() {
+            var days = parseInt(document.getElementById('countdown').textContent.split(':')[0]);
+            var hours = parseInt(document.getElementById('countdown').textContent.split(':')[1]);
+            var minutes = parseInt(document.getElementById('countdown').textContent.split(':')[2]);
+            var seconds = parseInt(document.getElementById('countdown').textContent.split(':')[3]);
+ 
+            if (seconds > 0) {
+                seconds--;
+            } else {
+                if (minutes > 0) {
+                    minutes--;
+                    seconds = 59;
+                } else {
+                    if (hours > 0) {
+                        hours--;
+                        minutes = 59;
+                        seconds = 59;
+                    } else {
+                        if (days > 0) {
+                        days--;
+                        hours = 23;
+                        minutes = 59;
+                        seconds = 59;
+                    } else {
+                        }
+                            // Timer has reached zero, you can handle this case as needed
+                    }
+                }
+            }
+ 
+            // Update the timer display
+            document.getElementById('countdown').textContent =
+                (days < 10 ? '0' : '') + days + ' : ' +
+                (hours < 10 ? '0' : '') + hours + ' : ' +
+                (minutes < 10 ? '0' : '') + minutes + ' : ' +
+                (seconds < 10 ? '0' : '') + seconds;
+        }
+ 
+        // Update the timer every second
+        setInterval(updateTimer, 1000);
+    </script>
+</body>
+</html>

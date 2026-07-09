@@ -21,8 +21,6 @@ from astropy.time import Time
 
 from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
 
-from dal import autocomplete
-
 
 class EventCandidateListView(FilterView):
     """
