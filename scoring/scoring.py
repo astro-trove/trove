@@ -1,4 +1,5 @@
 from .models import ScoreFactor
+from .dynamic_catalogs import UserGalaxy
 from .healpix_utils import SaTarget
 
 from candidate_vetting.vet import GALAXY_CATALOGS
@@ -23,6 +24,8 @@ from tom_nonlocalizedevents.healpix_utils import (
     # uniq_to_bigintrange,
     # update_all_credible_region_percents_for_candidates
 )
+
+
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
 from tom_targets.models import TargetExtra
 
@@ -36,7 +39,7 @@ from django.conf import settings
 cosmo = settings.COSMO
 logger = logging.getLogger(__name__)
 
-GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate(GALAXY_CATALOGS)}
+GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate([UserGalaxy] + GALAXY_CATALOGS)}
 
 # upper / lower bounds on distance for computing normal / asymmetric Gaussian
 # distributions
