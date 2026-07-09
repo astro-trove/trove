@@ -25,7 +25,11 @@
     <dt class="col-sm-3">&nbsp;</dt>
     <dd class="col-sm-9">
       {% if not event_candidate.viable %}<strike>{% endif %}
-      &#x1F517;<a href="{% url 'nonlocalizedevents:event-detail' event_candidate.nonlocalizedevent.event_id %}" target="_blank">{{ event_candidate.nonlocalizedevent.event_id }}</a>
+      &#x1F517;<a href="/eventcandidates/?nonlocalizedevent={{ event_candidate.nonlocalizedevent.id }}" target="_blank">{{ event_candidate.nonlocalizedevent.event_id }}</a>
+      {% if event_candidate.nonlocalizedevent.event_type == "GW" %}
+          <a href="{{ event_candidate.nonlocalizedevent.gracedb_url }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
+          <a href="{{ event_candidate.nonlocalizedevent.treasuremap_url }}" target="_blank"><img src="https://treasuremap.space/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" /></a>
+      {% endif %}
       {% if not event_candidate.viable %}</strike>{% endif %}
     </dd>
   {% endfor %}

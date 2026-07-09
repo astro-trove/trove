@@ -1,0 +1,19 @@
+<div id='aladin-lite-div' style='aspect-ratio: 2'></div>
+<script src='https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js' charset='utf-8'></script>
+<script type="text/javascript">
+    var aladin;
+A.init.then(() => {
+    aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showLayersControl: false, showFullscreenControl: false, showProjectionControl: false, showReticle: false, showCooGrid: false});
+    var candidates = A.catalog({color: '#84f', name: 'Linked Candidates'});
+    aladin.addCatalog(candidates);
+    {% for candidate in candidates %}
+        var cat_ra = {{ candidate.target.ra }};
+        var cat_dec = {{ candidate.target.dec }};
+        var cat_name = '{{ candidate.target.name }}'
+        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+    {% endfor %}
+    var json = {{ credible_region|safe }};
+    var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
+    aladin.addMOC(moc);
+});
+</script>
