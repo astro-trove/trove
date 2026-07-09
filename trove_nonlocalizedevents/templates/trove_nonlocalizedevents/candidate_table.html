@@ -16,15 +16,17 @@
     </form>
   </div>
   <div class="col" id="target-link-form-col">
-    <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form" hx-boost="false">
-      {% csrf_token %}
-      {% bootstrap_form eventcandidate_create_form %}
-      {% buttons %}
-      <button type="submit" class="btn btn-primary">
-	Link Target
-      </button>
-      {% endbuttons %}
-    </form>
+    {% if request.user.is_authenticated %}
+      <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form" hx-boost="false">
+        {% csrf_token %}
+        {% bootstrap_form eventcandidate_create_form %}
+        {% buttons %}
+        <button type="submit" class="btn btn-primary">
+	  Link Target
+        </button>
+        {% endbuttons %}
+      </form>
+    {% endif %}
   </div>
 </div>
 
