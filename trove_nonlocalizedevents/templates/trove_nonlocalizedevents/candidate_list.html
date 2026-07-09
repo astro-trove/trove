@@ -20,7 +20,7 @@
 <h1>Candidates for <a href="{% url 'nonlocalizedevents:detail' request.GET.nonlocalizedevent %}" target="_blank">{{ request.GET.nonlocalizedevent|event_id_from_pk }}</a></h1>
 {% nonlocalizedevent_details %}
 <br></br>
-{% comment %} <div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div> {% endcomment %}
+<div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
 <br><br>
 <div class="row">
   <a href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
