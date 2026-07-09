@@ -44,8 +44,8 @@ def format_inverse_far(far):
 
 @register.filter
 def format_distance(localization):
-    if localization is None or not localization.distance_mean:
-        return ""
+    if localization is None or isinstance(localization, str) or not localization.distance_mean:
+        return ""  # protect agains some weird localizations
     dist_mean = localization.distance_mean
     dist_std = localization.distance_std
     if localization.distance_mean < 1000.0:
@@ -55,9 +55,7 @@ def format_distance(localization):
         dist_std /= 1000.0
         unit = "Gpc"
     return (
-        f"{dist_mean:.0f} ± {dist_std:.0f} {unit}"
-        if dist_mean > 10.0
-        else f"{dist_mean:.1f} ± {dist_std:.1f} {unit}"
+        f"{dist_mean:.0f} ± {dist_std:.0f} {unit}" if dist_mean > 10.0 else f"{dist_mean:.1f} ± {dist_std:.1f} {unit}"
     )
 
 
@@ -117,14 +115,10 @@ def truncate(string, length=5):
 
 @register.filter
 def sort_localizations(localizations):
-    return localizations.annotate(Max("sequences__sequence_id")).order_by(
-        "sequences__sequence_id__max"
-    )
+    return localizations.annotate(Max("sequences__sequence_id")).order_by("sequences__sequence_id__max")
 
 
-@register.inclusion_tag(
-    "tom_nonlocalizedevents/partials/nonlocalizedevent_details.html", takes_context=True
-)
+@register.inclusion_tag("tom_nonlocalizedevents/partials/nonlocalizedevent_details.html", takes_context=True)
 def nonlocalizedevent_details(context, localization=None):
     print("Loading nonlocalizedevent details")
     if localization is None:
@@ -139,10 +133,7 @@ def nonlocalizedevent_details(context, localization=None):
     else:
         sequence = localization.sequences.last()
 
-    if (
-        sequence.nonlocalizedevent.event_type
-        == NonLocalizedEvent.NonLocalizedEventType.GRAVITATIONAL_WAVE
-    ):
+    if sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GRAVITATIONAL_WAVE:
         if sequence.details["group"] == "CBC":
             details_to_display = [
                 [
@@ -158,15 +149,10 @@ def nonlocalizedevent_details(context, localization=None):
                     ("1/FAR", format_inverse_far(sequence.details["far"])),
                     ("Distance", format_distance(localization)),
                 ]
-                + [
-                    (prop, f"{prob:.0%}")
-                    for prop, prob in sequence.details["properties"].items()
-                ],
+                + [(prop, f"{prob:.0%}") for prop, prob in sequence.details["properties"].items()],
                 [
                     (classification, f"{prob:.0%}")
-                    for classification, prob in sequence.details[
-                        "classification"
-                    ].items()
+                    for classification, prob in sequence.details["classification"].items()
                 ],
             ]
         elif sequence.details["group"] == "Burst":
@@ -188,10 +174,7 @@ def nonlocalizedevent_details(context, localization=None):
             ]
         else:
             details_to_display = []
-    elif (
-        sequence.nonlocalizedevent.event_type
-        == NonLocalizedEvent.NonLocalizedEventType.GAMMA_RAY_BURST
-    ):
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.GAMMA_RAY_BURST:
         details_to_display = [
             [
                 ("Event Type", sequence.nonlocalizedevent.event_type),
@@ -206,24 +189,15 @@ def nonlocalizedevent_details(context, localization=None):
                 ),
                 (
                     "Interval",
-                    millisecondformat(
-                        float(sequence.details["data_interval"].split()[0])
-                    ),
+                    millisecondformat(float(sequence.details["data_interval"].split()[0])),
                 ),
                 (
                     "Energy",
-                    "["
-                    + sequence.details["e_range"]
-                    .replace(" -", ",")
-                    .replace("]", "")
-                    .replace(" [", "] "),
+                    "[" + sequence.details["e_range"].replace(" -", ",").replace("]", "").replace(" [", "] "),
                 ),
             ],
         ]
-    elif (
-        sequence.nonlocalizedevent.event_type
-        == NonLocalizedEvent.NonLocalizedEventType.UNKNOWN
-    ):  # Einstein probe
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.UNKNOWN:  # Einstein probe
         details_to_display = [
             [
                 ("Event Type", "X-ray Transient"),
@@ -237,10 +211,7 @@ def nonlocalizedevent_details(context, localization=None):
                 ("Energy", f"{sequence.details['image_energy_range']} keV"),
             ],
         ]
-    elif (
-        sequence.nonlocalizedevent.event_type
-        == NonLocalizedEvent.NonLocalizedEventType.NEUTRINO
-    ):
+    elif sequence.nonlocalizedevent.event_type == NonLocalizedEvent.NonLocalizedEventType.NEUTRINO:
         details_to_display = [
             [
                 ("Event Type", f"Neutrino {sequence.details['notice_type'].title()}"),
@@ -263,22 +234,22 @@ def nonlocalizedevent_details(context, localization=None):
     return {"details": details_to_display}
 
 
-@register.inclusion_tag('trove_nonlocalizedevents/partials/recent_nonlocalizedevents.html', takes_context=True)
+@register.inclusion_tag("trove_nonlocalizedevents/partials/recent_nonlocalizedevents.html", takes_context=True)
 def recent_gw_nonlocalizedevents_withcandidates(context, ncands_min=1, limit=5):
     """
     Displays a list of the most recently created GW nonlocalized events in the
     TOM, with at least `ncands_min` candidates, up to the given limit of rows,
     or 5 if not specified.
     """
-    user = context['request'].user
-    nles = NonLocalizedEvent.objects.annotate(candidate_count=Count('candidates'))
+    user = context["request"].user
+    nles = NonLocalizedEvent.objects.annotate(candidate_count=Count("candidates"))
 
     return {
-        'empty_database': not NonLocalizedEvent.objects.exists(),
-        'authenticated': user.is_authenticated,
-        'nonlocalizedevents': nonlocalizedevents_for_user(
-            user,
-            nles.filter(event_type="GW", candidate_count__gte=ncands_min)).order_by('-event_id')[:limit]
+        "empty_database": not NonLocalizedEvent.objects.exists(),
+        "authenticated": user.is_authenticated,
+        "nonlocalizedevents": nonlocalizedevents_for_user(
+            user, nles.filter(event_type="GW", candidate_count__gte=ncands_min)
+        ).order_by("-event_id")[:limit],
     }
 
 
@@ -286,20 +257,22 @@ def recent_gw_nonlocalizedevents_withcandidates(context, ncands_min=1, limit=5):
 def event_id_from_pk(pk):
     return NonLocalizedEvent.objects.get(pk=pk).event_id
 
+
 @register.filter
 def event_type_from_pk(pk):
     return NonLocalizedEvent.objects.get(pk=pk).event_type
+
 
 @register.filter
 def gracedb_url_from_pk(pk):
     return NonLocalizedEvent.objects.get(pk=pk).gracedb_url
 
+
 @register.filter
 def treasuremap_url_from_pk(pk):
     return NonLocalizedEvent.objects.get(pk=pk).treasuremap_url
 
+
 @register.filter
 def hermes_url_from_pk(pk):
     return NonLocalizedEvent.objects.get(pk=pk).hermes_url
-
-
