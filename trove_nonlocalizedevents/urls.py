@@ -3,7 +3,6 @@ from .views import (
     EventCandidateCreateFromNLEView,
     generate_report,
     ToggleAgnCacheView,
-    ToggleAgnCacheSimpleView,
     RefreshCandidateList,
 )
 
@@ -20,11 +19,6 @@ urlpatterns = [
         "toggle-agn-cache/",
         ToggleAgnCacheView.as_view(),
         name="toggle-agn-cache",
-    ),
-    path(
-        "toggle-agn-cache-simple/",
-        ToggleAgnCacheSimpleView.as_view(),
-        name="toggle-agn-cache-simple",
     ),
     path(
         "refresh-candidate-list",
