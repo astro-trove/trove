@@ -263,3 +263,39 @@ def hybrid_cons_prob(mean1, mean2, std1, unc_minus, unc_plus, wt=2, z_thresh=1.1
     score_plus = erfc(np.abs(mean_diff) / sigma_plus)
 
     return w_minus * score_minus + w_plus * score_plus
+
+def robust_stats(pdf, x, p_lo=0.1587):
+    # 15.87/84.13 reproduces standard 1 sigma for a symmetric gaussian distribution
+    cdf = np.cumsum(pdf)
+    cdf = cdf / cdf[-1]
+    q_lo, q50, q_hi = np.interp([p_lo, 0.5, 1 - p_lo], cdf, x)
+    z = norm.ppf(1 - p_lo)
+    return q50, (q50 - q_lo) / z, (q_hi - q50) / z
+
+def hybrid_cons_prob_v2(gw_pdf, host_pdf, x, phot_type, wt=1, z_thresh=2):
+    # median location + robust MAD-family widths, but with the ORIGINAL
+    # consistency_probability that discretely picks a single tail (no smooth
+    # blend between tails like v2).
+    m1, gm, gp = robust_stats(gw_pdf, x)
+    mad1 = 0.5 * (gm + gp)                 # GW is symmetric -> gm == gp == sigma
+    m2, s_minus, s_plus = robust_stats(host_pdf, x)
+
+    med_diff = m2 - m1
+    host_scale = np.sqrt(s_minus**2 + s_plus**2)
+    z_gw = med_diff / mad1
+
+    if phot_type == 'spec-z':
+        # Score depends only on the (robust) z-score, rescaled into [0.9, 1.0]
+        return 1.0 - 0.1 * (np.abs(z_gw) / z_thresh)
+
+    if m2 < m1:
+        # host median below the GW -> the upper tail is the one facing the GW
+        mad2 = s_plus
+    else:
+        mad2 = s_minus
+
+    sigma_diff = wt * np.sqrt(2 * (mad1**2 + mad2**2))
+
+    # abs: med_diff can be negative, erfc of a negative would exceed 1
+    score = erfc(np.abs(med_diff) / sigma_diff)
+    return score

@@ -1,4 +1,4 @@
-from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3, hybrid_cons_prob, information_metric, resampled_zscore, zscore
+from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3, hybrid_cons_prob, hybrid_cons_prob_v2, information_metric, resampled_zscore, zscore
 
 from .models import ScoreFactor
 from .healpix_utils import SaTarget
@@ -137,6 +137,7 @@ def host_distance_match(
     prob_cons_ret = []
     cons_prob_3_ret = []
     hybrid_cons_prob_ret = []
+    hybrid_cons_prob_v2_ret = []
     for _, row in host_df.iterrows():
         cur_pdf = AsymmetricGaussian().pdf(
             _lumdist,
@@ -155,12 +156,14 @@ def host_distance_match(
         prob_cons_ret.append(consistency_probability(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
         cons_prob_3_ret.append(cons_prob_3(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
         hybrid_cons_prob_ret.append(hybrid_cons_prob(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+        hybrid_cons_prob_v2_ret.append(hybrid_cons_prob_v2(test_pdf, cur_pdf, _lumdist, phot_type=row.z_type))
 
     host_df["bc"] = bc_ret
     host_df["bc_norm"] = bc_norm_ret
     host_df['Consistent Probability'] = prob_cons_ret
     host_df['Improved Consistent Probability'] = cons_prob_3_ret
     host_df['Hybrid Consistent Probability'] = hybrid_cons_prob_ret
+    host_df['Hybrid Consistent Probability v2'] = hybrid_cons_prob_v2_ret
 
     return host_df
 
@@ -170,6 +173,7 @@ metrics = [
     'Consistent Probability',
     'Improved Consistent Probability',
     'Hybrid Consistent Probability',
+    'Hybrid Consistent Probability v2',
 ]
 
 def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):

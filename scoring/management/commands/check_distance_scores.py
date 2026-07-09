@@ -79,6 +79,7 @@ METRIC_ORDER = [
     "Consistent Probability",
     "Improved Consistent Probability",
     "Hybrid Consistent Probability",
+    "Hybrid Consistent Probability v2",
 ]
 
 # score-vs-distance / correlation-vs-distance figures only compare the erfc-
@@ -87,6 +88,7 @@ PROB_METRIC_ORDER = [
     "Consistent Probability",
     "Improved Consistent Probability",
     "Hybrid Consistent Probability",
+    "Hybrid Consistent Probability v2",
 ]
 
 
@@ -464,6 +466,7 @@ METRIC_COLORS = {
     "Consistent Probability": "#e34948",
     "Improved Consistent Probability": "#eb6834",
     "Hybrid Consistent Probability": "#008300",
+    "Hybrid Consistent Probability v2": "#0066cc",
 }
 
 def _plot_uncertainty_score_corr_vs_dist(
