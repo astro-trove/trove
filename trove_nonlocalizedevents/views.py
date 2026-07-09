@@ -162,8 +162,6 @@ def generate_report(request):
     except ValueError:
         ncands = 10  # this means the user didn't pass an integer to the n param
 
-    agn_toggle = cache.get("agn_toggle", False)
-
     candidates = EventCandidate.objects.filter(
         nonlocalizedevent_id=nle_id
     ).select_related("target", "nonlocalizedevent")
@@ -310,18 +308,6 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
         return redirect(reverse("custom_code:event-candidates"))
 
-# Used in the target_detail.html AGN Toggle Button
-class ToggleAgnCacheSimpleView(LoginRequiredMixin, View):
-    def get(self, request, *args, **kwargs):
-        new_val = not cache.get("agn_toggle", True)
-        cache.set("agn_toggle", new_val)
-
-        referer = request.META.get("HTTP_REFERER")
-        if referer and url_has_allowed_host_and_scheme(
-            referer, allowed_hosts={request.get_host()}, require_https=request.is_secure()
-        ):
-            return redirect(referer)
-        return redirect(reverse("home"))
 
 class RefreshCandidateList(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
