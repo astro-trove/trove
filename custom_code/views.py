@@ -3,22 +3,23 @@ import logging
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.http import HttpResponseRedirect
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView
 from django_filters.views import FilterView
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from guardian.mixins import PermissionListMixin
 
 from trove_targets.models import Target
+from trove_nonlocalizedevents.permissions import nonlocalizedevents_for_user
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from .filters import GWFilter, NeutrinoFilter
 from .forms import TargetReportForm, TargetClassifyForm
 from .forms import GWFormHelper, NeutrinoFormHelper
 from .forms import TNS_FILTER_CHOICES, TNS_INSTRUMENT_CHOICES, TNS_CLASSIFICATION_CHOICES
-from .hooks import target_post_save, update_or_create_target_extra
+from .hooks import update_or_create_target_extra
 from .templatetags.target_extras import split_name
 
 import json
@@ -219,7 +220,7 @@ class TargetNameSearchView(OldTargetNameSearchView):
     """
 
     def get(self, request, *args, **kwargs):
-        self.kwargs['name'] = request.GET.get('name').strip()
+        self.kwargs['name'] = self.kwargs["search_str"]
         return super().get(request, *args, **kwargs)
 
 
@@ -252,7 +253,26 @@ class GWListView(NonLocalizedEventListView):
 
     def get_queryset(self):
         qs = NonLocalizedEvent.objects.filter(event_type='GW').order_by('-event_id')
+        try:
+            search_str = self.kwargs["search_str"] # TRY to find a search string
+            qs = qs.filter(event_id__icontains=search_str).order_by('-event_id')
+        except KeyError:
+            pass
         return qs
+
+
+# class GWListSearchView(GWListView):
+#     """
+#     GWListView but with filtering by event ID through search_name
+#     """
+#     template_name = 'tom_nonlocalizedevents/gw_list.html'
+#     filterset_class = GWFilter
+#     formhelper_class = GWFormHelper
+
+#     def get_queryset(self):
+#         search_name = self.kwargs["search_name"]
+#         qs = super().get_queryset().filter(event_id__icontains=search_name)
+#         return qs
 
 
 class GRBListView(NonLocalizedEventListView):
@@ -314,3 +334,27 @@ class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
         """
         referer = self.request.META.get('HTTP_REFERER', '/')
         return referer
+
+
+class GWNonLocalizedEventOrTargetNameSearchView(RedirectView):
+    """
+    View for searching by nonlocalized event **or** target name. If only a
+    single GW NLE match, pulls up the candidate list for that GW NLE. If
+    multiple matches, pulls up the page with a list of GW NLEs, filtered by
+    the string. If no NLE matches, searches instead for targets.
+    """
+
+    def get(self, request, *args, **kwargs):
+        search_str = request.GET.get("name").strip()
+        all_gw_nles = nonlocalizedevents_for_user(request.user, NonLocalizedEvent.objects.filter(event_type="GW"))
+        gw_nles = all_gw_nles.filter(event_id__icontains=search_str,
+                                     event_type="GW")
+        try:
+            nle = gw_nles.get()
+        except NonLocalizedEvent.MultipleObjectsReturned as exc:
+            print(exc)
+            return HttpResponseRedirect(reverse('custom_code:gw-list-search', kwargs={"search_str":search_str}))
+        except NonLocalizedEvent.DoesNotExist:
+            return HttpResponseRedirect(reverse('custom_code:search', kwargs={"search_str":search_str}))
+
+        return HttpResponseRedirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
