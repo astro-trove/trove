@@ -1,7 +1,10 @@
 {% load bootstrap4 crispy_forms_tags event_candidate_extras %}
+{{ eventcandidate_filter_form.media }}
+{{ eventcandidate_create_form.media }}
+
 <div class="row">
   <div class="col">
-    <form action="" method="get" class="form">
+    <form action="{% url 'custom_code:event-candidates' %}" method="get" class="form">
       {% bootstrap_form eventcandidate_filter_form %}
 
       {% buttons %}
@@ -12,7 +15,7 @@
       {% endbuttons %}
     </form>
   </div>
-  <div class="col">
+  <div class="col" id="target-link-form-col">
     <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form" hx-boost="false">
       {% csrf_token %}
       {% bootstrap_form eventcandidate_create_form %}
@@ -103,4 +106,49 @@ function copyText() {
 }
 </script>
 
-{{ eventcandidate_filter_form.media }}
+<script>
+(function () {
+  // Keep the attributesToSettle fix -- it's a real, separate htmx behavior
+  // worth disabling regardless -- but it wasn't the actual cause of the
+  // visible duplicate. Confirmed via captured stack trace: dal's own
+  // persistent MutationObserver (autocomplete_light.js) ends up calling
+  // jQuery's $.fn.select2() a second time on the SAME already-initialized
+  // <select>. Select2's constructor unconditionally .destroy()s any
+  // existing instance before rebuilding, which strips the
+  // "select2-hidden-accessible" class it had already added and tears down
+  // the working container, right before creating a new one -- leaving the
+  // raw <select> visible next to its own replacement. Rather than chase why
+  // it's called twice, make the entry point itself idempotent: skip
+  // re-initializing any element that's already a working select2 widget.
+  function disableClassSettle() {
+    if (window.htmx) {
+      var idx = htmx.config.attributesToSettle.indexOf('class');
+      if (idx !== -1) {
+        htmx.config.attributesToSettle.splice(idx, 1);
+      }
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', disableClassSettle);
+  } else {
+    disableClassSettle();
+  }
+
+  var $ = (window.django && window.django.jQuery) || window.jQuery;
+  if ($ && $.fn.select2) {
+    var origSelect2 = $.fn.select2;
+    $.fn.select2 = function (options) {
+      // Command calls (e.g. .select2('close'), .select2('destroy')) pass a
+      // string, not an options object/undefined -- always let those through.
+      if (typeof options === 'object' || options === undefined) {
+        var toInit = this.not('.select2-hidden-accessible');
+        if (toInit.length === 0) {
+          return this;
+        }
+        return origSelect2.apply(toInit, arguments);
+      }
+      return origSelect2.apply(this, arguments);
+    };
+  }
+})();
+</script>
