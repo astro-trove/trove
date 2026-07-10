@@ -13,17 +13,25 @@
 </style>
 
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
+{% load static bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
 {% block title %}Candidates{% endblock %}
 {% block content %}
 {% if request.GET.nonlocalizedevent %}
-<h1>Candidates for <a href="{% url 'nonlocalizedevents:detail' request.GET.nonlocalizedevent %}" target="_blank">{{ request.GET.nonlocalizedevent|event_id_from_pk }}</a></h1>
+<h1>
+Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
+{% if request.GET.nonlocalizedevent|event_type_from_pk  == "GW" %}
+    <a href="{{ request.GET.nonlocalizedevent|gracedb_url_from_pk }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
+    <a href="{{ request.GET.nonlocalizedevent|treasuremap_url_from_pk }}" target="_blank"><img src="https://treasuremap.space/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" /></a>
+{% endif %}
+</h1>
 {% nonlocalizedevent_details %}
 <br></br>
-<div class="row"><div class="col-md-12">{% skymap_event_id %}</div></div>
+<div class="row"><div class="col-md-12">{% skymap_nle_id %}</div></div>
 <br><br>
 <div class="row">
-  <a href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
+  {% if request.user.is_authenticated %}
+    <a href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}" title="Run vetting for all candidates" class="btn btn-warning btn-lg">Vet All</a>
+  {% endif %}
   &nbsp;&nbsp;
   {% if request.user.is_superuser %}
     <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
@@ -57,103 +65,16 @@
     </div>
 </div>
 
-<div class="row">
-  <div class="col">
-    <form action="" method="get" class="form">
-      {% bootstrap_form eventcandidate_filter_form %}
+{% include 'trove_nonlocalizedevents/candidate_form.html' %}
 
-      {% buttons %}
-      <button type="submit" class="btn btn-primary">
-	Filter
-      </button>
-      <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" class="btn btn-secondary" title="Reset">Reset</a>
-      {% endbuttons %}
-    </form>
-  </div>
-  <div class="col">
-    <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form">
-      {% csrf_token %}
-      {% bootstrap_form eventcandidate_create_form %}
-      {% buttons %}
-      <button type="submit" class="btn btn-primary">
-	Link Target
-      </button>
-      {% endbuttons %}
-    </form>
+<div id="candidate-table-container" hx-boost="true" hx-target="#candidate-results" hx-push-url="true" hx-history="false">
+  <div id="candidate-results">
+    {% include 'trove_nonlocalizedevents/candidate_table_body.html' %}
   </div>
 </div>
 
-<br>
+{% endblock %}
 
-<div class="row">
-  <div class="col-md-10">
-  {% bootstrap_pagination page_obj extra=request.GET.urlencode %} 
-    <table class="table table-sm table-hover">
-      <thead>
-        <tr>
-          <th>Rank</th>
-          <th>Target</th>
-          <th>Event</th>
-          <th>Score</th>
-        </tr>
-      </thead>
-      <tbody>
-	{% for candidate in page_obj.object_list %}
-        <tr>
-	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
-	  <td>
-            {% if candidate.target is not None %}
-              <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
-            {% else %}
-              None
-            {% endif %}
-          </td>
-          <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
-          <td>
-	    {% for transient, score in candidate.score.items %}
-            {{ transient }} {{score|floatformat:2}}<br>
-            {% endfor %}
-          </td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="10">
-            {% if target_count == 0 %}
-            No candidates yet.
-            {% else %}
-            No candidates match those filters.
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
-  </div>
-</div>
-
-<script>
-function openSummaryModal() {
-    const nleId = "{{ request.GET.nonlocalizedevent }}";
-    fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=5`)
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('summaryText').value = data.text;
-            $('#summaryModal').modal('show');
-        });
-}
-
-function copyText() {
-    const text = document.getElementById('summaryText');
-    text.select();
-    navigator.clipboard.writeText(text.value).then(() => {
-        const btn = document.getElementById('copyBtn');
-        btn.innerHTML = '<i class="fa fa-check"></i> Copied!';
-        setTimeout(() => btn.innerHTML = '<i class="fa fa-copy"></i> Copy', 2000);
-    });
-}
-</script>
-
-{{ eventcandidate_filter_form.media }}
-
+{% block javascript %}
+<script src="{% static 'tom_common/js/htmx.min.js' %}"></script>
 {% endblock %}

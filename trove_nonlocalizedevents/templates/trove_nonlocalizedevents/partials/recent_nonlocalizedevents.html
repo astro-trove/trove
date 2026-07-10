@@ -1,0 +1,47 @@
+{% load nonlocalizedevent_extras %}
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Event ID</th>
+      <th scope="col" title="Most Likely Classification">Class.</th>
+      <th scope="col" title="Number of Event Candidates">No. of Candidates</th>
+      <th scope="col" title="External Links">Ext. Links</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for nle in nonlocalizedevents %}
+    <tr>
+      <td>
+        <a href="/eventcandidates/?nonlocalizedevent={{ nle.id }}" target="_blank" title="Candidates for {{ nle.event_id }}">
+          {{ nle.event_id }}
+        </a>
+      </td>
+      <td title="Most Likely Classification">
+        {{ nle.sequences.last.details | get_most_likely_class | truncate }}
+      </td>
+      <td title="Number of Event Candidates">
+        {{ nle.candidates.count }}
+      </td>
+      <td title="External Links">
+        <a href="{{ event.hermes_url }}" target="_blank"><img src="https://hermes.lco.global/favicon.ico" alt="Hermes" title="Hermes" class="hermes icon" /></a>
+        <a href="{{ event.gracedb_url }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
+        <a href="{{ event.treasuremap_url }}" target="_blank"><img src="https://treasuremap.space/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" /></a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr>
+      <td colspan="2">
+          {% if authenticated %}
+            {% if empty_database %}
+                There are no GW nonlocalizedevents in the database.
+            {% else %}
+                No nonlocalizedevents.
+            {% endif %}
+        {% else %}
+            Please <a href="{% url 'login' %}?next={% url 'targets:list' %}">login</a> to view or create targets.
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

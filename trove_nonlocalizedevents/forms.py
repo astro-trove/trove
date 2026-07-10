@@ -9,7 +9,7 @@ from dal import autocomplete
 
 class EventCandidateSearchForm(forms.Form):
     target__name = forms.CharField(
-        label="Search by target name:",
+        label="Filter table by target name:",
         required=False,
         widget=forms.TextInput(
             attrs={

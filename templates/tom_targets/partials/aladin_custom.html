@@ -61,6 +61,15 @@
       annotateChart({{ target.ra }}, {{ target.dec }}, {{ galaxy_ras }}, {{galaxy_decs}});
     });
 
+    aladin.createImageSurvey(
+	'VLASS-QL-MedianStack-20250131',
+	'VLASS',
+	'https://vlass-dl.nrao.edu/vlass/HiPS/MedianStack/Quicklook',
+	'equatorial',
+	9,
+	{imgFormat: 'png'}
+    );
+
     function getScaleBarFromForm() {
       let size = Number($('#scale-bar-size').val());
       if (size < 0) {

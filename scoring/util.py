@@ -4,6 +4,7 @@ Some common functions used in multiple places throughout the app
 
 from collections import OrderedDict
 import math
+import logging
 from astropy.units import Quantity
 from django.db.models import FloatField
 from django.db.models.functions import Cast
@@ -26,6 +27,8 @@ from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 from .models import ScoreFactor
 
 import time
+
+logger = logging.getLogger(__name__)
 
 # map imported parameter ranges to transients
 TRANSIENTS = ["KN", "KN-in-SN", "super-KN"]
@@ -90,6 +93,7 @@ def get_event_candidate_scores(
     event_candidates,
     dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
     subscore_names=SUBSCORE_NAMES,
+    agn_toggle=True
 ):
     """Get the event candidate scores for everything in subscore_names
 
@@ -98,6 +102,9 @@ def get_event_candidate_scores(
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
+    
+    if not agn_toggle:
+        exclude_keys.add('agn_score')
 
     # only evaluate this once since it is time consuming
     event_candidates_list = list(event_candidates)
@@ -168,6 +175,8 @@ def get_event_candidate_scores(
             mpc_score = int(te["mpc_match_name"] == str(None))
 
         # remove keys we don't want and calculate a base subscore
+        # need to add "agn" to exclude keys if button is selected
+        # AGN enabled should be a global state of the website
         subscore_no_phot = (
             math.prod([sf_dict[key] for key in sf_dict if key not in exclude_keys])
             * ps_score
