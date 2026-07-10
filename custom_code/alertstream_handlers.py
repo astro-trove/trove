@@ -282,10 +282,30 @@ def prepare_and_send_alerts(nle, seq):
     return localizations
 
 
+def _json_dump_default(obj):
+    if isinstance(obj, bytes):
+        return {"__bytes__": len(obj)}
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
+def _message_payload_for_json_dump(message):
+    """Return the HOP message content for archival JSON (not the JSONBlob wrapper)."""
+    if hasattr(message, "content"):
+        return message.content
+    return message
+
+
 def handle_message_and_send_alerts(message, metadata):
     jname = str(Time.now()).replace(" ", "T") + "-alert.json"
-    with open(jname, "w") as f:
-        json.dump(message, f)
+    try:
+        with open(jname, "w") as f:
+            json.dump(
+                _message_payload_for_json_dump(message),
+                f,
+                default=_json_dump_default,
+            )
+    except Exception as e:
+        logger.error(f"Could not write alert archive {jname}: {e}")
 
     # get skymap bytes out for later
     skymaps = []
