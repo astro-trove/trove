@@ -1,0 +1,31 @@
+ALLOWED_HOST = 'http://localhost:8000'
+ATLAS_API_KEY = ''
+DEBUG = True
+FORCE_SCRIPT_NAME = ''
+GCN_CLIENT_ID = ''
+GCN_CLIENT_SECRET = ''
+HOPSKOTCH_GROUP_ID = 'ci-test'
+LASAIR_TOKEN = ''
+POSTGRES_DB = 'trove'
+POSTGRES_HOST = 'localhost' # 2025/11/14: CHANGED from datatrove.as.arizona.edu
+POSTGRES_PORT = 5433  # local end of `ssh -L 5433:localhost:5432 datatrove.as.arizona.edu` tunnel # 2025/11/12: port for test database, default psql port
+POSTGRES_USER = 'trove'
+POSTGRES_PASSWORD = 'Tr0ve_520'
+
+POSTGRES_DB2 = "catalogs"
+POSTGRES_HOST2 = "localhost"
+POSTGRES_PORT2 = 5435
+POSTGRES_USER2 = "trove"
+POSTGRES_PASSWORD2 = "Tr0ve_520"
+
+SAVE_TEST_ALERTS = False
+SCIMMA_AUTH_USERNAME = ''
+SCIMMA_AUTH_PASSWORD = ''
+SECRET_KEY = 'ci-test-secret-key-not-for-production'
+NLE_LINKS = []
+TARGET_LINKS = []
+SLACK_TOKENS_GW = []
+SLACK_TOKEN_EP = ''
+SLACK_TOKEN_TNS = ''
+TNS_API_KEY = ''
+TREASUREMAP_API_KEY = ''
