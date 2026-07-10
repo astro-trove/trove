@@ -26,7 +26,7 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 </h1>
 {% nonlocalizedevent_details %}
 <br></br>
-<div class="row"><div class="col-md-12">{% skymap_nle_id %}</div></div>
+{% comment %} <div class="row"><div class="col-md-12">{% skymap_nle_id %}</div></div> {% endcomment %}
 <br><br>
 <div class="row">
   {% if request.user.is_authenticated %}
@@ -65,8 +65,12 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
     </div>
 </div>
 
-<div id="candidate-table-container" hx-boost="true" hx-target="this" hx-push-url="true" hx-history="false">
-  {% include 'trove_nonlocalizedevents/candidate_table.html' %}
+{% include 'trove_nonlocalizedevents/candidate_form.html' %}
+
+<div id="candidate-table-container" hx-boost="true" hx-target="#candidate-results" hx-push-url="true" hx-history="false">
+  <div id="candidate-results">
+    {% include 'trove_nonlocalizedevents/candidate_table_body.html' %}
+  </div>
 </div>
 
 {% endblock %}
