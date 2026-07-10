@@ -14,6 +14,7 @@ _static/
 !sphinx_docs/docs/build/html/_static/
 data/
 trove_tom/settings_local.py
+saguaro_tom/settings_local.py
 trove.egg-info/SOURCES.txt
 .DS_Store
 *.DAT
