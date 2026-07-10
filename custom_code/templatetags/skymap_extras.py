@@ -44,6 +44,28 @@ def skymap(context, localization):
     return extras
 
 
+@register.inclusion_tag(
+    "tom_nonlocalizedevents/partials/skymap_simple.html", takes_context=True
+)
+def skymap_simple(context, localization):
+    print("Fetching skymap")
+    # candidates only
+    extras = {
+        "candidates": localization.nonlocalizedevent.candidates.all(),
+    }
+
+    # GW skymap
+    contour = localization.credible_region_contours.filter(probability=0.9)
+    if contour.exists():
+        extras["credible_region"] = contour.last().pixels
+    else:
+        extras["credible_region"] = []
+
+    print("Finished fetching skymap")
+
+    return extras
+
+
 def get_preferred_localization(nle):
     seq = nle.sequences.last()
     if seq is not None:
@@ -57,14 +79,28 @@ def get_preferred_localization(nle):
 @register.inclusion_tag(
     "tom_nonlocalizedevents/partials/skymap.html", takes_context=True
 )
-def skymap_event_id(context):
-    event_id = context["request"].GET.get("nonlocalizedevent")
-    if event_id is None:
+def skymap_nle_id(context):
+    nle_id = context["request"].GET.get("nonlocalizedevent")
+    if nle_id is None:
         return
-    nle = NonLocalizedEvent.objects.get(id=event_id)
+    nle = NonLocalizedEvent.objects.get(id=nle_id)
     localization = get_preferred_localization(nle)
     return skymap(context, localization)
 
+
+@register.inclusion_tag(
+    "tom_nonlocalizedevents/partials/skymap.html", takes_context=True)
+def skymap_nle_id_manual(context, nle_id):
+    nle = NonLocalizedEvent.objects.get(id=nle_id)
+    localization = get_preferred_localization(nle)
+    return skymap(context, localization)
+
+@register.inclusion_tag(
+    "tom_nonlocalizedevents/partials/skymap_simple.html", takes_context=True)
+def skymap_nle_id_manual_simple(context, nle_id):
+    nle = NonLocalizedEvent.objects.get(id=nle_id)
+    localization = get_preferred_localization(nle)
+    return skymap_simple(context, localization)
 
 @register.filter
 def time_after_event(time, event_id, unit="hour", precision=1):
