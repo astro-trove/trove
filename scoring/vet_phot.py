@@ -54,7 +54,6 @@ def _flux_to_lum(flux, lumdist):
     """convert flux to lum. Everything should be astropy quantities"""
     return 4 * np.pi * lumdist**2 * flux
 
-
 def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataFrame:
     """
     Get the photometry for this target_id and parse into a dataframe for further analysis

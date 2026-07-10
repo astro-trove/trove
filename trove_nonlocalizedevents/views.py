@@ -6,6 +6,7 @@ from django.shortcuts import redirect
 from django.urls import reverse
 from django.http import JsonResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.base import View
 
 from trove_targets.models import Target
@@ -64,19 +65,29 @@ class EventCandidateListView(FilterView):
 
         return qs
 
+    def get_template_names(self):
+        if self.request.htmx:
+            return ["trove_nonlocalizedevents/candidate_table_body.html"]
+        return [self.template_name]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # Create cache key from filters (excluding page number)
-        filter_key = self.request.GET.urlencode().split("&page=")[0]
-        cache_key = f"event_candidates_scored_{filter_key}"
+        agn_toggle = cache.get("agn_toggle", True)
 
-        # Check cache first
+        # Create cache key from filters (excluding page number)
+        query_params = self.request.GET.copy()
+        query_params.pop("page", None)
+        filter_key = query_params.urlencode()
+        cache_key = f"event_candidates_scored_{filter_key}_{agn_toggle}"
+
+        # Check cache first (ToggleAgnCacheView pre-warms this key for the
+        # current NLE when the AGN toggle is flipped)
         scored_candidates = cache.get(cache_key)
         if scored_candidates is None:
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
-            scored_candidates = get_event_candidate_scores(all_candidates)
+            scored_candidates = get_event_candidate_scores(all_candidates, agn_toggle=agn_toggle)
             # Cache for 5 minutes
             cache.set(cache_key, scored_candidates, 60 * 5)
 
@@ -87,6 +98,7 @@ class EventCandidateListView(FilterView):
 
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
+        context["agn_toggle"] = agn_toggle
 
         nle_id = self.request.GET.get("nonlocalizedevent")
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
@@ -152,7 +164,7 @@ def generate_report(request):
         nonlocalizedevent_id=nle_id
     ).select_related("target", "nonlocalizedevent")
 
-    candidates = list(get_event_candidate_scores(candidates))  # [:ncands]
+    candidates = list(get_event_candidate_scores(candidates, agn_toggle=False))  # [:ncands]
 
     nle_name = NonLocalizedEvent.objects.get(id=nle_id)
 
@@ -274,3 +286,30 @@ We encourage additional follow up of these candidates to determine whether they 
     )
 
     return JsonResponse({"text": "\n".join(lines)})
+
+
+class ToggleAgnCacheView(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        new_val = not cache.get("agn_toggle", True)
+        cache.set("agn_toggle", new_val)
+
+        nle_id = request.GET.get("nonlocalizedevent")
+        if nle_id:
+            candidates = EventCandidate.objects.filter(
+                nonlocalizedevent_id=nle_id
+            ).select_related("target", "nonlocalizedevent")
+            scored_candidates = get_event_candidate_scores(candidates, agn_toggle=new_val)
+
+            # Re-sores all candidates after AGN-toggle change and saves to cache
+            cache_key = f"event_candidates_scored_nonlocalizedevent={nle_id}_{new_val}"
+            cache.set(cache_key, scored_candidates, 60 * 5)
+            return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
+        return redirect(reverse("custom_code:event-candidates"))
+
+
+class RefreshCandidateList(LoginRequiredMixin, View):
+    def get(self, request, *args, **kwargs):
+        nle_id = request.GET.get("nonlocalizedevent")
+        if nle_id:
+            return redirect(reverse('custom_code:event-candidates') + f'?nonlocalizedevent={nle_id}')
+        return redirect(reverse('curstom_code:event-candidates'))
