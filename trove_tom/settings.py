@@ -102,11 +102,7 @@ MIDDLEWARE = [
     "tom_registration.middleware.RedirectAuthenticatedUsersFromRegisterMiddleware",
 ]
 
-<<<<<<< HEAD
 ROOT_URLCONF = "trove_tom.urls"
-=======
-ROOT_URLCONF = "saguaro_tom.urls"
->>>>>>> 905f920 (Hybrid v2)
 
 TEMPLATES = [
     {
@@ -127,11 +123,7 @@ TEMPLATES = [
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
 CRISPY_TEMPLATE_PACK = "bootstrap4"
 
-<<<<<<< HEAD
 WSGI_APPLICATION = "trove_tom.wsgi.application"
-=======
-WSGI_APPLICATION = "saguaro_tom.wsgi.application"
->>>>>>> 905f920 (Hybrid v2)
 
 TASKS = {
     "default": {

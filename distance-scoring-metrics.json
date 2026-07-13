@@ -1,0 +1,3158 @@
+{
+    "AT2025adir": {
+        "Hybrid BC/Tophat": [
+            0.17316480589350425,
+            3892,
+            "photo-z"
+        ]
+    },
+    "AT2025adij": {
+        "Hybrid BC/Tophat": [
+            0.17900966572332858,
+            3851,
+            "photo-z"
+        ]
+    },
+    "AT2025adhg": {
+        "Hybrid BC/Tophat": [
+            0.002830498527880033,
+            "WISEA J002827.13-361543.4",
+            "spec-z"
+        ]
+    },
+    "AT2025adjd": {
+        "Hybrid BC/Tophat": [
+            2.787860164122828e-65,
+            "WISEA J124313.91+564806.0",
+            "spec-z"
+        ]
+    },
+    "SN2025adgq": {
+        "Hybrid BC/Tophat": [
+            3.4485142532062013e-07,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adhr": {
+        "Hybrid BC/Tophat": [
+            2.8347149522672457e-16,
+            "LCRS B004422.2-413729",
+            "spec-z"
+        ]
+    },
+    "AT2025aecf": {
+        "Hybrid BC/Tophat": [
+            2.2245906602117406e-37,
+            "DESI J336.0855+10.2076",
+            "spec-z"
+        ]
+    },
+    "SN2025adhf": {
+        "Hybrid BC/Tophat": [
+            6.74383851025267e-27,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adhh": {},
+    "AT2025adiv": {
+        "Hybrid BC/Tophat": [
+            0.6503823547688511,
+            1305822126,
+            "photo-z"
+        ]
+    },
+    "SN2025adim": {
+        "Hybrid BC/Tophat": [
+            1.5647338952716085e-14,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adit": {
+        "Hybrid BC/Tophat": [
+            0.01102270258932737,
+            2291,
+            "photo-z"
+        ]
+    },
+    "AT2025adie": {
+        "Hybrid BC/Tophat": [
+            9.817561447311014e-22,
+            "WISEA J122128.60+563534.0",
+            "spec-z"
+        ]
+    },
+    "AT2025adia": {
+        "Hybrid BC/Tophat": [
+            0.6453494076101035,
+            "4504-301-2-0089-0056",
+            "photo-z"
+        ]
+    },
+    "AT2025adib": {
+        "Hybrid BC/Tophat": [
+            0.3586188149408451,
+            1312,
+            "photo-z"
+        ]
+    },
+    "AT2025adic": {
+        "Hybrid BC/Tophat": [
+            0.5718500338694059,
+            "3893-301-2-0097-0157",
+            "photo-z"
+        ]
+    },
+    "SN2025adiw": {
+        "Hybrid BC/Tophat": [
+            3.023866061484823e-89,
+            null,
+            "redshift"
+        ]
+    },
+    "SN2025adjc": {
+        "Hybrid BC/Tophat": [
+            0.9102257743505429,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adjh": {
+        "Hybrid BC/Tophat": [
+            0.17047438198074832,
+            3025,
+            "photo-z"
+        ]
+    },
+    "AT2025adjn": {
+        "Hybrid BC/Tophat": [
+            0.0010917880189123587,
+            6115754,
+            "photo-z"
+        ]
+    },
+    "SN2025adhs": {
+        "Hybrid BC/Tophat": [
+            0.0004339978509918094,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adhj": {
+        "Hybrid BC/Tophat": [
+            0.12405030472752347,
+            3909941,
+            "photo-z"
+        ]
+    },
+    "SN2025adgp": {
+        "Hybrid BC/Tophat": [
+            0.0030047623249051247,
+            null,
+            "redshift"
+        ]
+    },
+    "SN2025adjf": {
+        "Hybrid BC/Tophat": [
+            6.761318368887945e-51,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adiq": {
+        "Hybrid BC/Tophat": [
+            3.1843979920908094e-06,
+            "WISEA J235825.62-303845.9",
+            "spec-z"
+        ]
+    },
+    "AT2025adhu": {
+        "Hybrid BC/Tophat": [
+            2.639397384471453e-15,
+            "DESI J181.7936+55.6520",
+            "spec-z"
+        ]
+    },
+    "AT2025aecp": {
+        "Hybrid BC/Tophat": [
+            1.2266654770034066e-06,
+            1316766830,
+            "photo-z"
+        ]
+    },
+    "AT2025addb": {
+        "Hybrid BC/Tophat": [
+            0.01514287577563877,
+            "NGC 3023",
+            "ind"
+        ]
+    },
+    "AT2025adil": {
+        "Hybrid BC/Tophat": [
+            0.28778076987770906,
+            6711,
+            "photo-z"
+        ]
+    },
+    "AT2025adht": {
+        "Hybrid BC/Tophat": [
+            0.29692573831314534,
+            "PSO J180.1022+49.0484",
+            "photo-z"
+        ]
+    },
+    "AT2025adto": {
+        "Hybrid BC/Tophat": [
+            0.6306459538971937,
+            7116962422,
+            "photo-z"
+        ]
+    },
+    "SN2025addc": {
+        "Hybrid BC/Tophat": [
+            1.1264455020860747e-96,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025aeco": {
+        "Hybrid BC/Tophat": [
+            0.15222166181124633,
+            "PSO J351.8323-24.0856",
+            "photo-z"
+        ]
+    },
+    "AT2025adin": {
+        "Hybrid BC/Tophat": [
+            0.9742266396867849,
+            438,
+            "photo-z"
+        ]
+    },
+    "AT2025adda": {
+        "Hybrid BC/Tophat": [
+            0.9904633041959827,
+            "WISEA J235148.81-345545.9",
+            "spec-z"
+        ]
+    },
+    "AT2025admx": {
+        "Hybrid BC/Tophat": [
+            0.6732959185921166,
+            5395,
+            "photo-z"
+        ]
+    },
+    "AT2025admv": {
+        "Hybrid BC/Tophat": [
+            0.7175818597790641,
+            9007239941,
+            "photo-z"
+        ]
+    },
+    "AT2025adms": {
+        "Hybrid BC/Tophat": [
+            0.17337553179841397,
+            6766,
+            "photo-z"
+        ]
+    },
+    "AT2025adoh": {
+        "Hybrid BC/Tophat": [
+            0.011660185069920163,
+            9015279640,
+            "photo-z"
+        ]
+    },
+    "AT2025adov": {
+        "Hybrid BC/Tophat": [
+            0.08582893261709287,
+            9000582005,
+            "photo-z"
+        ]
+    },
+    "AT2025adou": {
+        "Hybrid BC/Tophat": [
+            4.259328552610943e-07,
+            9000393757,
+            "photo-z"
+        ]
+    },
+    "AT2025adoq": {
+        "Hybrid BC/Tophat": [
+            0.4655853089890366,
+            9000396251,
+            "photo-z"
+        ]
+    },
+    "AT2025adoo": {
+        "Hybrid BC/Tophat": [
+            0.029529948539848867,
+            21695562,
+            "photo-z"
+        ]
+    },
+    "AT2025adog": {
+        "Hybrid BC/Tophat": [
+            0.12462619075158156,
+            8897338120,
+            "photo-z"
+        ]
+    },
+    "AT2025adoe": {
+        "Hybrid BC/Tophat": [
+            0.7400643583051698,
+            8897266045,
+            "photo-z"
+        ]
+    },
+    "AT2025adtu": {
+        "Hybrid BC/Tophat": [
+            0.9249716842196115,
+            "Arp 314A",
+            "ind"
+        ]
+    },
+    "AT2025adtt": {
+        "Hybrid BC/Tophat": [
+            0.8033185664123996,
+            8683452761,
+            "photo-z"
+        ]
+    },
+    "AT2025adml": {
+        "Hybrid BC/Tophat": [
+            0.35448216502820346,
+            980620205,
+            "photo-z"
+        ]
+    },
+    "AT2025adhy": {
+        "Hybrid BC/Tophat": [
+            2.0652544262540572e-38,
+            "DESI J339.5777-00.9533",
+            "spec-z"
+        ]
+    },
+    "AT2025adtp": {
+        "Hybrid BC/Tophat": [
+            0.007362722447076211,
+            "WISEA J102623.65+170243.7",
+            "ind"
+        ]
+    },
+    "AT2025adsw": {
+        "Hybrid BC/Tophat": [
+            0.061849940684624335,
+            1347778064,
+            "photo-z"
+        ]
+    },
+    "AT2025admk": {
+        "Hybrid BC/Tophat": [
+            6.289771503890923e-05,
+            3125,
+            "photo-z"
+        ]
+    },
+    "AT2025adng": {
+        "Hybrid BC/Tophat": [
+            0.0007628176175376318,
+            3977,
+            "photo-z"
+        ]
+    },
+    "AT2025admg": {
+        "Hybrid BC/Tophat": [
+            0.8340772101343981,
+            1144419966,
+            "photo-z"
+        ]
+    },
+    "AT2025adnp": {
+        "Hybrid BC/Tophat": [
+            0.2955162467346813,
+            1282,
+            "photo-z"
+        ]
+    },
+    "AT2025admp": {
+        "Hybrid BC/Tophat": [
+            0.28127027067408433,
+            1630,
+            "photo-z"
+        ]
+    },
+    "AT2025adsp": {
+        "Hybrid BC/Tophat": [
+            0.8763713511558064,
+            1197358823,
+            "photo-z"
+        ]
+    },
+    "AT2025adsl": {
+        "Hybrid BC/Tophat": [
+            0.0035033334888544786,
+            4990,
+            "photo-z"
+        ]
+    },
+    "AT2025admn": {
+        "Hybrid BC/Tophat": [
+            0.31979855254357614,
+            4862,
+            "photo-z"
+        ]
+    },
+    "AT2025adnv": {
+        "Hybrid BC/Tophat": [
+            0.9079220573266866,
+            1152828611,
+            "photo-z"
+        ]
+    },
+    "AT2025adon": {
+        "Hybrid BC/Tophat": [
+            0.0003079572419147882,
+            2288,
+            "photo-z"
+        ]
+    },
+    "AT2025admq": {
+        "Hybrid BC/Tophat": [
+            5.094958435258021e-15,
+            2160,
+            "photo-z"
+        ]
+    },
+    "AT2025ados": {
+        "Hybrid BC/Tophat": [
+            0.9910942122300817,
+            1117961661,
+            "photo-z"
+        ]
+    },
+    "AT2025adis": {
+        "Hybrid BC/Tophat": [
+            6.220656255278024e-82,
+            "WISEA J005451.02-400509.1",
+            "spec-z"
+        ]
+    },
+    "AT2025adnl": {
+        "Hybrid BC/Tophat": [
+            2.328159337303636e-62,
+            "LCRS B002708.0-415551",
+            "spec-z"
+        ]
+    },
+    "AT2025adsy": {
+        "Hybrid BC/Tophat": [
+            0.015458034988757434,
+            2984187,
+            "photo-z"
+        ]
+    },
+    "AT2025aech": {
+        "Hybrid BC/Tophat": [
+            4.9954516273486104e-27,
+            "DESI J138.5607-06.9657",
+            "spec-z"
+        ]
+    },
+    "AT2025adts": {
+        "Hybrid BC/Tophat": [
+            0.0027010412780008263,
+            1041404,
+            "spec-z"
+        ]
+    },
+    "AT2025admy": {
+        "Hybrid BC/Tophat": [
+            0.7280975267325204,
+            1043358359,
+            "photo-z"
+        ]
+    },
+    "AT2025admu": {
+        "Hybrid BC/Tophat": [
+            0.2746002458565079,
+            8126,
+            "photo-z"
+        ]
+    },
+    "AT2025adod": {
+        "Hybrid BC/Tophat": [
+            0.38122947409664626,
+            1039135992,
+            "photo-z"
+        ]
+    },
+    "AT2025admz": {
+        "Hybrid BC/Tophat": [
+            2.4600994329677208e-05,
+            "WISEA J000804.40-331237.3",
+            "spec-z"
+        ]
+    },
+    "AT2025adoi": {
+        "Hybrid BC/Tophat": [
+            0.00012141494906776177,
+            "WISEA J235417.61-314541.9",
+            "spec-z"
+        ]
+    },
+    "AT2025adok": {
+        "Hybrid BC/Tophat": [
+            0.5962275358780119,
+            9132069510,
+            "photo-z"
+        ]
+    },
+    "AT2025admt": {
+        "Hybrid BC/Tophat": [
+            0.3195083888632695,
+            1427,
+            "photo-z"
+        ]
+    },
+    "AT2025adoy": {
+        "Hybrid BC/Tophat": [
+            0.5748153490793853,
+            9014434286,
+            "photo-z"
+        ]
+    },
+    "AT2025adpd": {
+        "Hybrid BC/Tophat": [
+            5.473401258659847e-15,
+            "WISEA J233654.55-264538.4",
+            "spec-z"
+        ]
+    },
+    "AT2025adox": {
+        "Hybrid BC/Tophat": [
+            9.998206526101705e-37,
+            "WISEA J232825.15-235235.0",
+            "spec-z"
+        ]
+    },
+    "AT2025adob": {
+        "Hybrid BC/Tophat": [
+            9.503182538806261e-08,
+            1195152,
+            "spec-z"
+        ]
+    },
+    "AT2025adnk": {
+        "Hybrid BC/Tophat": [
+            0.23134800098053188,
+            9001140010,
+            "photo-z"
+        ]
+    },
+    "AT2025adnm": {
+        "Hybrid BC/Tophat": [
+            0.305338451734729,
+            8899045320,
+            "photo-z"
+        ]
+    },
+    "AT2025adoa": {},
+    "AT2025adom": {
+        "Hybrid BC/Tophat": [
+            0.00028181568128053495,
+            9002483779,
+            "photo-z"
+        ]
+    },
+    "AT2025adof": {
+        "Hybrid BC/Tophat": [
+            0.2377825619355444,
+            "PSO J352.1947-19.7373",
+            "photo-z"
+        ]
+    },
+    "AT2025adop": {
+        "Hybrid BC/Tophat": [
+            0.020780731930255057,
+            3449,
+            "photo-z"
+        ]
+    },
+    "AT2025adnz": {
+        "Hybrid BC/Tophat": [
+            0.9543076031829333,
+            "ESO 605- G 004",
+            "ind"
+        ]
+    },
+    "AT2025adnx": {
+        "Hybrid BC/Tophat": [
+            0.2701752786985815,
+            8894640122,
+            "photo-z"
+        ]
+    },
+    "AT2025adnn": {
+        "Hybrid BC/Tophat": [
+            0.005658969588300294,
+            "PSO J349.8112-16.5448",
+            "photo-z"
+        ]
+    },
+    "AT2025adnj": {},
+    "AT2025adpc": {
+        "Hybrid BC/Tophat": [
+            0.5908402051127042,
+            8893072644,
+            "photo-z"
+        ]
+    },
+    "AT2025adpe": {
+        "Hybrid BC/Tophat": [
+            0.7962089500410563,
+            8894520821,
+            "photo-z"
+        ]
+    },
+    "AT2025adnc": {
+        "Hybrid BC/Tophat": [
+            0.4702218208683464,
+            8895182812,
+            "photo-z"
+        ]
+    },
+    "AT2025adow": {
+        "Hybrid BC/Tophat": [
+            0.00168177113944299,
+            8897267077,
+            "photo-z"
+        ]
+    },
+    "AT2025adno": {
+        "Hybrid BC/Tophat": [
+            0.8230504307757727,
+            8896373188,
+            "photo-z"
+        ]
+    },
+    "AT2025adnr": {
+        "Hybrid BC/Tophat": [
+            0.7096376527362622,
+            8896222299,
+            "photo-z"
+        ]
+    },
+    "AT2025adny": {
+        "Hybrid BC/Tophat": [
+            0.056233104858726755,
+            440,
+            "photo-z"
+        ]
+    },
+    "AT2025adne": {
+        "Hybrid BC/Tophat": [
+            0.9230836829676142,
+            8896754032,
+            "photo-z"
+        ]
+    },
+    "AT2025adtv": {
+        "Hybrid BC/Tophat": [
+            0.591906230217671,
+            "WISEA J230226.76-130337.7",
+            "ind"
+        ]
+    },
+    "AT2025admw": {
+        "Hybrid BC/Tophat": [
+            0.016375793734840414,
+            1751,
+            "photo-z"
+        ]
+    },
+    "AT2025adra": {
+        "Hybrid BC/Tophat": [
+            0.5654641586683575,
+            "PSO J348.3486-10.3912",
+            "photo-z"
+        ]
+    },
+    "AT2025adnu": {
+        "Hybrid BC/Tophat": [
+            0.0472390216690747,
+            8891910547,
+            "photo-z"
+        ]
+    },
+    "AT2025adnb": {
+        "Hybrid BC/Tophat": [
+            0.06109670160689107,
+            "2576-301-2-0164-0317",
+            "photo-z"
+        ]
+    },
+    "AT2025adnw": {
+        "Hybrid BC/Tophat": [
+            0.9196610740122999,
+            8771863478,
+            "photo-z"
+        ]
+    },
+    "AT2025admr": {
+        "Hybrid BC/Tophat": [
+            6.585104055476641e-20,
+            "WISEA J225738.77-090128.9",
+            "spec-z"
+        ]
+    },
+    "AT2025adoc": {
+        "Hybrid BC/Tophat": [
+            0.06239073994786346,
+            3179,
+            "photo-z"
+        ]
+    },
+    "AT2025adot": {
+        "Hybrid BC/Tophat": [
+            0.7540464848903227,
+            "2576-301-6-0155-0125",
+            "photo-z"
+        ]
+    },
+    "AT2025adna": {
+        "Hybrid BC/Tophat": [
+            1.9345674710391785e-40,
+            "DESI J341.3075-04.3098",
+            "spec-z"
+        ]
+    },
+    "AT2025adtm": {
+        "Hybrid BC/Tophat": [
+            0.9986318392517977,
+            "DESI J144.9202-00.2351",
+            "spec-z"
+        ]
+    },
+    "AT2025adtn": {
+        "Hybrid BC/Tophat": [
+            0.018492711977710626,
+            "NGC 2967",
+            "ind"
+        ]
+    },
+    "AT2025adtl": {
+        "Hybrid BC/Tophat": [
+            0.0,
+            "DESI J143.4919+00.3769",
+            "spec-z"
+        ]
+    },
+    "AT2025adni": {
+        "Hybrid BC/Tophat": [
+            0.23040876954227285,
+            1288187517,
+            "photo-z"
+        ]
+    },
+    "AT2025adnh": {
+        "Hybrid BC/Tophat": [
+            0.04112182685631256,
+            1627,
+            "photo-z"
+        ]
+    },
+    "AT2025adnd": {
+        "Hybrid BC/Tophat": [
+            0.16103459014743554,
+            1245420527,
+            "photo-z"
+        ]
+    },
+    "AT2025adnq": {
+        "Hybrid BC/Tophat": [
+            0.06873234438260824,
+            1248452541,
+            "photo-z"
+        ]
+    },
+    "AT2025admi": {
+        "Hybrid BC/Tophat": [
+            5.7123969679936094e-12,
+            1248429018,
+            "photo-z"
+        ]
+    },
+    "AT2025adsk": {
+        "Hybrid BC/Tophat": [
+            0.03243020187924284,
+            194,
+            "photo-z"
+        ]
+    },
+    "AT2025adpa": {
+        "Hybrid BC/Tophat": [
+            0.007812969755513346,
+            1097240559,
+            "photo-z"
+        ]
+    },
+    "AT2025admo": {
+        "Hybrid BC/Tophat": [
+            0.18616413922413086,
+            1122394705,
+            "photo-z"
+        ]
+    },
+    "AT2025ador": {
+        "Hybrid BC/Tophat": [
+            0.8443251757874585,
+            1112469939,
+            "photo-z"
+        ]
+    },
+    "AT2025admh": {
+        "Hybrid BC/Tophat": [
+            0.0642514866870115,
+            8644,
+            "photo-z"
+        ]
+    },
+    "AT2025adnt": {
+        "Hybrid BC/Tophat": [
+            0.7769447689395517,
+            1112446286,
+            "photo-z"
+        ]
+    },
+    "AT2025admf": {
+        "Hybrid BC/Tophat": [
+            0.08995204521131926,
+            6624,
+            "photo-z"
+        ]
+    },
+    "AT2025admj": {
+        "Hybrid BC/Tophat": [
+            7.850615785062226e-05,
+            5285,
+            "photo-z"
+        ]
+    },
+    "AT2025adoz": {
+        "Hybrid BC/Tophat": [
+            0.21878839419496193,
+            1097198722,
+            "photo-z"
+        ]
+    },
+    "AT2025adoj": {
+        "Hybrid BC/Tophat": [
+            0.10594309410742261,
+            6823,
+            "photo-z"
+        ]
+    },
+    "AT2025adpb": {
+        "Hybrid BC/Tophat": [
+            0.023779872735338492,
+            1077619553,
+            "photo-z"
+        ]
+    },
+    "AT2025adol": {
+        "Hybrid BC/Tophat": [
+            8.763558220829842e-08,
+            "WISEA J002041.34-392552.4",
+            "spec-z"
+        ]
+    },
+    "AT2025adnf": {
+        "Hybrid BC/Tophat": [
+            0.1701219331336534,
+            6302,
+            "photo-z"
+        ]
+    },
+    "AT2025adns": {
+        "Hybrid BC/Tophat": [
+            1.3389212590291621e-08,
+            9738,
+            "photo-z"
+        ]
+    },
+    "SN2025adiz": {
+        "Hybrid BC/Tophat": [
+            1.9831671746997622e-27,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adhe": {
+        "Hybrid BC/Tophat": [
+            0.1175979324254867,
+            5270,
+            "photo-z"
+        ]
+    },
+    "AT2025adjl": {
+        "Hybrid BC/Tophat": [
+            0.2920709351001771,
+            1364316748,
+            "photo-z"
+        ]
+    },
+    "AT2025adhz": {
+        "Hybrid BC/Tophat": [
+            0.00193307635052444,
+            "3697-301-3-0089-0297",
+            "photo-z"
+        ]
+    },
+    "AT2025adtj": {
+        "Hybrid BC/Tophat": [
+            0.9107927567172236,
+            "UGC 06497",
+            "ind"
+        ]
+    },
+    "AT2025adtr": {
+        "Hybrid BC/Tophat": [
+            0.9985799105217287,
+            "WISEA J115057.53+503710.3",
+            "spec-z"
+        ]
+    },
+    "S251112cm_X68": {
+        "Hybrid BC/Tophat": [
+            0.039993373029267164,
+            8712,
+            "photo-z"
+        ]
+    },
+    "S251112cm_X69": {
+        "Hybrid BC/Tophat": [
+            0.988037610397285,
+            "NGC 1031",
+            "spec-z"
+        ]
+    },
+    "S251112cm_X51": {
+        "Hybrid BC/Tophat": [
+            0.9381130127475562,
+            "ESO 243- G 038",
+            "ind"
+        ]
+    },
+    "S251112cm_X73": {
+        "Hybrid BC/Tophat": [
+            0.9822410843296511,
+            "ESO 243- G 037",
+            "spec-z"
+        ]
+    },
+    "S251112cm_X52": {
+        "Hybrid BC/Tophat": [
+            0.9277659490219416,
+            "IC 1625",
+            "ind"
+        ]
+    },
+    "S251112cm_X67": {
+        "Hybrid BC/Tophat": [
+            2.1617322827196412e-05,
+            1077322,
+            "spec-z"
+        ]
+    },
+    "S251112cm_X2": {
+        "Hybrid BC/Tophat": [
+            0.8866909941648209,
+            "NGC 3569",
+            "ind"
+        ]
+    },
+    "S251112cm_X1": {
+        "Hybrid BC/Tophat": [
+            0.6162891141599398,
+            1863,
+            "photo-z"
+        ]
+    },
+    "S251112cm_X53": {
+        "Hybrid BC/Tophat": [
+            0.9792545745535669,
+            "MCG +06-25-009",
+            "ind"
+        ]
+    },
+    "S251112cm_X87": {
+        "Hybrid BC/Tophat": [
+            0.011521216153896284,
+            333,
+            "photo-z"
+        ]
+    },
+    "S251112cm_X71": {
+        "Hybrid BC/Tophat": [
+            0.9990015741681826,
+            "ZTF18aaxydyj",
+            "spec-z"
+        ]
+    },
+    "S251112cm_X72": {
+        "Hybrid BC/Tophat": [
+            0.24441571890327088,
+            "MCG +09-20-157",
+            "ind"
+        ]
+    },
+    "S251112cm_X70": {
+        "Hybrid BC/Tophat": [
+            0.00023356479520571927,
+            2875,
+            "photo-z"
+        ]
+    },
+    "S251112cm_X5": {
+        "Hybrid BC/Tophat": [
+            0.9208345730405891,
+            "IC 5362",
+            "ind"
+        ]
+    },
+    "S251112cm_X78": {
+        "Hybrid BC/Tophat": [
+            0.9381581868999258,
+            "WISEA J234825.76-281122.1",
+            "ind"
+        ]
+    },
+    "S251112cm_X38": {
+        "Hybrid BC/Tophat": [
+            0.8693681430401043,
+            "2MASX J23471684-2807265",
+            "ind"
+        ]
+    },
+    "S251112cm_X79": {
+        "Hybrid BC/Tophat": [
+            0.9133297059198229,
+            "WISEA J234821.06-280658.0",
+            "ind"
+        ]
+    },
+    "S251112cm_X3": {
+        "Hybrid BC/Tophat": [
+            0.9996352315501115,
+            "DESI J140.1928-08.0561",
+            "spec-z"
+        ]
+    },
+    "EPF_J232328.1-114600": {
+        "Hybrid BC/Tophat": [
+            0.27971080310386404,
+            8903701994,
+            "photo-z"
+        ]
+    },
+    "EPF_J010845.7-463304": {
+        "Hybrid BC/Tophat": [
+            0.9809924004556244,
+            "IC 1631",
+            "spec-z"
+        ]
+    },
+    "EPF_J020544.2-520424": {
+        "Hybrid BC/Tophat": [
+            0.48351069258107393,
+            1236141925,
+            "photo-z"
+        ]
+    },
+    "EPF_J092041.9-081815": {
+        "Hybrid BC/Tophat": [
+            0.8402140522577249,
+            7045697521,
+            "photo-z"
+        ]
+    },
+    "EPF_J111043.0+362227": {
+        "Hybrid BC/Tophat": [
+            4.760985271331006e-05,
+            614,
+            "photo-z"
+        ]
+    },
+    "EPF_J113825.2+432218": {},
+    "EPF_J000245.6-341925": {
+        "Hybrid BC/Tophat": [
+            0.22565950192457726,
+            1032933919,
+            "photo-z"
+        ]
+    },
+    "EPF_J234628.3-290057": {
+        "Hybrid BC/Tophat": [
+            0.1884979524595176,
+            "ESO 471- G 012",
+            "spec-z"
+        ]
+    },
+    "EPF_J234847.8-282639": {
+        "Hybrid BC/Tophat": [
+            0.9704749678531968,
+            "WISEA J234841.30-282641.1",
+            "spec-z"
+        ]
+    },
+    "EPF_J093255.2-020027": {
+        "Hybrid BC/Tophat": [
+            0.3738412666492189,
+            7060773539,
+            "photo-z"
+        ]
+    },
+    "AT2025aimk": {
+        "Hybrid BC/Tophat": [
+            0.8299762858790092,
+            8705112213,
+            "photo-z"
+        ]
+    },
+    "AT2025ailh": {
+        "Hybrid BC/Tophat": [
+            0.7688209981239682,
+            1094729007,
+            "photo-z"
+        ]
+    },
+    "AT2025ailr": {
+        "Hybrid BC/Tophat": [
+            0.09071142009776395,
+            "PSO J354.3795-21.4661",
+            "photo-z"
+        ]
+    },
+    "AT2025aima": {
+        "Hybrid BC/Tophat": [
+            0.8574177642121757,
+            8897828439,
+            "photo-z"
+        ]
+    },
+    "AT2025vof": {
+        "Hybrid BC/Tophat": [
+            0.2611672268120168,
+            5396,
+            "photo-z"
+        ]
+    },
+    "AT2025ailu": {
+        "Hybrid BC/Tophat": [
+            0.9855009905892912,
+            8896790650,
+            "photo-z"
+        ]
+    },
+    "AT2025wjk": {
+        "Hybrid BC/Tophat": [
+            8.421182619546243e-15,
+            "WISEA J224946.01-085509.5",
+            "spec-z"
+        ]
+    },
+    "AT2025aimn": {
+        "Hybrid BC/Tophat": [
+            5.095679004262384e-42,
+            "DESI J349.9408-11.7224",
+            "spec-z"
+        ]
+    },
+    "AT2025aimv": {
+        "Hybrid BC/Tophat": [
+            3.039804203277706e-06,
+            8896821214,
+            "photo-z"
+        ]
+    },
+    "AT2025aimu": {
+        "Hybrid BC/Tophat": [
+            0.014074181785736477,
+            8895958656,
+            "photo-z"
+        ]
+    },
+    "AT2025ailv": {
+        "Hybrid BC/Tophat": [
+            4.704925755153103e-14,
+            "WISEA J231235.29-102838.7",
+            "spec-z"
+        ]
+    },
+    "AT2025admd": {
+        "Hybrid BC/Tophat": [
+            0.4933976001644,
+            8893293910,
+            "photo-z"
+        ]
+    },
+    "AT2025adqf": {
+        "Hybrid BC/Tophat": [
+            3.844317904387627e-21,
+            "WISEA J225925.31-092949.1",
+            "spec-z"
+        ]
+    },
+    "AT2025ailx": {
+        "Hybrid BC/Tophat": [
+            0.8477548643920195,
+            8771871775,
+            "photo-z"
+        ]
+    },
+    "AT2025ailw": {
+        "Hybrid BC/Tophat": [
+            0.5290274101226236,
+            8705249350,
+            "photo-z"
+        ]
+    },
+    "AT2025aimd": {
+        "Hybrid BC/Tophat": [
+            0.0,
+            "DESI J341.7580-05.2464",
+            "spec-z"
+        ]
+    },
+    "AT2025aimp": {
+        "Hybrid BC/Tophat": [
+            0.6497369736950398,
+            1272644383,
+            "photo-z"
+        ]
+    },
+    "AT2025aimb": {
+        "Hybrid BC/Tophat": [
+            0.00996307442355376,
+            6711,
+            "photo-z"
+        ]
+    },
+    "AT2025ailn": {
+        "Hybrid BC/Tophat": [
+            1.4018157997616021e-12,
+            "LCRS B005016.6-451808",
+            "spec-z"
+        ]
+    },
+    "AT2025ailf": {
+        "Hybrid BC/Tophat": [
+            0.001300438722583756,
+            3161,
+            "photo-z"
+        ]
+    },
+    "AT2025ailk": {
+        "Hybrid BC/Tophat": [
+            0.38330647766799564,
+            1108986274,
+            "photo-z"
+        ]
+    },
+    "AT2025aimg": {
+        "Hybrid BC/Tophat": [
+            0.3131815012942341,
+            9588,
+            "photo-z"
+        ]
+    },
+    "AT2025adkm": {
+        "Hybrid BC/Tophat": [
+            2.2683266156838748e-108,
+            "WISEA J003100.66-393853.6",
+            "spec-z"
+        ]
+    },
+    "AT2025aile": {
+        "Hybrid BC/Tophat": [
+            0.19340631039640516,
+            1066873276,
+            "photo-z"
+        ]
+    },
+    "AT2025abwx": {
+        "Hybrid BC/Tophat": [
+            0.12034202174445127,
+            8891315210,
+            "photo-z"
+        ]
+    },
+    "AT2025aazc": {
+        "Hybrid BC/Tophat": [
+            0.05170601986332512,
+            "PSO J351.2958-21.0290",
+            "photo-z"
+        ]
+    },
+    "AT2025xhb": {
+        "Hybrid BC/Tophat": [
+            0.0038173059749365586,
+            21688358,
+            "photo-z"
+        ]
+    },
+    "AT2025aimw": {
+        "Hybrid BC/Tophat": [
+            3.2609856534292413e-290,
+            "DESI J338.0423-06.4618",
+            "spec-z"
+        ]
+    },
+    "AT2024aeuy": {
+        "Hybrid BC/Tophat": [
+            0.7615113405902235,
+            1058280469,
+            "photo-z"
+        ]
+    },
+    "AT2025aina": {
+        "Hybrid BC/Tophat": [
+            0.9804357891052244,
+            "2MASX J23112203-2315247",
+            "spec-z"
+        ]
+    },
+    "AT2025aimr": {
+        "Hybrid BC/Tophat": [
+            0.22881488957293658,
+            "PSO J342.8702-14.1800",
+            "photo-z"
+        ]
+    },
+    "AT2025aill": {
+        "Hybrid BC/Tophat": [
+            0.8964581058614036,
+            1290966222,
+            "photo-z"
+        ]
+    },
+    "AT2025aimx": {
+        "Hybrid BC/Tophat": [
+            0.00031456749723064877,
+            3136530,
+            "photo-z"
+        ]
+    },
+    "AT2025aimi": {
+        "Hybrid BC/Tophat": [
+            0.039094566679955936,
+            2992595,
+            "photo-z"
+        ]
+    },
+    "AT2025aiki": {
+        "Hybrid BC/Tophat": [
+            0.969410940328724,
+            1051740543,
+            "photo-z"
+        ]
+    },
+    "AT2025admm": {
+        "Hybrid BC/Tophat": [
+            0.06647675267670025,
+            1097239981,
+            "photo-z"
+        ]
+    },
+    "S251112cm_X88": {
+        "Hybrid BC/Tophat": [
+            0.928888106456277,
+            "MRK 0421",
+            "ind"
+        ]
+    },
+    "S251112cm_X50": {
+        "Hybrid BC/Tophat": [
+            0.06087971988800375,
+            "3698-301-5-0122-0012",
+            "photo-z"
+        ]
+    },
+    "AT2025ailt": {
+        "Hybrid BC/Tophat": [
+            0.0006677160728298184,
+            21043325,
+            "photo-z"
+        ]
+    },
+    "AT2025aime": {
+        "Hybrid BC/Tophat": [
+            5.665861872117577e-228,
+            "DESI J341.6254-07.0032",
+            "spec-z"
+        ]
+    },
+    "AT2025aimf": {
+        "Hybrid BC/Tophat": [
+            0.4841509206123846,
+            "2576-301-5-0184-0033",
+            "photo-z"
+        ]
+    },
+    "AT2025ailg": {
+        "Hybrid BC/Tophat": [
+            2.4317062311529186e-106,
+            "DESI J340.7539-01.6223",
+            "spec-z"
+        ]
+    },
+    "AT2025adqe": {
+        "Hybrid BC/Tophat": [
+            0.0824483169181911,
+            10420,
+            "photo-z"
+        ]
+    },
+    "AT2025mii": {
+        "Hybrid BC/Tophat": [
+            1.247297962536548e-99,
+            "DESI J339.6744+00.2167",
+            "spec-z"
+        ]
+    },
+    "AT2025ailp": {
+        "Hybrid BC/Tophat": [
+            0.8600304130739995,
+            1278046436,
+            "photo-z"
+        ]
+    },
+    "AT2025aimq": {
+        "Hybrid BC/Tophat": [
+            0.051192909502208436,
+            10414,
+            "photo-z"
+        ]
+    },
+    "AT2025ailm": {
+        "Hybrid BC/Tophat": [
+            0.12481288136274608,
+            7095,
+            "photo-z"
+        ]
+    },
+    "AT2025adjw": {
+        "Hybrid BC/Tophat": [
+            0.061338836978054534,
+            7551,
+            "photo-z"
+        ]
+    },
+    "AT2025aild": {
+        "Hybrid BC/Tophat": [
+            0.46439073729465463,
+            1695447420,
+            "photo-z"
+        ]
+    },
+    "AT2025ailc": {
+        "Hybrid BC/Tophat": [
+            1.9894350813555866e-09,
+            1256636152,
+            "photo-z"
+        ]
+    },
+    "AT2025vyp": {
+        "Hybrid BC/Tophat": [
+            0.2960546751261624,
+            3549812,
+            "photo-z"
+        ]
+    },
+    "AT2025aimh": {
+        "Hybrid BC/Tophat": [
+            0.8001717109839837,
+            1124373676,
+            "photo-z"
+        ]
+    },
+    "AT2025aims": {
+        "Hybrid BC/Tophat": [
+            0.7310516510140608,
+            1120153708,
+            "photo-z"
+        ]
+    },
+    "AT2025aimj": {
+        "Hybrid BC/Tophat": [
+            0.08666053571908895,
+            157,
+            "photo-z"
+        ]
+    },
+    "AT2025aimt": {
+        "Hybrid BC/Tophat": [
+            0.398369936802585,
+            12587,
+            "photo-z"
+        ]
+    },
+    "AT2025ailj": {
+        "Hybrid BC/Tophat": [
+            0.003490808747053637,
+            6533,
+            "photo-z"
+        ]
+    },
+    "AT2025aiml": {
+        "Hybrid BC/Tophat": [
+            7.378524321321247e-07,
+            8703,
+            "photo-z"
+        ]
+    },
+    "AT2025ails": {
+        "Hybrid BC/Tophat": [
+            0.6917114812134596,
+            1043753345,
+            "photo-z"
+        ]
+    },
+    "AT2025aily": {
+        "Hybrid BC/Tophat": [
+            0.14062198552719424,
+            1039127519,
+            "photo-z"
+        ]
+    },
+    "AT2025ailq": {
+        "Hybrid BC/Tophat": [
+            0.02982354035879219,
+            7439,
+            "photo-z"
+        ]
+    },
+    "AT2025aimy": {
+        "Hybrid BC/Tophat": [
+            0.9728428108896107,
+            "2MFGC 17963",
+            "spec-z"
+        ]
+    },
+    "AT2025aimz": {
+        "Hybrid BC/Tophat": [
+            0.9714751279026334,
+            "WISEA J234936.41-281425.0",
+            "spec-z"
+        ]
+    },
+    "AT2025aili": {
+        "Hybrid BC/Tophat": [
+            0.96068439015211,
+            9002393122,
+            "photo-z"
+        ]
+    },
+    "AT2025aimo": {
+        "Hybrid BC/Tophat": [
+            0.8055397422531667,
+            8999107749,
+            "photo-z"
+        ]
+    },
+    "AT2025ailo": {
+        "Hybrid BC/Tophat": [
+            0.0037586940474380105,
+            9003033148,
+            "photo-z"
+        ]
+    },
+    "AT2025aimm": {
+        "Hybrid BC/Tophat": [
+            9.795815994825552e-08,
+            "PSO J351.7219-21.3575",
+            "photo-z"
+        ]
+    },
+    "AT2025ailz": {
+        "Hybrid BC/Tophat": [
+            0.029169262860630176,
+            "PSO J349.9446-18.2149",
+            "photo-z"
+        ]
+    },
+    "AT2025aimc": {
+        "Hybrid BC/Tophat": [
+            0.0,
+            "DESI J350.1722-12.5496",
+            "spec-z"
+        ]
+    },
+    "AT2025adjp": {
+        "Hybrid BC/Tophat": [
+            0.989808543664804,
+            "ESO 350- G 007",
+            "spec-z"
+        ]
+    },
+    "AT2025adkl": {
+        "Hybrid BC/Tophat": [
+            0.9921777181365613,
+            "ESO 294- G 017",
+            "spec-z"
+        ]
+    },
+    "SN2025adcy": {
+        "Hybrid BC/Tophat": [
+            2.4807479409584035e-103,
+            null,
+            "redshift"
+        ]
+    },
+    "AT2025adip": {
+        "Hybrid BC/Tophat": [
+            0.08802519332568454,
+            9121490334,
+            "photo-z"
+        ]
+    },
+    "AT2025adiu": {
+        "Hybrid BC/Tophat": [
+            1.2242595014129132e-11,
+            1178298,
+            "spec-z"
+        ]
+    },
+    "AT2025adjo": {
+        "Hybrid BC/Tophat": [
+            0.020281716028289976,
+            1068337453,
+            "photo-z"
+        ]
+    },
+    "AT2025adrz": {
+        "Hybrid BC/Tophat": [
+            1.0037584632480224e-07,
+            "SARS 014.56153-51.50151",
+            "spec-z"
+        ]
+    },
+    "AT2025adsa": {
+        "Hybrid BC/Tophat": [
+            0.3959323496014946,
+            9132230549,
+            "photo-z"
+        ]
+    },
+    "AT2025adsf": {
+        "Hybrid BC/Tophat": [
+            0.7208921214949431,
+            1165385342,
+            "photo-z"
+        ]
+    },
+    "AT2025adsi": {
+        "Hybrid BC/Tophat": [
+            0.18528381209136338,
+            3602,
+            "photo-z"
+        ]
+    },
+    "AT2025adsm": {
+        "Hybrid BC/Tophat": [
+            0.884283232053907,
+            1238721451,
+            "photo-z"
+        ]
+    },
+    "AT2025adsx": {
+        "Hybrid BC/Tophat": [
+            0.9280734815610041,
+            "WISEA J023924.19-582738.3",
+            "photo-z"
+        ]
+    },
+    "AT2025adsz": {
+        "Hybrid BC/Tophat": [
+            0.11726899456864832,
+            1307999442,
+            "photo-z"
+        ]
+    },
+    "AT2025adtd": {
+        "Hybrid BC/Tophat": [
+            1.3646695372178279e-09,
+            "PSO J345.1687-22.2295",
+            "photo-z"
+        ]
+    },
+    "AT2025aecn": {
+        "Hybrid BC/Tophat": [
+            2.539752001824067e-15,
+            1217962,
+            "spec-z"
+        ]
+    },
+    "AT2025aefe": {
+        "Hybrid BC/Tophat": [
+            1.3627959704483181e-59,
+            "DESI J192.4836+51.7024",
+            "spec-z"
+        ]
+    },
+    "AT2025aegj": {
+        "Hybrid BC/Tophat": [
+            3.7677278858424233e-10,
+            1228937,
+            "spec-z"
+        ]
+    },
+    "AT2025adba": {
+        "Hybrid BC/Tophat": [
+            0.003933731056407756,
+            1164815,
+            "spec-z"
+        ]
+    },
+    "AT2025adbu": {
+        "Hybrid BC/Tophat": [
+            7.13937709447173e-16,
+            "SARS 352.41467-36.98253",
+            "spec-z"
+        ]
+    },
+    "AT2025adbv": {
+        "Hybrid BC/Tophat": [
+            0.33058001711905444,
+            1179472443,
+            "photo-z"
+        ]
+    },
+    "AT2025adid": {
+        "Hybrid BC/Tophat": [
+            1.5649726607689623e-12,
+            1641,
+            "photo-z"
+        ]
+    },
+    "AT2025adjq": {
+        "Hybrid BC/Tophat": [
+            0.007350326102609134,
+            9798,
+            "photo-z"
+        ]
+    },
+    "AT2025adjr": {
+        "Hybrid BC/Tophat": [
+            8.346315818248416e-05,
+            3598446,
+            "photo-z"
+        ]
+    },
+    "AT2025adjs": {
+        "Hybrid BC/Tophat": [
+            0.13854109964058706,
+            1118635415,
+            "photo-z"
+        ]
+    },
+    "AT2025adjt": {
+        "Hybrid BC/Tophat": [
+            0.8233645531165419,
+            1184646588,
+            "photo-z"
+        ]
+    },
+    "AT2025adjv": {
+        "Hybrid BC/Tophat": [
+            1.8020954718208208e-69,
+            "WISEA J021218.91-532650.4",
+            "spec-z"
+        ]
+    },
+    "AT2025adjy": {
+        "Hybrid BC/Tophat": [
+            0.10916409449079714,
+            8892551170,
+            "photo-z"
+        ]
+    },
+    "AT2025adkb": {
+        "Hybrid BC/Tophat": [
+            0.7495891534203529,
+            9015464494,
+            "photo-z"
+        ]
+    },
+    "AT2025adkc": {
+        "Hybrid BC/Tophat": [
+            1.1054355291898254e-26,
+            "WISEA J235714.40-335558.6",
+            "spec-z"
+        ]
+    },
+    "AT2025adkd": {
+        "Hybrid BC/Tophat": [
+            0.6797233668438029,
+            9559,
+            "photo-z"
+        ]
+    },
+    "AT2025adke": {
+        "Hybrid BC/Tophat": [
+            0.9308517449078003,
+            "AM 0031-380",
+            "ind"
+        ]
+    },
+    "AT2025adkf": {
+        "Hybrid BC/Tophat": [
+            0.13840668145074686,
+            7556,
+            "photo-z"
+        ]
+    },
+    "AT2025adkg": {
+        "Hybrid BC/Tophat": [
+            0.03465812629577758,
+            3206,
+            "photo-z"
+        ]
+    },
+    "AT2025adki": {
+        "Hybrid BC/Tophat": [
+            0.11970754473610357,
+            12740,
+            "photo-z"
+        ]
+    },
+    "AT2025adkk": {
+        "Hybrid BC/Tophat": [
+            0.22557554835377805,
+            6686,
+            "photo-z"
+        ]
+    },
+    "AT2025adkn": {
+        "Hybrid BC/Tophat": [
+            0.7643724296366833,
+            1078194678,
+            "photo-z"
+        ]
+    },
+    "AT2025adko": {
+        "Hybrid BC/Tophat": [
+            0.059010481743069075,
+            1090649672,
+            "photo-z"
+        ]
+    },
+    "AT2025adkp": {
+        "Hybrid BC/Tophat": [
+            8.791624212363676e-52,
+            "WISEA J004740.18-405031.0",
+            "spec-z"
+        ]
+    },
+    "AT2025adks": {
+        "Hybrid BC/Tophat": [
+            0.5063454820188181,
+            1154732501,
+            "photo-z"
+        ]
+    },
+    "AT2025adkt": {
+        "Hybrid BC/Tophat": [
+            0.16110820579755622,
+            3130,
+            "photo-z"
+        ]
+    },
+    "AT2025adkv": {
+        "Hybrid BC/Tophat": [
+            6.00465809094904e-05,
+            1254140370,
+            "photo-z"
+        ]
+    },
+    "AT2025adkx": {
+        "Hybrid BC/Tophat": [
+            0.042693617960026395,
+            "PSO J341.4104-03.2333",
+            "photo-z"
+        ]
+    },
+    "AT2025adkz": {
+        "Hybrid BC/Tophat": [
+            0.019112968695479248,
+            "PSO J349.0744-19.9230",
+            "photo-z"
+        ]
+    },
+    "AT2025adla": {
+        "Hybrid BC/Tophat": [
+            7.650826817644643e-08,
+            21502198,
+            "photo-z"
+        ]
+    },
+    "AT2025adlb": {
+        "Hybrid BC/Tophat": [
+            8.206073632355156e-06,
+            "5064-301-3-0089-0232",
+            "photo-z"
+        ]
+    },
+    "AT2025adlc": {
+        "Hybrid BC/Tophat": [
+            0.10031593795110659,
+            8896290382,
+            "photo-z"
+        ]
+    },
+    "AT2025adld": {
+        "Hybrid BC/Tophat": [
+            2.173417931049736e-16,
+            9002483113,
+            "photo-z"
+        ]
+    },
+    "AT2025adlf": {
+        "Hybrid BC/Tophat": [
+            0.22222063467353761,
+            9009225705,
+            "photo-z"
+        ]
+    },
+    "AT2025adlg": {
+        "Hybrid BC/Tophat": [
+            0.43552813782297406,
+            8896936765,
+            "photo-z"
+        ]
+    },
+    "AT2025adlh": {
+        "Hybrid BC/Tophat": [
+            2.0190334518410864e-05,
+            "WISEA J235847.39-335902.3",
+            "spec-z"
+        ]
+    },
+    "AT2025adlu": {
+        "Hybrid BC/Tophat": [
+            0.12637604898244953,
+            1174075314,
+            "photo-z"
+        ]
+    },
+    "AT2025adly": {
+        "Hybrid BC/Tophat": [
+            1.8777367920220772e-05,
+            525,
+            "photo-z"
+        ]
+    },
+    "AT2025adlz": {
+        "Hybrid BC/Tophat": [
+            0.8998860366006332,
+            1123306940,
+            "photo-z"
+        ]
+    },
+    "AT2025admc": {
+        "Hybrid BC/Tophat": [
+            0.09755701374401425,
+            2713,
+            "photo-z"
+        ]
+    },
+    "AT2025adme": {
+        "Hybrid BC/Tophat": [
+            0.8238836082432742,
+            1061576432,
+            "photo-z"
+        ]
+    },
+    "AT2025adpg": {
+        "Hybrid BC/Tophat": [
+            0.9841074316595901,
+            "WISEA J233951.92-251412.7",
+            "spec-z"
+        ]
+    },
+    "AT2025adph": {
+        "Hybrid BC/Tophat": [
+            0.06708616177445695,
+            7216,
+            "photo-z"
+        ]
+    },
+    "AT2025adpi": {
+        "Hybrid BC/Tophat": [
+            1.1967137177175191e-62,
+            1255278,
+            "spec-z"
+        ]
+    },
+    "AT2025adpj": {
+        "Hybrid BC/Tophat": [
+            0.784027959361432,
+            "5064-301-1-0082-0067",
+            "photo-z"
+        ]
+    },
+    "AT2025adpk": {
+        "Hybrid BC/Tophat": [
+            0.014212529696210695,
+            "5064-301-2-0107-0342",
+            "photo-z"
+        ]
+    },
+    "AT2025adpn": {
+        "Hybrid BC/Tophat": [
+            2.449602929743981e-59,
+            "LCRS B002209.3-391857",
+            "spec-z"
+        ]
+    },
+    "AT2025adpp": {
+        "Hybrid BC/Tophat": [
+            0.8161290709347939,
+            1124338806,
+            "photo-z"
+        ]
+    },
+    "AT2025adpr": {
+        "Hybrid BC/Tophat": [
+            0.8070807466770845,
+            1248458894,
+            "photo-z"
+        ]
+    },
+    "AT2025adps": {
+        "Hybrid BC/Tophat": [
+            0.21314068492434593,
+            2887,
+            "photo-z"
+        ]
+    },
+    "AT2025adpt": {
+        "Hybrid BC/Tophat": [
+            0.033690055926763086,
+            1585,
+            "photo-z"
+        ]
+    },
+    "AT2025adpu": {
+        "Hybrid BC/Tophat": [
+            0.9881716030891996,
+            "WISEA J001006.86-332355.1",
+            "spec-z"
+        ]
+    },
+    "AT2025adpv": {
+        "Hybrid BC/Tophat": [
+            0.15211993340108945,
+            9008096500,
+            "photo-z"
+        ]
+    },
+    "AT2025adpw": {
+        "Hybrid BC/Tophat": [
+            1.005046512487031e-20,
+            9002305255,
+            "photo-z"
+        ]
+    },
+    "AT2025adpx": {
+        "Hybrid BC/Tophat": [
+            0.022779505476886033,
+            9014258868,
+            "photo-z"
+        ]
+    },
+    "AT2025adpy": {
+        "Hybrid BC/Tophat": [
+            0.3236646963213345,
+            1122405175,
+            "photo-z"
+        ]
+    },
+    "AT2025adpz": {
+        "Hybrid BC/Tophat": [
+            1.0083208296346959e-16,
+            "WISEA J005444.50-463926.8",
+            "spec-z"
+        ]
+    },
+    "AT2025adqc": {
+        "Hybrid BC/Tophat": [
+            8.945341807872413e-85,
+            "LCRS B001218.5-384419",
+            "spec-z"
+        ]
+    },
+    "AT2025adqi": {
+        "Hybrid BC/Tophat": [
+            0.19996147169303552,
+            3258,
+            "photo-z"
+        ]
+    },
+    "AT2025adqj": {
+        "Hybrid BC/Tophat": [
+            1.8170495497552963e-37,
+            "LCRS B004834.1-454400",
+            "spec-z"
+        ]
+    },
+    "AT2025adqk": {
+        "Hybrid BC/Tophat": [
+            0.17354290987984394,
+            4456,
+            "photo-z"
+        ]
+    },
+    "AT2025adql": {
+        "Hybrid BC/Tophat": [
+            0.07122356707140466,
+            1152660992,
+            "photo-z"
+        ]
+    },
+    "AT2025adqn": {},
+    "AT2025adqp": {
+        "Hybrid BC/Tophat": [
+            6.655708046018955e-06,
+            1254101088,
+            "photo-z"
+        ]
+    },
+    "AT2025adqq": {
+        "Hybrid BC/Tophat": [
+            0.32205597945087605,
+            3992,
+            "photo-z"
+        ]
+    },
+    "AT2025adqr": {
+        "Hybrid BC/Tophat": [
+            0.10965019189035416,
+            1046195884,
+            "photo-z"
+        ]
+    },
+    "AT2025adqs": {
+        "Hybrid BC/Tophat": [
+            0.06685757397352038,
+            21493403,
+            "photo-z"
+        ]
+    },
+    "AT2025adqu": {
+        "Hybrid BC/Tophat": [
+            0.0005897687770297639,
+            21600868,
+            "photo-z"
+        ]
+    },
+    "AT2025adqv": {
+        "Hybrid BC/Tophat": [
+            0.00015421411157514334,
+            "2MFGC 17860",
+            "spec-z"
+        ]
+    },
+    "AT2025adqw": {
+        "Hybrid BC/Tophat": [
+            0.029497502262188894,
+            "PSO J358.9888-28.6134",
+            "photo-z"
+        ]
+    },
+    "AT2025adqy": {
+        "Hybrid BC/Tophat": [
+            0.005879199577307414,
+            10414,
+            "photo-z"
+        ]
+    },
+    "AT2025adqz": {
+        "Hybrid BC/Tophat": [
+            0.08509756801029054,
+            1382,
+            "photo-z"
+        ]
+    },
+    "AT2025adrb": {
+        "Hybrid BC/Tophat": [
+            0.07994872482658971,
+            "PSO J350.7652-19.8633",
+            "photo-z"
+        ]
+    },
+    "AT2025adrc": {
+        "Hybrid BC/Tophat": [
+            0.6023133424206953,
+            "5064-301-3-0100-0030",
+            "photo-z"
+        ]
+    },
+    "AT2025adre": {
+        "Hybrid BC/Tophat": [
+            0.09898912518671596,
+            1068002946,
+            "photo-z"
+        ]
+    },
+    "AT2025adrg": {
+        "Hybrid BC/Tophat": [
+            0.20920309913146076,
+            8892145400,
+            "photo-z"
+        ]
+    },
+    "AT2025adrh": {
+        "Hybrid BC/Tophat": [
+            0.19246424482390617,
+            1113,
+            "photo-z"
+        ]
+    },
+    "AT2025adrj": {
+        "Hybrid BC/Tophat": [
+            0.0007895855805680988,
+            6928,
+            "photo-z"
+        ]
+    },
+    "AT2025adrk": {
+        "Hybrid BC/Tophat": [
+            0.986511338287182,
+            1051539257,
+            "photo-z"
+        ]
+    },
+    "AT2025adro": {
+        "Hybrid BC/Tophat": [
+            0.9981624787042854,
+            6517,
+            "photo-z"
+        ]
+    },
+    "AT2025adrp": {
+        "Hybrid BC/Tophat": [
+            0.006270780553999471,
+            1109149901,
+            "photo-z"
+        ]
+    },
+    "AT2025adrs": {
+        "Hybrid BC/Tophat": [
+            0.14187099754848043,
+            7048272680,
+            "photo-z"
+        ]
+    },
+    "AT2025adsq": {
+        "Hybrid BC/Tophat": [
+            0.5874481157384855,
+            9124861393,
+            "photo-z"
+        ]
+    },
+    "AT2025adtk": {
+        "Hybrid BC/Tophat": [
+            0.006192547389801677,
+            1040098,
+            "spec-z"
+        ]
+    },
+    "AT2025adup": {
+        "Hybrid BC/Tophat": [
+            0.006730862740017432,
+            12753253,
+            "photo-z"
+        ]
+    },
+    "AT2025aduq": {
+        "Hybrid BC/Tophat": [
+            4.133966502226573e-06,
+            "2MFGC 08384",
+            "spec-z"
+        ]
+    },
+    "AT2025adur": {
+        "Hybrid BC/Tophat": [
+            3.3270354526611797e-13,
+            "WISEA J112439.13+322209.2",
+            "spec-z"
+        ]
+    },
+    "AT2025adut": {
+        "Hybrid BC/Tophat": [
+            1.8344138728250364e-78,
+            "DESI J176.9226+37.3003",
+            "spec-z"
+        ]
+    },
+    "AT2025aduu": {
+        "Hybrid BC/Tophat": [
+            0.08276573806398277,
+            "PSO J164.4791+24.4684",
+            "photo-z"
+        ]
+    },
+    "AT2025aduv": {
+        "Hybrid BC/Tophat": [
+            0.008795374403843622,
+            "PSO J156.0698+18.7995",
+            "photo-z"
+        ]
+    },
+    "AT2025adux": {
+        "Hybrid BC/Tophat": [
+            0.2826158385246673,
+            11834476,
+            "photo-z"
+        ]
+    },
+    "AT2025aduy": {
+        "Hybrid BC/Tophat": [
+            0.9117003989368746,
+            8101200194,
+            "photo-z"
+        ]
+    },
+    "AT2025aduz": {
+        "Hybrid BC/Tophat": [
+            3.9867452346004225e-06,
+            "2MASX J10443853+1910569",
+            "spec-z"
+        ]
+    },
+    "AT2025adva": {
+        "Hybrid BC/Tophat": [
+            2.938531875983246e-47,
+            "DESI J146.6325+09.7884",
+            "spec-z"
+        ]
+    },
+    "AT2025adve": {
+        "Hybrid BC/Tophat": [
+            6.549784067316579e-39,
+            "WISEA J105054.71+322629.5",
+            "spec-z"
+        ]
+    },
+    "AT2025advg": {
+        "Hybrid BC/Tophat": [
+            2.1890880051462775e-12,
+            "2MASX J10371035+2918439",
+            "spec-z"
+        ]
+    },
+    "AT2025advn": {
+        "Hybrid BC/Tophat": [
+            0.07312254735348114,
+            4985,
+            "photo-z"
+        ]
+    },
+    "AT2025adxn": {
+        "Hybrid BC/Tophat": [
+            0.9781329912811491,
+            "WISEA J233057.70-343658.7",
+            "spec-z"
+        ]
+    },
+    "AT2025adxr": {
+        "Hybrid BC/Tophat": [
+            2.0411318153176778e-16,
+            "WISEA J120940.27+574551.2",
+            "spec-z"
+        ]
+    },
+    "AT2025adxx": {
+        "Hybrid BC/Tophat": [
+            7.408978501850818e-69,
+            "DESI J165.2003+38.8552",
+            "spec-z"
+        ]
+    },
+    "AT2025adxz": {
+        "Hybrid BC/Tophat": [
+            0.11463752940693275,
+            "3893-301-2-0099-0523",
+            "photo-z"
+        ]
+    },
+    "AT2025adya": {
+        "Hybrid BC/Tophat": [
+            1.4090738126684272e-22,
+            "WISEA J102747.24+174155.4",
+            "spec-z"
+        ]
+    },
+    "AT2025adyg": {
+        "Hybrid BC/Tophat": [
+            5.18813004953762e-236,
+            "DESI J164.2303+37.8750",
+            "spec-z"
+        ]
+    },
+    "AT2025adyh": {
+        "Hybrid BC/Tophat": [
+            0.19824664235127892,
+            1383,
+            "photo-z"
+        ]
+    },
+    "AT2025adyi": {
+        "Hybrid BC/Tophat": [
+            0.2703279982611749,
+            "5935-301-4-0249-0340",
+            "photo-z"
+        ]
+    },
+    "AT2025adyr": {
+        "Hybrid BC/Tophat": [
+            4.0174950174687495e-07,
+            "DESI J177.1117+54.2815",
+            "spec-z"
+        ]
+    },
+    "AT2025adys": {
+        "Hybrid BC/Tophat": [
+            3.153970745765006e-06,
+            "WISEA J114616.15+525351.2",
+            "spec-z"
+        ]
+    },
+    "AT2025adyt": {
+        "Hybrid BC/Tophat": [
+            0.055224518477207114,
+            "2883-301-2-0159-0307",
+            "photo-z"
+        ]
+    },
+    "AT2025adyv": {
+        "Hybrid BC/Tophat": [
+            5.5722052426832845e-11,
+            "2MASX J11562140+5032351",
+            "spec-z"
+        ]
+    },
+    "AT2025adyw": {
+        "Hybrid BC/Tophat": [
+            0.7900273217295101,
+            "3818-301-3-0147-0026",
+            "photo-z"
+        ]
+    },
+    "AT2025adyx": {
+        "Hybrid BC/Tophat": [
+            0.0,
+            "DESI J187.5294+58.5021",
+            "spec-z"
+        ]
+    },
+    "AT2025adyy": {
+        "Hybrid BC/Tophat": [
+            2.155759400002246e-139,
+            "DESI J187.0569+58.3350",
+            "spec-z"
+        ]
+    },
+    "AT2025adyz": {
+        "Hybrid BC/Tophat": [
+            1.442194429131141e-71,
+            "DESI J181.1575+55.0573",
+            "spec-z"
+        ]
+    },
+    "AT2025adza": {
+        "Hybrid BC/Tophat": [
+            2.0168366840311604e-07,
+            11890013,
+            "photo-z"
+        ]
+    },
+    "AT2025adzd": {
+        "Hybrid BC/Tophat": [
+            5.06971431879755e-06,
+            "WISEA J112953.96+443552.3",
+            "spec-z"
+        ]
+    },
+    "AT2025adze": {
+        "Hybrid BC/Tophat": [
+            3.12268370133481e-16,
+            "WISEA J120123.39+441555.0",
+            "spec-z"
+        ]
+    },
+    "AT2025adzf": {
+        "Hybrid BC/Tophat": [
+            0.19276762124186728,
+            "PSO J176.4711+45.4567",
+            "photo-z"
+        ]
+    },
+    "AT2025adzg": {
+        "Hybrid BC/Tophat": [
+            0.03075587491149911,
+            "3698-301-4-0110-0446",
+            "photo-z"
+        ]
+    },
+    "AT2025adzj": {
+        "Hybrid BC/Tophat": [
+            0.034380239309815167,
+            2823,
+            "photo-z"
+        ]
+    },
+    "AT2025adzk": {
+        "Hybrid BC/Tophat": [
+            4.982510579117576e-06,
+            "WISEA J122027.22+510230.8",
+            "spec-z"
+        ]
+    },
+    "AT2025adzm": {
+        "Hybrid BC/Tophat": [
+            0.3233103377932708,
+            2367170,
+            "photo-z"
+        ]
+    },
+    "AT2025adzn": {
+        "Hybrid BC/Tophat": [
+            8.842438755879596e-42,
+            "WISEA J124607.28+525234.7",
+            "spec-z"
+        ]
+    },
+    "AT2025adzo": {
+        "Hybrid BC/Tophat": [
+            1.1521138014418705e-06,
+            "WISEA J121344.31+532737.1",
+            "spec-z"
+        ]
+    },
+    "AT2025adzp": {
+        "Hybrid BC/Tophat": [
+            1.2591639710997179e-15,
+            "DESI J184.5752+54.0360",
+            "spec-z"
+        ]
+    },
+    "AT2025adzq": {
+        "Hybrid BC/Tophat": [
+            8.902317919544704e-98,
+            "WISEA J121334.58+541557.9",
+            "spec-z"
+        ]
+    },
+    "AT2025adzt": {
+        "Hybrid BC/Tophat": [
+            9.915087814083435e-211,
+            "DESI J189.0569+55.8461",
+            "spec-z"
+        ]
+    },
+    "AT2025adzu": {
+        "Hybrid BC/Tophat": [
+            9.424082775672614e-06,
+            "WISEA J102504.79+244230.5",
+            "spec-z"
+        ]
+    },
+    "AT2025adzv": {
+        "Hybrid BC/Tophat": [
+            0.05444938450408608,
+            "PSO J160.1309+28.7883",
+            "photo-z"
+        ]
+    },
+    "AT2025adzw": {
+        "Hybrid BC/Tophat": [
+            0.02021580786213604,
+            4330,
+            "photo-z"
+        ]
+    },
+    "AT2025adzx": {
+        "Hybrid BC/Tophat": [
+            0.15227853756179,
+            "PSO J157.7321+28.0002",
+            "photo-z"
+        ]
+    },
+    "AT2025adzy": {
+        "Hybrid BC/Tophat": [
+            2.3289520815075747e-124,
+            "WISEA J102920.28+263901.5",
+            "spec-z"
+        ]
+    },
+    "AT2025adzz": {
+        "Hybrid BC/Tophat": [
+            0.6447968058950467,
+            "MCG +05-26-027",
+            "ind"
+        ]
+    },
+    "AT2025aeaa": {
+        "Hybrid BC/Tophat": [
+            0.16639076351948223,
+            3982,
+            "photo-z"
+        ]
+    },
+    "AT2025aead": {
+        "Hybrid BC/Tophat": [
+            8.638999454877332e-08,
+            "WISEA J105454.87+341757.7",
+            "spec-z"
+        ]
+    },
+    "AT2025aeae": {
+        "Hybrid BC/Tophat": [
+            2.3474247155323876e-22,
+            "2MASX J10584623+3918413",
+            "spec-z"
+        ]
+    },
+    "AT2025aeaf": {
+        "Hybrid BC/Tophat": [
+            0.20027837272619767,
+            2255,
+            "photo-z"
+        ]
+    },
+    "AT2025aeag": {
+        "Hybrid BC/Tophat": [
+            0.695166693070957,
+            "4550-301-3-0065-0052",
+            "photo-z"
+        ]
+    },
+    "AT2025aeah": {
+        "Hybrid BC/Tophat": [
+            1.1366433138807581e-13,
+            "WISEA J110028.11+342025.0",
+            "spec-z"
+        ]
+    },
+    "AT2025aeai": {
+        "Hybrid BC/Tophat": [
+            0.16258795158109943,
+            969,
+            "photo-z"
+        ]
+    },
+    "AT2025aeaj": {
+        "Hybrid BC/Tophat": [
+            5.6451407211275804e-11,
+            "WISEA J111715.65+354610.6",
+            "spec-z"
+        ]
+    },
+    "AT2025aeak": {
+        "Hybrid BC/Tophat": [
+            0.029607932852627618,
+            "4504-301-6-0070-0377",
+            "photo-z"
+        ]
+    },
+    "AT2025aeao": {
+        "Hybrid BC/Tophat": [
+            3.7332350128279845e-34,
+            "2MASS J11101290+3147145",
+            "spec-z"
+        ]
+    },
+    "AT2025aeaq": {
+        "Hybrid BC/Tophat": [
+            0.1781452752291771,
+            11391055,
+            "photo-z"
+        ]
+    },
+    "AT2025aeat": {
+        "Hybrid BC/Tophat": [
+            2.5764984202078077e-22,
+            1120094,
+            "spec-z"
+        ]
+    },
+    "AT2025aeau": {
+        "Hybrid BC/Tophat": [
+            0.16760996941689363,
+            "PSO J170.6619+37.1047",
+            "photo-z"
+        ]
+    },
+    "AT2025aeav": {
+        "Hybrid BC/Tophat": [
+            1.3735571734548895e-32,
+            "DESI J171.0450+38.3882",
+            "spec-z"
+        ]
+    },
+    "AT2025aeaw": {
+        "Hybrid BC/Tophat": [
+            3.8398893061738614e-149,
+            "DESI J162.2150+32.5387",
+            "spec-z"
+        ]
+    },
+    "AT2025aeax": {
+        "Hybrid BC/Tophat": [
+            1.6226715976528458e-15,
+            "WISEA J105553.07+331138.9",
+            "spec-z"
+        ]
+    },
+    "AT2025aeay": {
+        "Hybrid BC/Tophat": [
+            4.389793204168926e-12,
+            1098251,
+            "spec-z"
+        ]
+    },
+    "AT2025aeba": {
+        "Hybrid BC/Tophat": [
+            0.8070167167780633,
+            "5140-301-3-0034-0023",
+            "photo-z"
+        ]
+    },
+    "AT2025aebb": {
+        "Hybrid BC/Tophat": [
+            0.27431037694096333,
+            1627,
+            "photo-z"
+        ]
+    },
+    "AT2025aebe": {
+        "Hybrid BC/Tophat": [
+            0.10257118004049032,
+            2411,
+            "photo-z"
+        ]
+    },
+    "AT2025aebg": {},
+    "AT2025aebh": {
+        "Hybrid BC/Tophat": [
+            6.598309823262322e-28,
+            "DESI J161.3012+32.2969",
+            "spec-z"
+        ]
+    },
+    "AT2025aebi": {
+        "Hybrid BC/Tophat": [
+            0.3196381470717891,
+            "4623-301-5-0049-0243",
+            "photo-z"
+        ]
+    },
+    "AT2025aebj": {
+        "Hybrid BC/Tophat": [
+            0.3315359826737744,
+            "PSO J170.1412+39.2801",
+            "photo-z"
+        ]
+    },
+    "AT2025aebk": {
+        "Hybrid BC/Tophat": [
+            0.5068880616209475,
+            3383,
+            "photo-z"
+        ]
+    },
+    "AT2025aebl": {
+        "Hybrid BC/Tophat": [
+            0.18684049164146865,
+            10606811,
+            "photo-z"
+        ]
+    },
+    "AT2025aebm": {
+        "Hybrid BC/Tophat": [
+            0.0005533168050344598,
+            1067249,
+            "spec-z"
+        ]
+    },
+    "AT2025aebn": {
+        "Hybrid BC/Tophat": [
+            5.61307725242106e-08,
+            "DESI J182.4654+57.5722",
+            "spec-z"
+        ]
+    },
+    "AT2025aebo": {
+        "Hybrid BC/Tophat": [
+            9.258843437737633e-07,
+            "WISEA J104655.25+320615.4",
+            "spec-z"
+        ]
+    },
+    "AT2025aebp": {
+        "Hybrid BC/Tophat": [
+            0.00035008493378902003,
+            1057711,
+            "spec-z"
+        ]
+    },
+    "AT2025aebr": {
+        "Hybrid BC/Tophat": [
+            0.402735375513462,
+            6792,
+            "photo-z"
+        ]
+    },
+    "AT2025aebs": {
+        "Hybrid BC/Tophat": [
+            0.0071698589473841,
+            21858755,
+            "photo-z"
+        ]
+    },
+    "AT2025aecj": {
+        "Hybrid BC/Tophat": [
+            0.09499552883263823,
+            2644,
+            "photo-z"
+        ]
+    },
+    "AT2025aeck": {
+        "Hybrid BC/Tophat": [
+            0.5601466898569184,
+            9006372643,
+            "photo-z"
+        ]
+    },
+    "AT2025aecm": {
+        "Hybrid BC/Tophat": [
+            0.04103423702934233,
+            1093,
+            "photo-z"
+        ]
+    },
+    "AT2025aenw": {
+        "Hybrid BC/Tophat": [
+            0.07960439118663466,
+            7649,
+            "photo-z"
+        ]
+    },
+    "AT2025aepm": {
+        "Hybrid BC/Tophat": [
+            1.8055149879659064e-09,
+            "WISEA J225225.42+002827.1",
+            "spec-z"
+        ]
+    },
+    "AT2025aerl": {
+        "Hybrid BC/Tophat": [
+            6.936017103359746e-11,
+            "2MASX J12012876+5201317",
+            "spec-z"
+        ]
+    },
+    "AT2025aetm": {
+        "Hybrid BC/Tophat": [
+            0.8927999446240049,
+            "2MFGC 08975",
+            "spec-z"
+        ]
+    },
+    "AT2025afge": {
+        "Hybrid BC/Tophat": [
+            0.03642164007147527,
+            833,
+            "photo-z"
+        ]
+    },
+    "AT2025afqq": {
+        "Hybrid BC/Tophat": [
+            0.0,
+            "DESI J342.1836+02.9739",
+            "spec-z"
+        ]
+    },
+    "AT2025ahcc": {
+        "Hybrid BC/Tophat": [
+            0.18442355712901687,
+            10668,
+            "photo-z"
+        ]
+    },
+    "AT2025alku": {
+        "Hybrid BC/Tophat": [
+            0.20616452326178256,
+            "PSO J345.0684-21.4035",
+            "photo-z"
+        ]
+    },
+    "AT2025almq": {
+        "Hybrid BC/Tophat": [
+            0.8060846744298512,
+            "4392-301-5-0186-0064",
+            "photo-z"
+        ]
+    },
+    "AT2025almu": {
+        "Hybrid BC/Tophat": [
+            0.7315780948973745,
+            7088477908,
+            "photo-z"
+        ]
+    },
+    "AT2025alot": {
+        "Hybrid BC/Tophat": [
+            0.08602086297637605,
+            3049,
+            "photo-z"
+        ]
+    },
+    "AT2025alov": {
+        "Hybrid BC/Tophat": [
+            0.4405989543390347,
+            8884856778,
+            "photo-z"
+        ]
+    },
+    "AT2025alow": {
+        "Hybrid BC/Tophat": [
+            1.4192790402239643e-06,
+            "WISEA J120309.09+415803.4",
+            "spec-z"
+        ]
+    },
+    "AT2025alox": {
+        "Hybrid BC/Tophat": [
+            1.6200247097326432e-51,
+            "DESI J339.9545+02.1079",
+            "spec-z"
+        ]
+    },
+    "AT2025aloy": {
+        "Hybrid BC/Tophat": [
+            9.085151304505968e-05,
+            5001,
+            "photo-z"
+        ]
+    },
+    "AT2025aloz": {
+        "Hybrid BC/Tophat": [
+            0.6573487050493388,
+            "3900-301-1-0302-0121",
+            "photo-z"
+        ]
+    },
+    "AT2025alpg": {
+        "Hybrid BC/Tophat": [
+            0.04252372964898345,
+            7064837072,
+            "photo-z"
+        ]
+    },
+    "AT2025alpk": {
+        "Hybrid BC/Tophat": [
+            0.3757168115000472,
+            21777903,
+            "photo-z"
+        ]
+    },
+    "AT2025alpl": {
+        "Hybrid BC/Tophat": [
+            9.677103574558831e-172,
+            "WISEA J223119.30+045453.1",
+            "spec-z"
+        ]
+    },
+    "AT2025alpm": {
+        "Hybrid BC/Tophat": [
+            0.10861640287074763,
+            2920,
+            "photo-z"
+        ]
+    },
+    "AT2025alpq": {
+        "Hybrid BC/Tophat": [
+            0.24103598336942428,
+            972584427,
+            "photo-z"
+        ]
+    },
+    "AT2025alpr": {
+        "Hybrid BC/Tophat": [
+            2.3769475234226774e-24,
+            2459,
+            "photo-z"
+        ]
+    },
+    "AT2025alpw": {
+        "Hybrid BC/Tophat": [
+            0.05728584097299972,
+            "2576-301-6-0148-0442",
+            "photo-z"
+        ]
+    },
+    "AT2025alqe": {
+        "Hybrid BC/Tophat": [
+            0.8137539409260575,
+            8889716469,
+            "photo-z"
+        ]
+    },
+    "AT2025alqf": {
+        "Hybrid BC/Tophat": [
+            0.2550208035611903,
+            "PSO J354.2302-19.7431",
+            "photo-z"
+        ]
+    },
+    "AT2025alre": {
+        "Hybrid BC/Tophat": [
+            0.18148116563942934,
+            9012247326,
+            "photo-z"
+        ]
+    },
+    "AT2025alrk": {
+        "Hybrid BC/Tophat": [
+            0.38210869660256885,
+            7150031047,
+            "photo-z"
+        ]
+    },
+    "AT2025alsk": {
+        "Hybrid BC/Tophat": [
+            0.6162767770330752,
+            7087280500,
+            "photo-z"
+        ]
+    },
+    "AT2025alsm": {
+        "Hybrid BC/Tophat": [
+            3.726263103569983e-119,
+            "DESI J342.9350-08.0489",
+            "spec-z"
+        ]
+    },
+    "AT2025alsy": {
+        "Hybrid BC/Tophat": [
+            0.0021252094699381364,
+            21681756,
+            "photo-z"
+        ]
+    },
+    "AT2025alsz": {
+        "Hybrid BC/Tophat": [
+            0.028145447183634882,
+            9003133945,
+            "photo-z"
+        ]
+    },
+    "AT2025alta": {
+        "Hybrid BC/Tophat": [
+            0.8195915887247017,
+            8897429633,
+            "photo-z"
+        ]
+    },
+    "AT2025altb": {
+        "Hybrid BC/Tophat": [
+            6.04224623490306e-08,
+            "WISEA J090855.37-094045.4",
+            "spec-z"
+        ]
+    },
+    "AT2025altc": {
+        "Hybrid BC/Tophat": [
+            0.14912527787617139,
+            "PSO J341.3130-14.6074",
+            "photo-z"
+        ]
+    },
+    "AT2025alth": {
+        "Hybrid BC/Tophat": [
+            6.422091776717341e-95,
+            "WISEA J114346.69+495409.5",
+            "spec-z"
+        ]
+    },
+    "AT2025alti": {
+        "Hybrid BC/Tophat": [
+            0.11974447267305258,
+            "PSO J166.4363+34.3855",
+            "photo-z"
+        ]
+    },
+    "AT2025alwt": {
+        "Hybrid BC/Tophat": [
+            8.129009399592324e-11,
+            "WISEA J113605.44+441406.3",
+            "spec-z"
+        ]
+    },
+    "AT2025alye": {
+        "Hybrid BC/Tophat": [
+            0.20897468373880732,
+            11063439,
+            "photo-z"
+        ]
+    },
+    "AT2025amex": {
+        "Hybrid BC/Tophat": [
+            3.74670993063287e-09,
+            "WISEA J111929.99+364843.9",
+            "spec-z"
+        ]
+    },
+    "AT2025amjb": {
+        "Hybrid BC/Tophat": [
+            7.206451942748498e-233,
+            "DESI J165.5699+37.2681",
+            "spec-z"
+        ]
+    },
+    "AT2025amjx": {
+        "Hybrid BC/Tophat": [
+            0.9999188128847405,
+            "DESI J173.4262+48.3186",
+            "spec-z"
+        ]
+    },
+    "SN2025adcv": {
+        "Hybrid BC/Tophat": [
+            4.938344594680149e-24,
+            null,
+            "redshift"
+        ]
+    },
+    "SN2025adpq": {
+        "Hybrid BC/Tophat": [
+            1.2657447324276444e-46,
+            null,
+            "redshift"
+        ]
+    },
+    "SN2025adtq": {
+        "Hybrid BC/Tophat": [
+            0.8950590485265242,
+            null,
+            "redshift"
+        ]
+    }
+}

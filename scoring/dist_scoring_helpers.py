@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.special import erfc
+from scipy.special import erfc, erf
 
 from scipy.integrate import trapezoid
 from scipy.stats import norm, rv_continuous
@@ -53,7 +53,7 @@ class AsymmetricGaussian(rv_continuous):
 # two distributions. https://en.wikipedia.org/wiki/Bhattacharyya_distance
 # This coefficient is non-parametric which is good for our Asymmetric Gaussian
 # Original paper: http://www.jstor.org/stable/25047806
-def bc(pdf1, pdf2, x):
+def bc_slow(pdf1, pdf2, x):
     """The bhattacharyya coefficient of PDF1 and PDF2, defined over x"""
     return trapezoid(np.sqrt(pdf1*pdf2), x=x)
 
@@ -69,8 +69,8 @@ def bc_norm_median_asymmetric(ref_pdf, test_pdf, mean1, unc_minus, unc_plus, x):
         integ_b=x[-1],
     )
 
-    bc_true = bc(ref_pdf, test_pdf, x)
-    bc_max = bc(ref_pdf, maxtest_pdf, x)
+    bc_true = bc_slow(ref_pdf, test_pdf, x)
+    bc_max = bc_slow(ref_pdf, maxtest_pdf, x)
 
     return bc_true/bc_max
 
@@ -299,3 +299,72 @@ def hybrid_cons_prob_v2(gw_pdf, host_pdf, x, phot_type, wt=1, z_thresh=2):
     # abs: med_diff can be negative, erfc of a negative would exceed 1
     score = erfc(np.abs(med_diff) / sigma_diff)
     return score
+
+def normalization_prefactor(mean_gw, sigma_gw, mean_cand, sigma_cand_neg, sigma_cand_pos):
+    prefactor_cand = np.sqrt(2/np.pi) * (sigma_cand_pos + sigma_cand_neg*erf(mean_cand/(sigma_cand_neg*np.sqrt(2))))**-1
+    prefactor_gw = float(sigma_gw)**-1 * np.sqrt(2/np.pi) * (1 + erf(mean_gw/(sigma_gw*np.sqrt(2))))**-1
+    return np.sqrt(prefactor_cand*prefactor_gw)
+
+def a(sigma_gw, sigma_cand):
+    return 1/sigma_gw**2 + 1/sigma_cand**2
+        
+def b(mean_gw, sigma_gw, mean_cand, sigma_cand):
+    return mean_gw/sigma_gw**2 + mean_cand/sigma_cand**2
+
+def c(mean_gw, sigma_gw, mean_cand, sigma_cand):
+    return (mean_gw/sigma_gw)**2 + (mean_cand/sigma_cand)**2
+
+def p(_a, _b, _c):
+    return np.sqrt(np.pi/_a) * np.exp(-0.25*(_c - _b**2/_a))
+
+def bc_integral_neg(mean_gw, sigma_gw, mean_cand, sigma_cand_neg):
+    _a = a(sigma_gw, sigma_cand_neg)
+    _b = b(mean_gw, sigma_gw, mean_cand, sigma_cand_neg)
+    _c = c(mean_gw, sigma_gw, mean_cand, sigma_cand_neg)
+
+    _p = p(_a, _b, _c)
+    x0 = erf(-_b/(2*np.sqrt(_a)))
+    x1 = erf(np.sqrt(_a)/2 * (mean_cand - _b/_a))
+    return _p*(x1-x0)
+
+def bc_integral_pos(mean_gw, sigma_gw, mean_cand, sigma_cand_pos):
+    _a = a(sigma_gw, sigma_cand_pos)
+    _b = b(mean_gw, sigma_gw, mean_cand, sigma_cand_pos)
+    _c = c(mean_gw, sigma_gw, mean_cand, sigma_cand_pos)
+
+    _p = p(_a, _b, _c)
+    return _p*erfc(np.sqrt(_a)/2 * (mean_cand - _b/_a))
+
+def bc(mean_gw, sigma_gw, mean_cand, sigma_cand_neg, sigma_cand_pos):
+    lower_args = (mean_gw, sigma_gw, mean_cand, sigma_cand_neg)
+    upper_args = (mean_gw, sigma_gw, mean_cand, sigma_cand_pos)
+    norm = normalization_prefactor(mean_gw, sigma_gw, mean_cand, sigma_cand_neg, sigma_cand_pos)
+    return norm*(bc_integral_neg(*lower_args) + bc_integral_pos(*upper_args))
+
+def sigmoid(x, k=1):
+    return 1 / (1 + np.exp(-k * x))
+
+def smooth_tophat(x, a, b, k=1):
+    return sigmoid(x - a, k) * (1 - sigmoid(x - b, k))
+
+def smooth_tophat_score(galaxy_dist, gw_mean, gw_std, nsigma=2):
+    return smooth_tophat(galaxy_dist, gw_mean-nsigma*gw_std, gw_mean+nsigma*gw_std)
+
+
+def hybrid(gw_mean, galaxy_mean, gw_std, galaxy_std_minus, galaxy_std_plus):
+
+    if galaxy_std_minus == 0 or galaxy_std_plus == 0:
+        bc_score = 0 # this score should be computed in the sigmoid regime
+    else:
+        bc_score = bc(gw_mean, gw_std, galaxy_mean, galaxy_std_minus, galaxy_std_plus)
+
+    tophat_score = smooth_tophat_score(galaxy_mean, gw_mean, gw_std)
+
+    # this weight will be small for spec-z's and large for photo-z's   
+    w = np.mean([galaxy_std_minus, galaxy_std_plus], axis=0) / gw_std
+    max_w = np.ones(w.shape)
+    w = np.min([max_w, w], axis=0)
+
+    print(f"\tBC={bc_score}", f"S={tophat_score}", f"w={w}", f"score={(1-w)*tophat_score + w*bc_score}")
+
+    return (1-w)*tophat_score + w*bc_score

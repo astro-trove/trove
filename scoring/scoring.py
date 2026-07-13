@@ -1,4 +1,4 @@
-from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3, hybrid_cons_prob, hybrid_cons_prob_v2, information_metric, resampled_zscore, zscore
+from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3, hybrid_cons_prob, hybrid_cons_prob_v2, information_metric, resampled_zscore, zscore, hybrid
 
 from .models import ScoreFactor
 from .healpix_utils import SaTarget
@@ -129,6 +129,9 @@ def host_distance_match(
         nonlocalized_event_name, target_id, max_time=max_time
     )
 
+    print("\n###############################")
+    print(f"GW={test_mean}+/-{test_std}")
+    
     bc_ret = []
     zscore_ret = []
     resampled_zscore_ret = []
@@ -138,6 +141,7 @@ def host_distance_match(
     cons_prob_3_ret = []
     hybrid_cons_prob_ret = []
     hybrid_cons_prob_v2_ret = []
+    hybrid_bc_tophat = []
     for _, row in host_df.iterrows():
         cur_pdf = AsymmetricGaussian().pdf(
             _lumdist,
@@ -148,32 +152,61 @@ def host_distance_match(
             integ_b=_lumdist[-1],
         )
 
-        bc_ret.append(bc(cur_pdf, test_pdf, _lumdist))
-        bc_norm_ret.append(bc_norm_median_asymmetric(test_pdf, cur_pdf, test_mean, row.lumdist_neg_err, row.lumdist_pos_err, _lumdist))
-        zscore_ret.append(zscore(row.lumdist, test_mean, test_std))
-        resampled_zscore_ret.append(resampled_zscore(row.lumdist, test_mean, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
-        cond_ret.append(conditional_scoring(cur_pdf, test_pdf, test_mean, row.lumdist, test_std))
-        prob_cons_ret.append(consistency_probability(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
-        cons_prob_3_ret.append(cons_prob_3(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
-        hybrid_cons_prob_ret.append(hybrid_cons_prob(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
-        hybrid_cons_prob_v2_ret.append(hybrid_cons_prob_v2(test_pdf, cur_pdf, _lumdist, phot_type=row.z_type))
+        print(f"\tGal={row.lumdist} +{row.lumdist_pos_err} -{row.lumdist_neg_err}")
 
-    host_df["bc"] = bc_ret
-    host_df["bc_norm"] = bc_norm_ret
-    host_df['Consistent Probability'] = prob_cons_ret
-    host_df['Improved Consistent Probability'] = cons_prob_3_ret
-    host_df['Hybrid Consistent Probability'] = hybrid_cons_prob_ret
-    host_df['Hybrid Consistent Probability v2'] = hybrid_cons_prob_v2_ret
+        try:
+            #bc_ret.append(bc(test_mean, test_std, row.lumdist, row.lumdist_neg_err, row.lumdist_pos_err))
+            #bc_norm_ret.append(bc_norm_median_asymmetric(test_pdf, cur_pdf, test_mean, row.lumdist_neg_err, row.lumdist_pos_err, _lumdist))
+            #zscore_ret.append(zscore(row.lumdist, test_mean, test_std))
+            #resampled_zscore_ret.append(resampled_zscore(row.lumdist, test_mean, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+            #cond_ret.append(conditional_scoring(cur_pdf, test_pdf, test_mean, row.lumdist, test_std))
+            #prob_cons_ret.append(consistency_probability(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+            #cons_prob_3_ret.append(cons_prob_3(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+            #hybrid_cons_prob_ret.append(hybrid_cons_prob(test_mean, row.lumdist, test_std, row.lumdist_neg_err, row.lumdist_pos_err))
+            #hybrid_cons_prob_v2_ret.append(hybrid_cons_prob_v2(test_pdf, cur_pdf, _lumdist, phot_type=row.z_type))
+            hybrid_bc_tophat.append(
+                hybrid(
+                    gw_mean=test_mean,
+                    galaxy_mean=row.lumdist,
+                    gw_std=test_std,
+                    galaxy_std_minus=row.lumdist_neg_err,
+                    galaxy_std_plus=row.lumdist_pos_err
+                )
+            )
+        except ZeroDivisionError:
+            print(f"Skipping {target_id} {row.ID} because dist err is 0")
+            #bc_ret.append(np.nan)
+            #bc_norm_ret.append(np.nan)
+            #zscore_ret.append(np.nan)
+            #resampled_zscore_ret.append(np.nan)
+            #cond_ret.append(np.nan)
+            #prob_cons_ret.append(np.nan)
+            #cons_prob_3_ret.append(np.nan)
+            #hybrid_cons_prob_ret.append(np.nan)
+            #hybrid_cons_prob_v2_ret.append(np.nan)
+            hybrid_bc_tophat.append(np.nan)
+            continue
 
+        print()
+        
+    #host_df["bc"] = bc_ret
+    #host_df["bc_norm"] = bc_norm_ret
+    #host_df['Consistent Probability'] = prob_cons_ret
+    #host_df['Improved Consistent Probability'] = cons_prob_3_ret
+    #host_df['Hybrid Consistent Probability'] = hybrid_cons_prob_ret
+    #host_df['Hybrid Consistent Probability v2'] = hybrid_cons_prob_v2_ret
+    host_df['Hybrid BC/Tophat'] = hybrid_bc_tophat 
+    
     return host_df
 
 metrics = [
-    'bc',
-    'bc_norm',
-    'Consistent Probability',
-    'Improved Consistent Probability',
-    'Hybrid Consistent Probability',
-    'Hybrid Consistent Probability v2',
+#    'bc',
+#    'bc_norm',
+#    'Consistent Probability',
+#    'Improved Consistent Probability',
+#    'Hybrid Consistent Probability',
+#    'Hybrid Consistent Probability v2',
+    'Hybrid BC/Tophat'
 ]
 
 def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):
@@ -202,8 +235,8 @@ def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):
             integ_b=_lumdist[-1],
         )
 
-        return {
-            "bc": (bc(targ_pdf, nle_pdf, _lumdist), None, 'redshift'),
+        """
+        "bc": (bc(test_mean, test_std, targ_dist, targ_dist_err, targ_dist_err), None, 'redshift'),
             "bc_norm": (
                 bc_norm_median_asymmetric(
                     nle_pdf, targ_pdf, test_mean, targ_dist_err, targ_dist_err, _lumdist
@@ -237,6 +270,20 @@ def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):
                 None,
                 "redshift"
             ),
+        """
+        
+        return {
+            "Hybrid BC/Tophat":(
+                hybrid(
+                    gw_mean=test_mean,
+                    galaxy_mean=targ_dist,
+                    gw_std=test_std,
+                    galaxy_std_minus=targ_dist_err,
+                    galaxy_std_plus=targ_dist_err
+                ),
+                None,
+                "redshift"
+            )
         }
 
     # first, some cleanup
