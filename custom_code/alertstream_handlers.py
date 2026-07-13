@@ -283,9 +283,6 @@ def prepare_and_send_alerts(nle, seq):
 
 
 def handle_message_and_send_alerts(message, metadata):
-    jname = str(Time.now()).replace(" ", "T") + "-alert.json"
-    with open(jname, "w") as f:
-        json.dump(message, f)
 
     # get skymap bytes out for later
     skymaps = []
