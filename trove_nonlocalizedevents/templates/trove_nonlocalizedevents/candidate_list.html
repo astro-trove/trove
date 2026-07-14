@@ -34,6 +34,10 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
   {% endif %}
   &nbsp;&nbsp;
   {% if request.user.is_superuser %}
+    <a href="{% url 'scoring:nle_associate_targets_form' request.GET.nonlocalizedevent %}" title="Associate targets with the NLE" class="btn btn-success btn-lg">Associate Targets</a>
+  {% endif %}
+  &nbsp;&nbsp;
+  {% if request.user.is_superuser %}
     <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
   {% endif %}
 </div>
