@@ -331,7 +331,7 @@ def handle_message_and_send_alerts(message, metadata):
     
     # check for targets over appropriate time horizon
     nle_eventseq = localization_sequence_from_name(nle.event_id)
-    nle_most_likely_class = get_most_likely_class(nle_eventseq)  # most likely class for the NLE
+    nle_most_likely_class = get_most_likely_class(nle_eventseq.details)  # most likely class for the NLE
     associate_targets_with_nle(
         nle,
         DETECTION_HORIZON_DEFAULTS[nle_most_likely_class][0],
