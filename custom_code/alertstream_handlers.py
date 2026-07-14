@@ -1,15 +1,31 @@
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
-from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
+import time
+import json
+from datetime import datetime
+import traceback
+from io import BytesIO
+
+import numpy as np
+
+from email.mime.text import MIMEText
+# from slack_sdk import WebClient
+import smtplib
+
 from django.contrib.auth.models import Group
 from django.contrib.sites.models import Site
 from django.conf import settings
-from email.mime.text import MIMEText
 
-# from slack_sdk import WebClient
-import smtplib
-import logging
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
+from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from tom_dataproducts.tasks import atlas_query
-from .hooks import target_post_save
+
+from astropy.table import Table
+from astropy.time import Time
+import astropy_healpix as ah
+
+from .hooks import (
+    target_post_save,
+    associate_targets_with_nle,
+)
 from .templatetags.nonlocalizedevent_extras import (
     format_inverse_far,
     format_distance,
@@ -18,19 +34,14 @@ from .templatetags.nonlocalizedevent_extras import (
 )
 from .healpix_utils import create_elliptical_localization
 from .models import CredibleRegionContour
-from .hooks import associate_targets_with_nle
-from astropy.table import Table
-from astropy.time import Time
-from datetime import datetime
-from io import BytesIO
-import astropy_healpix as ah
-import numpy as np
-import traceback
-from trove_targets.models import Target
-import time
-import json
 
+from candidate_vetting.vet import localization_sequence_from_name
+from scoring.config import DETECTION_HORIZON_DEFAULTS
+from trove_targets.models import Target
+
+import logging
 logger = logging.getLogger(__name__)
+
 
 # for einstein probe
 ALERT_TEXT_EP = """Einstein Probe trigger <{target_link}|{{target.name}}>
@@ -318,8 +329,14 @@ def handle_message_and_send_alerts(message, metadata):
                 skymap = Table.read(BytesIO(skymap_bytes))
                 calculate_credible_region(skymap, localization)
     
-    # check for candidates since the trigger time
-    associate_targets_with_nle(nle, -1, 10)
+    # check for targets over appropriate time horizon
+    nle_eventseq = localization_sequence_from_name(nle.event_id)
+    nle_most_likely_class = get_most_likely_class(nle_eventseq)  # most likely class for the NLE
+    associate_targets_with_nle(
+        nle,
+        DETECTION_HORIZON_DEFAULTS[nle_most_likely_class][0],
+        DETECTION_HORIZON_DEFAULTS[nle_most_likely_class][-1]
+    )
 
     logger.info(f"Finished processing alert for {nle.event_id}")
     return nle, seq
