@@ -55,7 +55,7 @@ Welcome to the Treasure TROVE: a Tool for Rapid Object Vetting and Examination!
 
   If you use **SQLite**, run **`python manage.py repair_migrate`** instead of `migrate` alone. It creates missing tables (e.g. `tom_nonlocalizedevents_superevent`), fakes renames when the target table already exists, and retries migrate by faking any migration that fails with "table already exists" or "no such column" until migrate succeeds. For one-off fixes you can still use `python manage.py repair_superevent_table` then `migrate`. Prefer PostgreSQL to avoid these issues.
 
-  5. Run the development server. The first time, Django may attempt to download the SFD dust map (network access required).
+  5. Run the development server. Milky Way extinction uses a cached SFD dust map if present; otherwise `mwebv` defaults to 0. To download the map once, run with `FETCH_DUSTMAPS=1` (network access required). CI sets `SKIP_DUSTMAP=1` so tests never depend on that download.
 
   ```bash
     % python3 manage.py collectstatic # only the first time you start the development server
