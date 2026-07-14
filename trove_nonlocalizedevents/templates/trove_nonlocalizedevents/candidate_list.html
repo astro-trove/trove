@@ -26,7 +26,25 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 </h1>
 {% nonlocalizedevent_details %}
 <br></br>
-<div class="row"><div class="col-md-12">{% skymap_nle_id %}</div></div>
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-header">
+        <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#skymap-collapse"
+                aria-expanded="false" aria-controls="skymap-collapse"
+                hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+                hx-target="#skymap-body" hx-trigger="click once" hx-swap="innerHTML">
+          <h4 style="display:inline-block; margin:0;">Skymap</h4>
+        </button>
+      </div>
+      <div id="skymap-collapse" class="collapse">
+        <div class="card-body" id="skymap-body">
+          <p class="text-muted">Click to load skymap&hellip;</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 <br><br>
 <div class="row">
   {% if request.user.is_authenticated %}

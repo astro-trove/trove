@@ -4,6 +4,7 @@ from .views import (
     generate_report,
     ToggleAgnCacheView,
     RefreshCandidateList,
+    SkymapPartialView,
 )
 
 app_name = "trove_nonlocalizedevents"
@@ -24,5 +25,10 @@ urlpatterns = [
         "refresh-candidate-list",
         RefreshCandidateList.as_view(),
         name="refresh-candidate-list"
-    )
+    ),
+    path(
+        "skymap/",
+        SkymapPartialView.as_view(),
+        name="skymap"
+    ),
 ]
