@@ -2,9 +2,9 @@ import json
 from django_filters.views import FilterView
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.base import View
@@ -16,6 +16,7 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from scoring.models import ScoreFactor
 from scoring.util import get_event_candidate_scores
 from tom_dataproducts.models import ReducedDatum
+from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
 
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
@@ -305,6 +306,19 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             cache.set(cache_key, scored_candidates, 60 * 5)
             return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
         return redirect(reverse("custom_code:event-candidates"))
+
+
+class SkymapPartialView(View):
+    def get(self, request, *args, **kwargs):
+        nle_id = request.GET.get("nonlocalizedevent")
+        if not nle_id:
+            return HttpResponse("")
+        nle = NonLocalizedEvent.objects.get(id=nle_id)
+        localization = get_preferred_localization(nle)
+        if localization is None:
+            return HttpResponse("<p>No Skymap Found</p>")
+        context = skymap({"request": request}, localization)
+        return render(request, "tom_nonlocalizedevents/partials/skymap.html", context)
 
 
 class RefreshCandidateList(LoginRequiredMixin, View):

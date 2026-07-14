@@ -1,3 +1,27 @@
+<style>
+  .select2-container {
+    width: 100% !important;
+  }
+  .select2-selection {
+    height: auto !important;
+    min-height: 38px;
+    padding: 4px 8px;
+  }
+  .select2-selection__rendered {
+    line-height: 28px !important;
+  }
+  .loader {
+    width: 48px;
+    height: 48px;
+    border: 6px solid #e5e7eb;   /* light track */
+    border-top-color: #111827;  /* dark arc */
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
 {% extends 'tom_common/base.html' %}
 {% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras nonlocalizedevent_extras skymap_extras %}
 {% block title %}Home{% endblock %}
@@ -14,33 +38,33 @@
             </div>
         </div>
     </div>
-    </br>
+    <br>
 
     <!-- Description of TROVE -->
     <h5 style="text-align:justify">The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
-    </br>
+    <br>
     {% comment %}
     <h5 style="text-align:justify">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
-    </br>
+    <br>
     {% endcomment %}
     <h5 style="text-align:justify"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
-    </br>
+    <br>
 
     <!-- Documentation and Register buttons -->
     <div style="text-align:center">
       <a href="{% url 'sphinx_docs:docs' %}" target="_blank" title="Read the documentation!" class="btn btn-lg btn-info">📜 Documentation</a>
       <a href="/accounts/register" target="_blank" title="Register for an account!" class="btn btn-lg btn-warning">🌐 Register</a>
     </div>
-    </br>
+    <br>
 
     <!-- Countdown to IR1, O5, end of O5, etc. -->
     <div class="card">
       <div class="card-header">
         {% countdown_IR1 %}
-      </br>
+      <br>
       </div>
     </div>
-    </br>
+    <br>
 
   </div> <!-- END OF LEFT SIDE OF PAGE -->
 
@@ -57,28 +81,26 @@
     <br/>
 
     <!-- NLE Spotlight -->
-    {% comment %}
     <div class="card">
-      <div class="card-header">
-        <b>Event Spotlight</b>
+      <div class="card-header btn btn-light" data-toggle="collapse" data-target="#skymap-collapse"
+           aria-expanded="false" aria-controls="skymap-collapse"
+           hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent=20113"
+           hx-target="#skymap-body" hx-trigger="click once" hx-swap="innerHTML">
+        <b>Event Spotlight (Click to Load!)</b>
       </div>
-      <div class="row align:center">
-        <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
-        <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div>
-        <!-- <div class="col-md-12"><div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving one (or two!) subsolar mass compact object!</div> -->
-      </div>
-      </br>
-      <div class="row">
-        <div class="col-md-12">
-          <!-- {% skymap_nle_id_manual_simple 21962 %} --> <!-- 21962 = GW170817 -->
-          {% skymap_nle_id_manual_simple 21085 %} <!-- 21962 = GW190814 -->
-          <!-- {% skymap_nle_id_manual_simple 20113 %} --> <!-- 20113 = S251112cm -->
+      <div id="skymap-collapse" class="collapse">
+        <div class="row align:center">
+          <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
+          <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div> -->
+          <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving at least one subsolar mass compact object!</div>
+        </div>
+        <div class="card-body" id="skymap-body" style="text-align:center">
+          <p class="loader"></p>
         </div>
       </div>
-      </br>
+      <br/>
     </div>
-    </br>
-    {% endcomment %}
+    <br/>
 
     <!-- Latest targets -->
     {% comment %}
@@ -101,4 +123,8 @@
   </div> <!-- END OF RIGHT SIDE OF PAGE -->
 
 </div>
+{% endblock %}
+
+{% block javascript %}
+<script src="{% static 'tom_common/js/htmx.min.js' %}"></script>
 {% endblock %}

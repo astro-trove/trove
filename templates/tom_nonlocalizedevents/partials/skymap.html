@@ -1,9 +1,8 @@
 <div id='aladin-lite-div' style='aspect-ratio: 2'></div>
-<script src='https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js' charset='utf-8'></script>
 <script type="text/javascript">
-    var aladin;
-A.init.then(() => {
-    aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+(function() {
+function renderAladin() {
+    var aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
     var moon_ra = {{ current_moon_ra }};
     var moon_dec = {{ current_moon_dec }};
     var moon_excl = {{ current_moon_exclusion }};
@@ -32,5 +31,12 @@ A.init.then(() => {
     var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
     aladin.addMOC(moc);
-});
+}
+
+var aladinScript = document.createElement('script');
+aladinScript.src = 'https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js';
+aladinScript.charset = 'utf-8';
+aladinScript.onload = function() { A.init.then(renderAladin); };
+document.body.appendChild(aladinScript);
+})();
 </script>
