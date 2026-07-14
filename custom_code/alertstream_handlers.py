@@ -18,6 +18,7 @@ from .templatetags.nonlocalizedevent_extras import (
 )
 from .healpix_utils import create_elliptical_localization
 from .models import CredibleRegionContour
+from .hooks import associate_targets_with_nle
 from astropy.table import Table
 from astropy.time import Time
 from datetime import datetime
@@ -284,6 +285,9 @@ def prepare_and_send_alerts(nle, seq):
 
 def handle_message_and_send_alerts(message, metadata):
 
+    # because they change the alert format but tom_nonlocalizedevents doesn't expect it
+    message.content = [message.content]
+    
     # get skymap bytes out for later
     skymaps = []
     try:
@@ -313,6 +317,9 @@ def handle_message_and_send_alerts(message, metadata):
             if skymap_bytes is not None:
                 skymap = Table.read(BytesIO(skymap_bytes))
                 calculate_credible_region(skymap, localization)
+    
+    # check for candidates since the trigger time
+    associate_targets_with_nle(nle, -1, 10)
 
     logger.info(f"Finished processing alert for {nle.event_id}")
     return nle, seq

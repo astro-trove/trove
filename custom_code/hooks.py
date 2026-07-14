@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta, timezone
 import numpy as np
+from django.db.models import Min
 from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_dataproducts.models import ReducedDatum
@@ -121,7 +122,36 @@ def associate_nle_with_target(
 
     return new_candidates
 
+def associate_targets_with_nle(
+    nle:NonLocalizedEvent, first_det_min, first_det_max   
+):
+    # get info on the NLE
+    seq = nle.sequences.last()
+    localization = get_preferred_localization(nle)
+    try:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+    except ValueError:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
 
+    # query for relevant targets
+    targets = ReducedDatum.objects.filter(
+        data_type="photometry",
+        value__magnitude__isnull=False
+    ).values(
+        "target_id"
+    ).annotate(
+        min_timestamp=Min("timestamp")
+    ).filter(
+        min_timestamp__gt = nle_time + timedelta(days=first_det_min),
+        min_timestamp__lt = nle_time + timedelta(days=first_det_max)
+    ).values_list(
+        "target_id",
+        flat=True
+    )
+
+    # then create candidates from these targets and return them
+    return create_candidates_from_targets(seq, target_ids=list(targets)) 
+    
 def target_post_save(
     target,
     created=True,
