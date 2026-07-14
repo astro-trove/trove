@@ -1,5 +1,6 @@
 <div id='aladin-lite-div' style='aspect-ratio: 2'></div>
 <script type="text/javascript">
+(function() {
 function renderAladin() {
     var aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
     var moon_ra = {{ current_moon_ra }};
@@ -32,10 +33,10 @@ function renderAladin() {
     aladin.addMOC(moc);
 }
 
-// Useful for the htmx
 var aladinScript = document.createElement('script');
 aladinScript.src = 'https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js';
 aladinScript.charset = 'utf-8';
 aladinScript.onload = function() { A.init.then(renderAladin); };
 document.body.appendChild(aladinScript);
+})();
 </script>
