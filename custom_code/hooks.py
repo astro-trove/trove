@@ -1,20 +1,16 @@
 import logging
 from datetime import datetime, timedelta, timezone
-import numpy as np
 from django.db.models import Min
 from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_dataproducts.models import ReducedDatum
 
-from scoring.vet_phot import find_public_phot
 from scoring.vet_bns import vet_bns
 from scoring.vet_kn_in_sn import vet_kn_in_sn
 from scoring.vet_super_kn import vet_super_kn
 from scoring.vet_basic import vet_basic
 
-from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from custom_code.healpix_utils import create_candidates_from_targets
-from custom_code.templatetags.skymap_extras import get_preferred_localization
 from trove_targets.models import Target
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
@@ -97,7 +93,6 @@ def associate_nle_with_target(
     new_candidates = []
     for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
         seq = nle.sequences.last()
-        localization = get_preferred_localization(nle)
         try:
             nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
         except ValueError:
@@ -127,7 +122,6 @@ def associate_targets_with_nle(
 ):
     # get info on the NLE
     seq = nle.sequences.last()
-    localization = get_preferred_localization(nle)
     try:
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
     except ValueError:
