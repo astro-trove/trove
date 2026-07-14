@@ -58,7 +58,11 @@ def format_redshift_parts(z, z_err):
     When the uncertainty is finer than hundredths, z is shown with one extra decimal
     place beyond the quoted error (e.g. 0.03921 +/- 0.0001).
     """
-    z = float(z)
+    try:
+        z = float(z)
+    except TypeError:
+        return {"empty": True}
+
     if math.isnan(z):
         return {"empty": True}
 
