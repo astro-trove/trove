@@ -10,8 +10,18 @@
   .select2-selection__rendered {
     line-height: 28px !important;
   }
+  .loader {
+    width: 48px;
+    height: 48px;
+    border: 6px solid #e5e7eb;   /* light track */
+    border-top-color: #111827;  /* dark arc */
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 </style>
-
 {% extends 'tom_common/base.html' %}
 {% load static bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
 {% block title %}Candidates{% endblock %}
@@ -29,17 +39,15 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 <div class="row">
   <div class="col-md-12">
     <div class="card">
-      <div class="card-header">
-        <button class="btn btn-link" type="button" data-toggle="collapse" data-target="#skymap-collapse"
-                aria-expanded="false" aria-controls="skymap-collapse"
-                hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
-                hx-target="#skymap-body" hx-trigger="click once" hx-swap="innerHTML">
-          <h4 style="display:inline-block; margin:0;">Skymap</h4>
-        </button>
-      </div>
+      <button class="btn btn-dark" type="button" data-toggle="collapse" data-target="#skymap-collapse"
+              aria-expanded="false" aria-controls="skymap-collapse"
+              hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+              hx-target="#skymap-body" hx-trigger="click once" hx-swap="innerHTML">
+        <h4 style="display:inline-block; margin:0; text-align:center">Load Skymap</h4>
+      </button>
       <div id="skymap-collapse" class="collapse">
-        <div class="card-body" id="skymap-body">
-          <p class="text-muted">Click to load skymap&hellip;</p>
+        <div class="card-body" id="skymap-body" style="text-align:center">
+          <p class="loader"></p>
         </div>
       </div>
     </div>
