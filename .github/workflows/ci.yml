@@ -67,11 +67,6 @@ jobs:
           TREASUREMAP_API_KEY = ''
           EOF
 
-      - name: Create dustmaps config
-        run: |
-          mkdir -p ~/dustmaps
-          echo '{"data_dir": "'$HOME'/dustmaps"}' > ~/.dustmapsrc
-
       - name: Install package and dependencies
         run: |
           python -m pip install --upgrade pip wheel setuptools
@@ -87,6 +82,7 @@ jobs:
       - name: Run Django system checks
         env:
           POSTGRES_DB: ""
+          SKIP_DUSTMAP: "1"
         run: |
           python manage.py check
 
@@ -152,18 +148,21 @@ jobs:
       - name: Run database migrations
         env:
           POSTGRES_DB: ""
+          SKIP_DUSTMAP: "1"
         run: |
           python manage.py migrate --run-syncdb
 
       - name: Collect static files
         env:
           POSTGRES_DB: ""
+          SKIP_DUSTMAP: "1"
         run: |
           python manage.py collectstatic --noinput
 
       - name: Validate Django server can start
         env:
           POSTGRES_DB: ""
+          SKIP_DUSTMAP: "1"
         run: |
           # Start the server in background
           python manage.py runserver 0.0.0.0:8000 &
@@ -209,6 +208,7 @@ jobs:
       - name: Run test suite
         env:
           POSTGRES_DB: ""
+          SKIP_DUSTMAP: "1"
         run: |
           pytest tests/ -v --tb=short
 

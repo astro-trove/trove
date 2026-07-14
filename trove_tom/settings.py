@@ -424,25 +424,40 @@ TARGET_MODEL_CLASS = os.getenv("TARGET_MODEL_CLASS", "trove_targets.models.Targe
 COSMO = FlatLambdaCDM(H0=69.6 * _u.km / _u.s / _u.Mpc, Tcmb0=2.725 * _u.K, Om0=0.3)
 
 
-# dust maps for Milky Way extinction (optional for local dev if download fails)
+# dust maps for Milky Way extinction.
+# Never download at import time by default: Harvard Dataverse fetches are flaky in CI
+# and slow on first local run. Use an already-cached map if present; otherwise return 0.
+# Opt in to downloading with FETCH_DUSTMAPS=1 (or force the noop with SKIP_DUSTMAP=1).
 def _dust_map_noop(*args):
     return 0.0
 
 
-try:
-    os.environ["DUSTMAPS_CONFIG_FNAME"] = os.path.join(BASE_DIR, ".dustmapsrc")
+def _load_dust_map():
+    if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
+        return _dust_map_noop
+
+    os.environ.setdefault(
+        "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
+    )
     with warnings.catch_warnings(action="ignore"):
         from dustmaps import sfd
+
     try:
         sfd_query = sfd.SFDQuery()
     except FileNotFoundError:
+        if os.getenv("FETCH_DUSTMAPS", "").lower() not in ("1", "true", "yes"):
+            return _dust_map_noop
         sfd.fetch()
         sfd_query = sfd.SFDQuery()
 
     def sf11(*args):
         return 0.86 * sfd_query(*args)
 
-    DUST_MAP = sf11
+    return sf11
+
+
+try:
+    DUST_MAP = _load_dust_map()
 except Exception:
     DUST_MAP = _dust_map_noop
 COMMENTS_ENABLED = False
