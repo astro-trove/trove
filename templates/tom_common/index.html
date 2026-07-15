@@ -74,7 +74,7 @@
     <!-- Latest GW NLEs -->
     <div class="card">
       <div class="card-header">
-        <b>Latest GW Events</b>
+        <b>Latest Gravitational Wave Events</b>
       </div>
       {% recent_gw_nonlocalizedevents_withcandidates 1 5 %}
     </div>
@@ -82,20 +82,27 @@
 
     <!-- NLE Spotlight -->
     <div class="card">
-      <div class="card-header btn btn-light" data-toggle="collapse" data-target="#skymap-collapse"
-           aria-expanded="false" aria-controls="skymap-collapse"
-           hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent=20113"
-           hx-target="#skymap-body" hx-trigger="click once" hx-swap="innerHTML">
-        <b>Event Spotlight (Click to Load!)</b>
+      <div class="card-header btn btn-light" data-target="#skymap-collapse"
+           aria-expanded="false" aria-controls="skymap-collapse">
+        <b>Event Spotlight</b>
       </div>
-      <div id="skymap-collapse" class="collapse">
+      &nbsp;
+      <div id="skymap-collapse">
         <div class="row align:center">
           <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
           <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div> -->
           <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving at least one subsolar mass compact object!</div>
         </div>
-        <div class="card-body" id="skymap-body" style="text-align:center">
-          <p class="loader"></p>
+        <div class="card-body"
+             id="skymap-body"
+             style="text-align:center; justify-content:center; align-items:center"
+             hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent=20113"
+             hx-target="#skymap-body"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <div style="display:flex; justify-content:center; align-items:center">
+            <p class="loader"></p>
+          </div>
         </div>
       </div>
       <br/>
