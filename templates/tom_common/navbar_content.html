@@ -16,13 +16,13 @@
             <a class="nav-link" href="{% url 'custom_code:gw-list' %}?prefix=S&state=ACTIVE&inv_far_min=0.5" style="color:black">Gravitational Waves</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:grb-list' %}" style="color:black">&gamma;-ray Bursts</a>
+            <a class="nav-link" href="/somewhere" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:neutrino-list' %}" style="color:gray">Neutrinos</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:neutrino-list' %}" style="color:black">Neutrinos</a>
+            <a class="nav-link" href="/somewhere" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:grb-list' %}" style="color:gray">&gamma;-ray Bursts</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:unknown-list' %}" style="color:black">X-ray Transients</a>
+            <a class="nav-link" href="/somewhere" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:unknown-list' %}" style="color:gray">X-ray Transients</a>
         </li>
     </ul>
 </li>
