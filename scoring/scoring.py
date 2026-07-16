@@ -1,4 +1,4 @@
-from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3, hybrid_cons_prob, hybrid_cons_prob_v2, information_metric, resampled_zscore, zscore, hybrid
+from scoring.dist_scoring_helpers import AsymmetricGaussian, bc, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3, hybrid_cons_prob, hybrid_cons_prob_v2, information_metric, resampled_zscore, zscore, hybrid, hybrid_v3
 
 from .models import ScoreFactor
 from .healpix_utils import SaTarget
@@ -142,6 +142,7 @@ def host_distance_match(
     hybrid_cons_prob_ret = []
     hybrid_cons_prob_v2_ret = []
     hybrid_bc_tophat = []
+    hybrid_bc_tophat_v3 = []
     for _, row in host_df.iterrows():
         cur_pdf = AsymmetricGaussian().pdf(
             _lumdist,
@@ -173,6 +174,16 @@ def host_distance_match(
                     galaxy_std_plus=row.lumdist_pos_err
                 )
             )
+            hybrid_bc_tophat_v3.append(
+                hybrid_v3(
+                    gw_mean=test_mean,
+                    galaxy_mean=row.lumdist,
+                    gw_std=test_std,
+                    galaxy_std_minus=row.lumdist_neg_err,
+                    galaxy_std_plus=row.lumdist_pos_err,
+                    verbose=False,
+                )
+            )
         except ZeroDivisionError:
             print(f"Skipping {target_id} {row.ID} because dist err is 0")
             #bc_ret.append(np.nan)
@@ -185,6 +196,7 @@ def host_distance_match(
             #hybrid_cons_prob_ret.append(np.nan)
             #hybrid_cons_prob_v2_ret.append(np.nan)
             hybrid_bc_tophat.append(np.nan)
+            hybrid_bc_tophat_v3.append(np.nan)
             continue
 
         print()
@@ -195,8 +207,9 @@ def host_distance_match(
     #host_df['Improved Consistent Probability'] = cons_prob_3_ret
     #host_df['Hybrid Consistent Probability'] = hybrid_cons_prob_ret
     #host_df['Hybrid Consistent Probability v2'] = hybrid_cons_prob_v2_ret
-    host_df['Hybrid BC/Tophat'] = hybrid_bc_tophat 
-    
+    host_df['Hybrid BC/Tophat'] = hybrid_bc_tophat
+    host_df['Hybrid BC/Tophat V3'] = hybrid_bc_tophat_v3
+
     return host_df
 
 metrics = [
@@ -206,7 +219,8 @@ metrics = [
 #    'Improved Consistent Probability',
 #    'Hybrid Consistent Probability',
 #    'Hybrid Consistent Probability v2',
-    'Hybrid BC/Tophat'
+    'Hybrid BC/Tophat',
+    'Hybrid BC/Tophat V3',
 ]
 
 def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):
@@ -280,6 +294,18 @@ def get_distance_score_diagnostic(host_df, target_id, nonlocalized_event_name):
                     gw_std=test_std,
                     galaxy_std_minus=targ_dist_err,
                     galaxy_std_plus=targ_dist_err
+                ),
+                None,
+                "redshift"
+            ),
+            "Hybrid BC/Tophat V3":(
+                hybrid_v3(
+                    gw_mean=test_mean,
+                    galaxy_mean=targ_dist,
+                    gw_std=test_std,
+                    galaxy_std_minus=targ_dist_err,
+                    galaxy_std_plus=targ_dist_err,
+                    verbose=False,
                 ),
                 None,
                 "redshift"

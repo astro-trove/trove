@@ -74,22 +74,16 @@ CATEGORY_COLORS = {
 }
 
 METRIC_ORDER = [
-    "bc",
-    "bc_norm",
-    "Consistent Probability",
-    "Improved Consistent Probability",
-    "Hybrid Consistent Probability",
-    "Hybrid Consistent Probability v2",
+    "Hybrid BC/Tophat",
+    "Hybrid BC/Tophat V3",
 ]
 
-# score-vs-distance / correlation-vs-distance figures only compare the erfc-
-# based probability metrics (not bc/bc_norm's numerical overlap approach)
-PROB_METRIC_ORDER = [
-    "Consistent Probability",
-    "Improved Consistent Probability",
-    "Hybrid Consistent Probability",
-    "Hybrid Consistent Probability v2",
-]
+# bc, bc_norm, Consistent Probability, Improved Consistent Probability,
+# Hybrid Consistent Probability(/v2) are currently disabled in
+# host_distance_match() (commented out in favor of the BC/tophat hybrids
+# above), so they're intentionally left out of METRIC_ORDER -- add them back
+# here if scoring.py re-enables them.
+PROB_METRIC_ORDER = METRIC_ORDER
 
 
 def _plot_metric_boxplots(
@@ -243,6 +237,24 @@ def _plot_log_score_vs_dist(records, output_path, event, log_floor=1e-30, metric
     plt.close(fig)
     return output_path
 
+def _gw_distance_curve(records, xs):
+    """
+    A single representative GW distance PDF (Gaussian, normalized to peak at
+    1.0) for overlay on a score-vs-distance plot -- test_mean/test_std vary
+    slightly per host (each is looked up at that host's own sky position), so
+    this uses the median across all records as one representative curve,
+    same idea as the fixed GW distance/error used in S251112cm-distance-
+    scores-hybrid.png.
+    """
+    test_means = np.array([r["test_mean"] for r in records if "test_mean" in r])
+    test_stds = np.array([r["test_std"] for r in records if "test_std" in r])
+    if not len(test_means):
+        return None
+    gw_mean, gw_std = np.median(test_means), np.median(test_stds)
+    pdf = norm.pdf(xs, loc=gw_mean, scale=gw_std)
+    return pdf / pdf.max()
+
+
 def _plot_score_vs_dist(records, output_path, event, log_floor=1e-30, metric_order=None):
     """
     Score vs. host distance, one panel per metric, color-coded by distance
@@ -266,6 +278,10 @@ def _plot_score_vs_dist(records, output_path, event, log_floor=1e-30, metric_ord
     all_uncertainty = np.clip([r["uncertainty"] for r in records if "distance" in r], 1e-2, None)
     vmin, vmax = np.percentile(all_uncertainty, [2, 98])  # robust range, ignore extreme outliers
     color_norm = LogNorm(vmin=max(vmin, 1e-2), vmax=vmax)
+
+    all_distances = np.array([r["distance"] for r in records if "distance" in r], dtype=float)
+    gw_xs = np.geomspace(all_distances[all_distances > 0].min(), all_distances.max(), 500)
+    gw_curve = _gw_distance_curve(records, gw_xs)
 
     n_cols = 2
     n_rows = -(-len(metrics_present) // n_cols)  # ceil division
@@ -292,6 +308,10 @@ def _plot_score_vs_dist(records, output_path, event, log_floor=1e-30, metric_ord
                 xs, ys, c=cs, cmap=cmap, norm=color_norm, marker=marker,
                 s=8, alpha=0.5, edgecolor="none", zorder=2,
             )
+
+        if gw_curve is not None:
+            ax.plot(gw_xs, gw_curve, color="#e34948", linewidth=2, zorder=3, label="GW Distance")
+            ax.legend(fontsize=7, loc="upper right", frameon=False)
 
         ax.set_xscale("log")
         ax.set_title(metric, fontsize=10)
@@ -467,6 +487,8 @@ METRIC_COLORS = {
     "Improved Consistent Probability": "#eb6834",
     "Hybrid Consistent Probability": "#008300",
     "Hybrid Consistent Probability v2": "#0066cc",
+    "Hybrid BC/Tophat": "#e34948",
+    "Hybrid BC/Tophat V3": "#2a78d6",
 }
 
 def _plot_uncertainty_score_corr_vs_dist(
@@ -535,6 +557,50 @@ def _plot_uncertainty_score_corr_vs_dist(
     ax.legend(fontsize=8, loc="best", frameon=False)
 
     fig.tight_layout()
+    fig.savefig(output_path, dpi=150)
+    plt.close(fig)
+    return output_path
+
+
+def _plot_metric_diff_vs_dist(records, output_path, event, metric_a, metric_b):
+    """
+    (metric_b - metric_a) raw score vs. host distance, colored by z-type --
+    directly highlights where two metrics diverge (sign and size), rather
+    than requiring a side-by-side read of two separate panels.
+    """
+    usable = [r for r in records if metric_a in r and metric_b in r and "distance" in r]
+    if not usable:
+        return None
+
+    fig, ax = plt.subplots(figsize=(9, 5.5))
+    for z_type, marker in TYPE_MARKERS.items():
+        cat_records = [r for r in usable if r["z_type"] == z_type]
+        if not cat_records:
+            continue
+        xs = np.array([r["distance"] for r in cat_records])
+        diffs = np.array([r[metric_b] - r[metric_a] for r in cat_records])
+        ax.scatter(
+            xs, diffs, marker=marker, s=10, alpha=0.5,
+            color=CATEGORY_COLORS.get(z_type, "#52514e"), edgecolor="none", zorder=2,
+        )
+
+    ax.axhline(0, color="#898781", linewidth=1, linestyle="--", zorder=1)
+    ax.set_xscale("log")
+    ax.set_xlabel("distance (Mpc)", fontsize=10)
+    ax.set_ylabel(f"{metric_b}  minus  {metric_a}", fontsize=10)
+    ax.set_title(f"{metric_b} vs. {metric_a} score difference -- {event}", fontsize=12)
+    ax.tick_params(labelsize=8)
+
+    shape_handles = [
+        plt.Line2D([0], [0], marker=marker, color="none", markerfacecolor="none",
+                   markeredgecolor="#52514e", markersize=7, linestyle="none")
+        for marker in TYPE_MARKERS.values()
+    ]
+    fig.legend(
+        shape_handles, TYPE_MARKERS.keys(), loc="lower center",
+        ncol=len(TYPE_MARKERS), frameon=False,
+    )
+    fig.tight_layout(rect=[0, 0.05, 1, 1])
     fig.savefig(output_path, dpi=150)
     plt.close(fig)
     return output_path
@@ -853,3 +919,11 @@ class Command(BaseCommand):
         print(f"Saved Log_score-vs-distance plot to {log_dist_path}")
         print(f"Saved percentile-score-vs-distance plot to {percentile_dist_path}")
         print(f"Saved uncertainty-score correlation plot to {corr_path}")
+
+        if len(PROB_METRIC_ORDER) == 2:
+            diff_path = _plot_metric_diff_vs_dist(
+                all_records, f"{output}_metric_diff_vs_distance.png", event,
+                metric_a=PROB_METRIC_ORDER[0], metric_b=PROB_METRIC_ORDER[1],
+            )
+            if diff_path:
+                print(f"Saved metric-diff-vs-distance plot to {diff_path}")

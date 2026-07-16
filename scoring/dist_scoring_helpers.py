@@ -365,6 +365,54 @@ def hybrid(gw_mean, galaxy_mean, gw_std, galaxy_std_minus, galaxy_std_plus):
     max_w = np.ones(w.shape)
     w = np.min([max_w, w], axis=0)
 
-    print(f"\tBC={bc_score}", f"S={tophat_score}", f"w={w}", f"score={(1-w)*tophat_score + w*bc_score}")
+    score = np.clip((1-w)*tophat_score + w*bc_score, 0, 1)
 
-    return (1-w)*tophat_score + w*bc_score
+    print(f"\tBC={bc_score}", f"S={tophat_score}", f"w={w}", f"score={score}")
+
+    return score
+
+def tophat_score(galaxy_dist, gw_mean, gw_std, nsigma=2,
+                 cliff=2.5,            # sigma where the steep drop happens
+                 cliff_steepness=4,    # super-Gaussian order; higher = flatter top, sharper cliff
+                 box_edge_score=0.95,  # target score at +/- nsigma (sets the in-box gradient)
+                 tail_scale=6.0):      # sigma-scale of the heavy tail
+    z = (galaxy_dist - gw_mean) / gw_std
+    u = np.abs(z)
+    alpha = np.log(box_edge_score) / nsigma**2
+    tilt = np.exp(alpha * u**2)        # (A) gentle in-box gradient
+    core = np.exp(-(u / cliff)**(2 * cliff_steepness)) # (B) flat plateau + steep cliff
+    tail = 1.0 / (1.0 + (u / tail_scale)**2)           # (C) heavy tail
+    # Find where this value gives desirable results
+    weight = 0.98
+    return (weight) * tilt * core + (1 - weight) * tail
+
+def sigma_ratio(gw_std, sigma_minus, sigma_plus):
+    # original: naive unweighted average of the two tails
+    return np.mean([sigma_minus, sigma_plus], axis=0) / gw_std
+
+# Mess around with the logistic k parameter
+# Must have some physical reasoning for why the k-value is chosen
+def weight_logistic(r, r0=1.0, k=4.0):
+    # Soft threshold: stays ~0 (trust top-hat) until r ~ r0, then switches on.
+    return 1.0 / (1.0 + np.exp(-k * (r - r0)))
+
+# Key improvements are higher scores for delta_functions closer to the mean
+def hybrid_v3(gw_mean, galaxy_mean, gw_std, galaxy_std_minus, galaxy_std_plus,
+              weight_fn=weight_logistic, verbose=True):
+    if galaxy_std_minus == 0 or galaxy_std_plus == 0:
+        bc_score = 0 # this score should be computed in the sigmoid regime
+    else:
+        bc_score = bc(gw_mean, gw_std, galaxy_mean, galaxy_std_minus, galaxy_std_plus)
+
+    ts = tophat_score(galaxy_mean, gw_mean, gw_std)
+
+    # sigma combination: naive unweighted average of the two tails
+    r = sigma_ratio(gw_std, galaxy_std_minus, galaxy_std_plus)
+    w = np.clip(weight_fn(r), 0.0, 1.0)
+
+    # Bhattacharya Coefficient is good (Potentially work on this a bit though)
+    # Non-linear weighting and tophat scoring needs improvement
+    if verbose:
+        print(f"\tBC={bc_score}", f"S={ts}", f"w={w}", f"score={(1-w)*ts + w*bc_score}")
+
+    return np.clip((1-w)*ts + w*bc_score, 0, 1)
