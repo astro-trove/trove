@@ -4,6 +4,8 @@ from .views import TargetReportView, TargetClassifyView
 from .views import TargetNameSearchView
 from .views import GWListView, GRBListView, NeutrinoListView, UnknownListView
 from .views import EventCandidateCreateView
+from .views import GWNonLocalizedEventOrTargetNameSearchView
+
 from tom_nonlocalizedevents.views import SupereventIdView
 from trove_nonlocalizedevents.views import EventCandidateListView
 
@@ -16,12 +18,14 @@ app_name = 'custom_code'
 urlpatterns = [
     path('targets/<int:pk>/report/', TargetReportView.as_view(), name='report'),
     path('targets/<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
-    path('targets/search/', TargetNameSearchView.as_view(), name='search'),
+    path('targets/search/<str:search_str>', TargetNameSearchView.as_view(), name='search'),
     path('nonlocalizedevents/gw/', GWListView.as_view(), name='gw-list'),
+    path('nonlocalizedevents/gwsearch/<str:search_str>', GWListView.as_view(), name='gw-list-search'),
     path('nonlocalizedevents/grb/', GRBListView.as_view(), name='grb-list'),
     path('nonlocalizedevents/neutrino/', NeutrinoListView.as_view(), name='neutrino-list'),
     path('nonlocalizedevents/unknown/', UnknownListView.as_view(), name='unknown-list'),
     path('nonlocalizedevents/<str:event_id>/', SupereventIdView.as_view(), name='event-detail'),  # prioritize event_id
     path('nonlocalizedevents/<str:event_id>/createcandidate/<int:target_id>/', EventCandidateCreateView.as_view(), name='create-candidate'),
     path('eventcandidates/', EventCandidateListView.as_view(), name='event-candidates'),
+    path('search/', GWNonLocalizedEventOrTargetNameSearchView.as_view(), name='gwnle-or-target-search'),
 ]

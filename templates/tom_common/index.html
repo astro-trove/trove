@@ -1,29 +1,146 @@
+<style>
+  .select2-container {
+    width: 100% !important;
+  }
+  .select2-selection {
+    height: auto !important;
+    min-height: 38px;
+    padding: 4px 8px;
+  }
+  .select2-selection__rendered {
+    line-height: 28px !important;
+  }
+  .loader {
+    width: 48px;
+    height: 48px;
+    border: 6px solid #e5e7eb;   /* light track */
+    border-top-color: #111827;  /* dark arc */
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
 {% extends 'tom_common/base.html' %}
-{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras %}
+{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras nonlocalizedevent_extras skymap_extras %}
 {% block title %}Home{% endblock %}
 {% block content %}
 <div class="row">
-  <div class="col-md-8">
-    <h2 class="text-center">Congratulations!! Welcome to the TROVE!</h2>
-    <p class="text-center"><img src="{% static 'img/trove_logo.jpeg' %}" class="img-fluid mx-auto"></p>
-    <form action="{% url 'custom_code:search' %}" class="text-center">
-      <input type="search" name="name" size=50 placeholder="Search by name" class="text-center">
-    </form>
-  </div>
-  <div class="col-md-4">
+  <!-- LEFT SIDE OF PAGE -->
+  <div class="col-md-6">
+    <!-- Logo and welcome -->
+    <div class="row">
+        <div style="display:flex; gap:16px; align-items:flex-start;">
+            <img src="{% static 'img/trove_logo_small.jpeg' %}" style="flex:0 0 auto">
+            <div style="flex:1 1 auto;">
+                <h1 style="text-align:justify flex: 1 1 auto"><b>Welcome to the TROVE!</b></h1>
+                <h4 style="text-align:justify flex: 1 1 auto"><b>[alpha version]</b></h4>
+            </div>
+        </div>
+    </div>
+    <br>
+
+    <!-- Description of TROVE -->
+    <h5 style="text-align:justify">The <b>Tool for Rapid Object Vetting and Examination (TROVE)</b> is a web application and application programming interface (API) designed for real-time vetting and scoring of electromagnetic (EM) transients, with the ultimate goal of optimizing follow-up of poorly localized astronomical events like gravitational waves (GWs).</h5>
+    <br>
+    {% comment %}
+    <h5 style="text-align:justify">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
+    <br>
+    {% endcomment %}
+    <h5 style="text-align:justify">TROVE is currently in <b>alpha</b> development. If you encounter an issue, please <a href="https://github.com/astro-trove/trove/issues/new" target="_blank">open an issue</a> on our Github.</h5>
+    <br>
+    <h5 style="text-align:justify"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
+    <br>
+
+    <!-- Documentation and Register buttons -->
+    <div style="text-align:center">
+      <a href="{% url 'sphinx_docs:docs' %}" target="_blank" title="Read the documentation!" class="btn btn-lg btn-info">📜 Documentation</a>
+      <a href="/accounts/register" target="_blank" title="Register for an account!" class="btn btn-lg btn-warning">🌐 Register</a>
+    </div>
+    <br>
+
+    <!-- Countdown to IR1, O5, end of O5, etc. -->
     <div class="card">
       <div class="card-header">
-        Latest Comments
+        {% countdown_IR1 %}
+      <br>
+      </div>
+    </div>
+    <br>
+
+    <!-- NSF acknowledgement -->
+    <div style="text-align:center">
+        <h5>The Treasure TROVE is funded by the National Science Foundation, grant numbers AST-2432037 and AST-2432036.</h5>
+        <img src="{% static 'img/NSF_logo.png' %}" style="height:7em"></img>
+    </div>
+
+  </div> <!-- END OF LEFT SIDE OF PAGE -->
+
+
+  <!-- RIGHT SIDE OF PAGE -->
+  <div class="col-md-6">
+    <!-- Latest GW NLEs -->
+    <div class="card">
+      <div class="card-header">
+        <b>Latest Gravitational Wave Events</b>
+      </div>
+      {% recent_gw_nonlocalizedevents_withcandidates 1 5 %}
+    </div>
+    <br/>
+
+    <!-- NLE Spotlight -->
+    <div class="card">
+      <div class="card-header btn btn-light" data-target="#skymap-collapse"
+           aria-expanded="false" aria-controls="skymap-collapse">
+        <b>Event Spotlight</b>
+      </div>
+      &nbsp;
+      <div id="skymap-collapse">
+        <div class="row align:center">
+          <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
+          <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div> -->
+          <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving at least one subsolar mass compact object!</div>
+        </div>
+        <div class="card-body"
+             id="skymap-body"
+             style="text-align:center; justify-content:center; align-items:center"
+             hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent=20113"
+             hx-target="#skymap-body"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <div style="display:flex; justify-content:center; align-items:center">
+            <p class="loader"></p>
+          </div>
+        </div>
+      </div>
+      <br/>
+    </div>
+    <br/>
+
+    <!-- Latest targets -->
+    {% comment %}
+    <div class="card">
+      <div class="card-header">
+        <b>Latest Targets</b>
+      </div>
+      {% recent_targets 5 %}
+    </div>
+    {% endcomment %}
+
+    <!-- Latest comments on targets -->
+    <div class="card">
+      <div class="card-header">
+        <b>Latest Target Comments</b>
       </div>
       {% recent_comments %}
     </div>
-    <br/>
-    <div class="card">
-      <div class="card-header">
-        Latest Targets
-      </div>
-      {% recent_targets %}
-    </div>
-  </div>
+
+  </div> <!-- END OF RIGHT SIDE OF PAGE -->
+
 </div>
+{% endblock %}
+
+{% block javascript %}
+<script src="{% static 'tom_common/js/htmx.min.js' %}"></script>
 {% endblock %}

@@ -1,0 +1,33 @@
+{% load bootstrap4 crispy_forms_tags event_candidate_extras %}
+{{ eventcandidate_filter_form.media }}
+{{ eventcandidate_create_form.media }}
+
+<div class="row">
+  <div class="col">
+    <form action="{% url 'custom_code:event-candidates' %}" method="get" class="form" hx-get="{% url 'custom_code:event-candidates' %}" hx-target="#candidate-results" hx-push-url="true">
+      {% bootstrap_form eventcandidate_filter_form %}
+
+      {% buttons %}
+      <button type="submit" class="btn btn-primary">
+	Filter
+      </button>
+      <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-get="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-target="#candidate-results" hx-push-url="true" class="btn btn-secondary" title="Reset">Reset</a>
+      {% endbuttons %}
+    </form>
+  </div>
+  <div class="col" id="target-link-form-col">
+    {% if request.user.is_authenticated %}
+      <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form" hx-boost="false">
+        {% csrf_token %}
+        {% bootstrap_form eventcandidate_create_form %}
+        {% buttons %}
+        <button type="submit" class="btn btn-primary">
+	  Link Target
+        </button>
+        {% endbuttons %}
+      </form>
+    {% endif %}
+  </div>
+</div>
+
+<br>

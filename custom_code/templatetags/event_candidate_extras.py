@@ -6,6 +6,7 @@ import numpy as np
 from collections import OrderedDict
 from functools import partial
 from django import template
+from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
 from django.utils.safestring import mark_safe
 from trove_targets.models import Target
@@ -17,6 +18,12 @@ from scoring.util import (
 )
 
 register = template.Library()
+
+
+@register.simple_tag
+def get_agn_toggle():
+    """Current value of the site-wide, cache-backed agn_toggle flag."""
+    return cache.get("agn_toggle", True)
 
 
 @register.simple_tag
@@ -70,6 +77,7 @@ def display_score_details(target_id):
     ) in target.eventcandidate_set.all():  # add MPC score from scorefactor, if present
         sf_set = event_candidate.scorefactor_set.filter(key="mpc_score")
         basic_score_details.append(sf_set)
+    ### TODO: Potentially just add "agn" here?
     te_set = te.filter(key__in=TARGETEXTRA_KEYS).exclude(key__in=["ps_score"])
     basic_score_details.append(te_set)
 

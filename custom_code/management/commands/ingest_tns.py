@@ -365,8 +365,9 @@ class Command(BaseCommand):
             )
             logger.info("##########################################################")
 
-        total_vetting_time = time.time() - vetting_start
-        logger.info(
-            f"Vetting took {total_vetting_time / 60:.2f}mins with an average of "
-            + f"{total_vetting_time / nvet:.2f}s per target"
-        )
+        if nvet: 
+            total_vetting_time = time.time() - vetting_start
+            logger.info(
+                f"Vetting took {total_vetting_time / 60:.2f}mins with an average of "
+                + f"{total_vetting_time / nvet:.2f}s per target"
+            )
