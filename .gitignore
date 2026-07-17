@@ -25,3 +25,7 @@ MPCORB.csv
 test.py
 ztf-forced-phot-logs/
 ztf-forced-phot-logs-backup/
+trove_tom/settings_local.py
+.vscode/launch.json
+.vscode/settings.json
+.vscode/tasks.json

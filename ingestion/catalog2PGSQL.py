@@ -9,6 +9,9 @@ logger = logging.getLogger(__name__)
 
 def parse_and_insert(dbctxt: DBctxt, catalog_path: str, catalog_type: str):
     match(catalog_config.Catalogs[catalog_type]):
+        case catalog_config.Catalogs.ALLWISE:
+            datain = catalog_config.AllWISEConfig(dbctxt, catalog_path)
+            datain.insert_all()
         case catalog_config.Catalogs.COSMICFLOWS4:
             datain = catalog_config.CosmicFlows4Config(dbctxt, catalog_path)
             datain.insert_all()

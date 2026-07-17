@@ -17,6 +17,7 @@ comma_nl = ",\n" # because `",\n".join(...)` doesn't work
 
 Catalogs = Enum('Catalogs', 
 [
+    ('ALLWISE',      'allWISE'),
     ('COSMICFLOWS4', 'COSMIC_FLOWS_4'),
     ('DESIDR1',      'DESI_DR1'),
     ('FERMILPSC',    'Fermi_LPSC'),
@@ -61,9 +62,7 @@ class CatalogConfig():
 
         SQL_statement = ""
         
-        SQL_statement += f"DROP TABLE IF EXISTS {self.dbctxt.sql_table};\n"
-        
-        SQL_statement += f"CREATE TABLE {self.dbctxt.sql_table} ({comma_nl.join(self.relational_schema)});"
+        SQL_statement += f"CREATE TABLE IF NOT EXISTS {self.dbctxt.sql_table} ({comma_nl.join(self.relational_schema)}); TRUNCATE {self.dbctxt.sql_table} RESTART IDENTITY;"
         
         with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, port=self.dbctxt.POSTGRES_PORT, dbname=self.dbctxt.POSTGRES_DB, user=self.dbctxt.POSTGRES_USER, password=self.dbctxt.POSTGRES_PASSWORD) as conn:
             with conn.cursor() as cur:
@@ -165,6 +164,369 @@ class BasicAstropyConfig(CatalogConfig):
                     value = value.replace("'", "''")
 
                 self.data[i][j] = value
+
+
+class AllWISEConfig(CatalogConfig):
+    relational_schema = [
+    "designation text",
+    "ra double precision",
+    "dec double precision",
+    "sigra double precision",
+    "sigdec double precision",
+    "sigradec double precision",
+    "glon double precision",
+    "glat double precision",
+    "elon double precision",
+    "elat double precision",
+    "wx double precision",
+    "wy double precision",
+    "cntr bigserial",
+    "source_id text",
+    "coadd_id text",
+    "src integer",
+    "w1mpro double precision",
+    "w1sigmpro double precision",
+    "w1snr double precision",
+    "w1rchi2 real",
+    "w2mpro double precision",
+    "w2sigmpro double precision",
+    "w2snr double precision",
+    "w2rchi2 real",
+    "w3mpro double precision",
+    "w3sigmpro double precision",
+    "w3snr double precision",
+    "w3rchi2 real",
+    "w4mpro double precision",
+    "w4sigmpro double precision",
+    "w4snr double precision",
+    "w4rchi2 real",
+    "rchi2 real",
+    "nb integer",
+    "na integer",
+    "w1sat double precision",
+    "w2sat double precision",
+    "w3sat double precision",
+    "w4sat double precision",
+    "satnum text",
+    "ra_pm double precision",
+    "dec_pm double precision",
+    "sigra_pm double precision",
+    "sigdec_pm double precision",
+    "sigradec_pm double precision",
+    "pmra integer",
+    "sigpmra integer",
+    "pmdec integer",
+    "sigpmdec integer",
+    "w1rchi2_pm real",
+    "w2rchi2_pm real",
+    "w3rchi2_pm real",
+    "w4rchi2_pm real",
+    "rchi2_pm real",
+    "pmcode text",
+    "cc_flags text",
+    "rel text",
+    "ext_flg integer",
+    "var_flg text",
+    "ph_qual text",
+    "det_bit integer",
+    "moon_lev text",
+    "w1nm integer",
+    "w1m integer",
+    "w2nm integer",
+    "w2m integer",
+    "w3nm integer",
+    "w3m integer",
+    "w4nm integer",
+    "w4m integer",
+    "w1cov double precision",
+    "w2cov double precision",
+    "w3cov double precision",
+    "w4cov double precision",
+    "w1cc_map integer",
+    "w1cc_map_str text",
+    "w2cc_map integer",
+    "w2cc_map_str text",
+    "w3cc_map integer",
+    "w3cc_map_str text",
+    "w4cc_map integer",
+    "w4cc_map_str text",
+    "best_use_cntr int8",
+    "ngrp smallint",
+    "w1flux real",
+    "w1sigflux real",
+    "w1sky double precision",
+    "w1sigsk double precision",
+    "w1conf double precision",
+    "w2flux real",
+    "w2sigflux real",
+    "w2sky double precision",
+    "w2sigsk double precision",
+    "w2conf double precision",
+    "w3flux real",
+    "w3sigflux real",
+    "w3sky double precision",
+    "w3sigsk double precision",
+    "w3conf double precision",
+    "w4flux real",
+    "w4sigflux real",
+    "w4sky double precision",
+    "w4sigsk double precision",
+    "w4conf double precision",
+    "w1mag double precision",
+    "w1sigm double precision",
+    "w1flg integer",
+    "w1mcor double precision",
+    "w2mag double precision",
+    "w2sigm double precision",
+    "w2flg integer",
+    "w2mcor double precision",
+    "w3mag double precision",
+    "w3sigm double precision",
+    "w3flg integer",
+    "w3mcor double precision",
+    "w4mag double precision",
+    "w4sigm double precision",
+    "w4flg integer",
+    "w4mcor double precision",
+    "w1mag_1 double precision",
+    "w1sigm_1 double precision",
+    "w1flg_1 integer",
+    "w2mag_1 double precision",
+    "w2sigm_1 double precision",
+    "w2flg_1 integer",
+    "w3mag_1 double precision",
+    "w3sigm_1 double precision",
+    "w3flg_1 integer",
+    "w4mag_1 double precision",
+    "w4sigm_1 double precision",
+    "w4flg_1 integer",
+    "w1mag_2 double precision",
+    "w1sigm_2 double precision",
+    "w1flg_2 integer",
+    "w2mag_2 double precision",
+    "w2sigm_2 double precision",
+    "w2flg_2 integer",
+    "w3mag_2 double precision",
+    "w3sigm_2 double precision",
+    "w3flg_2 integer",
+    "w4mag_2 double precision",
+    "w4sigm_2 double precision",
+    "w4flg_2 integer",
+    "w1mag_3 double precision",
+    "w1sigm_3 double precision",
+    "w1flg_3 integer",
+    "w2mag_3 double precision",
+    "w2sigm_3 double precision",
+    "w2flg_3 integer",
+    "w3mag_3 double precision",
+    "w3sigm_3 double precision",
+    "w3flg_3 integer",
+    "w4mag_3 double precision",
+    "w4sigm_3 double precision",
+    "w4flg_3 integer",
+    "w1mag_4 double precision",
+    "w1sigm_4 double precision",
+    "w1flg_4 integer",
+    "w2mag_4 double precision",
+    "w2sigm_4 double precision",
+    "w2flg_4 integer",
+    "w3mag_4 double precision",
+    "w3sigm_4 double precision",
+    "w3flg_4 integer",
+    "w4mag_4 double precision",
+    "w4sigm_4 double precision",
+    "w4flg_4 integer",
+    "w1mag_5 double precision",
+    "w1sigm_5 double precision",
+    "w1flg_5 integer",
+    "w2mag_5 double precision",
+    "w2sigm_5 double precision",
+    "w2flg_5 integer",
+    "w3mag_5 double precision",
+    "w3sigm_5 double precision",
+    "w3flg_5 integer",
+    "w4mag_5 double precision",
+    "w4sigm_5 double precision",
+    "w4flg_5 integer",
+    "w1mag_6 double precision",
+    "w1sigm_6 double precision",
+    "w1flg_6 integer",
+    "w2mag_6 double precision",
+    "w2sigm_6 double precision",
+    "w2flg_6 integer",
+    "w3mag_6 double precision",
+    "w3sigm_6 double precision",
+    "w3flg_6 integer",
+    "w4mag_6 double precision",
+    "w4sigm_6 double precision",
+    "w4flg_6 integer",
+    "w1mag_7 double precision",
+    "w1sigm_7 double precision",
+    "w1flg_7 integer",
+    "w2mag_7 double precision",
+    "w2sigm_7 double precision",
+    "w2flg_7 integer",
+    "w3mag_7 double precision",
+    "w3sigm_7 double precision",
+    "w3flg_7 integer",
+    "w4mag_7 double precision",
+    "w4sigm_7 double precision",
+    "w4flg_7 integer",
+    "w1mag_8 double precision",
+    "w1sigm_8 double precision",
+    "w1flg_8 integer",
+    "w2mag_8 double precision",
+    "w2sigm_8 double precision",
+    "w2flg_8 integer",
+    "w3mag_8 double precision",
+    "w3sigm_8 double precision",
+    "w3flg_8 integer",
+    "w4mag_8 double precision",
+    "w4sigm_8 double precision",
+    "w4flg_8 integer",
+    "w1magp double precision",
+    "w1sigp1 double precision",
+    "w1sigp2 double precision",
+    "w1k double precision",
+    "w1ndf integer",
+    "w1mlq double precision",
+    "w1mjdmin double precision",
+    "w1mjdmax double precision",
+    "w1mjdmean double precision",
+    "w2magp double precision",
+    "w2sigp1 double precision",
+    "w2sigp2 double precision",
+    "w2k double precision",
+    "w2ndf integer",
+    "w2mlq double precision",
+    "w2mjdmin double precision",
+    "w2mjdmax double precision",
+    "w2mjdmean double precision",
+    "w3magp double precision",
+    "w3sigp1 double precision",
+    "w3sigp2 double precision",
+    "w3k double precision",
+    "w3ndf integer",
+    "w3mlq double precision",
+    "w3mjdmin double precision",
+    "w3mjdmax double precision",
+    "w3mjdmean double precision",
+    "w4magp double precision",
+    "w4sigp1 double precision",
+    "w4sigp2 double precision",
+    "w4k double precision",
+    "w4ndf integer",
+    "w4mlq double precision",
+    "w4mjdmin double precision",
+    "w4mjdmax double precision",
+    "w4mjdmean double precision",
+    "rho12 integer",
+    "rho23 integer",
+    "rho34 integer",
+    "q12 integer",
+    "q23 integer",
+    "q34 integer",
+    "xscprox double precision",
+    "w1rsemi double precision",
+    "w1ba double precision",
+    "w1pa double precision",
+    "w1gmag double precision",
+    "w1gerr double precision",
+    "w1gflg integer",
+    "w2rsemi double precision",
+    "w2ba double precision",
+    "w2pa double precision",
+    "w2gmag double precision",
+    "w2gerr double precision",
+    "w2gflg integer",
+    "w3rsemi double precision",
+    "w3ba double precision",
+    "w3pa double precision",
+    "w3gmag double precision",
+    "w3gerr double precision",
+    "w3gflg integer",
+    "w4rsemi double precision",
+    "w4ba double precision",
+    "w4pa double precision",
+    "w4gmag double precision",
+    "w4gerr double precision",
+    "w4gflg integer",
+    "tmass_key integer",
+    "r_2mass double precision",
+    "pa_2mass double precision",
+    "n_2mass integer",
+    "j_m_2mass double precision",
+    "j_msig_2mass double precision",
+    "h_m_2mass double precision",
+    "h_msig_2mass double precision",
+    "k_m_2mass double precision",
+    "k_msig_2mass double precision",
+    "x double precision",
+    "y double precision",
+    "z double precision",
+    "spt_ind integer",
+    "htm20 int8"
+    ]
+    
+    def __init__(self, dbctxt, path, chunk_rows = 100000):
+        super().__init__(dbctxt, path, chunk_rows=100000)
+
+    def _tabularize(self, path: str):
+        with open(path, 'r') as file:
+            self.data = []
+            
+            new_table = file.readlines()
+
+            for i, row in enumerate(new_table):
+                self.data.append(row.split("|")[:-1])
+
+            del new_table
+            
+    
+    def _clean_data(self):
+        for i, row in enumerate(self.data):
+            for j, col in enumerate(row):
+                if col == '':
+                    col = 'NULL'
+                if col == None:
+                    col = 'NULL'
+                if ' text' in self.relational_schema[j]:
+                    col = f"'{col}'"
+                self.data[i][j] = col
+    
+    def _relational_schema(self) -> str:
+        self.relational_schema = AllWISEConfig.relational_schema
+        return self.relational_schema
+
+    def insert_all(self):
+        self._relational_schema()
+        self._create_table()
+
+        for i in range(1, 49):
+            srcname = f"{os.path.dirname(self.path)}/wise-allwise-cat-part{i:02}"
+            self._tabularize(srcname)
+            self._clean_data()
+
+            for j in range(0, len(self.data), self.chunk_rows):
+                SQL_statement = ""
+                rows = range(j, min(len(self.data), j + self.chunk_rows))
+            
+                logger.info(f"Inserting values for rows {rows.start}-{rows.stop} of {len(self.data)}. File {i} of 48.")
+            
+                SQL_statement = f"INSERT INTO {self.dbctxt.sql_table} VALUES {comma_nl.join(self._data2SQL(rows))};"
+            
+                # connect to db & insert
+                with psycopg2.connect(host=self.dbctxt.POSTGRES_HOST, user=self.dbctxt.POSTGRES_USER, port=self.dbctxt.POSTGRES_PORT, password=self.dbctxt.POSTGRES_PASSWORD, dbname=self.dbctxt.POSTGRES_DB) as conn:
+                    with conn.cursor() as cur:
+                        try:
+                            cur.execute(SQL_statement)
+                            conn.commit()
+                        except Exception as e:
+                            raise e
+                logger.info("chunk complete.")
+            
+        q3c_index_table(self.dbctxt, self.ra, self.dec)
+        logger.info("table ingested.")
 
 
 class CosmicFlows4Config(CatalogConfig):
