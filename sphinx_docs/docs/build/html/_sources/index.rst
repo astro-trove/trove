@@ -12,7 +12,10 @@
 
    introduction
    details
+   scoringexplained
+   updatingredshifts
    api
    dev
    faq
+   citations
    

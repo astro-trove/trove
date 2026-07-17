@@ -364,6 +364,46 @@ class TestTargetListExtras:
         from custom_code.templatetags.target_list_extras import islist
         assert islist(None) is False
 
+    def test_format_redshift_parts_coarse_uncertainty(self):
+        from custom_code.templatetags.target_list_extras import format_redshift_parts
+
+        parts = format_redshift_parts(0.04, 0.01)
+        assert parts == {"z": "0.04", "err": "0.01"}
+
+    def test_format_redshift_parts_fine_uncertainty_1e4(self):
+        from custom_code.templatetags.target_list_extras import format_redshift_parts
+
+        parts = format_redshift_parts(0.039214, 0.0001)
+        assert parts == {"z": "0.03921", "err": "0.0001"}
+
+    def test_format_redshift_parts_fine_uncertainty_1e5(self):
+        from custom_code.templatetags.target_list_extras import format_redshift_parts
+
+        parts = format_redshift_parts(0.039214, 0.00001)
+        assert parts == {"z": "0.039214", "err": "0.00001"}
+
+    def test_format_redshift_parts_no_error(self):
+        from custom_code.templatetags.target_list_extras import format_redshift_parts
+
+        parts = format_redshift_parts(0.04, float("nan"))
+        assert parts == {"z": "0.04", "no_err": True}
+
+    def test_format_redshift_parts_asymmetric(self):
+        from custom_code.templatetags.target_list_extras import format_redshift_parts
+
+        parts = format_redshift_parts(0.039214, [0.00008, 0.00012])
+        assert parts["z"] == "0.03921"
+        assert parts["neg"] == "0.00008"
+        assert parts["pos"] == "0.0001"
+
+    def test_redshift_cell_symmetric(self):
+        from custom_code.templatetags.target_list_extras import redshift_cell
+
+        html = redshift_cell(0.039214, 0.0001)
+        assert "0.03921" in html
+        assert "0.0001" in html
+        assert "&plusmn;" in html
+
 
 class TestEventCandidateExtras:
     """Tests for custom_code/templatetags/event_candidate_extras.py"""

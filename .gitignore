@@ -13,8 +13,8 @@ tests/data/*
 _static/
 !sphinx_docs/docs/build/html/_static/
 data/
-saguaro_tom/settings_local.py
-saguaro_tom.egg-info/SOURCES.txt
+trove_tom/settings_local.py
+trove.egg-info/SOURCES.txt
 .DS_Store
 *.DAT
 venv/
@@ -23,8 +23,11 @@ MPCORB.csv
 .venv_readme_test/
 .venv_test/
 test.py
+forcedphotometry*.txt
 ztf-forced-phot-logs/
 ztf-forced-phot-logs-backup/
 .vscode/
 build/
+!sphinx_docs/docs/build/
 trove.egg-info/
+.claude/

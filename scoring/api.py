@@ -10,6 +10,7 @@ router = Router()
 
 def _compute_scores(ecs):
     # calculate the final scores, sorted by decreasing score, and return
+    # Add agn scoring potentially here
     ecs_with_scores = get_event_candidate_scores(ecs)
 
     return [

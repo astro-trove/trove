@@ -50,7 +50,7 @@ Issues = "https://github.com/astro-trove/trove/issues"
 
 [tool.setuptools]
 packages = [
-    "saguaro_tom",
+    "trove_tom",
     "custom_code",
     "scoring",
     "trove_nonlocalizedevents",
@@ -71,7 +71,7 @@ select = ["E", "F", "W", "I"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "saguaro_tom.settings"
+DJANGO_SETTINGS_MODULE = "trove_tom.settings"
 python_files = ["test_*.py", "*_test.py"]
 markers = [
     "slow: tests that read or convert large skymap fixtures",

@@ -46,12 +46,12 @@
           {% include 'tom_common/navbar_content.html' %}
 
         </ul>
-        <form action="{% url 'custom_code:search' %}" class="form-inline">
-          <input type="search" name="name" placeholder="Search by name">
+        <form action="{% url 'custom_code:gwnle-or-target-search' %}" class="form-inline">
+          <input type="search" name="name" placeholder="Search events/targets">
         </form>
         <ul class="navbar-nav ml-auto" id="login-buttons">
           {# navbar_login #}
-	  {% include 'tom_common/partials/navbar_login.html' %}
+	      {% include 'tom_common/partials/navbar_login.html' %}
         </ul>
       </div>
     </nav>
