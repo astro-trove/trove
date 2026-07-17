@@ -1,9 +1,11 @@
 {% load bootstrap4 %}
 {% comment %}
-The following nav-item list elements (li) are included in the tom_common/base.html navbar-nav (ul).
-For customization instructions, see tom_common/base.html
+  The following nav-item list elements (li) are included in the tom_common/base.html navbar-nav (ul).
+  For customization instructions, see tom_common/base.html
 {% endcomment %}
-
+<li class="nav-item {% if request.resolver_match.namespace == '/docs' %}active{% endif %}">
+  <a class="nav-link" href="https://astro-trove.github.io/" target="_blank">The TROVE Collaboration</a>
+</li>
 <li class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
     <a class="nav-link" href="{% url 'home' %}">Home <span class="sr-only">(current)</span></a>
 </li>
@@ -14,13 +16,13 @@ For customization instructions, see tom_common/base.html
             <a class="nav-link" href="{% url 'custom_code:gw-list' %}?prefix=S&state=ACTIVE&inv_far_min=0.5" style="color:black">Gravitational Waves</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:grb-list' %}" style="color:black">&gamma;-ray Bursts</a>
+            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:neutrino-list' %}" style="color:gray">Neutrinos</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:neutrino-list' %}" style="color:black">Neutrinos</a>
+            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:grb-list' %}" style="color:gray">&gamma;-ray Bursts</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link" href="{% url 'custom_code:unknown-list' %}" style="color:black">X-ray Transients</a>
+            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:unknown-list' %}" style="color:gray">X-ray Transients</a>
         </li>
     </ul>
 </li>
@@ -52,6 +54,8 @@ For customization instructions, see tom_common/base.html
     <a class="nav-link" href="{% url 'tom_dataproducts:list' %}">Data</a>
 </li>
 -->
-<li class="nav-item {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
-    <a class="nav-link" href="{% url 'user-list' %}">Users</a>
-</li>
+{% if request.user.is_superuser %}
+  <li class="nav-item {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
+      <a class="nav-link" href="{% url 'user-list' %}">Users</a>
+  </li>
+{% endif %}

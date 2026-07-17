@@ -2,6 +2,10 @@
 
 Welcome to the Treasure TROVE: a Tool for Rapid Object Vetting and Examination!
 
+### Documentation: https://datatrove.as.arizona.edu/docs/
+
+### Enter the Treasure TROVE: https://datatrove.as.arizona.edu/
+
 ## Repositories of Interest:
 
   * https://github.com/astro-trove/candidate_vetting

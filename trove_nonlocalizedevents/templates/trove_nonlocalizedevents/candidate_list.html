@@ -39,15 +39,17 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 <div class="row">
   <div class="col-md-12">
     <div class="card">
-      <button class="btn btn-dark" type="button" data-toggle="collapse" data-target="#skymap-collapse"
-              aria-expanded="false" aria-controls="skymap-collapse"
-              hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
-              hx-target="#skymap-body" hx-trigger="click once" hx-swap="innerHTML">
-        <h4 style="display:inline-block; margin:0; text-align:center">Load Skymap</h4>
-      </button>
-      <div id="skymap-collapse" class="collapse">
-        <div class="card-body" id="skymap-body" style="text-align:center">
-          <p class="loader"></p>
+      <div id="skymap-collapse">
+        <div class="card-body"
+             id="skymap-body"
+             style="text-align:center; justify-content:center; align-items:center"
+             hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+             hx-target="#skymap-body"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <div style="display:flex; justify-content:center; align-items:center">
+            <p class="loader"></p>
+          </div>
         </div>
       </div>
     </div>

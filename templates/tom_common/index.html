@@ -35,6 +35,7 @@
             <img src="{% static 'img/trove_logo_small.jpeg' %}" style="flex:0 0 auto">
             <div style="flex:1 1 auto;">
                 <h1 style="text-align:justify flex: 1 1 auto"><b>Welcome to the TROVE!</b></h1>
+                <h4 style="text-align:justify flex: 1 1 auto"><b>[alpha version]</b></h4>
             </div>
         </div>
     </div>
@@ -47,6 +48,8 @@
     <h5 style="text-align:justify">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
     <br>
     {% endcomment %}
+    <h5 style="text-align:justify">TROVE is currently in <b>alpha</b> development. If you encounter an issue, please <a href="https://github.com/astro-trove/trove/issues/new" target="_blank">open an issue</a> on our Github.</h5>
+    <br>
     <h5 style="text-align:justify"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
     <br>
 
@@ -66,6 +69,12 @@
     </div>
     <br>
 
+    <!-- NSF acknowledgement -->
+    <div style="text-align:center">
+        <h5>The Treasure TROVE is funded by the National Science Foundation, grant numbers AST-2432037 and AST-2432036.</h5>
+        <img src="{% static 'img/NSF_logo.png' %}" style="height:7em"></img>
+    </div>
+
   </div> <!-- END OF LEFT SIDE OF PAGE -->
 
 
@@ -74,7 +83,7 @@
     <!-- Latest GW NLEs -->
     <div class="card">
       <div class="card-header">
-        <b>Latest GW Events</b>
+        <b>Latest Gravitational Wave Events</b>
       </div>
       {% recent_gw_nonlocalizedevents_withcandidates 1 5 %}
     </div>
@@ -82,20 +91,27 @@
 
     <!-- NLE Spotlight -->
     <div class="card">
-      <div class="card-header btn btn-light" data-toggle="collapse" data-target="#skymap-collapse"
-           aria-expanded="false" aria-controls="skymap-collapse"
-           hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent=20113"
-           hx-target="#skymap-body" hx-trigger="click once" hx-swap="innerHTML">
-        <b>Event Spotlight (Click to Load!)</b>
+      <div class="card-header btn btn-light" data-target="#skymap-collapse"
+           aria-expanded="false" aria-controls="skymap-collapse">
+        <b>Event Spotlight</b>
       </div>
-      <div id="skymap-collapse" class="collapse">
+      &nbsp;
+      <div id="skymap-collapse">
         <div class="row align:center">
           <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
           <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div> -->
           <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving at least one subsolar mass compact object!</div>
         </div>
-        <div class="card-body" id="skymap-body" style="text-align:center">
-          <p class="loader"></p>
+        <div class="card-body"
+             id="skymap-body"
+             style="text-align:center; justify-content:center; align-items:center"
+             hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent=20113"
+             hx-target="#skymap-body"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <div style="display:flex; justify-content:center; align-items:center">
+            <p class="loader"></p>
+          </div>
         </div>
       </div>
       <br/>

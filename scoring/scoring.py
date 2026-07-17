@@ -216,9 +216,9 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     # but we need to account for users calling this function for arbitrary
     # host_df, target, and NLE without prior filtering on host_df
     if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
-        host_df = host_df[host_df.z != -99.0] # LS DR9 North
+        host_df = host_df[host_df.z != -99.0] # LS DR9 North; DELVE DR3
         host_df = host_df[host_df.z != -999.0] # PS1-STRM
-        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
+        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z; DELVE DR3
         host_df = host_df[~np.isnan(host_df.z)]
 
     # then use the redshift of user-uploaded host galaxies
