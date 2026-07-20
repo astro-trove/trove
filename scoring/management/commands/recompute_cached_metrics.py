@@ -15,10 +15,12 @@ Probability, Improved Consistent Probability, Hybrid Consistent Probability,
 Hybrid BC/Tophat, Hybrid BC/Tophat V3) -- all scalar-only, no PDF construction
 needed (dist_scoring_helpers.bc is now the analytic closed-form Bhattacharyya
 overlap, not the old numerical-integration one -- that older version is
-bc_slow). Pass --include-bc-slow to also redo bc_slow/bc_norm, which
-numerically build an AsymmetricGaussian PDF and integrate it per record
-(~7ms/record vs. ~microseconds for the closed-form metrics; see
-time_distance_metrics.py), so only worth it when those two actually changed.
+bc_slow). Pass --include-pdf-metrics to also redo bc_slow/bc_norm/Conditional
+JSD Metric, which numerically build an AsymmetricGaussian PDF and integrate it
+per record (~7ms/record vs. ~microseconds for the closed-form metrics; see
+time_distance_metrics.py), so only worth it when those actually changed or
+(as with Conditional JSD Metric) were never backfilled for the bulk of
+host-based records in the first place.
 
 Example
 -------
@@ -37,7 +39,7 @@ from scipy.stats import norm
 from django.core.management.base import BaseCommand
 
 from scoring.dist_scoring_helpers import (
-    AsymmetricGaussian, bc_slow, bc_norm_median_asymmetric, consistency_probability, cons_prob_3,
+    AsymmetricGaussian, bc_slow, bc_norm_median_asymmetric, conditional_scoring, consistency_probability, cons_prob_3,
     hybrid_cons_prob, hybrid, hybrid_v3,
 )
 from scoring.scoring import D_LIM_LOWER, D_LIM_UPPER
@@ -55,17 +57,17 @@ class Command(BaseCommand):
             help="Where to save the updated cache (default: overwrite --records in place)",
         )
         parser.add_argument(
-            "--include-bc-slow",
+            "--include-pdf-metrics",
             action="store_true",
-            help="Also recompute bc_slow/bc_norm (slow -- builds+integrates a PDF per record)",
+            help="Also recompute bc_slow/bc_norm/Conditional JSD Metric (slow -- builds+integrates a PDF per record)",
         )
 
-    def handle(self, records, output, include_bc_slow, **kwargs):
+    def handle(self, records, output, include_pdf_metrics, **kwargs):
         with open(records) as f:
             all_records = json.load(f)
 
         output = output or records
-        _lumdist = np.linspace(D_LIM_LOWER, D_LIM_UPPER, int(10 * D_LIM_UPPER)) if include_bc_slow else None
+        _lumdist = np.linspace(D_LIM_LOWER, D_LIM_UPPER, int(10 * D_LIM_UPPER)) if include_pdf_metrics else None
 
         n_ok, n_failed = 0, 0
         for rec in all_records:
@@ -73,7 +75,7 @@ class Command(BaseCommand):
                 n_failed += 1
                 continue
             try:
-                if include_bc_slow:
+                if include_pdf_metrics:
                     test_pdf = norm.pdf(_lumdist, loc=rec["test_mean"], scale=rec["test_std"])
                     cur_pdf = AsymmetricGaussian().pdf(
                         _lumdist,
@@ -86,6 +88,9 @@ class Command(BaseCommand):
                     rec["bc_slow"] = bc_slow(cur_pdf, test_pdf, _lumdist)
                     rec["bc_norm"] = bc_norm_median_asymmetric(
                         test_pdf, cur_pdf, rec["test_mean"], rec["lumdist_neg_err"], rec["lumdist_pos_err"], _lumdist
+                    )
+                    rec["Conditional JSD Metric"] = conditional_scoring(
+                        cur_pdf, test_pdf, rec["test_mean"], rec["distance"], rec["test_std"]
                     )
 
                 rec["Consistent Probability"] = consistency_probability(

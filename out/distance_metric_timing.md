@@ -1,47 +1,42 @@
 # Distance-metric compute time comparison
 
-Per-call execution time of the distance-scoring metrics (`bc`, `bc_norm`,
-`Consistent Probability`, `Improved Consistent Probability`, `Hybrid
-Consistent Probability`), measured on 40 real host records sampled from
-`distance_metric_bias_records.json`, 20 timed repeats per record. Produced by
+Per-call execution time of the distance-scoring metrics, measured on 40 real
+host records sampled from `distance_metric_bias_records.json`, 20 timed
+repeats per record. Produced by
 `scoring/management/commands/time_distance_metrics.py`.
 
-| metric | mean (us) | median (us) | total (ms) | x slowdown |
-|---|---:|---:|---:|---:|
-| bc | 236.23 | 195.83 | 9.449 | 147.57x |
-| bc_norm | 8480.60 | 8418.30 | 339.224 | 5297.55x |
-| Consistent Probability | 1.60 | 1.49 | 0.064 | 1.00x |
-| Improved Consistent Probability | 3.28 | 3.19 | 0.131 | 2.05x |
-| Hybrid Consistent Probability | 4.76 | 4.64 | 0.191 | 2.98x |
+| metric | mean (us) | median (us) | total (ms) |
+|---|---:|---:|---:|
+| bc_slow | 334.96 | 323.89 | 13.399 |
+| bc (analytic) | 15.73 | 14.87 | 0.629 |
+| bc_norm | 11772.94 | 11595.85 | 470.918 |
+| Consistent Probability | 2.45 | 2.17 | 0.098 |
+| Improved Consistent Probability | 5.55 | 5.20 | 0.222 |
+| Hybrid Consistent Probability | 8.37 | 7.79 | 0.335 |
+| Hybrid BC/Tophat | 47.91 | 38.34 | 1.916 |
+| Hybrid BC/Tophat V3 | 34.37 | 32.61 | 1.375 |
 
 ![Distance-metric compute time per call](distance_metric_timing.png)
 
 ## Notes
 
-- `bc` and `bc_norm` both numerically build an `AsymmetricGaussian` PDF (with
-  its own internal trapezoidal integration over a 100,000-point distance
-  grid) and compute a Bhattacharyya-coefficient overlap -- real numerical
-  work. `bc_norm` costs ~36x more than plain `bc` since it does a *second*
-  overlap (against a reshifted "best-case" host PDF) to normalize the score.
+- `bc_slow` and `bc_norm` are the older, numerical-integration metrics (build
+  an `AsymmetricGaussian` PDF over a 100,000-point grid, then integrate) --
+  `bc_norm` costs ~35x more than `bc_slow` since it does a *second* overlap
+  (against a reshifted "best-case" host PDF) to normalize the score. Neither
+  is called anywhere in the current pipeline (`host_distance_match()` has
+  both commented out).
+- `bc (analytic)` is the closed-form replacement now used internally by both
+  `Hybrid BC/Tophat` and `Hybrid BC/Tophat V3` -- ~16us, a direct formula
+  rather than a PDF build + integration.
 - `Consistent Probability`, `Improved Consistent Probability`, and `Hybrid
-  Consistent Probability` are all closed-form `erfc` expressions on scalars,
-  so they're 2-4 orders of magnitude cheaper than `bc`/`bc_norm`. Among the
-  three, cost scales with how much extra branching/blending each does:
-  `Consistent Probability` picks one tail (cheapest), `Improved Consistent
-  Probability` blends both tails via one `erfc`-weight (~2x), and `Hybrid
-  Consistent Probability` evaluates two separate `erfc` sigmas
-  (`score_minus`/`score_plus`) plus a z-score/width-threshold branch check
-  (~3x) -- still under 5us, negligible in absolute terms.
-- `hybrid_cons_prob()` has a leftover debug `print("Z Score only")` on one of
-  its branches; the timing script suppresses stdout during the timed calls
-  (via `contextlib.redirect_stdout`) so it doesn't flood output or add I/O
-  latency to the measured cost.
-- At ~2112 host records (a full collection run), `bc_norm` alone accounts for
-  roughly 18s of pure compute, `bc` adds another ~0.5s, while all three
-  erfc-based metrics combined cost well under 25ms total -- negligible next
-  to the per-candidate network/DB wait (~7-10s seen during real collection
-  runs). Metric compute time is not a bottleneck in `check_distance_scores`;
-  the SSH-tunneled galaxy queries are.
+  Consistent Probability` are all closed-form `erfc` expressions on scalars
+  -- cheapest of the group (2-8us), cost scales with how much tail-blending/
+  branching each does.
+- `Hybrid BC/Tophat` and `Hybrid BC/Tophat V3` (the two currently active
+  metrics) both call the analytic `bc()` plus a tophat-score term and a
+  blend weight -- ~35-48us, still negligible next to the per-candidate
+  network/DB wait (~7-10s seen during real collection runs).
 
 Reproduce with:
 

@@ -1,8 +1,8 @@
 """
 Diagnostic: compare per-call execution time of the distance-scoring metrics
-(bc, bc_norm, Consistent Probability, Improved Consistent Probability, Hybrid
-Consistent Probability) on real host data, without touching the DB or SSH
-tunnels.
+(bc_slow, bc_norm, Consistent Probability, Improved Consistent Probability,
+Hybrid Consistent Probability, Hybrid BC/Tophat, Hybrid BC/Tophat V3) on real
+host data, without touching the DB or SSH tunnels.
 
 Reuses a *_records.json cache (from check_distance_scores) since it already
 holds everything needed to rebuild each host's two distance PDFs locally:
@@ -32,13 +32,15 @@ from scipy.stats import norm
 from django.core.management.base import BaseCommand, CommandError
 
 from scoring.dist_scoring_helpers import (
-    AsymmetricGaussian, bc, bc_norm_median_asymmetric, consistency_probability, cons_prob_3, hybrid_cons_prob,
+    AsymmetricGaussian, bc, bc_slow, bc_norm_median_asymmetric, consistency_probability, cons_prob_3,
+    hybrid_cons_prob, hybrid, hybrid_v3,
 )
 from scoring.scoring import D_LIM_LOWER, D_LIM_UPPER
 from scoring.management.commands.check_distance_scores import METRIC_COLORS
 
 METRICS = [
-    "bc", "bc_norm", "Consistent Probability", "Improved Consistent Probability", "Hybrid Consistent Probability",
+    "bc_slow", "bc (analytic)", "bc_norm", "Consistent Probability", "Improved Consistent Probability",
+    "Hybrid Consistent Probability", "Hybrid BC/Tophat", "Hybrid BC/Tophat V3",
 ]
 
 REQUIRED_FIELDS = ("distance", "uncertainty", "lumdist_neg_err", "lumdist_pos_err", "test_mean", "test_std")
@@ -142,8 +144,13 @@ class Command(BaseCommand):
                 integ_b=_lumdist[-1],
             )
 
-            timed_fns["bc"].append(
-                lambda test_pdf=test_pdf, cur_pdf=cur_pdf: bc(cur_pdf, test_pdf, _lumdist)
+            timed_fns["bc_slow"].append(
+                lambda test_pdf=test_pdf, cur_pdf=cur_pdf: bc_slow(cur_pdf, test_pdf, _lumdist)
+            )
+            timed_fns["bc (analytic)"].append(
+                lambda rec=rec: bc(
+                    rec["test_mean"], rec["test_std"], rec["distance"], rec["lumdist_neg_err"], rec["lumdist_pos_err"]
+                )
             )
             timed_fns["bc_norm"].append(
                 lambda test_pdf=test_pdf, cur_pdf=cur_pdf, rec=rec: bc_norm_median_asymmetric(
@@ -165,6 +172,19 @@ class Command(BaseCommand):
                     rec["test_mean"], rec["distance"], rec["test_std"], rec["lumdist_neg_err"], rec["lumdist_pos_err"]
                 )
             )
+            timed_fns["Hybrid BC/Tophat"].append(
+                lambda rec=rec: hybrid(
+                    gw_mean=rec["test_mean"], galaxy_mean=rec["distance"], gw_std=rec["test_std"],
+                    galaxy_std_minus=rec["lumdist_neg_err"], galaxy_std_plus=rec["lumdist_pos_err"],
+                )
+            )
+            timed_fns["Hybrid BC/Tophat V3"].append(
+                lambda rec=rec: hybrid_v3(
+                    gw_mean=rec["test_mean"], galaxy_mean=rec["distance"], gw_std=rec["test_std"],
+                    galaxy_std_minus=rec["lumdist_neg_err"], galaxy_std_plus=rec["lumdist_pos_err"],
+                    verbose=False,
+                )
+            )
 
         print(f"Timing {len(METRICS)} metrics over {n} sampled host records, {repeats} repeats each...\n")
 
@@ -180,10 +200,8 @@ class Command(BaseCommand):
                     per_call_times.append(total / repeats)
             results[metric] = np.array(per_call_times)
 
-        fastest_mean = min(np.mean(v) for v in results.values())
-
-        col_widths = (32, 12, 14, 14, 12)
-        header_cells = ("metric", "mean (us)", "median (us)", "total (ms)", "x slowdown")
+        col_widths = (32, 12, 14, 14)
+        header_cells = ("metric", "mean (us)", "median (us)", "total (ms)")
         header = "".join(f"{c:<{w}}" if i == 0 else f"{c:>{w}}" for i, (c, w) in enumerate(zip(header_cells, col_widths)))
         print(header)
         print("-" * len(header))
@@ -192,19 +210,17 @@ class Command(BaseCommand):
             mean_us = np.mean(times) * 1e6
             median_us = np.median(times) * 1e6
             total_ms = np.sum(times) * 1e3
-            slowdown = np.mean(times) / fastest_mean
-            print(f"{metric:<32}{mean_us:>12.2f}{median_us:>14.2f}{total_ms:>14.3f}{slowdown:>11.2f}x")
+            print(f"{metric:<32}{mean_us:>12.2f}{median_us:>14.2f}{total_ms:>14.3f}")
 
         # markdown table, easy to paste elsewhere
-        print("\n| metric | mean (us) | median (us) | total (ms) | x slowdown |")
-        print("|---|---:|---:|---:|---:|")
+        print("\n| metric | mean (us) | median (us) | total (ms) |")
+        print("|---|---:|---:|---:|")
         for metric in METRICS:
             times = results[metric]
             mean_us = np.mean(times) * 1e6
             median_us = np.median(times) * 1e6
             total_ms = np.sum(times) * 1e3
-            slowdown = np.mean(times) / fastest_mean
-            print(f"| {metric} | {mean_us:.2f} | {median_us:.2f} | {total_ms:.3f} | {slowdown:.2f}x |")
+            print(f"| {metric} | {mean_us:.2f} | {median_us:.2f} | {total_ms:.3f} |")
 
         plot_path = _plot_metric_timings(results, output, n, repeats)
         print(f"\nSaved timing boxplot to {plot_path}")
