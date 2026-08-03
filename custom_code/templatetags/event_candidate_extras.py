@@ -38,8 +38,153 @@ def get_target_score(*args, **kwargs):
     return _get_target_score(*args, **kwargs)
 
 
+from django import template
+from collections import OrderedDict
+from functools import partial
+import numpy as np
+from django.utils.safestring import mark_safe
+
+register = template.Library()
+
 @register.simple_tag
 def display_score_details(target_id):
+
+    if target_id is None:
+        return "Target ID is None!"
+
+    target = Target.objects.get(id=target_id)
+
+    keymap = OrderedDict(
+        ps_score=("Point Source Score (1 or 0)", _bool_format),
+        mpc_score=("Minor Planet Center Score (1 or 0)", _bool_format),
+        mpc_match_name=("MPC Match Name", _str_format),
+        mpc_match_date=("MPC Match Date", _str_format),
+        mpc_match_sep=('MPC Match Separation (")', _float_format),
+        skymap_score=("2D Localization Score", _float_format),
+        host_distance_score=("3D Association Score", _float_format),
+        host_name=("Host Galaxy Name", _str_int_format),
+        agn_score=("AGN Score (1 or 0)", _bool_format),
+        phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
+        phot_peak_time=(
+            "Time of Maximum Light Curve",
+            partial(_float_format, unit="days"),
+        ),
+        phot_decay_rate=(
+            "Light Curve Slope (positive is brightening)",
+            partial(_float_format, unit="mag/day"),
+        ),
+    )
+    order = list(keymap.keys())
+
+    # basic scores/details
+    basic_score_details = []
+    te = TargetExtra.objects.filter(target_id=target_id)
+    basic_score_details.append(te.filter(key="ps_score"))
+    for event_candidate in target.eventcandidate_set.all():
+        sf_set = event_candidate.scorefactor_set.filter(key="mpc_score")
+        basic_score_details.append(sf_set)
+    te_set = te.filter(key__in=TARGETEXTRA_KEYS).exclude(key__in=["ps_score"])
+    basic_score_details.append(te_set)
+
+    # NLE-specific scores/details
+    score_details = []
+    for event_candidate in target.eventcandidate_set.all():
+        sf_set = event_candidate.scorefactor_set.exclude(
+            key__in=TARGETEXTRA_KEYS
+            + ["mpc_score", "predetection_score"]
+        ).all()
+        sf_set = sorted(sf_set, key=lambda sf: order.index(sf.key))
+        score_details.append(sf_set)
+
+    # Build structured data instead of strings
+    cards = []
+
+    # Basic Score Details Card
+    basic_card = {
+        "title": "Basic Score Details",
+        "details": []
+    }
+    for queryset in basic_score_details:
+        for te in queryset:
+            if te.key in keymap:
+                label, fmter = keymap[te.key]
+            else:
+                label = te.key
+                fmter = _float_format
+            
+            if te.value is None or isinstance(te.value, str):
+                value = te.value
+            else:
+                value = fmter(float(te.value))
+            
+            basic_card["details"].append({
+                "label": label,
+                "value": value
+            })
+    
+    cards.append(basic_card)
+
+    # Event Cards
+    for queryset in score_details:
+        event_name = None
+        event_card = None
+        
+        for score_factor in queryset:
+            nle = score_factor.event_candidate.nonlocalizedevent
+            
+            # Create new card if we encounter a new event
+            if event_name != str(nle):
+                if event_card:
+                    cards.append(event_card)
+                event_name = str(nle)
+                event_card = {
+                    "title": event_name,
+                    "details": []
+                }
+            
+            if score_factor.key in keymap:
+                label, fmter = keymap[score_factor.key]
+            else:
+                label = score_factor.key
+                fmter = _float_format
+            
+            if score_factor.value in (None, np.nan, "nan"):
+                value = score_factor.value
+            else:
+                value = (
+                    fmter(score_factor.value)
+                    if label == "Host Galaxy Name"
+                    else fmter(float(score_factor.value))
+                )
+            
+            event_card["details"].append({
+                "label": label,
+                "value": value
+            })
+        
+        if event_card:
+            cards.append(event_card)
+
+    # Render cards as HTML
+    html = '<div class="score-details-wrapper">\n'
+    for card in cards:
+        html += f'  <div class="score-card">\n'
+        html += f'    <div class="score-card-header">{card["title"]}</div>\n'
+        html += f'    <div class="score-card-content">\n'
+        for detail in card["details"]:
+            html += f'      <div class="detail-row">\n'
+            html += f'        <span class="detail-label">{detail["label"]}</span>\n'
+            html += f'        <span class="detail-value">{detail["value"]}</span>\n'
+            html += f'      </div>\n'
+        html += f'    </div>\n'
+        html += f'  </div>\n'
+    html += '</div>\n'
+
+    return mark_safe(html)
+
+
+@register.simple_tag
+def _display_score_details(target_id):
 
     if target_id is None:
         return "Target ID is None!"

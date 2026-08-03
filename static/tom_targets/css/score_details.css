@@ -1,0 +1,50 @@
+.score-details-wrapper {
+  max-width: 900px;
+  margin: 20px auto;
+}
+
+.score-details-wrapper .score-card {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  overflow: hidden;
+}
+
+.score-details-wrapper .score-card-header {
+  background-color: #2c3e50;
+  color: white;
+  padding: 16px 20px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.score-details-wrapper .score-card-content {
+  padding: 20px;
+}
+
+.score-details-wrapper .detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.score-details-wrapper .detail-row:last-child {
+  border-bottom: none;
+}
+
+.score-details-wrapper .detail-label {
+  color: #555;
+  font-weight: 500;
+  flex: 1;
+}
+
+.score-details-wrapper .detail-value {
+  color: #2c3e50;
+  font-weight: 600;
+  text-align: right;
+  margin-left: 20px;
+  white-space: nowrap;
+}
