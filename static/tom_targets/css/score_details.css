@@ -86,6 +86,10 @@
   border-radius: 0 8px 0 0;
 }
 
+.event-tab:only-child {
+  border-radius: 8px 8px 0 0;
+}
+
 .event-tab:hover {
   color: #2c3e50;
   background-color: rgba(0, 0, 0, 0.1);
