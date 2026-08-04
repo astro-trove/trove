@@ -166,22 +166,53 @@ def display_score_details(target_id):
             cards.append(event_card)
 
     # Render cards as HTML
+
+        # Separate basic card from event cards
+    basic_card = cards[0]  # First card is always "Basic Score Details"
+    event_cards = cards[1:]  # Rest are event cards
+
+    basic_card = cards[0]  # First card is always "Basic Score Details"
+    event_cards = cards[1:]  # Rest are event cards
+
+    # Render basic card
     html = '<div class="score-details-wrapper">\n'
-    for card in cards:
-        html += f'  <div class="score-card">\n'
-        html += f'    <div class="score-card-header">{card["title"]}</div>\n'
-        html += f'    <div class="score-card-content">\n'
-        for detail in card["details"]:
-            html += f'      <div class="detail-row">\n'
-            html += f'        <span class="detail-label">{detail["label"]}</span>\n'
-            html += f'        <span class="detail-value">{detail["value"]}</span>\n'
+    html += f'  <div class="score-card">\n'
+    html += f'    <div class="score-card-header">{basic_card["title"]}</div>\n'
+    html += f'    <div class="score-card-content">\n'
+    for detail in basic_card["details"]:
+        html += f'      <div class="detail-row">\n'
+        html += f'        <span class="detail-label">{detail["label"]}</span>\n'
+        html += f'        <span class="detail-value">{detail["value"]}</span>\n'
+        html += f'      </div>\n'
+    html += f'    </div>\n'
+    html += f'  </div>\n'
+
+    # Render event tabs and cards
+    if event_cards:
+        html += '  <div class="event-tabs-container">\n'
+        html += '    <div class="event-tabs">\n'
+        for idx, card in enumerate(event_cards):
+            active_class = 'active' if idx == 0 else ''
+            html += f'      <button class="event-tab {active_class}" data-tab="{idx}">{card["title"]}</button>\n'
+        html += '    </div>\n'
+        
+        html += '    <div class="event-cards">\n'
+        for idx, card in enumerate(event_cards):
+            display_class = 'active' if idx == 0 else 'hidden'
+            html += f'      <div class="event-card {display_class}" data-tab-content="{idx}">\n'
+            html += f'        <div class="score-card-content">\n'  # Skip the header, go straight to content
+            for detail in card["details"]:
+                html += f'          <div class="detail-row">\n'
+                html += f'            <span class="detail-label">{detail["label"]}</span>\n'
+                html += f'            <span class="detail-value">{detail["value"]}</span>\n'
+                html += f'          </div>\n'
+            html += f'        </div>\n'
             html += f'      </div>\n'
-        html += f'    </div>\n'
-        html += f'  </div>\n'
+        html += '    </div>\n'
+        html += '  </div>\n'
+
     html += '</div>\n'
-
     return mark_safe(html)
-
 
 @register.simple_tag
 def _display_score_details(target_id):

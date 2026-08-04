@@ -39,6 +39,7 @@
   color: #555;
   font-weight: 500;
   flex: 1;
+  text-align: left;
 }
 
 .score-details-wrapper .detail-value {
@@ -47,4 +48,70 @@
   text-align: right;
   margin-left: 20px;
   white-space: nowrap;
+}
+
+.event-tabs-container {
+  margin-top: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.event-tabs {
+  display: flex;
+  gap: 0;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 8px 8px 0 0;
+  padding: 0;
+  margin: 0;
+}
+
+.event-tab {
+  flex: 1;
+  padding: 14px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  color: #2c3e50;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
+  text-align: left;
+}
+
+.event-tab:first-child {
+  border-radius: 8px 0 0 0;
+}
+
+.event-tab:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+.event-tab:hover {
+  color: #2c3e50;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.event-tab.active {
+  color: white;
+  background-color: #2c3e50;
+  border: none;
+}
+
+.event-cards {
+  position: relative;
+  background: white;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.01);
+}
+
+.event-card {
+  transition: opacity 0.3s ease;
+}
+
+.event-card.hidden {
+  display: none;
+}
+
+.event-card.active {
+  display: block;
 }
