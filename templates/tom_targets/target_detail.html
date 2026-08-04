@@ -3,6 +3,10 @@
 {% block title %}Target {{ object.name }}{% endblock %}
 {% block content %}
 
+{# Save the number of photometry points and spectra for later #}
+{% count_phot object as nphot %}
+{% count_spec object as nspec %}
+
 <div class="row">
   <div class="col-md-4">
     <div id="target-info">
@@ -27,12 +31,16 @@
       <li class="nav-item">
         <a class="nav-link active" id="score-details-tab" href="#score-details" role="tab" data-toggle="tab"><h5>Score Details</h5></a>
       </li>
+      {% if nphot %}
       <li class="nav-item">
         <a class="nav-link" id="photometry-tab" href="#photometry" role="tab" data-toggle="tab"><h5>Photometry</h5></a>
       </li>
+      {% endif %}
+      {% if nspec %}
       <li class="nav-item">
         <a class="nav-link" id="spectroscopy-tab" href="#spectroscopy" role="tab" data-toggle="tab"><h5>Spectroscopy</h5></a>
       </li>
+      {% endif %}
       <li class="nav-item">
         <a class="nav-link" id="comments-tab" href="#comments" role="tab" data-toggle="tab"><h5>Comments</h5></a>
       </li>

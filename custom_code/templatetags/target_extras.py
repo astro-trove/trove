@@ -1,5 +1,6 @@
 from django import template
 from django.template.defaultfilters import stringfilter
+from tom_dataproducts.models import ReducedDatum
 from astropy.coordinates import SkyCoord
 import json
 import re
@@ -20,6 +21,19 @@ def ecliptic_lat(target):
     sc = SkyCoord(target.ra, target.dec, unit='deg')
     return sc.barycentrictrueecliptic.lat.deg
 
+@register.simple_tag
+def count_phot(target):
+    return ReducedDatum.objects.filter(
+        data_type="photometry",
+        target_id=target.id
+    ).count()
+
+@register.simple_tag
+def count_spec(target):
+    return ReducedDatum.objects.filter(
+        data_type="spectroscopy",
+        target_id=target.id
+    ).count()
 
 @register.filter
 @stringfilter
