@@ -35,6 +35,18 @@
   border-bottom: none;
 }
 
+.event-card .detail-row:first-child {
+  background-color: #f0f4f8;
+  border-bottom: 4px solid #2c3e50;
+  /* border-top: 4px solid #2c3e50; */
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-top: -20px;
+  margin-left: -20px;
+  margin-right: -20px;
+  font-weight: 600;
+}
+
 .score-details-wrapper .detail-label {
   color: #555;
   font-weight: 500;
@@ -58,7 +70,7 @@
 .event-tabs {
   display: flex;
   gap: 0;
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: #f0f4f8; /* rgba(0, 0, 0, 0.05); */
   border-radius: 8px 8px 0 0;
   padding: 0;
   margin: 0;
@@ -69,15 +81,17 @@
   padding: 14px 20px;
   background: none;
   border: none;
+  width: 50px;
   cursor: pointer;
   font-size: 16px;
   font-weight: 500;
   color: #2c3e50;
   transition: all 0.3s ease;
-  border-bottom: 3px solid transparent;
+  border-bottom: 4px solid #2c3e50;
+  border-radius: 8px 8px 0 0;
   text-align: left;
 }
-
+/*
 .event-tab:first-child {
   border-radius: 8px 0 0 0;
 }
@@ -89,7 +103,7 @@
 .event-tab:only-child {
   border-radius: 8px 8px 0 0;
 }
-
+*/
 .event-tab:hover {
   color: #2c3e50;
   background-color: rgba(0, 0, 0, 0.1);

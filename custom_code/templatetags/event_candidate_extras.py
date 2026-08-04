@@ -130,16 +130,24 @@ def display_score_details(target_id):
         event_card = None
         
         for score_factor in queryset:
-            nle = score_factor.event_candidate.nonlocalizedevent
+            ec = score_factor.event_candidate
+            nle = ec.nonlocalizedevent
             
             # Create new card if we encounter a new event
             if event_name != str(nle):
                 if event_card:
                     cards.append(event_card)
                 event_name = str(nle)
+
+                ec_scores = _get_event_candidate_scores([ec])[0].score
+                ec_score_summary = "<br>".join([f"{k} = {v:.2f}" for k,v in ec_scores.items()])
+                
                 event_card = {
                     "title": event_name,
-                    "details": []
+                    "details": [{
+                        "label": "Total Score",
+                        "value": ec_score_summary
+                    }]
                 }
             
             if score_factor.key in keymap:
@@ -159,7 +167,7 @@ def display_score_details(target_id):
             
             event_card["details"].append({
                 "label": label,
-                "value": value
+                "value": value, 
             })
         
         if event_card:
@@ -167,7 +175,7 @@ def display_score_details(target_id):
 
     # Render cards as HTML
 
-        # Separate basic card from event cards
+    # Separate basic card from event cards
     basic_card = cards[0]  # First card is always "Basic Score Details"
     event_cards = cards[1:]  # Rest are event cards
 
@@ -199,7 +207,7 @@ def display_score_details(target_id):
         html += '    <div class="event-cards">\n'
         for idx, card in enumerate(event_cards):
             display_class = 'active' if idx == 0 else 'hidden'
-            html += f'      <div class="event-card {display_class}" data-tab-content="{idx}">\n'
+            html += f'      <div class="event-card {display_class}" data-tab-content="{idx}">\n'    
             html += f'        <div class="score-card-content">\n'  # Skip the header, go straight to content
             for detail in card["details"]:
                 html += f'          <div class="detail-row">\n'
