@@ -25,6 +25,7 @@ from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 from .models import ScoreFactor
+from .phot_method import KILONOVA, KILONOVA_SCORE_KEY, get_phot_method
 
 import time
 
@@ -49,6 +50,7 @@ SUBSCORE_NAMES = [
     "phot_peak_lum",
     "phot_peak_time",
     "phot_decay_rate",
+    KILONOVA_SCORE_KEY,
 ]
 
 # some of the keys in ScoreFactor are really just calculated values
@@ -93,16 +95,27 @@ def get_event_candidate_scores(
     event_candidates,
     dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
     subscore_names=SUBSCORE_NAMES,
-    agn_toggle=True
+    agn_toggle=True,
+    phot_method=None,
 ):
     """Get the event candidate scores for everything in subscore_names
 
     event_candidates should be a django queryset of EventCandidate objects
+
+    ``phot_method`` selects how the photometry factor of the total score is
+    computed -- see :mod:`scoring.phot_method`. It defaults to whatever was
+    chosen for *this event* in the candidate list UI, resolved below once the
+    queryset has been evaluated and the event is known.
     """
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
-    
+
+    # the KilonovaSCORER score is a photometry score, not another independent
+    # factor, so it never joins the generic product below -- it is applied (or
+    # not) in the per-transient loop instead
+    exclude_keys.add(KILONOVA_SCORE_KEY)
+
     if not agn_toggle:
         exclude_keys.add('agn_score')
 
@@ -118,6 +131,14 @@ def get_event_candidate_scores(
         most_likely_class = get_most_likely_class(nle_eventseq.details)
     except IndexError:
         return []
+
+    # The photometry method is chosen per non-localized event, because a
+    # KilonovaSCORER run scores one event's candidates and only that event has
+    # kilonova_score rows to rank by. Every candidate in this list belongs to
+    # the same event whenever the list is filtered by one, which is the only
+    # case the setting applies to.
+    if phot_method is None:
+        phot_method = get_phot_method(event_candidates_list[0].nonlocalizedevent_id)
 
     if most_likely_class == "SSM":
         transients = TRANSIENTS
@@ -164,6 +185,10 @@ def get_event_candidate_scores(
             if subscore_key in sf_dict
         }
 
+        # the raw KilonovaSCORER score, so the candidate list can show it next
+        # to the total it went into; None when the candidate has none
+        ec.kilonova_score = sf_dict.get(KILONOVA_SCORE_KEY)
+
         # now get all the scores stored in TargetExtra objects
         te = target_extras_by_id.get(ec.target_id, {})
         ps_score = 1
@@ -188,7 +213,7 @@ def get_event_candidate_scores(
             param_ranges = dict_transients_param_ranges[transient]
 
             # compute the photometry score
-            phot_score = math.prod(
+            trove_phot_score = math.prod(
                 [
                     _check_phot_val(
                         val_dict[subscore_key], param_ranges, param_range_key
@@ -197,6 +222,25 @@ def get_event_candidate_scores(
                     if subscore_key in val_dict
                 ]
             )
+
+            if phot_method == KILONOVA:
+                # KilonovaSCORER's cumulative P_tail_KNe, in [0, 1], written by
+                # the background run, used raw: a score of 0 means every epoch
+                # falls outside the simulated kilonova population, and zeroing
+                # the total score is the intended reading of that.
+                #
+                # A candidate with no score at all is a different thing -- not
+                # yet run, too sparse, no usable distance, no band in common
+                # with the grid -- so it falls back to the TROVE photometry
+                # check rather than being penalised for missing data. Its
+                # skip reason is on the candidate's score-details page.
+                kilonova_score = sf_dict.get(KILONOVA_SCORE_KEY)
+                if kilonova_score is not None and math.isfinite(kilonova_score):
+                    phot_score = kilonova_score
+                else:
+                    phot_score = trove_phot_score
+            else:
+                phot_score = trove_phot_score
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object

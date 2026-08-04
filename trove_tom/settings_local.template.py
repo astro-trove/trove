@@ -9,6 +9,7 @@ FORCE_SCRIPT_NAME = ''  # the subdomain where you will host the site (leave blan
 GCN_CLIENT_ID = ''      # client ID for GCN Classic over Kafka
 GCN_CLIENT_SECRET = ''  # secret key for GCN Classic over Kafka
 HOPSKOTCH_GROUP_ID = '' # make up a unique ID for your Hopskotch alert consumer
+KN_SIM_PYTHON = ''      # python of the kn-sim env, for generating KilonovaSCORER grid rungs; how to build it: scoring/KilonovaScorer/README.md (blank to disable)
 LASAIR_TOKEN = ''       # API key for the Lasair broker
 POSTGRES_DB = ''        # name of the Postgres database
 POSTGRES_HOST = ''      # hostname or IP address of the Postgres database server

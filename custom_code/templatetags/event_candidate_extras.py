@@ -65,6 +65,8 @@ def display_score_details(target_id):
             "Light Curve Slope (positive is brightening)",
             partial(_float_format, unit="mag/day"),
         ),
+        kilonova_score=("KilonovaSCORER Score (0 to 1)", _float_format),
+        kilonova_skip_reason=("KilonovaSCORER Skip Reason", _str_format),
     )
     order = list(keymap.keys())
 
@@ -123,9 +125,11 @@ def display_score_details(target_id):
             if score_factor.value in (None, np.nan, "nan"):
                 res[nle] += f"&emsp;{label}: {score_factor.value}\n"
             else:
+                # string-valued factors (a host name, a KilonovaSCORER skip
+                # reason) must not be run through float() first
                 res[nle] += (
                     f"&emsp;{label}: {fmter(score_factor.value)}\n"
-                    if label == "Host Galaxy Name"
+                    if fmter in (_str_format, _str_int_format)
                     else f"&emsp;{label}: {fmter(float(score_factor.value))}\n"
                 )
 

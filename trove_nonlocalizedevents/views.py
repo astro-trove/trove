@@ -1,5 +1,6 @@
 import json
 from django_filters.views import FilterView
+from django.contrib import messages
 from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
@@ -14,6 +15,16 @@ from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from scoring.models import ScoreFactor
+from scoring.phot_method import (
+    KILONOVA,
+    TROVE,
+    get_kilonova_status,
+    get_phot_method,
+    get_phot_method_label,
+    scored_candidates_cache_key,
+    set_phot_method,
+)
+from scoring.tasks import kilonova_score_all_async
 from scoring.util import get_event_candidate_scores
 from tom_dataproducts.models import ReducedDatum
 from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
@@ -21,7 +32,11 @@ from custom_code.templatetags.skymap_extras import skymap, get_preferred_localiz
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
-from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
+from .forms import (
+    EventCandidateSearchForm,
+    CreateEventCandidateFromNLEForm,
+    PhotScoringMethodForm,
+)
 
 
 class EventCandidateListView(FilterView):
@@ -76,11 +91,18 @@ class EventCandidateListView(FilterView):
 
         agn_toggle = cache.get("agn_toggle", True)
 
+        # The photometry method belongs to the event being viewed, not the site:
+        # a KilonovaSCORER run scores one event's candidates, and only that
+        # event has kilonova_score rows. Without an event in the URL this is the
+        # cross-event list, which has no run behind it and stays on TROVE.
+        nle_id = self.request.GET.get("nonlocalizedevent")
+        phot_method = get_phot_method(nle_id)
+
         # Create cache key from filters (excluding page number)
         query_params = self.request.GET.copy()
         query_params.pop("page", None)
         filter_key = query_params.urlencode()
-        cache_key = f"event_candidates_scored_{filter_key}_{agn_toggle}"
+        cache_key = scored_candidates_cache_key(filter_key, agn_toggle, phot_method)
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
         # current NLE when the AGN toggle is flipped)
@@ -88,7 +110,9 @@ class EventCandidateListView(FilterView):
         if scored_candidates is None:
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
-            scored_candidates = get_event_candidate_scores(all_candidates, agn_toggle=agn_toggle)
+            scored_candidates = get_event_candidate_scores(
+                all_candidates, agn_toggle=agn_toggle, phot_method=phot_method
+            )
             # Cache for 5 minutes
             cache.set(cache_key, scored_candidates, 60 * 5)
 
@@ -100,8 +124,14 @@ class EventCandidateListView(FilterView):
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
+        context["phot_method"] = phot_method
+        context["phot_method_label"] = get_phot_method_label(nle_id)
+        context["phot_method_is_kilonova"] = phot_method == KILONOVA
+        context["phot_scoring_form"] = PhotScoringMethodForm(nle_id=nle_id)
 
-        nle_id = self.request.GET.get("nonlocalizedevent")
+        # status is stored per event, so this is already this event's run
+        context["kilonova_status"] = get_kilonova_status(nle_id)
+
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
 
@@ -165,7 +195,12 @@ def generate_report(request):
         nonlocalizedevent_id=nle_id
     ).select_related("target", "nonlocalizedevent")
 
-    candidates = list(get_event_candidate_scores(candidates, agn_toggle=False))  # [:ncands]
+    # pinned to the TROVE method, not the site-wide setting: the report text
+    # below describes that procedure by name and cites the paper it comes from,
+    # so the numbers in the table have to be the ones it is describing
+    candidates = list(
+        get_event_candidate_scores(candidates, agn_toggle=False, phot_method=TROVE)
+    )  # [:ncands]
 
     nle_name = NonLocalizedEvent.objects.get(id=nle_id)
 
@@ -302,10 +337,74 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             scored_candidates = get_event_candidate_scores(candidates, agn_toggle=new_val)
 
             # Re-sores all candidates after AGN-toggle change and saves to cache
-            cache_key = f"event_candidates_scored_nonlocalizedevent={nle_id}_{new_val}"
+            cache_key = scored_candidates_cache_key(
+                f"nonlocalizedevent={nle_id}", new_val
+            )
             cache.set(cache_key, scored_candidates, 60 * 5)
             return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
         return redirect(reverse("custom_code:event-candidates"))
+
+
+class SetPhotScoringMethodView(LoginRequiredMixin, View):
+    """Set one event's photometry scoring method from its candidate list.
+
+    The choice and its parameters go in the cache keyed by non-localized event:
+    it is a shared display preference rather than per-user state, but scoped to
+    the event, because a KilonovaSCORER run is minutes-to-hours of work that
+    produces ``kilonova_score`` rows for that event's candidates alone.
+    Selecting KilonovaSCORER also enqueues the run, since the scores it ranks by
+    do not exist until something computes them.
+    """
+
+    def post(self, request, *args, **kwargs):
+        nle_id = request.GET.get("nonlocalizedevent") or request.POST.get(
+            "nonlocalizedevent"
+        )
+        redirect_url = reverse("custom_code:event-candidates")
+        if nle_id:
+            redirect_url += f"?nonlocalizedevent={nle_id}"
+
+        if not nle_id:
+            # nothing to attach the setting to, and nothing to score
+            messages.warning(
+                request,
+                "The photometry scoring method is set per non-localized event. "
+                "Open an event's candidate list and choose it there.",
+            )
+            return redirect(redirect_url)
+
+        form = PhotScoringMethodForm(request.POST, nle_id=nle_id)
+        if not form.is_valid():
+            errors = "; ".join(
+                f"{form.fields[field].label if field in form.fields else field}: {' '.join(errs)}"
+                for field, errs in form.errors.items()
+            )
+            messages.error(request, f"Could not set the photometry scoring method. {errors}")
+            return redirect(redirect_url)
+
+        method = form.cleaned_data["phot_method"]
+        nle = NonLocalizedEvent.objects.get(id=nle_id)
+
+        if method != KILONOVA:
+            set_phot_method(TROVE, nle_id)
+            messages.info(
+                request,
+                f"Ranking {nle.event_id} candidates with TROVE photometry scoring.",
+            )
+            return redirect(redirect_url)
+
+        params = form.kilonova_params()
+        set_phot_method(KILONOVA, nle_id, params)
+
+        kilonova_score_all_async(nle, params)
+        messages.info(
+            request,
+            f"Switched {nle.event_id} to KilonovaSCORER and started re-scoring "
+            "its candidates. This takes minutes to hours for a large event -- "
+            "candidates show their previous score until their new one lands, so "
+            "refresh the list to follow along. Other events are unaffected.",
+        )
+        return redirect(redirect_url)
 
 
 class SkymapPartialView(View):

@@ -1,0 +1,928 @@
+"""
+Score TROVE candidates with KilonovaSCORER.
+
+This is the bridge between TROVE's database and the vendored
+:mod:`scoring.KilonovaScorer` package: it pulls a candidate's photometry,
+converts it to absolute magnitudes, matches it against a simulated kilonova
+grid, and returns a single cumulative score with its diagnostics.
+
+Typical use::
+
+    from scoring.kilonova_scoring import score_event, load_simulation_grid
+    from scoring.KilonovaScorer.grids import grid_for_distance
+
+    grid = load_simulation_grid(grid_for_distance(300))   # nearest grid to 300 Mpc
+    scores = score_event("S251112cm", grid=grid)          # DataFrame, one row per candidate
+    scores.sort_values("score", ascending=False).head(10)
+
+or one candidate at a time, keeping the full diagnostics::
+
+    from scoring.kilonova_scoring import score_candidate
+
+    result = score_candidate("S251112cm", "SN2025adgq", grid=grid)
+    result.score, result.score_err        # cumulative P_tail_KNe and its error
+    result.per_observation                # per-epoch metrics
+    result.binned                         # per-time-bin running score
+    result.survivors                      # ABC survivor counts per band
+
+The scorer needs a **simulation grid**, which this repo does not ship -- it is
+generated with :mod:`scoring.KilonovaScorer.simulation` (which pulls in redback
+/ bilby / lal, and is deliberately *not* imported by the package ``__init__``,
+so nothing here drags that stack in). See ``simulation_grids`` below and
+scoring/README_kilonova_scoring.md.
+
+Distance handling
+-----------------
+Absolute magnitudes are derived from the candidate's own distance
+(:func:`scoring.candidate_photometry.get_candidate_distance`), which falls back
+through target redshift -> best host-galaxy redshift -> the GW skymap posterior
+at the candidate's healpix. Because the simulated grid is generated at a
+particular luminosity distance (the redshift enters the model), grids are
+selected per distance bin -- see :func:`select_grid_for_distance`.
+"""
+
+from __future__ import annotations
+
+import logging
+import re
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+import numpy as np
+import pandas as pd
+
+from .KilonovaScorer.core import binned_stats_cumulative_ptail, kilonovascorer_v3
+from .KilonovaScorer.utils import compute_abs_mag_samples
+from .candidate_photometry import (
+    get_candidate_distance,
+    get_candidates,
+    get_event,
+    get_event_photometry,
+    to_scorer_frame,
+)
+
+logger = logging.getLogger(__name__)
+
+#: Bands the scorer models. Anything else is dropped upstream by
+#: :func:`~scoring.candidate_photometry.to_scorer_frame`.
+BAND_LIST: Tuple[str, ...] = ("g-band", "r-band", "i-band", "z-band")
+
+#: Columns ``kilonovascorer_v3`` requires on the observation frame.
+DATA_OBS_COLUMNS = (
+    "filter_mapped",
+    "time_after_gw",
+    "absolute_magnitude",
+    "absolute_magnitude_error",
+)
+
+#: Columns ``kilonovascorer_v3`` requires on the simulation grid.
+DATA_SIM_COLUMNS = ("filter_mapped", "time", "absolute_magnitude", "sample_id")
+
+
+# ---------------------------------------------------------------------------
+# Simulation grids
+#
+# Grid loading, the distance ladder and the artifact filtering all live in
+# KilonovaScorer.grids, next to the data. These are thin aliases so callers of
+# this module do not need to reach into the package, plus the CSV->Parquet
+# converter for grids produced before the switch.
+# ---------------------------------------------------------------------------
+from .KilonovaScorer.grids import GRID_DIR  # noqa: E402
+from .KilonovaScorer.grids import available_grids as simulation_grids  # noqa: E402
+from .KilonovaScorer.grids import clear_cache as clear_grid_cache  # noqa: E402
+from .KilonovaScorer.grids import grid_distance_mpc  # noqa: E402
+from .KilonovaScorer.grids import grid_for_distance as select_grid_for_distance  # noqa: E402
+from .KilonovaScorer.grids import load_grid as load_simulation_grid  # noqa: E402
+
+
+def _parquet_columns(path: Path) -> List[str]:
+    """Column names from a parquet footer, without reading any data."""
+    import pyarrow.parquet as pq
+
+    return list(pq.ParquetFile(path).schema_arrow.names)
+
+
+def convert_grid_to_parquet(
+    csv_path,
+    parquet_path=None,
+    chunksize: int = 1_000_000,
+    compression: str = "zstd",
+    verify: bool = True,
+) -> Path:
+    """Convert a simulation-grid CSV to Parquet, losslessly.
+
+    Grids are written by redback as multi-GB CSVs. Parquet stores the same
+    numbers column-wise in typed binary, which compresses ~14x on this data and
+    loads far faster, and lets :func:`load_simulation_grid` read only the
+    columns it needs.
+
+    **All** columns are kept at their native dtypes -- no float32 narrowing --
+    so the parquet is a faithful replacement for the CSV and the model
+    parameter columns stay available for the posterior plots in
+    ``KilonovaScorer.plotting``.
+
+    The CSV is streamed in chunks of ``chunksize`` rows, so peak memory stays
+    flat regardless of grid size; a 6 GB CSV never has to fit in RAM.
+
+    With ``verify`` (default), the parquet is read back and checked against the
+    CSV -- row count, column names, dtypes, and full numeric equality on a
+    chunk-by-chunk pass. Returns the parquet path. Does **not** delete the CSV;
+    that is left to the caller, after the verification result has been seen.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    csv_path = Path(csv_path)
+    if parquet_path is None:
+        parquet_path = csv_path.with_suffix(".parquet")
+    parquet_path = Path(parquet_path)
+    parquet_path.parent.mkdir(parents=True, exist_ok=True)
+
+    logger.info("Converting %s -> %s", csv_path.name, parquet_path)
+    writer = None
+    n_rows = 0
+    try:
+        for chunk in pd.read_csv(csv_path, chunksize=chunksize):
+            table = pa.Table.from_pandas(chunk, preserve_index=False)
+            if writer is None:
+                writer = pq.ParquetWriter(parquet_path, table.schema, compression=compression)
+            writer.write_table(table)
+            n_rows += len(chunk)
+            logger.info("  %d rows written", n_rows)
+    finally:
+        if writer is not None:
+            writer.close()
+
+    csv_mb = csv_path.stat().st_size / 1e6
+    pq_mb = parquet_path.stat().st_size / 1e6
+    logger.info(
+        "Wrote %s: %d rows, %.1f MB (was %.1f MB, %.1fx smaller)",
+        parquet_path.name, n_rows, pq_mb, csv_mb, csv_mb / pq_mb,
+    )
+
+    if verify:
+        ok, detail = verify_grid_conversion(csv_path, parquet_path, chunksize=chunksize)
+        if not ok:
+            raise ValueError(f"Verification FAILED for {parquet_path.name}: {detail}")
+        logger.info("Verified: %s", detail)
+
+    return parquet_path
+
+
+def verify_grid_conversion(csv_path, parquet_path, chunksize: int = 1_000_000) -> Tuple[bool, str]:
+    """Check a parquet is a faithful copy of the CSV it came from.
+
+    Compares row count, column names, dtypes, and every value, streaming both
+    sides in chunks. Returns ``(ok, detail)`` rather than raising, so the caller
+    can decide what to do before deleting anything.
+    """
+    import pyarrow.parquet as pq
+
+    csv_path, parquet_path = Path(csv_path), Path(parquet_path)
+    pf = pq.ParquetFile(parquet_path)
+    n_pq = pf.metadata.num_rows
+
+    csv_cols = list(pd.read_csv(csv_path, nrows=0).columns)
+    pq_cols = list(pf.schema_arrow.names)
+    if csv_cols != pq_cols:
+        return False, f"column mismatch: csv={csv_cols} parquet={pq_cols}"
+
+    # Value comparison, streamed: parquet row groups against CSV chunks. The
+    # row count falls out of this pass, so there is no separate counting read.
+    n_csv = 0
+    csv_iter = pd.read_csv(csv_path, chunksize=chunksize)
+    csv_buf = pd.DataFrame()
+    for rg in range(pf.num_row_groups):
+        pq_chunk = pf.read_row_group(rg).to_pandas()
+        while len(csv_buf) < len(pq_chunk):
+            try:
+                csv_buf = pd.concat([csv_buf, next(csv_iter)], ignore_index=True)
+            except StopIteration:
+                break
+        head, csv_buf = csv_buf.iloc[: len(pq_chunk)], csv_buf.iloc[len(pq_chunk) :].reset_index(drop=True)
+        if len(head) != len(pq_chunk):
+            return False, f"row group {rg}: csv ran out ({len(head)} vs {len(pq_chunk)})"
+        n_csv += len(head)
+        for col in pq_cols:
+            a, b = head[col].to_numpy(), pq_chunk[col].to_numpy()
+            if a.dtype.kind in "fc" or b.dtype.kind in "fc":
+                same = np.array_equal(a, b, equal_nan=True)
+            else:
+                same = np.array_equal(a, b)
+            if not same:
+                return False, f"values differ in column '{col}' (row group {rg})"
+
+    # Anything left in the CSV means the parquet is short.
+    leftover = len(csv_buf) + sum(len(c) for c in csv_iter)
+    if leftover:
+        return False, f"csv has {leftover} rows beyond the parquet's {n_pq}"
+    if n_csv != n_pq:
+        return False, f"row count mismatch: csv={n_csv} parquet={n_pq}"
+
+    return True, (
+        f"{n_pq} rows, {len(pq_cols)} columns, all values identical; "
+        f"{csv_path.stat().st_size / 1e6:.0f} MB CSV -> "
+        f"{parquet_path.stat().st_size / 1e6:.0f} MB parquet"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Observation frame
+# ---------------------------------------------------------------------------
+def build_data_obs(
+    phot: pd.DataFrame,
+    dist_mpc: float,
+    dist_err_mpc: float,
+    map_wide_bands: bool = False,
+    n_samples: int = 5000,
+    mode: str = "survey",
+    random_state=42,
+) -> pd.DataFrame:
+    """Turn a TROVE photometry frame into the scorer's ``data_obs``.
+
+    In-memory equivalent of KilonovaSCORER's ``load_observations``: same
+    columns, same Monte-Carlo distance-modulus treatment
+    (``compute_abs_mag_samples``), without the CSV round-trip.
+
+    ``phot`` is the long frame from
+    :func:`~scoring.candidate_photometry.get_event_photometry`, already
+    restricted to one candidate. Pre-merger points and upper limits must
+    already be removed -- :func:`score_candidate` does that.
+    """
+    scorer = to_scorer_frame(phot, map_wide_bands=map_wide_bands, mode=mode)
+    if scorer.empty:
+        return scorer
+
+    abs_mag, abs_err = compute_abs_mag_samples(
+        scorer["magnitude"].to_numpy(),
+        scorer["e_magnitude"].to_numpy(),
+        dist_mpc=dist_mpc,
+        dist_err_mpc=dist_err_mpc,
+        n_samples=n_samples,
+        random_state=random_state,
+    )
+    out = scorer.copy()
+    out["absolute_magnitude"] = abs_mag
+    out["absolute_magnitude_error"] = abs_err
+
+    # A NaN absolute magnitude means the distance draw failed; the scorer would
+    # skip these silently, so drop them here where it can be reported.
+    bad = out["absolute_magnitude"].isna() | ~(out["absolute_magnitude_error"] > 0)
+    if bad.any():
+        logger.info("Dropping %d observation(s) with no usable absolute magnitude", int(bad.sum()))
+        out = out[~bad]
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Results
+# ---------------------------------------------------------------------------
+@dataclass
+class KilonovaScore:
+    """Outcome of scoring one candidate.
+
+    ``score`` is the cumulative P_tail_KNe after the last time bin -- the
+    headline number, in [0, 1], higher meaning more consistent with the
+    simulated kilonova population. It is ``None`` when the candidate could not
+    be scored, with ``skip_reason`` saying why.
+    """
+
+    event_id: str
+    target_name: str
+    target_id: Optional[int] = None
+    score: Optional[float] = None
+    score_err: Optional[float] = None
+    dist_mpc: float = np.nan
+    dist_err_mpc: float = np.nan
+    n_obs_supplied: int = 0
+    n_obs_scored: int = 0
+    bands: Tuple[str, ...] = ()
+    final_survivors: Dict[str, int] = field(default_factory=dict)
+    grid: Optional[str] = None
+    skip_reason: Optional[str] = None
+    score_note: Optional[str] = None
+    per_observation: Optional[pd.DataFrame] = None
+    binned: Optional[pd.DataFrame] = None
+    survivors: Optional[pd.DataFrame] = None
+
+    @property
+    def scored(self) -> bool:
+        return self.score is not None and np.isfinite(self.score)
+
+    def as_row(self) -> Dict[str, Any]:
+        """Flat summary suitable for a results table (drops the frames)."""
+        return {
+            "event_id": self.event_id,
+            "target_name": self.target_name,
+            "target_id": self.target_id,
+            "score": self.score,
+            "score_err": self.score_err,
+            "dist_mpc": self.dist_mpc,
+            "dist_err_mpc": self.dist_err_mpc,
+            "n_obs_supplied": self.n_obs_supplied,
+            "n_obs_scored": self.n_obs_scored,
+            "n_bands": len(self.bands),
+            "bands": ",".join(self.bands),
+            "final_survivors": (
+                min(self.final_survivors.values()) if self.final_survivors else np.nan
+            ),
+            "grid": self.grid,
+            "skip_reason": self.skip_reason,
+            "score_note": self.score_note,
+        }
+
+
+# ---------------------------------------------------------------------------
+# Scoring
+# ---------------------------------------------------------------------------
+def _cumulative_score(per_obs: pd.DataFrame, bin_size: float) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
+    """Run the logit-space cumulative aggregation, guarding its edge cases.
+
+    ``binned_stats_cumulative_ptail`` assumes a non-empty metric frame and at
+    least one surviving bin; both assumptions fail routinely on sparse TROVE
+    light curves (a single epoch, or every bin dropped by its internal
+    ``dropna``). Returns ``(binned_df, error_reason)``.
+    """
+    if per_obs.empty:
+        return None, "no epochs scored"
+
+    # NOTE: this used to short-circuit when every epoch had p_tail_std == 0,
+    # because the aggregation divided by zero and returned NaN. `ivw_stats_logit`
+    # now floors the std (IMPROVEMENTS.md §1c), so an all-zero-spread candidate
+    # aggregates normally and comes out at ~0 -- which is the correct answer for
+    # a candidate lying wholly outside the simulated population, not a failure.
+    # Short-circuiting here would hide the fix.
+    try:
+        binned = binned_stats_cumulative_ptail(per_obs, bin_size=bin_size)
+    except Exception as exc:  # noqa: BLE001
+        # Deliberately broad. `ivw_stats_logit` returns Series with different
+        # key sets on different paths, so what groupby().apply() produces
+        # depends on how pandas aligns them -- with a single bin, or with every
+        # bin taking the short return, the result has no "mean" column at all
+        # and indexing it raises KeyError (IMPROVEMENTS.md #1b, #15). An
+        # unscoreable candidate must not take down a whole event's run.
+        return None, f"cumulative aggregation failed: {type(exc).__name__}: {exc}"
+
+    if binned is None or binned.empty:
+        return None, "all time bins dropped during aggregation"
+    if not np.isfinite(binned["running_mean"].iloc[-1]):
+        return binned, "cumulative score is not finite"
+    return binned, None
+
+
+def score_candidate(
+    event_id: str,
+    target_name: str,
+    grid: Optional[pd.DataFrame] = None,
+    grid_path=None,
+    phot: Optional[pd.DataFrame] = None,
+    dist: Optional[Tuple[float, float]] = None,
+    dt_min: float = 0.0,
+    dt_max: Optional[float] = None,
+    snr_min: Optional[float] = None,
+    map_wide_bands: bool = False,
+    mode: str = "survey",
+    time_bin_width: float = 0.2,
+    band_list: Optional[Sequence[str]] = None,
+    keep_frames: bool = True,
+    zero_on_total_rejection: bool = True,
+    random_state=42,
+    **scorer_kwargs,
+) -> KilonovaScore:
+    """Score one candidate of one GW event.
+
+    Parameters
+    ----------
+    event_id, target_name
+        Superevent name (``'S251112cm'``) and the candidate's target name.
+    grid
+        A grid already loaded with :func:`load_simulation_grid`. Pass this when
+        scoring many candidates so the file is read once.
+    grid_path
+        Explicit grid file. If neither ``grid`` nor ``grid_path`` is given, one
+        is chosen from the grid directory by the candidate's distance.
+    phot
+        Pre-fetched photometry for this candidate (from
+        :func:`~scoring.candidate_photometry.get_event_photometry`). Avoids a
+        second database round-trip when scoring a whole event.
+    dist
+        ``(dist_mpc, dist_err_mpc)`` override. Defaults to the candidate's own
+        distance from TROVE's scoring.
+    dt_min, dt_max, snr_min
+        Photometry cuts, in days since the trigger and S/N. ``dt_min=0`` (the
+        default) drops pre-merger data, as KilonovaSCORER's own loader does.
+    map_wide_bands
+        Fold unfiltered/very wide bands (Clear, GOTO L, BlackGem q, ATLAS wide)
+        onto their nearest SDSS band instead of dropping them.
+    keep_frames
+        Attach the per-observation / binned / survivor frames to the result.
+        Set False when scoring in bulk to keep memory flat.
+    zero_on_total_rejection
+        Report a score of 0 when every epoch falls outside the simulated
+        population, instead of "unscoreable". See the comment in the body --
+        this is the one place this module departs from raw upstream behaviour.
+
+    Remaining keyword arguments are passed to ``kilonovascorer_v3``
+    (``k_near``, ``n_kde_sim``, ``min_sim_points``, ``overlap_k``).
+    """
+    result = KilonovaScore(event_id=event_id, target_name=target_name)
+
+    # --- photometry --------------------------------------------------------
+    if phot is None:
+        phot = get_event_photometry(
+            event_id,
+            target_names=[target_name],
+            dt_min=dt_min,
+            dt_max=dt_max,
+            include_limits=False,
+            snr_min=snr_min,
+        )
+    phot = phot[phot["target_name"] == target_name]
+    result.n_obs_supplied = len(phot)
+    if phot.empty:
+        result.skip_reason = "no photometry"
+        return result
+    result.target_id = int(phot["target_id"].iloc[0])
+
+    # --- distance ----------------------------------------------------------
+    if dist is None:
+        dist_mpc, dist_err_mpc = get_candidate_distance(result.target_id, event_id)
+    else:
+        dist_mpc, dist_err_mpc = dist
+    result.dist_mpc, result.dist_err_mpc = dist_mpc, dist_err_mpc
+    if not np.isfinite(dist_mpc) or dist_mpc <= 0:
+        result.skip_reason = f"no usable distance ({dist_mpc})"
+        return result
+    if not np.isfinite(dist_err_mpc) or dist_err_mpc <= 0:
+        result.skip_reason = f"no usable distance error ({dist_err_mpc})"
+        return result
+
+    # --- observation frame -------------------------------------------------
+    # Built BEFORE the grid so the grid can be read for just the bands this
+    # candidate was actually observed in. A ladder rung is 380M rows and needs
+    # ~15 GB materialised in full -- enough to OOM the machine -- while a single
+    # band is 1/38 of that. Candidates are rarely observed in more than a few
+    # bands, so the band-scoped read is both the cheap and the correct one.
+    data_obs = build_data_obs(
+        phot, dist_mpc, dist_err_mpc, map_wide_bands=map_wide_bands, mode=mode,
+        random_state=random_state,
+    )
+    if data_obs.empty:
+        result.skip_reason = "no observations in a modelled band"
+        return result
+    result.bands = tuple(sorted(data_obs["filter_mapped"].unique()))
+
+    # --- grid --------------------------------------------------------------
+    if grid is None:
+        path = Path(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
+        # The filter applies to the grid's own `band` column. In survey mode the
+        # observation's filter_mapped IS that band id; in canonical mode it is
+        # 'g-band'/'r-band'/..., so it has to be inverted through FILTER_LOOKUP
+        # first or the filter would match nothing and the load would come back
+        # empty.
+        if mode == "survey":
+            grid_bands = list(result.bands)
+        else:
+            from .KilonovaScorer.core import FILTER_LOOKUP
+
+            grid_bands = [k for k, v in FILTER_LOOKUP.items() if v in result.bands]
+        grid = load_simulation_grid(path, bands=grid_bands or None, mode=mode)
+        result.grid = Path(path).name
+    else:
+        result.grid = getattr(grid, "attrs", {}).get("name", result.grid)
+
+    # --- score -------------------------------------------------------------
+    # Score only bands present on BOTH sides. In survey mode this is the set
+    # of real bandpasses the candidate was observed in and the grid simulates;
+    # a fixed g/r/i/z list would silently skip atlaso, gotol, ztfg and the rest.
+    if band_list is None:
+        obs_bands = set(data_obs["filter_mapped"].dropna().unique())
+        sim_bands = set(grid["filter_mapped"].dropna().unique())
+        bands = tuple(sorted(obs_bands & sim_bands))
+        missing = sorted(obs_bands - sim_bands)
+        if missing:
+            logger.info(
+                "%s: %d observation(s) in band(s) the grid does not simulate: %s",
+                target_name, int(data_obs["filter_mapped"].isin(missing).sum()), missing,
+            )
+        if not bands:
+            result.skip_reason = (
+                f"no band overlap between observations {sorted(obs_bands)} "
+                f"and grid {sorted(sim_bands)[:8]}"
+            )
+            return result
+    else:
+        bands = tuple(band_list)
+
+    per_obs, summary = kilonovascorer_v3(
+        data_obs=data_obs,
+        data_sim=grid,
+        candidate_name=target_name,
+        time_bin_width=time_bin_width,
+        band_list=bands,
+        random_state=random_state,
+        **scorer_kwargs,
+    )
+    result.n_obs_scored = len(per_obs)
+    if per_obs.empty:
+        result.skip_reason = "no epoch fell inside the grid's time coverage"
+        return result
+
+    if not summary.empty:
+        result.final_survivors = {
+            band: int(summary[band]["final_n_survivors"]) for band in summary.columns
+        }
+
+    # ------------------------------------------------------------------
+    # Categorical rejection is an ANSWER, not a failure.
+    #
+    # When every scored epoch has p_tail_mean == 0, the candidate lies wholly
+    # outside the simulated kilonova population at every epoch -- the strongest
+    # possible evidence against the hypothesis, and the two-sided tail
+    # probability genuinely is 0. But `ivw_stats_logit` filters on
+    # `p_tail_mean > 0` and drops those epochs, so the cumulative aggregation
+    # has nothing left and returns no score (IMPROVEMENTS.md #1).
+    #
+    # Reporting that as "unscoreable" would make the most confidently rejected
+    # candidates indistinguishable from ones with missing data. They score 0.
+    # This is a boundary decision in the integration layer only -- the scorer's
+    # own arithmetic is untouched. Set `zero_on_total_rejection=False` to get
+    # the raw upstream behaviour back.
+    # ------------------------------------------------------------------
+    all_rejected = bool((per_obs["p_tail_mean"] <= 0).all())
+
+    binned, reason = _cumulative_score(per_obs, bin_size=time_bin_width)
+    if reason:
+        result.skip_reason = reason
+    if binned is not None and not binned.empty:
+        last = binned.iloc[-1]
+        if np.isfinite(last["running_mean"]):
+            result.score = float(last["running_mean"])
+            result.score_err = float(last["running_std"])
+
+    if result.score is None and all_rejected and zero_on_total_rejection:
+        result.score = 0.0
+        result.score_err = 0.0
+        result.skip_reason = None
+        result.score_note = (
+            f"all {len(per_obs)} epoch(s) fall outside the simulated population "
+            "(p_tail = 0): categorical rejection, not missing data"
+        )
+
+    if keep_frames:
+        result.per_observation = per_obs
+        result.binned = binned
+        result.survivors = summary
+    return result
+
+
+def score_event(
+    event_id: str,
+    grid: Optional[pd.DataFrame] = None,
+    grid_path=None,
+    viable_only: bool = False,
+    target_names: Optional[Iterable[str]] = None,
+    min_obs: int = 3,
+    min_bands: int = 1,
+    dt_min: float = 0.0,
+    dt_max: Optional[float] = None,
+    snr_min: Optional[float] = None,
+    map_wide_bands: bool = False,
+    mode: str = "survey",
+    keep_frames: bool = False,
+    progress: bool = False,
+    **kwargs,
+) -> pd.DataFrame:
+    """Score every candidate of a GW event and return a ranked table.
+
+    Photometry for all candidates is fetched in one query and split per
+    candidate, so this costs the same two database round-trips as extracting
+    the photometry alone.
+
+    ``min_obs`` / ``min_bands`` pre-filter candidates whose light curves are
+    too sparse to score meaningfully; they still appear in the output with a
+    ``skip_reason`` so nothing silently disappears. Sorted by score, highest
+    first, unscored candidates last.
+    """
+    event = get_event(event_id)
+    candidates = list(get_candidates(event, viable_only=viable_only, target_names=target_names))
+    if not candidates:
+        logger.warning("No candidates for %s", event_id)
+        return pd.DataFrame()
+
+    phot = get_event_photometry(
+        event_id,
+        viable_only=viable_only,
+        target_names=target_names,
+        dt_min=dt_min,
+        dt_max=dt_max,
+        include_limits=False,
+        snr_min=snr_min,
+    )
+
+    by_target = dict(tuple(phot.groupby("target_name"))) if not phot.empty else {}
+    results: List[KilonovaScore] = []
+
+    for i, cand in enumerate(candidates, start=1):
+        name = cand.target.name
+        if progress:
+            logger.info("[%d/%d] %s", i, len(candidates), name)
+
+        lc = by_target.get(name)
+        if lc is None or lc.empty:
+            results.append(
+                KilonovaScore(event_id, name, target_id=cand.target_id, skip_reason="no photometry")
+            )
+            continue
+        if len(lc) < min_obs or lc["filter"].nunique() < min_bands:
+            results.append(
+                KilonovaScore(
+                    event_id, name, target_id=cand.target_id,
+                    n_obs_supplied=len(lc),
+                    skip_reason=f"too sparse ({len(lc)} pts, {lc['filter'].nunique()} bands)",
+                )
+            )
+            continue
+
+        try:
+            results.append(
+                score_candidate(
+                    event_id, name, grid=grid, grid_path=grid_path, phot=lc,
+                    dt_min=dt_min, dt_max=dt_max, snr_min=snr_min,
+                    map_wide_bands=map_wide_bands, mode=mode,
+                    keep_frames=keep_frames, **kwargs,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - one bad candidate must not stop the run
+            logger.exception("Scoring failed for %s", name)
+            results.append(
+                KilonovaScore(
+                    event_id, name, target_id=cand.target_id,
+                    skip_reason=f"error: {type(exc).__name__}: {exc}",
+                )
+            )
+
+    table = pd.DataFrame([r.as_row() for r in results])
+    if keep_frames:
+        table.attrs["results"] = {r.target_name: r for r in results}
+    return table.sort_values("score", ascending=False, na_position="last").reset_index(drop=True)
+
+
+def score_event_by_distance(
+    event_id: str,
+    grid_path=None,
+    viable_only: bool = False,
+    target_names: Optional[Iterable[str]] = None,
+    min_obs: int = 3,
+    min_bands: int = 1,
+    dt_min: float = 0.0,
+    dt_max: Optional[float] = None,
+    snr_min: Optional[float] = None,
+    map_wide_bands: bool = False,
+    mode: str = "survey",
+    time_bin_width: float = 0.2,
+    max_bands_per_load: int = 6,
+    random_state=42,
+    keep_frames: bool = False,
+    progress: bool = False,
+    **kwargs,
+) -> pd.DataFrame:
+    """Score every candidate of a GW event, grouped by simulation grid.
+
+    Same contract as :func:`score_event` -- one row per candidate, unscoreable
+    ones carrying a ``skip_reason`` rather than vanishing -- but ordered so each
+    grid is read **once**.
+
+    ``score_event`` scores candidates in name order and lets ``score_candidate``
+    pull a grid per candidate, scoped to that candidate's bands. Those loads are
+    memoised on ``(path, bands)``, so the cache only helps candidates whose band
+    sets match exactly. Measured on ``S251112cm``: 269 scoreable candidates over
+    **101 distinct band sets** across 3 rungs, i.e. 101 loads of ~8-50 s each,
+    and a memo that grows all run because nothing is ever evicted -- which is
+    how a bulk run reaches an OOM.
+
+    Here candidates are bucketed by the rung their own distance selects, the
+    buckets are walked in distance order, and each rung is read once for the
+    *union* of the bands its candidates need, then handed to every candidate in
+    the bucket. Three loads instead of 101, and the previous rung is dropped
+    before the next is read, so peak memory is one grid rather than an
+    accumulating cache.
+
+    Distances are resolved once, up front, and passed in -- ``score_candidate``
+    would otherwise re-derive each one, which is a database round trip per
+    candidate.
+
+    Candidates too sparse to score never reach any of this: they are filtered
+    before the distance pass, so they cost one dictionary lookup each.
+    """
+    from .KilonovaScorer.grids import clear_cache
+
+    event = get_event(event_id)
+    candidates = list(get_candidates(event, viable_only=viable_only, target_names=target_names))
+    if not candidates:
+        logger.warning("No candidates for %s", event_id)
+        return pd.DataFrame()
+
+    phot = get_event_photometry(
+        event_id,
+        viable_only=viable_only,
+        target_names=target_names,
+        dt_min=dt_min,
+        dt_max=dt_max,
+        include_limits=False,
+        snr_min=snr_min,
+    )
+    by_target = dict(tuple(phot.groupby("target_name"))) if not phot.empty else {}
+
+    results: List[KilonovaScore] = []
+    scoreable: List[Tuple[Any, pd.DataFrame]] = []
+
+    # --- cheap rejections first, before any distance or grid work ----------
+    for cand in candidates:
+        name = cand.target.name
+        lc = by_target.get(name)
+        if lc is None or lc.empty:
+            results.append(
+                KilonovaScore(event_id, name, target_id=cand.target_id, skip_reason="no photometry")
+            )
+            continue
+        if len(lc) < min_obs or lc["filter"].nunique() < min_bands:
+            results.append(
+                KilonovaScore(
+                    event_id, name, target_id=cand.target_id,
+                    n_obs_supplied=len(lc),
+                    skip_reason=f"too sparse ({len(lc)} pts, {lc['filter'].nunique()} bands)",
+                )
+            )
+            continue
+        scoreable.append((cand, lc))
+
+    logger.info(
+        "%s: %d candidates, %d scoreable after the sparsity cut",
+        event_id, len(candidates), len(scoreable),
+    )
+    if not scoreable:
+        return _results_table(results, keep_frames)
+
+    # --- distances, once ---------------------------------------------------
+    buckets: Dict[Any, List[Tuple[Any, pd.DataFrame, float, float]]] = {}
+    for cand, lc in scoreable:
+        name = cand.target.name
+        try:
+            dist_mpc, dist_err_mpc = get_candidate_distance(cand.target_id, event_id)
+        except Exception as exc:  # noqa: BLE001
+            results.append(
+                KilonovaScore(event_id, name, target_id=cand.target_id,
+                              skip_reason=f"distance lookup failed: {type(exc).__name__}: {exc}")
+            )
+            continue
+        if not np.isfinite(dist_mpc) or dist_mpc <= 0:
+            results.append(
+                KilonovaScore(event_id, name, target_id=cand.target_id, dist_mpc=dist_mpc,
+                              n_obs_supplied=len(lc), skip_reason=f"no usable distance ({dist_mpc})")
+            )
+            continue
+        if not np.isfinite(dist_err_mpc) or dist_err_mpc <= 0:
+            results.append(
+                KilonovaScore(event_id, name, target_id=cand.target_id, dist_mpc=dist_mpc,
+                              dist_err_mpc=dist_err_mpc, n_obs_supplied=len(lc),
+                              skip_reason=f"no usable distance error ({dist_err_mpc})")
+            )
+            continue
+
+        try:
+            path = Path(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
+        except Exception as exc:  # noqa: BLE001 - no grid at all, or none close enough
+            results.append(
+                KilonovaScore(event_id, name, target_id=cand.target_id, dist_mpc=dist_mpc,
+                              dist_err_mpc=dist_err_mpc, n_obs_supplied=len(lc),
+                              skip_reason=f"no usable grid: {exc}")
+            )
+            continue
+        buckets.setdefault(path, []).append((cand, lc, dist_mpc, dist_err_mpc))
+
+    # --- grid loads, nearest rung first ------------------------------------
+    ordered = sorted(buckets, key=lambda p: grid_distance_mpc(p))
+    for rung_i, path in enumerate(ordered, start=1):
+        members = buckets[path]
+
+        # the bands each candidate at this rung needs
+        bands_by_member = []
+        for member in members:
+            frame = to_scorer_frame(member[1], map_wide_bands=map_wide_bands, mode=mode)
+            bands = (
+                frozenset(frame["filter_mapped"].dropna().unique())
+                if not frame.empty
+                else frozenset()
+            )
+            bands_by_member.append((member, bands))
+
+        no_band = [m for m, b in bands_by_member if not b]
+        for cand, lc, d, derr in no_band:
+            results.append(
+                KilonovaScore(event_id, cand.target.name, target_id=cand.target_id,
+                              dist_mpc=d, dist_err_mpc=derr, n_obs_supplied=len(lc),
+                              skip_reason="no observations in a modelled band")
+            )
+        with_band = [(m, b) for m, b in bands_by_member if b]
+        if not with_band:
+            continue
+
+        for chunk_i, (chunk, chunk_bands) in enumerate(
+            _chunk_by_bands(with_band, max_bands_per_load), start=1
+        ):
+            if mode != "survey":
+                from .KilonovaScorer.core import FILTER_LOOKUP
+
+                grid_bands = [k for k, v in FILTER_LOOKUP.items() if v in chunk_bands]
+            else:
+                grid_bands = sorted(chunk_bands)
+
+            logger.info(
+                "[rung %d/%d load %d] %s: %d candidates, %d band(s)",
+                rung_i, len(ordered), chunk_i, path.name, len(chunk), len(grid_bands),
+            )
+            try:
+                grid = load_simulation_grid(path, bands=grid_bands, mode=mode)
+            except Exception as exc:  # noqa: BLE001 - one bad load must not stop the event
+                logger.exception("Loading %s failed", path.name)
+                for cand, lc, d, derr in chunk:
+                    results.append(
+                        KilonovaScore(event_id, cand.target.name, target_id=cand.target_id,
+                                      dist_mpc=d, dist_err_mpc=derr, n_obs_supplied=len(lc),
+                                      skip_reason=f"grid load failed: {type(exc).__name__}: {exc}")
+                    )
+                continue
+
+            for i, (cand, lc, dist_mpc, dist_err_mpc) in enumerate(chunk, start=1):
+                name = cand.target.name
+                if progress:
+                    logger.info("  [%d/%d] %s", i, len(chunk), name)
+                try:
+                    results.append(
+                        score_candidate(
+                            event_id, name, grid=grid, phot=lc,
+                            dist=(dist_mpc, dist_err_mpc),
+                            dt_min=dt_min, dt_max=dt_max, snr_min=snr_min,
+                            map_wide_bands=map_wide_bands, mode=mode,
+                            time_bin_width=time_bin_width,
+                            random_state=random_state,
+                            keep_frames=keep_frames, **kwargs,
+                        )
+                    )
+                except Exception as exc:  # noqa: BLE001 - one bad candidate must not stop the run
+                    logger.exception("Scoring failed for %s", name)
+                    results.append(
+                        KilonovaScore(event_id, name, target_id=cand.target_id,
+                                      skip_reason=f"error: {type(exc).__name__}: {exc}")
+                    )
+
+            # drop this grid before reading the next, so peak memory is one load
+            del grid
+            clear_cache()
+
+    return _results_table(results, keep_frames)
+
+
+def _chunk_by_bands(with_band, max_bands: int):
+    """Group candidates so each grid load covers at most ``max_bands`` bands.
+
+    The union of bands over a whole rung is what a single load would have to
+    read, and it does not stay small: on ``S251112cm`` every rung's union is
+    12-13 bands, which measured **12.9 GB of peak RSS** on a 15 GB machine --
+    pyarrow's transient peak during the read is well above the final frame, so
+    the union is not something to hand to the reader unbounded.
+
+    Candidates are sorted by band set so ones needing the same bands land in the
+    same load, then packed greedily until adding the next would exceed
+    ``max_bands``. Identical band sets therefore still share a load -- which is
+    the case that matters, since 87% of TROVE photometry is ATLAS c/o -- while
+    the tail of odd single-band candidates is spread over a few small loads
+    instead of forcing one enormous one.
+
+    ``max_bands`` at or above the rung's union size collapses to exactly one
+    load, i.e. the unbounded behaviour, so this only ever costs extra reads
+    where an unbounded read would not have fit.
+    """
+    chunks = []
+    current, current_bands = [], set()
+    for member, bands in sorted(with_band, key=lambda mb: sorted(mb[1])):
+        if current and len(current_bands | bands) > max_bands:
+            chunks.append((current, current_bands))
+            current, current_bands = [], set()
+        current.append(member)
+        current_bands |= bands
+    if current:
+        chunks.append((current, current_bands))
+    return chunks
+
+
+def _results_table(results: List[KilonovaScore], keep_frames: bool) -> pd.DataFrame:
+    """Flatten scoring results into the ranked table both entry points return."""
+    table = pd.DataFrame([r.as_row() for r in results])
+    if keep_frames:
+        table.attrs["results"] = {r.target_name: r for r in results}
+    if table.empty:
+        return table
+    return table.sort_values("score", ascending=False, na_position="last").reset_index(drop=True)

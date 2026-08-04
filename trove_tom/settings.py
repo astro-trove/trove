@@ -128,7 +128,19 @@ WSGI_APPLICATION = "trove_tom.wsgi.application"
 TASKS = {
     "default": {
         "BACKEND": "django_tasks.backends.database.DatabaseBackend",
-        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_all", "associate_targets"],
+        "QUEUES": [
+            "default",
+            "mpc",
+            "atlas_fphot",
+            "vet_all",
+            "associate_targets",
+            # KilonovaSCORER runs on its own queue: holds a multi-GB simulation grid in memory, 
+            # so it must not be in front of the short vetting jobs
+            "kilonova_scoring",
+            # grid generation is ~30 min and ~4 GB of disk per rung, and runs a
+            # separate interpreter, so it gets its own queue again
+            "kilonova_grids",
+        ],
     }
 }
 

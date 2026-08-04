@@ -31,3 +31,8 @@ build/
 !sphinx_docs/docs/build/
 trove.egg-info/
 .claude/
+
+scoring/KilonovaScorer/grids/
+*.parquet
+
+diagnostics/
