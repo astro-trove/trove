@@ -55,8 +55,8 @@ def display_score_details(target_id):
     target = Target.objects.get(id=target_id)
 
     keymap = OrderedDict(
-        ps_score=("Point Source Score (1 or 0)", _bool_format),
-        mpc_score=("Minor Planet Center Score (1 or 0)", _bool_format),
+        ps_score=("Point Source Score (0=associated, 1=no association)", _bool_format),
+        mpc_score=("Minor Planet Center Score (0=associated, 1=no association)", _bool_format),
         mpc_match_name=("MPC Match Name", _str_format),
         mpc_match_date=("MPC Match Date", _str_format),
         mpc_match_sep=('MPC Match Separation (")', _float_format),
