@@ -1,3 +1,4 @@
+import math
 from typing import List
 from ninja import Router, Schema
 from ninja.orm import create_schema
@@ -8,31 +9,42 @@ from .util import get_event_candidate_scores
 
 router = Router()
 
+def _recursive_nan_clean(obj):
+    if isinstance(obj, float) and math.isnan(obj):
+        return None
+    elif isinstance(obj, dict):
+        return {k: _recursive_nan_clean(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_recursive_nan_clean(item) for item in obj]
+    return obj
+
 def _compute_scores(ecs):
     # calculate the final scores, sorted by decreasing score, and return
     # Add agn scoring potentially here
     ecs_with_scores = get_event_candidate_scores(ecs)
 
-    return [
-        {
-            "id": ec.id,
-            "target": {
-                "id": ec.target.id,
-                "name": ec.target.name,
-                "ra":ec.target.ra,
-                "dec":ec.target.dec,
-                "tns_redshift":ec.target.redshift,
-                "tns_classification":ec.target.classification
-            },
-            "nonlocalizedevent": {
-                "id": ec.nonlocalizedevent.id,
-                "event_id": ec.nonlocalizedevent.event_id,
-                "event_type": ec.nonlocalizedevent.event_type
-            },
-            "score": ec.score,
-        }
-        for ec in ecs_with_scores
-    ]
+    return _recursive_nan_clean(
+        [
+            {
+                "id": ec.id,
+                "target": {
+                    "id": ec.target.id,
+                    "name": ec.target.name,
+                    "ra":ec.target.ra,
+                    "dec":ec.target.dec,
+                    "tns_redshift":ec.target.redshift,
+                    "tns_classification":ec.target.classification
+                },
+                "nonlocalizedevent": {
+                    "id": ec.nonlocalizedevent.id,
+                    "event_id": ec.nonlocalizedevent.event_id,
+                    "event_type": ec.nonlocalizedevent.event_type
+                },
+                "score": ec.score,
+            }
+            for ec in ecs_with_scores
+        ]
+    )
 
 
 @router.get("/{nle_name}")
