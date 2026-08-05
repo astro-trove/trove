@@ -41,11 +41,14 @@
 }
 
 table.table.galaxies {
-  font-size: 10px !important;
+  font-size: 14px !important;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden; /* Critical for border-radius to work on table */
   border-collapse: collapse; /* Removes gaps between cells */
+  display: block;
+  overflow-x: auto;
+  table-layout: auto;
 }
 
 table.table.galaxies th {
@@ -61,13 +64,12 @@ table.table.galaxies td {
   border-right: 1px solid transparent !important; /* Optional: add subtle spacing if needed */
 }
 
-/* Optional: Add subtle row alternation for readability */
-table.table.galaxies tr:nth-child(odd) {
-  background-color: #f8f9fa;
-}
-
-table.table.galaxies tr:hover {
-  background-color: #e8eef5;
+/* this adjusts the width of the name column only */
+table.table.galaxies td:nth-child(2),
+table.table.galaxies th:nth-child(2) {
+  max-width: 170px; /* Constrain Name column width */
+  /* word-break: break-word; /* Allow text to wrap within the column */
+  overflow-wrap: break-word; /* Backup for word breaking */
 }
 
 details {

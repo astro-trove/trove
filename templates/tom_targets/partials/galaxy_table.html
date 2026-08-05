@@ -10,13 +10,13 @@
       <th scope="col">Redshift</th>
       <th scope="col">Distance Type</th>
       <th scope="col">Mag.  <br/> (AB)</th>
-      <th scope="col">Source</th>
+      <!-- <th scope="col">Source</th> -->
       <th scope="col">Submitter [Original Source]</th>
     </tr>
   {% for galaxy in galaxies %}
     <tr>
       <td>{{ forloop.counter }}</td>
-      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&in_csys=Equatorial&in_equinox=J2000&ra={{galaxy.RA}}d&dec={{galaxy.Dec}}d&radius=0.02" target="_blank">{{ galaxy.ID }}</a></td>
+      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&in_csys=Equatorial&in_equinox=J2000&ra={{galaxy.RA}}d&dec={{galaxy.Dec}}d&radius=0.02" target="_blank">{{ galaxy.ID }}</a> ({{ galaxy.Source }})</td>
       <td>{{ galaxy.PCC|floatformat:3 }}</td>
       <td>{{ galaxy.Offset|floatformat:2 }}</td>
       {% if galaxy.Dist and galaxy.Dist|floatformat != 'nan' %}
@@ -51,7 +51,7 @@
         <td> </td>
       {% endif %}
       <td><i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{{ galaxy.Mags|floatformat:1 }}</td>
-      <td>{{ galaxy.Source }}</td>
+      <!-- <td>{{ galaxy.Source }}</td> -->
       <td>{{ galaxy.Submitter }}</td>
     </tr>
   {% empty %}

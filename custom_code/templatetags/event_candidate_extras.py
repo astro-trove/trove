@@ -244,6 +244,6 @@ def _str_int_format(s):
     except ValueError:
         return str(s)
 
-
+    
 def _str_format(s):
     return str(s)
