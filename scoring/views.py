@@ -6,12 +6,13 @@ import numpy as np
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
+from django.core.cache import cache
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponseForbidden
 from django.urls import reverse
 from django.shortcuts import redirect
 from dal import autocomplete
@@ -101,6 +102,24 @@ class TargetVettingFormView(FormView):
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
+        # first check that no user has clicked this button
+        if cache.get(settings.VETTING_COOLDOWN_KEY):
+            return HttpResponseForbidden(
+                "A user has recently clicked this button placing it on cooldown. "+
+                "The vetting results will update for all users. Please try again "+
+                "later if you need to re-vet *veverything* again (you can still vet"+
+                "individual targets)."
+            )
+        
+
+        # since the button was clicked we need to start the cooldown
+        cache.set(
+            settings.VETTING_COOLDOWN_KEY,
+            True,
+            timeout=settings.VETTING_COOLDOWN_PERIOD
+        )
+
+        # and now we can actually perform the vetting and redirect
         pk = self.kwargs["pk"]
         vetting_mode = form.cleaned_data["vetting_method"]
 

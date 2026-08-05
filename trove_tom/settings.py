@@ -256,6 +256,10 @@ CACHES = {
     }
 }
 
+# cache keys
+VETTING_COOLDOWN_KEY = "vetting_all_button_cooldown"
+VETTING_COOLDOWN_PERIOD = 3600  # 1 hour in seconds
+
 # TOM Specific configuration
 TARGET_TYPE = "SIDEREAL"
 
