@@ -437,14 +437,14 @@ class TestEventCandidateExtras:
     def test_bool_format_true(self):
         """Test _bool_format with truthy value."""
         from custom_code.templatetags.event_candidate_extras import _bool_format
-        assert _bool_format(1.0) == 1
+        assert _bool_format(1.0) == "No"
 
     def test_bool_format_false(self):
         """Test _bool_format with falsy value."""
         from custom_code.templatetags.event_candidate_extras import _bool_format
-        assert _bool_format(0.0) == 0
+        assert _bool_format(0.0) == "Yes"
 
     def test_bool_format_fractional(self):
         """Test _bool_format with fractional value."""
         from custom_code.templatetags.event_candidate_extras import _bool_format
-        assert _bool_format(0.7) == 0
+        assert _bool_format(0.7) == "No"
