@@ -146,6 +146,13 @@
 }
 
 /* Content panel — full border on ALL sides including top */
+.score-card-content-basic {
+  background-color: white;
+  padding: 20px;
+  border-radius: 0 0 6px 6px;
+  position: relative;
+}
+
 .score-card-content {
   background-color: white;
   padding: 20px;

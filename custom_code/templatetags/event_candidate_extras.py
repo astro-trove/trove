@@ -186,7 +186,7 @@ def display_score_details(target_id):
     html = '<div class="score-details-wrapper">\n'
     html += f'  <div class="score-card">\n'
     html += f'    <div class="score-card-header">{basic_card["title"]}</div>\n'
-    html += f'    <div class="score-card-content">\n'
+    html += f'    <div class="score-card-content-basic">\n'
     for detail in basic_card["details"]:
         html += f'      <div class="detail-row">\n'
         html += f'        <span class="detail-label">{detail["label"]}</span>\n'
