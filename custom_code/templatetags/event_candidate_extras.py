@@ -46,9 +46,11 @@ from django.utils.safestring import mark_safe
 
 register = template.Library()
 
-@register.simple_tag
-def display_score_details(target_id):
-
+@register.simple_tag(takes_context=True)
+def display_score_details(context, target_id):
+    request = context['request']
+    nle_requested = request.GET.get('nonlocalizedevent')
+    
     if target_id is None:
         return "Target ID is None!"
 
@@ -184,9 +186,6 @@ def display_score_details(target_id):
     basic_card = cards[0]  # First card is always "Basic Score Details"
     event_cards = cards[1:]  # Rest are event cards
 
-    basic_card = cards[0]  # First card is always "Basic Score Details"
-    event_cards = cards[1:]  # Rest are event cards
-
     # Render basic card
     html = '<div class="score-details-wrapper">\n'
     html += f'  <div class="score-card">\n'
@@ -205,7 +204,12 @@ def display_score_details(target_id):
         html += '  <div class="event-tabs-container">\n'
         html += '    <div class="event-tabs">\n'
         for idx, card in enumerate(event_cards):
-            active_class = 'active' if idx == 0 else ''
+            ec = card["ec"]
+            if nle_requested is None:
+                active_class = 'active' if idx == 0 else ''
+            else:
+                active_class = 'active' if nle_requested==ec.nonlocalizedevent.event_id else ''
+                
             html += f'      <button class="event-tab {active_class}" data-tab="{idx}">{card["title"]}</button>\n'
         html += '    </div>\n'
         
