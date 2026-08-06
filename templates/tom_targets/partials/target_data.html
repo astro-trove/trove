@@ -50,15 +50,25 @@
 <!-- This displays the target extras values -->
 <dl class="row">
   {% for key, value in target.as_dict.items %}
-    {% if key != 'name' and key != 'ra' and key != 'dec' and key != 'galactic_lng' and key != 'galactic_lat' and key != 'type' and key != 'epoch' and key != 'permissions' %}
-    {% if key == 'redshift' or key == 'mwebv' %}
-      <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
-      <dd class="col-sm-6">{{ value|floatformat:4 }}</dd>
-    {% elif key == 'classification' %}
-      <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
-      <dd class="col-sm-6">{{ value|truncate_value_for_display }}</dd>
-    {% endif %}
-    {% endif %}
+  {% if key != 'name' and key != 'ra' and key != 'dec' and key != 'galactic_lng' and key != 'galactic_lat' and key != 'type' and key != 'epoch' and key != 'permissions' %}
+  {% if key == 'redshift' or key == 'mwebv' %}
+  {% if value is None or value == 'nan' or value == '' or value|isnan %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">---</dd>
+  {% else %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">{{ value|floatformat:4 }}</dd>
+  {% endif %}
+  {% elif key == 'classification' %}
+  {% if value is None or value == 'nan' or value == '' or value|isnan %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">---</dd>
+  {% else %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">{{ value|truncate_value_for_display }}</dd>
+  {% endif %}
+  {% endif %}
+  {% endif %}
   {% endfor %}
 </dl>
 

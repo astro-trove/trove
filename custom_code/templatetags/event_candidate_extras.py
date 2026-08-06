@@ -55,15 +55,15 @@ def display_score_details(target_id):
     target = Target.objects.get(id=target_id)
 
     keymap = OrderedDict(
-        ps_score=("Variable Star Association?", _bool_format),
-        mpc_score=("Asteroid Association?", _bool_format),
+        ps_score=("Point Source Association?", _bool_format_yesno),
+        mpc_score=("Minor Planet Score Association?", _bool_format_yesno),
         mpc_match_name=("MPC Match Name", _str_format),
         mpc_match_date=("MPC Match Date", _str_format),
         mpc_match_sep=('MPC Match Separation', partial(_float_format, unit='"')),
         skymap_score=("Localization Score", _float_format),
         host_distance_score=("Distance Score", _float_format),
-        host_name=("Host Galaxy used for Distance Score", _str_int_format),
-        agn_score=("AGN Association?", _bool_format),
+        host_name=("Host Galaxy used for Distance Scoring", _str_int_format),
+        agn_score=("AGN Score", _bool_format),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",
@@ -101,7 +101,7 @@ def display_score_details(target_id):
 
     # Basic Score Details Card
     basic_card = {
-        "title": "Basic Score Details",
+        "title": "Basic Scores (Not Event Specific)",
         "details": []
     }
     for queryset in basic_score_details:
@@ -140,7 +140,7 @@ def display_score_details(target_id):
                 event_name = str(nle)
 
                 ec_scores = _get_event_candidate_scores([ec])[0].score
-                ec_score_summary = "<br>".join([f"{k} = {v:.2f}" for k,v in ec_scores.items()])
+                ec_score_summary = "<br>".join([f"{k} Score = {v:.2f}" for k,v in ec_scores.items()])
                 
                 event_card = {
                     "title": event_name,
@@ -161,7 +161,7 @@ def display_score_details(target_id):
             else:
                 value = (
                     fmter(score_factor.value)
-                    if label == "Host Galaxy used for Distance Score"
+                    if label == "Host Galaxy used for Distance Scoring"
                     else fmter(float(score_factor.value))
                 )
             
@@ -197,6 +197,7 @@ def display_score_details(target_id):
 
     # Render event tabs and cards
     if event_cards:
+        #import pdb; pdb.set_trace()
         html += '  <div class="event-tabs-container">\n'
         html += '    <div class="event-tabs">\n'
         for idx, card in enumerate(event_cards):
@@ -206,16 +207,46 @@ def display_score_details(target_id):
         
         html += '    <div class="event-cards">\n'
         for idx, card in enumerate(event_cards):
+            total_scores = card["details"][0]
+            score_details = card["details"][1:]
+
+            # setup the "event" card tab content
             display_class = 'active' if idx == 0 else 'hidden'
             html += f'      <div class="event-card {display_class}" data-tab-content="{idx}">\n'    
-            html += f'        <div class="score-card-content">\n'  # Skip the header, go straight to content
-            for detail in card["details"]:
+
+            # add "subtabs" for the different types of scores
+            html += '  <div class="event-subtabs-container">\n'
+            html += '    <div class="event-subtabs">\n'
+            for jdx, label in enumerate(total_scores["value"].split("<br>")):
+                active_class = 'active' if jdx == 0 else ''
+                html += f'      <button class="event-subtab {active_class}" data-subtab="{idx}-{jdx}">{label}</button>\n'
+            html += '    </div>\n'
+            html += '  </div>\n'
+
+            # then add the content with the score details
+            # first the actual scores
+            html += f'        <div class="score-card-content-filled">\n'
+            for detail in score_details:
+                if "Score" not in detail["label"]: continue 
                 html += f'          <div class="detail-row">\n'
                 html += f'            <span class="detail-label">{detail["label"]}</span>\n'
                 html += f'            <span class="detail-value">{detail["value"]}</span>\n'
                 html += f'          </div>\n'
             html += f'        </div>\n'
+                
+            # then the score details (max lum., etc.)
+            html += f'        <div class="score-card-content">\n'
+            for detail in score_details:
+                if "Score" in detail["label"]: continue 
+                html += f'          <div class="detail-row">\n'
+                html += f'            <span class="detail-label">{detail["label"]}</span>\n'
+                html += f'            <span class="detail-value">{detail["value"]}</span>\n'
+                html += f'          </div>\n'
+            html += f'        </div>\n'    
             html += f'      </div>\n'
+
+            
+            
         html += '    </div>\n'
         html += '  </div>\n'
 
@@ -234,9 +265,11 @@ def _sci_format(flt, unit=""):
 
 
 def _bool_format(flt):
-    # yes, this order is correct because a score of 0 means an association!
-    return "No" if bool(flt) else "Yes" 
+    return int(flt) 
 
+def _bool_format_yesno(flt):
+    # yes, this order is correct because a score of 0 means an association!
+    return "No" if bool(flt) else "Yes"
 
 def _str_int_format(s):
     try:

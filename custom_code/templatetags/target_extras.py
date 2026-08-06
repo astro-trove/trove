@@ -1,3 +1,4 @@
+import math
 from django import template
 from django.template.defaultfilters import stringfilter
 from tom_dataproducts.models import ReducedDatum
@@ -34,6 +35,10 @@ def count_spec(target):
         data_type="spectroscopy",
         target_id=target.id
     ).count()
+
+@register.filter
+def isnan(flt):
+    return math.isnan(flt)
 
 @register.filter
 @stringfilter

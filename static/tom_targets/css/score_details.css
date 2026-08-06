@@ -23,6 +23,10 @@
   padding: 20px;
 }
 
+.score-details-wrapper .score-card-content-filled {
+  padding: 20px;
+}
+
 .score-details-wrapper .detail-row {
   display: flex;
   justify-content: space-between;
@@ -33,18 +37,6 @@
 
 .score-details-wrapper .detail-row:last-child {
   border-bottom: none;
-}
-
-.event-card .detail-row:first-child {
-  background-color: #f0f4f8;
-  border-bottom: 4px solid #2c3e50;
-  /* border-top: 4px solid #2c3e50; */
-  padding-left: 16px;
-  padding-right: 16px;
-  margin-top: -20px;
-  margin-left: -20px;
-  margin-right: -20px;
-  font-weight: 600;
 }
 
 .score-details-wrapper .detail-label {
@@ -91,19 +83,7 @@
   border-radius: 8px 8px 0 0;
   text-align: left;
 }
-/*
-.event-tab:first-child {
-  border-radius: 8px 0 0 0;
-}
 
-.event-tab:last-child {
-  border-radius: 0 8px 0 0;
-}
-
-.event-tab:only-child {
-  border-radius: 8px 8px 0 0;
-}
-*/
 .event-tab:hover {
   color: #2c3e50;
   background-color: rgba(0, 0, 0, 0.1);
@@ -115,11 +95,76 @@
   border: none;
 }
 
-.event-cards {
+.event-subtabs-container {
+  margin-top: 5px;
+  padding: 0;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.event-subtabs {
+  display: flex;
+  gap: 0;
+  background-color: transparent;
+  padding: 0;
+  margin: 0;
+  border-bottom: 4px solid #2c3e50;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.event-subtab {
+  flex: none;
+  width: auto;
+  padding: 8px 16px;
+  background: transparent;
+  border: 4px solid transparent;
+  border-bottom: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.2s ease;
+  text-align: center;
+  margin: 0;
+  margin-bottom: -4px;
   position: relative;
-  background: white;
-  border-radius: 0 0 8px 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.01);
+  z-index: 1;
+}
+
+.event-subtab.active {
+  background-color: #f0f4f8;
+  color: #2c3e50;
+  font-weight: 600;
+  border-bottom: 4px solid #f0f4f8;
+  border-left: 4px solid #2c3e50;
+  border-right: 4px solid #2c3e50;
+  border-top: 4px solid #2c3e50;
+  border-radius: 6px 6px 0 0;
+  width: 45%;
+}
+
+/* Content panel — full border on ALL sides including top */
+.score-card-content {
+  background-color: white;
+  padding: 20px;
+  border: 4px solid #2c3e50;
+  border-radius: 0 0 6px 6px;
+  position: relative;
+  margin-left: 10px;
+  margin-right: 10px;
+}
+
+.score-card-content-filled {
+  background-color: #f0f4f8;
+  padding: 20px;
+  border-left: 4px solid #2c3e50;
+  border-right: 4px solid #2c3e50;
+  border-bottom: none;
+  border-top: none;
+  margin-left: 10px;
+  margin-right: 10px;
 }
 
 .event-card {
