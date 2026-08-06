@@ -188,3 +188,15 @@
 .event-card.active {
   display: block;
 }
+
+.event-subtab-content {
+  display: none;
+}
+
+.event-subtab-content.active {
+  display: block;
+}
+
+.event-subtab-content.hidden {
+  display: none;
+}

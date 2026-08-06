@@ -40,13 +40,13 @@ $(document).ready(function() {
     tabsContainer.find('.event-subtab').removeClass("active");
     
     // Hide all cards in this container
-    tabsContainer.find('.event-card').removeClass("active").addClass("hidden");
+    tabsContainer.find('.event-subtab-content').removeClass("active").addClass("hidden");
     
     // Add active class to clicked tab
     $(this).addClass("active");
     
     // Show corresponding card
-    tabsContainer.find('.event-card[data-subtab-content="' + tabIndex + '"]')
+    tabsContainer.find('.event-subtab-content[data-subtab-content="' + tabIndex + '"]')
       .removeClass("hidden")
       .addClass("active");
   });

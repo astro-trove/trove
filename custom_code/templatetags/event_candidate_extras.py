@@ -73,6 +73,15 @@ def display_score_details(target_id):
             "Light Curve Slope (positive is brightening)",
             partial(_float_format, unit="mag/day"),
         ),
+        phot_peak_lum_score=("Score from Maximum Luminosity", _float_format),
+        phot_peak_time_score=(
+            "Score from Time of Maximum Light Curve",
+            _float_format,
+        ),
+        phot_decay_rate_score=(
+            "Score from Light Curve Slope",
+            _float_format,
+        ),
     )
     order = list(keymap.keys())
 
@@ -137,17 +146,12 @@ def display_score_details(target_id):
             if event_name != str(nle):
                 if event_card:
                     cards.append(event_card)
-                event_name = str(nle)
 
-                ec_scores = _get_event_candidate_scores([ec])[0].score
-                ec_score_summary = "<br>".join([f"{k} Score = {v:.2f}" for k,v in ec_scores.items()])
-                
+                event_name = nle.event_id
                 event_card = {
                     "title": event_name,
-                    "details": [{
-                        "label": "Total Score",
-                        "value": ec_score_summary
-                    }]
+                    "ec": ec,
+                    "details": []
                 }
             
             if score_factor.key in keymap:
@@ -165,9 +169,10 @@ def display_score_details(target_id):
                     else fmter(float(score_factor.value))
                 )
             
-            event_card["details"].append({
-                "label": label,
-                "value": value, 
+            event_card["details"].append(
+                {
+                    "label": label,
+                    "value": value, 
             })
         
         if event_card:
@@ -197,7 +202,6 @@ def display_score_details(target_id):
 
     # Render event tabs and cards
     if event_cards:
-        #import pdb; pdb.set_trace()
         html += '  <div class="event-tabs-container">\n'
         html += '    <div class="event-tabs">\n'
         for idx, card in enumerate(event_cards):
@@ -207,51 +211,78 @@ def display_score_details(target_id):
         
         html += '    <div class="event-cards">\n'
         for idx, card in enumerate(event_cards):
-            total_scores = card["details"][0]
-            score_details = card["details"][1:]
+            ec = card.pop("ec")
+            ec_score_details = _get_event_candidate_scores(
+                [ec],
+                include_subscores=True
+            )[0]
+            ec_scores = ec_score_details.score
+            ec_subscores = ec_score_details.subscores
+
+            score_details = card["details"]
 
             # setup the "event" card tab content
             display_class = 'active' if idx == 0 else 'hidden'
             html += f'      <div class="event-card {display_class}" data-tab-content="{idx}">\n'    
 
             # add "subtabs" for the different types of scores
-            html += '  <div class="event-subtabs-container">\n'
-            html += '    <div class="event-subtabs">\n'
-            for jdx, label in enumerate(total_scores["value"].split("<br>")):
+            html += '        <div class="event-subtabs-container">\n'
+            html += '          <div class="event-subtabs">\n'
+            label_idx_map = {}
+            for jdx, (label, score) in enumerate(ec_scores.items()):
                 active_class = 'active' if jdx == 0 else ''
-                html += f'      <button class="event-subtab {active_class}" data-subtab="{idx}-{jdx}">{label}</button>\n'
-            html += '    </div>\n'
-            html += '  </div>\n'
-
-            # then add the content with the score details
-            # first the actual scores
-            html += f'        <div class="score-card-content-filled">\n'
-            for detail in score_details:
-                if "Score" not in detail["label"]: continue 
-                html += f'          <div class="detail-row">\n'
-                html += f'            <span class="detail-label">{detail["label"]}</span>\n'
-                html += f'            <span class="detail-value">{detail["value"]}</span>\n'
-                html += f'          </div>\n'
-            html += f'        </div>\n'
+                html += f'            <button class="event-subtab {active_class}" data-subtab="{idx}-{jdx}">{label} = {score:.2f}</button>\n'
+                label_idx_map[label] = f"{idx}-{jdx}"
                 
-            # then the score details (max lum., etc.)
-            html += f'        <div class="score-card-content">\n'
-            for detail in score_details:
-                if "Score" in detail["label"]: continue 
-                html += f'          <div class="detail-row">\n'
-                html += f'            <span class="detail-label">{detail["label"]}</span>\n'
-                html += f'            <span class="detail-value">{detail["value"]}</span>\n'
-                html += f'          </div>\n'
-            html += f'        </div>\n'    
-            html += f'      </div>\n'
+            html += '          </div>\n'
 
-            
-            
+            html += '          <div class="event-cards">\n'
+            for kdx, (em_transient_score_label, idxlabel) in enumerate(label_idx_map.items()): 
+                em_transient_type = em_transient_score_label.split(" ")[0]
+
+                active_subclass = ""
+                if not kdx:
+                    active_subclass = "active"
+                
+                html += f'            <div class="event-subtab-content {active_subclass}" data-subtab-content="{idxlabel}">\n'
+                # then add the content with the score details
+                # first the more general scores (2D, Distance, AGN, etc.) that don't change
+                # per transient model 
+                html += f'              <div class="score-card-content-filled">\n'
+                for detail in score_details:
+                    if "Score" not in detail["label"]: continue 
+                    html += f'                <div class="detail-row">\n'
+                    html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
+                    html += f'                  <span class="detail-value">{detail["value"]}</span>\n'
+                    html += f'                </div>\n'
+
+                # then the photometry scores too
+                for key, subscore in ec_subscores[em_transient_type].items():
+                    label, fmter = keymap[key+"_score"]
+                    html += f'                <div class="detail-row">\n'
+                    html += f'                  <span class="detail-label">{label}</span>\n'
+                    html += f'                  <span class="detail-value">{fmter(subscore)}</span>\n'
+                    html += f'                </div>\n'
+                html += f'              </div>\n'
+                
+                # then the score details (max lum., etc.)
+                html += f'              <div class="score-card-content">\n'
+                for detail in score_details:
+                    if "Score" in detail["label"]: continue 
+                    html += f'                <div class="detail-row">\n'
+                    html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
+                    html += f'                  <span class="detail-value">{detail["value"]}</span>\n'
+                    html += f'                </div>\n'
+                html += f'              </div>\n'
+                html += f'            </div>\n'
+            html += '          </div>\n'
+            html += '        </div>\n'
+            html += '      </div>\n'
         html += '    </div>\n'
         html += '  </div>\n'
-
     html += '</div>\n'
     return mark_safe(html)
+
 
 def _float_format(flt, unit=""):
     return f"{flt:.2f} {unit}"

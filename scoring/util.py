@@ -90,10 +90,11 @@ def _check_phot_val(val, param_ranges, param_range_key):
 
 
 def get_event_candidate_scores(
-    event_candidates,
-    dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
-    subscore_names=SUBSCORE_NAMES,
-    agn_toggle=True
+        event_candidates,
+        dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
+        subscore_names=SUBSCORE_NAMES,
+        agn_toggle=True,
+        include_subscores=False
 ):
     """Get the event candidate scores for everything in subscore_names
 
@@ -152,6 +153,9 @@ def get_event_candidate_scores(
         # set ec.score to be a dictionary mapping transient : score
         ec.score = {}
 
+        if include_subscores:
+            ec.subscores = {}
+        
         # get all 'subscores' (sometimes actually calculated values)
         # for object; need to re-do this per transient because of step
         # below where we exclude certain scores from the queryset
@@ -183,20 +187,32 @@ def get_event_candidate_scores(
             * mpc_score
         )
 
+        # add things to the subscores dict, if requested by the user
+        if include_subscores:
+            ec.subscores["ps_score"] = ps_score
+            ec.subscores["mpc_score"] = mpc_score
+            for key in sf_dict:
+                if key in exclude_keys: continue
+                ec.subscores[key] = sf_dict[key]
+                
+        # now for EM transient/model specific scores
         for transient in transients:
             # allowed parameter ranges for given transient
             param_ranges = dict_transients_param_ranges[transient]
 
             # compute the photometry score
-            phot_score = math.prod(
-                [
-                    _check_phot_val(
-                        val_dict[subscore_key], param_ranges, param_range_key
-                    )
-                    for subscore_key, param_range_key in val_not_score_keys.items()
-                    if subscore_key in val_dict
-                ]
-            )
+            phot_subscores = {
+                subscore_key: _check_phot_val(
+                    val_dict[subscore_key], param_ranges, param_range_key
+                )
+                for subscore_key, param_range_key in val_not_score_keys.items()
+                if subscore_key in val_dict
+            }
+
+            if include_subscores:
+                ec.subscores[transient] = phot_subscores
+            
+            phot_score = math.prod(list(phot_subscores.values()))
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object
