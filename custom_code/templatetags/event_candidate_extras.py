@@ -8,6 +8,7 @@ from functools import partial
 from django import template
 from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
+from django.conf import settings
 from django.utils.safestring import mark_safe
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
@@ -37,7 +38,14 @@ def get_target_score(*args, **kwargs):
     """A wrapper on the imported _get_target_score, but registered as a tag"""
     return _get_target_score(*args, **kwargs)
 
+@register.simple_tag(takes_context=True)
+def vet_all_is_allowed(context):
+    request = context['request']
+    nle_id = request.GET.get('nonlocalizedevent')
+    cooldown_cache_key = settings.VETTING_COOLDOWN_KEY+"_"+nle_id
 
+    return cache.get(cooldown_cache_key) is None
+        
 @register.simple_tag
 def display_score_details(target_id):
 
