@@ -1,6 +1,7 @@
 .score-details-wrapper {
   max-width: 900px;
   margin: 20px auto;
+  padding-bottom: 20px;
 }
 
 .score-details-wrapper .score-card {
@@ -109,8 +110,8 @@
   padding: 0;
   margin: 0;
   border-bottom: 4px solid #2c3e50;
-  margin-left: 10px;
-  margin-right: 10px;
+  margin-left: 20px;
+  margin-right: 20px;
 }
 
 .event-subtab {
@@ -129,6 +130,8 @@
   text-align: center;
   margin: 0;
   margin-bottom: -4px;
+  margin-left: 20px;
+  margin-right: -20px;
   position: relative;
   z-index: 1;
 }
@@ -142,10 +145,10 @@
   border-right: 4px solid #2c3e50;
   border-top: 4px solid #2c3e50;
   border-radius: 6px 6px 0 0;
-  width: 45%;
+  width: 38%;
+  z-index: 2;
 }
 
-/* Content panel — full border on ALL sides including top */
 .score-card-content-basic {
   background-color: white;
   padding: 20px;
@@ -159,8 +162,8 @@
   border: 4px solid #2c3e50;
   border-radius: 0 0 6px 6px;
   position: relative;
-  margin-left: 10px;
-  margin-right: 10px;
+  margin-left: 20px;
+  margin-right: 20px;
 }
 
 .score-card-content-filled {
@@ -170,8 +173,8 @@
   border-right: 4px solid #2c3e50;
   border-bottom: none;
   border-top: none;
-  margin-left: 10px;
-  margin-right: 10px;
+  margin-left: 20px;
+  margin-right: 20px;
 }
 
 .event-card {
