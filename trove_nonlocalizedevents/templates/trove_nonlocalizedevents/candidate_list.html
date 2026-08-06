@@ -61,7 +61,7 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 <br><br>
 <div class="row">
   {% if request.user.is_authenticated %}
-  {% if can_vet_all %}
+  {% if can_vet_all or request.user.is_superuser %}
   <a
     href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
     title="Run vetting for all candidates"
