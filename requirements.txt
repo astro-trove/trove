@@ -38,13 +38,12 @@ skypatrol==0.6.21
 slack_sdk==3.42.0
 specutils==1.20.3
 sphinx==9.0.4
-candidate_vetting @ git+https://github.com/astro-trove/candidate_vetting.git@v0.4.0-alpha
+candidate_vetting @ git+https://github.com/astro-trove/candidate_vetting.git@v0.5.1
 sphinx_book_theme==1.2.0
 sphinx_design==0.7.0
 SQLAlchemy==2.0.50
 tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@v2.32.3
 tom-alertstreams==1.2.1
-tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git
+tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git@0.9.0
 tom-registration==1.0.5
-trove_mpc @ git+https://github.com/astro-trove/trove-mpc.git
 whitenoise==6.12.0

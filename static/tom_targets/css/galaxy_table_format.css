@@ -40,6 +40,74 @@
     top: 0.1em;
 }
 
-.galaxies td {
-    vertical-align: bottom;
+table.table.galaxies {
+  font-size: 14px !important;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden; /* Critical for border-radius to work on table */
+  border-collapse: collapse; /* Removes gaps between cells */
+  display: block;
+  overflow-x: auto;
+  table-layout: auto;
+}
+
+table.table.galaxies th {
+  background-color: lightgray !important;
+  color: #2c3e50;
+  font-weight: bold; /* Note: "weight" should be "font-weight" */
+  border: none !important; /* Remove all borders from headers */
+}
+
+table.table.galaxies td {
+  vertical-align: bottom !important;
+  border: none !important; /* Remove all borders from cells */
+  border-right: 1px solid transparent !important; /* Optional: add subtle spacing if needed */
+}
+
+/* this adjusts the width of the name column only */
+table.table.galaxies td:nth-child(2),
+table.table.galaxies th:nth-child(2) {
+  max-width: 170px; /* Constrain Name column width */
+  /* word-break: break-word; /* Allow text to wrap within the column */
+  overflow-wrap: break-word; /* Backup for word breaking */
+}
+
+details {
+  margin-top: 1rem;
+}
+
+details summary {
+  background-color: #2c3e50;
+  color: white !important;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  margin-bottom: 0; /* Remove gap between header and table */
+  border-radius: 4px 4px 0 0; /* Round only top corners */
+  font-weight: bold;
+}
+
+details summary h5 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: white !important;
+}
+
+details summary:hover {
+  background-color: #1a252f;
+  color: white !important;
+}
+
+/* Make the table feel connected to the header */
+details > table.table.galaxies {
+  margin-bottom: 0;
+  border-radius: 0 0 4px 4px; /* Round only bottom corners */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Remove the light gray from header row */
+details table.table.galaxies th {
+  background-color: #f8f9fa !important; /* Lighter than body rows */
+  color: #333;
+  font-weight: bold;
 }
