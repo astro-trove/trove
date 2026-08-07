@@ -145,7 +145,7 @@ class TestStaticCatalogStandardization:
         cat = DesiDr1()
         df = pd.DataFrame(
             {
-                "desiname": "DESI123",
+                "name": "DESI123",
                 "target_ra": [150.0],
                 "target_dec": [30.0],
                 "z": [0.1],
@@ -224,7 +224,7 @@ class TestStaticCatalogStandardization:
         cat = GladePlus()
         df = pd.DataFrame(
             {
-                "gn": ["GLADE12345"],
+                "name": ["GLADE12345"],
                 "ra": [150.0],
                 "dec": [30.0],
                 "z_helio": [0.05],
@@ -295,7 +295,7 @@ class TestStaticCatalogStandardization:
         cat = Ps1()
         df = pd.DataFrame(
             {
-                "objname": ["PS112345"],
+                "name": ["PS112345"],
                 "ra": [150.0],
                 "dec": [30.0],
                 "z_phot": [0.1],
@@ -318,7 +318,7 @@ class TestStaticCatalogStandardization:
 
         cat = Sdss12Photoz()
         df = pd.DataFrame(
-            {"sdssid": ["SDSS12345"], "ra": [150.0], "dec": [30.0], "zph": [0.15], "e_zph": [0.02], "rmag": [19.5]}
+            {"name": ["SDSS12345"], "ra": [150.0], "dec": [30.0], "zph": [0.15], "e_zph": [0.02], "rmag": [19.5]}
         )
 
         result = cat.to_standardized_catalog(df)
@@ -335,7 +335,7 @@ class TestStaticCatalogStandardization:
         cat = LsDr10South()
         df = pd.DataFrame(
             {
-                "objid": [12345],
+                "name": [12345],
                 "ra": [150.0],
                 "declination": [30.0],
                 "z_phot_mean": [0.15],
