@@ -77,8 +77,6 @@ def vet_kn_in_sn(
         nonlocalized_event_name, target_id, max_time=max_time
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
-    if skymap_score < 1e-2:
-        return
 
     ## get dataframes of potential hosts / AGN
     host_df, agn_df = vet_basic(event_candidate.target.id)
