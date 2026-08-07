@@ -65,7 +65,7 @@ def display_score_details(context, target_id):
         skymap_score=("Localization Score", _float_format),
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance Scoring", _str_int_format),
-        agn_score=("AGN Score", _bool_format),
+        agn_score=("AGN Score (0.1 or 1.0)", partial(_float_format, precision=1)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",
@@ -75,14 +75,14 @@ def display_score_details(context, target_id):
             "Light Curve Slope (positive is brightening)",
             partial(_float_format, unit="mag/day"),
         ),
-        phot_peak_lum_score=("Score from Maximum Luminosity", _float_format),
+        phot_peak_lum_score=("Score from Maximum Luminosity", partial(_float_format, precision=1)),
         phot_peak_time_score=(
             "Score from Time of Maximum Light Curve",
-            _float_format,
+            partial(_float_format, precision=1),
         ),
         phot_decay_rate_score=(
             "Score from Light Curve Slope",
-            _float_format,
+            partial(_float_format, precision=1),
         ),
     )
     order = list(keymap.keys())
@@ -112,7 +112,7 @@ def display_score_details(context, target_id):
 
     # Basic Score Details Card
     basic_card = {
-        "title": "Basic Scores (Not Event Specific)",
+        "title": "Basic Scores (Not Event-Specific)",
         "details": []
     }
     for queryset in basic_score_details:
@@ -288,8 +288,8 @@ def display_score_details(context, target_id):
     return mark_safe(html)
 
 
-def _float_format(flt, unit=""):
-    return f"{flt:.2f} {unit}"
+def _float_format(flt, unit="", precision=2):
+    return f"{flt:.{precision}f} {unit}"
 
 
 def _sci_format(flt, unit=""):
