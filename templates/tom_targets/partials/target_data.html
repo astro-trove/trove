@@ -46,24 +46,38 @@
   <dd class="col-sm-4">{{ target|ecliptic_lng|floatformat:6 }}</dd>
   <dd class="col-sm-5">{{ target|ecliptic_lat|floatformat:6 }}</dd>
 </dl>
+
+<!-- This displays the target extras values -->
 <dl class="row">
   {% for key, value in target.as_dict.items %}
-    {% if value != None and value != '' and key != 'name' and key != 'ra' and key != 'dec' and key != 'galactic_lng' and key != 'galactic_lat' and key != 'type' and key != 'epoch' %}
-      <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
-    {% if key == 'redshift' or key == 'mwebv' %}
-      <dd class="col-sm-6">{{ value|floatformat:4 }}</dd>
-    {% elif key == 'permissions' %}
-      <dd class="col-sm-6">{{ value|title }}</dd>
-    {% else %}
-      <dd class="col-sm-6">{{ value|truncate_value_for_display }}</dd>
-    {% endif %}
-    {% endif %}
+  {% if key != 'name' and key != 'ra' and key != 'dec' and key != 'galactic_lng' and key != 'galactic_lat' and key != 'type' and key != 'epoch' and key != 'permissions' %}
+  {% if key == 'redshift' or key == 'mwebv' %}
+  {% if value is None or value == 'nan' or value == '' or value|isnan %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">---</dd>
+  {% else %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">{{ value|floatformat:4 }}</dd>
+  {% endif %}
+  {% elif key == 'classification' %}
+  {% if value is None or value == 'nan' or value == '' or value|isnan %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">---</dd>
+  {% else %}
+  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+  <dd class="col-sm-6">{{ value|truncate_value_for_display }}</dd>
+  {% endif %}
+  {% endif %}
+  {% endif %}
   {% endfor %}
 </dl>
+
+<!-- This displays the custom trove_target properties (currently redundant with target extras values, hence the comment) -->
 <dl class="row">
-{% for key, value in extras.items %}
+  {% for key, value in extras.items %}
+  {% if key == 'mwebv' %}
   <dt class="col-sm-6">{{ key }}</dt>
   <dd class="col-sm-6">{{ value }}</dd>
-{% endfor %}
+  {% endif %}
+  {% endfor %}
 </dl>
-<h4>Photometry:</h4>
