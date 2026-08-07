@@ -100,11 +100,12 @@ def vet_bns(
         host_df = host_distance_match(host_df, target_id, nonlocalized_event_name)
 
         # choose the maximum score
-        host_score, host_name = get_distance_score(
+        host_score, host_name, host_catalog = get_distance_score(
             host_df, target_id, nonlocalized_event_name
         )
         update_score_factor(event_candidate, "host_distance_score", host_score)
         update_score_factor(event_candidate, "host_name", host_name)
+        update_score_factor(event_candidate, "host_catalog", host_catalog)
 
     else:
         # if no target redshift is known and no hosts are found, we don't want
@@ -114,6 +115,7 @@ def vet_bns(
         # and we should also clear out any existing scores / host names for it
         delete_score_factor(event_candidate, "host_distance_score")
         delete_score_factor(event_candidate, "host_name")
+        delete_score_factor(event_candidate, "host_catalog")
 
     ## AGN scoring
     if len(agn_df) != 0:

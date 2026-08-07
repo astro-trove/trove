@@ -65,6 +65,7 @@ def display_score_details(context, target_id):
         skymap_score=("Localization Score", _float_format),
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance Scoring", _str_int_format),
+        host_catalog=("Host Galaxy Source Catalog", _str_format),
         agn_score=("AGN Score (0.1 or 1.0)", partial(_float_format, precision=1)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
@@ -141,6 +142,7 @@ def display_score_details(context, target_id):
         event_card = None
         
         for score_factor in queryset:
+            print(score_factor.key)
             ec = score_factor.event_candidate
             nle = ec.nonlocalizedevent
             
@@ -167,7 +169,7 @@ def display_score_details(context, target_id):
             else:
                 value = (
                     fmter(score_factor.value)
-                    if label == "Host Galaxy used for Distance Scoring"
+                    if label in ("Host Galaxy used for Distance Scoring", "Host Galaxy Source Catalog")
                     else fmter(float(score_factor.value))
                 )
             
