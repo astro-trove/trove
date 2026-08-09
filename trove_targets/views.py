@@ -126,7 +126,3 @@ class CustomTargetCreateView(TargetCreateView):
 
 class TroveTargetListView(TargetListView):
     table_class = TroveTargetTable
-
-    def get_context_data(self, *args, **kwargs):
-        print("test that this is actually implemented")
-        return super().get_context_data(*args, **kwargs)

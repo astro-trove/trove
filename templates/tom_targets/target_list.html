@@ -55,13 +55,30 @@
     {% endif %}
     
     <hr>
+
+    {% block target_table_content %}
+    {# Search form (we refer to this id="filter-form" in the TargetTable.Meta.attrs) #}
+    <form id="filter-form" class="mb-3"
+      hx-get="{% url 'trove_targets:targetlist' %}"
+      hx-target="div.table-container"
+      hx-swap="outerHTML"
+      hx-indicator=".progress">
+        {% crispy filter.form %}
+    </form>
+    
+    {# Progress indicator #}
+    <div class="progress">
+        <div class="indeterminate"></div>
+    </div>
     
     {# The actual table #}
-    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
-    <form class="table-container">
-        {% include "tom_targets/partials/target_table_partial.html" %}
-    </form>
-    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    {# bootstrap_pagination page_obj extra=request.GET.urlencode #}
+    <div class="table-container">
+        {% include "trove_targets/partials/target_table_partial.html" %}
+    </div>
+    {# bootstrap_pagination page_obj extra=request.GET.urlencode #}
+
+    {% endblock target_table_content %}
   </div>
 </div>
 
