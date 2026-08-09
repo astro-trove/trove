@@ -7,13 +7,14 @@ from dal import autocomplete
 
 from tom_common.hooks import run_hook
 
-from tom_targets.views import TargetCreateView
+from tom_targets.views import TargetCreateView, TargetListView
 from tom_targets.models import BaseTarget, Target
 from tom_targets.forms import TargetForm, SiderealTargetCreateForm
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 
 from .forms import TargetNLEForm, CustomSiderealTargetCreateForm
+from .tables import TroveTargetTable
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +123,10 @@ class CustomTargetCreateView(TargetCreateView):
 
         print("Returning", form_class, form_class._meta.fields)
         return form_class
+
+class TroveTargetListView(TargetListView):
+    table_class = TroveTargetTable
+
+    def get_context_data(self, *args, **kwargs):
+        print("test that this is actually implemented")
+        return super().get_context_data(*args, **kwargs)

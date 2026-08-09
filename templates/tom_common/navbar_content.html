@@ -27,7 +27,7 @@
     </ul>
 </li>
 <li class="nav-item {% if 'targets' in request.resolver_match.route %}active{% endif %}">
-    <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
+    <a class="nav-link" href="{% url 'trove_targets:targetlist' %}">EM Candidates</a>
 </li>
 <!--
 <li class="nav-item {% if request.resolver_match.namespace == 'alerts' %}active{% endif %}">
