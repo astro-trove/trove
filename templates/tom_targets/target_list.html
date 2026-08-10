@@ -56,7 +56,8 @@
       hx-target="div.table-container"
       hx-swap="outerHTML"
       hx-indicator=".progress">
-        {% crispy filter.form %}
+      {% crispy filter.form %}
+      <button type="submit" class="btn btn-primary">Apply Filter</button>
     </form>
     
     {# Progress indicator #}

@@ -162,7 +162,9 @@ class TroveTargetListView(TargetListView):
         qs = qs.annotate(
             associated_events = StringAgg(
                 "eventcandidate__nonlocalizedevent__event_id",
-                delimiter=","
+                delimiter="\n",
+                distinct=True,
+                order_by="eventcandidate__nonlocalizedevent__event_id"
             )
         )
 
