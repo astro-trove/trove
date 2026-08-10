@@ -1,9 +1,10 @@
 import logging
+from datetime import datetime
 
 from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView
 from django.conf import settings
-from django.db.models import Value, CharField, Min
+from django.db.models import Value, CharField, Min, Q
 from django.db.models.functions import Cast, Replace
 from dal import autocomplete
 
@@ -143,14 +144,16 @@ class TroveTargetListView(TargetListView):
         )
 
         # add the date of first detection
-        qs = qs.filter(
-            reduceddatum__data_type="photometry", # only get photometry
-            reduceddatum__value__has_key="magnitude", # only get detections
-        ).exclude(
-            reduceddatum__source_name="ATLAS", # exclude ATLAS forced photometry
-        ).annotate(
-            first_detection = Min("reduceddatum__timestamp")
+        qs = qs.annotate(
+            first_detection=Min(
+                "reduceddatum__timestamp",
+                filter=Q(
+                    ~Q(reduceddatum__source_name="ATLAS"), # exclude ATLAS FP which can have spurious detections
+                    reduceddatum__data_type="photometry", # only include phot, not spec
+                    reduceddatum__value__has_key="magnitude", # make sure it is a detection, not a limit
+                )
+            )
         )
-        
+
         return qs
     
