@@ -3,6 +3,8 @@ import logging
 from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView
 from django.conf import settings
+from django.db.models import Value, CharField, Min
+from django.db.models.functions import Cast, Replace
 from dal import autocomplete
 
 from tom_common.hooks import run_hook
@@ -126,3 +128,29 @@ class CustomTargetCreateView(TargetCreateView):
 
 class TroveTargetListView(TargetListView):
     table_class = TroveTargetTable
+
+    def get_queryset(self, *args, **kwargs):
+        qs = super().get_queryset(*args, **kwargs)
+
+        # add the redshift to the queryset in a nice format for the table
+        qs = qs.annotate(
+            _z = Replace(
+                Cast("redshift", output_field=CharField()),
+                Value("NaN"),
+                Value("—"),
+                output_field=CharField()
+            )
+        )
+
+        # add the date of first detection
+        qs = qs.filter(
+            reduceddatum__data_type="photometry", # only get photometry
+            reduceddatum__value__has_key="magnitude", # only get detections
+        ).exclude(
+            reduceddatum__source_name="ATLAS", # exclude ATLAS forced photometry
+        ).annotate(
+            first_detection = Min("reduceddatum__timestamp")
+        )
+        
+        return qs
+    

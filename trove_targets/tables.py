@@ -12,7 +12,7 @@ class TroveTargetTable(HTMXTable):
 
     class Meta(HTMXTable.Meta):
         model = Target # the model to pull the table info from
-        fields = ['name', 'ra', 'dec', 'created'] # the columns in the table
+        fields = ['name', 'ra', 'dec', 'created', 'first_detection', '_z'] # the columns in the table
         exclude = ["selection"]        
         template_name = "django_tables2/bootstrap5.html"
         partial_template_name = "trove_targets/partials/target_table_partial.html"
