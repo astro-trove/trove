@@ -6,6 +6,7 @@ from django.views.generic.edit import CreateView
 from django.conf import settings
 from django.db.models import Value, CharField, Min, Q
 from django.db.models.functions import Cast, Replace
+from django.contrib.postgres.aggregates import StringAgg
 from dal import autocomplete
 
 from tom_common.hooks import run_hook
@@ -130,6 +131,8 @@ class CustomTargetCreateView(TargetCreateView):
 class TroveTargetListView(TargetListView):
     table_class = TroveTargetTable
 
+    ordering = ['-created']
+    
     def get_queryset(self, *args, **kwargs):
         qs = super().get_queryset(*args, **kwargs)
 
@@ -152,6 +155,14 @@ class TroveTargetListView(TargetListView):
                     reduceddatum__data_type="photometry", # only include phot, not spec
                     reduceddatum__value__has_key="magnitude", # make sure it is a detection, not a limit
                 )
+            )
+        )
+
+        # associated NLEs
+        qs = qs.annotate(
+            associated_events = StringAgg(
+                "eventcandidate__nonlocalizedevent__event_id",
+                delimiter=","
             )
         )
 
