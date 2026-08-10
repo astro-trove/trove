@@ -14,26 +14,43 @@ class TroveTargetListFilterSet(TargetFilterSet):
     implemented in the TOMToolkit
     """
 
-    has_associated_events = django_filters.BooleanFilter(
-        field_name='associated_events',
-        method='filter_has_associated_events',
-        label='Is associated to a multi-messenger event?',
-        widget=forms.CheckboxInput,
-    )
-
+    # define the django_filters filter classes
     target_name_search = django_filters.CharFilter(
         field_name='name',
         method='general_search',
         label='Candidate Name (Fuzzy)',
         widget=forms.TextInput
     )
+
+    
+    has_associated_events = django_filters.BooleanFilter(
+        field_name='associated_events',
+        method='filter_has_associated_events',
+        label='MMA-associated Events Only',
+        widget=forms.CheckboxInput,
+    )
+    
+    associated_event = django_filters.CharFilter(
+        field_name="associated_events",
+        method="filter_associated_event",
+        label="Associated MMA Event (Fuzzy)",
+        widget=forms.TextInput
+    )
+    
+    # define the methods that actually do the filtering
     def filter_has_associated_events(self, queryset, name, value):
         if value:
             return queryset.filter(
                 eventcandidate__nonlocalizedevent__isnull=False
             ).distinct().order_by("-associated_events")
         return queryset.order_by("-associated_events")
-    
+
+    def filter_associated_event(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(associated_events__icontains=value)
+
+        
     @property
     def form(self):
         """Override form property to configure crispy forms helper. This is to remove
@@ -57,8 +74,15 @@ class TroveTargetListFilterSet(TargetFilterSet):
             self._form.helper.layout = Layout(
                 # Row 1: Primary Search parameters
                 Row(
-                    Column('target_name_search', css_class='form-group col-md-3'),
-                    Column('has_associated_events', css_class='form-group col-md-3 d-flex align-items-end'),
+                    Column('target_name_search', css_class='form-group col-md-4'),
+                    Column('associated_event', css_class='form-group col-md-4'),
+                ),
+                Row(
+                    Column(
+                        'has_associated_events',
+                        css_class='form-group col-md-4 mb-0'
+                    ),
+                    css_class='mt-0'
                 ),
                 # 2. The Toggle Button (HTML)
                 HTML("""
