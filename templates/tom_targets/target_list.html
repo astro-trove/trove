@@ -59,12 +59,7 @@
       {% crispy filter.form %}
       <button type="submit" class="btn btn-primary">Apply Filter</button>
     </form>
-    
-    {# Progress indicator #}
-    <div class="progress">
-        <div class="indeterminate"></div>
-    </div>
-    
+        
     {# The actual table #}
     {# bootstrap_pagination page_obj extra=request.GET.urlencode #}
     <div class="table-container">

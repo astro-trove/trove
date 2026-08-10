@@ -19,6 +19,7 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 
 from .forms import TargetNLEForm, CustomSiderealTargetCreateForm
 from .tables import TroveTargetTable
+from .filters import TroveTargetListFilterSet
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +131,8 @@ class CustomTargetCreateView(TargetCreateView):
 
 class TroveTargetListView(TargetListView):
     table_class = TroveTargetTable
-
+    filterset_class = TroveTargetListFilterSet
+    
     ordering = ['-created']
     
     def get_queryset(self, *args, **kwargs):
