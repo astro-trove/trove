@@ -2,8 +2,8 @@ from django.urls import path
 from .views import (
     EventCandidateCreateFromNLEView,
     generate_report,
-    SetPhotScoringMethodView,
     ToggleAgnCacheView,
+    TogglePhotScoringMethodView,
     RefreshCandidateList,
     SkymapPartialView,
 )
@@ -23,9 +23,9 @@ urlpatterns = [
         name="toggle-agn-cache",
     ),
     path(
-        "set-phot-scoring-method/",
-        SetPhotScoringMethodView.as_view(),
-        name="set-phot-scoring-method",
+        "toggle-phot-scoring-method/",
+        TogglePhotScoringMethodView.as_view(),
+        name="toggle-phot-scoring-method",
     ),
     path(
         "refresh-candidate-list",

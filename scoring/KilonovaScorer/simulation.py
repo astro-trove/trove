@@ -28,6 +28,32 @@ def arcade_progress_bar(current, total, bar_length=30):
     if current == total:
         sys.stdout.write('\n')
 
+def _prewarm_bandpasses(bands):
+    """Download and cache every bandpass once, serially, in this process.
+
+    Guards against the concurrent-download race described in
+    :func:`simulate_kilonova`. Safe to call repeatedly: a cached band is a
+    no-op. A band that cannot be resolved is reported and left alone rather
+    than raised on -- the simulation itself will fail on it with a clearer
+    message than this helper can give.
+    """
+    try:
+        import sncosmo
+    except ImportError:  # redback can be present without sncosmo exposed
+        return
+
+    missing = []
+    for band in bands:
+        try:
+            sncosmo.get_bandpass(band)
+        except Exception as exc:  # noqa: BLE001 - report, do not abort
+            missing.append(f"{band} ({type(exc).__name__})")
+    if missing:
+        print(f"⚠ bandpasses that would not load: {', '.join(missing)}", flush=True)
+    else:
+        print(f"✔ {len(bands)} bandpasses cached", flush=True)
+
+
 # Worker function must be top-level for multiprocessing
 def simulate_single_sample(sample_id, MODEL_NAME, TIME, FILTER_BANDS, z, mu, RANDOM_SEED=42):
     import numpy as np
@@ -157,6 +183,20 @@ def simulate_kilonova(
     ncores = min(6, multiprocessing.cpu_count() - 1)
     print(f"🕹 {N_SIM} samples x {len(FILTER_BANDS)} bands x {len(TIME)} epochs "
           f"= {est_rows:,} rows, on {ncores} cores", flush=True)
+
+    # Must happen BEFORE the Pool starts. sncosmo fetches a bandpass the first
+    # time it is used and caches it under ~/.astropy/cache/sncosmo. With a cold
+    # cache every worker reaches the same uncached band at the same moment and
+    # they all download it to the same path concurrently; one of them reads a
+    # partially written file, gets an empty transmission array, and the run
+    # dies far downstream with
+    #
+    #     ValueError: zero-size array to reduction operation maximum which has
+    #     no identity
+    #
+    # which names neither the band nor the cache. Touching every bandpass once,
+    # serially, in the parent makes the workers' lookups pure cache hits.
+    _prewarm_bandpasses(FILTER_BANDS)
 
     if not save:
         # Small test runs only -- everything is held in memory.

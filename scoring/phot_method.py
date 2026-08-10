@@ -18,6 +18,14 @@ TROVE ranks a candidate by multiplying a set of subscores together (see
     is run once per event by :func:`scoring.tasks.async_kilonova_score` and
     stored as a ``ScoreFactor`` row keyed :data:`KILONOVA_SCORE_KEY`.
 
+    It replaces the photometry factor of the plain **KN** score only. An SSM
+    event also gets a KN-in-SN and a super-KN score, and those keep the TROVE
+    check: the grids are populations of bare kilonovae, so P_tail_KNe would
+    penalise the very excess flux that defines those two classes. This is
+    enforced by :data:`KILONOVA_TRANSIENT` below, in the scoring loop -- *not*
+    by restricting when the method can be chosen, so the toggle is free to be
+    on for any event.
+
 The choice, and the parameters the KilonovaSCORER run was configured with, live
 in the Django cache rather than the database, and are keyed **per non-localized
 event**. Unlike ``agn_toggle``, which is a cheap site-wide display flag, a
@@ -51,6 +59,11 @@ PHOT_METHOD_CHOICES = [
 ]
 PHOT_METHOD_LABELS = dict(PHOT_METHOD_CHOICES)
 
+#: The only entry of :data:`scoring.util.TRANSIENTS` whose photometry factor
+#: KilonovaSCORER may supply. Lives here rather than in ``util`` so that it can
+#: be read without pulling in astropy and the ORM.
+KILONOVA_TRANSIENT = "KN"
+
 #: Cache key prefixes. Each is suffixed with the non-localized event id, so one
 #: event's method and run parameters cannot leak into another's. ``None``
 #: timeouts below mean "never expire" -- these are settings, not derived data,
@@ -73,9 +86,16 @@ SCORED_CACHE_VERSION_KEY = "event_candidates_scored_version"
 KILONOVA_SCORE_KEY = "kilonova_score"
 KILONOVA_SKIP_KEY = "kilonova_skip_reason"
 
-#: Defaults for the KilonovaSCORER form. Keys match the keyword arguments of
-#: :func:`scoring.kilonova_scoring.score_event` (which forwards the last four
-#: on to ``kilonovascorer_v3``), so the dict can be splatted straight in.
+#: The parameters every KilonovaSCORER run uses. Keys match the keyword
+#: arguments of :func:`scoring.kilonova_scoring.score_event` (which forwards the
+#: last four on to ``kilonovascorer_v3``), so the dict can be splatted straight
+#: in.
+#:
+#: **This is the only place these are set.** The UI offers the choice of
+#: scoring method and nothing else: the numbers below are the paper's fiducial
+#: values plus automatic per-candidate grid selection, and a vetter picking
+#: between them in a modal was fourteen ways to get a worse answer than the
+#: default. Change a value here to change it for every run.
 DEFAULT_KILONOVA_PARAMS = {
     "grid_path": "",        # "" means pick the nearest grid per candidate distance
     "max_grid_offset": 0.5,
@@ -102,12 +122,16 @@ DEFAULT_KILONOVA_PARAMS = {
     "random_state": 42,
 }
 
-#: What to do with a candidate whose distance is further than
-#: ``max_grid_offset`` (as a fraction of its own distance) from every rung of
-#: the grid ladder. See ``KilonovaScorer/generate_ladder.py`` for why a grid is
-#: distance-specific at all: the k-correction and time dilation change the
-#: SHAPE of the magnitude distribution per band and epoch, so a badly matched
-#: rung cannot be corrected for after the fact.
+#: The valid values of ``grid_offset_action`` above -- what to do with a
+#: candidate whose distance is further than ``max_grid_offset`` (as a fraction
+#: of its own distance) from every rung of the grid ladder. Read by
+#: :func:`scoring.tasks.async_kilonova_score`; no longer rendered as form
+#: choices, kept as the enumeration and its rationale.
+#:
+#: See ``KilonovaScorer/generate_ladder.py`` for why a grid is distance-specific
+#: at all: the k-correction and time dilation change the SHAPE of the magnitude
+#: distribution per band and epoch, so a badly matched rung cannot be corrected
+#: for after the fact.
 GRID_OFFSET_ACTIONS = [
     ("score", "Score against the nearest rung anyway"),
     ("skip", "Leave the candidate unscored, recording the offset"),

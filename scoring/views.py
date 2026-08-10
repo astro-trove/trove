@@ -35,7 +35,15 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      VETTING_FORM_INITIALS,
                      DETECTION_HORIZON_DEFAULTS
                      )
-from .tasks import vet_all_async, associate_targets_with_nle_async
+from .phot_method import (KILONOVA,
+                          get_kilonova_params,
+                          get_phot_method,
+                          set_kilonova_status,
+                          )
+from .tasks import (vet_all_async,
+                    associate_targets_with_nle_async,
+                    kilonova_score_all_async,
+                    )
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .dynamic_catalogs import UserGalaxy
@@ -381,6 +389,29 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
             f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate; check back later.",
         )
         vet_all_async(ecs, nle, vetting_mode)
+
+        # This is where a KilonovaSCORER run starts -- not when the photometry
+        # toggle is clicked. The toggle only records the choice, so a user can
+        # set up several scoring changes and pay for one pass over the
+        # candidates here, rather than one run per click.
+        if get_phot_method(nle.id) == KILONOVA:
+            params = get_kilonova_params(nle.id)
+            set_kilonova_status(
+                nle.id,
+                state="running",
+                event_id=nle.event_id,
+                message=(
+                    f"Queued KilonovaSCORER scoring of {nle.event_id} candidates. "
+                    "Candidates show their previous score until their new one lands."
+                ),
+            )
+            kilonova_score_all_async(nle, params)
+            messages.info(
+                request,
+                f"{nle.event_id} is set to KilonovaSCORER, so its candidates are also "
+                "being re-scored against the simulation grid. That is a separate, "
+                "slower pass than the vetting above.",
+            )
 
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"

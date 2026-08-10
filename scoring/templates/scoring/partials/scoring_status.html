@@ -1,0 +1,10 @@
+{# Progress of this event's KilonovaSCORER run -- see scoring/tasks.py, which #}
+{# writes the status, and scoring/templatetags/scoring_controls.py, which reads #}
+{# it. Included by scoring_controls.html and usable on its own as #}
+{# {% scoring_status %} where the layout needs it somewhere else. #}
+{% if request.user.is_authenticated and phot_method_is_kilonova and kilonova_status %}
+  <div class="alert {% if kilonova_status.state == 'error' %}alert-danger{% elif kilonova_status.state == 'running' %}alert-info{% else %}alert-light{% endif %} py-1 px-2 mb-2" style="font-size:0.9em">
+    {% if kilonova_status.state == 'running' %}<i class="fa fa-spinner fa-spin"></i>{% endif %}
+    KilonovaSCORER: {{ kilonova_status.message }}
+  </div>
+{% endif %}

@@ -55,7 +55,9 @@ def display_score_details(target_id):
         skymap_score=("2D Localization Score", _float_format),
         host_distance_score=("3D Association Score", _float_format),
         host_name=("Host Galaxy Name", _str_int_format),
-        agn_score=("AGN Score (1 or 0)", _bool_format),
+        # not _bool_format: that is int(), which renders the 0.1 AGN penalty
+        # as a flat 0 and makes the label a lie
+        agn_score=("AGN Score (1 or 0.1)", _float_format),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",

@@ -32,6 +32,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from collections import OrderedDict
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -76,7 +77,64 @@ _DISTANCE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*mpc", re.IGNORECASE)
 #: generated at one redshift, so this only needs to beat any leading NaNs.
 _Z_SAMPLE_ROWS = 1000
 
-_CACHE: dict = {}
+#: Ceiling on the combined size of cached grids, in bytes.
+#:
+#: :func:`load_grid` keys its cache on (path, columns, bands, time cuts, mode),
+#: and a scoring run walks through many band combinations -- one per distinct
+#: set of filters a candidate was observed in. Unbounded, *every* combination
+#: is retained for the life of the process. That is invisible in a script that
+#: exits, and fatal under ``manage.py runserver``, which lives for days: the
+#: resident set only ever grows, and on WSL the OOM kill that ends it takes the
+#: whole VM -- editor included -- with it.
+#:
+#: A single band of a 40M-row rung is ~0.4 GB, so the default holds a working
+#: set of a few band combinations. Override with ``TROVE_GRID_CACHE_BYTES``;
+#: 0 disables caching entirely.
+GRID_CACHE_BYTES = int(os.environ.get("TROVE_GRID_CACHE_BYTES") or 2_000_000_000)
+
+#: key -> (frame, size_in_bytes), least-recently-used first so eviction pops
+#: from the front. Sizes are measured once on insert -- ``memory_usage(deep=
+#: True)`` walks the string column, which is not something to repeat on every
+#: cache hit.
+_CACHE: "OrderedDict[tuple, tuple[pd.DataFrame, int]]" = OrderedDict()
+
+
+def _cache_get(key):
+    """Cached frame for ``key``, marked most-recently-used, or None."""
+    entry = _CACHE.get(key)
+    if entry is None:
+        return None
+    _CACHE.move_to_end(key)
+    return entry[0]
+
+
+def _cache_put(key, df: pd.DataFrame) -> None:
+    """Cache ``df``, evicting least-recently-used frames to stay under budget.
+
+    A frame bigger than the entire budget is not cached at all: admitting it
+    would evict everything else and still leave the cache over its ceiling.
+    """
+    if GRID_CACHE_BYTES <= 0:
+        return
+    size = int(df.memory_usage(deep=True).sum())
+    if size > GRID_CACHE_BYTES:
+        logger.info(
+            "Not caching %s (%.0f MB): larger than the %.0f MB cache budget",
+            df.attrs.get("name", "grid"), size / 1e6, GRID_CACHE_BYTES / 1e6,
+        )
+        return
+
+    _CACHE[key] = (df, size)
+    _CACHE.move_to_end(key)
+
+    total = sum(sz for _, sz in _CACHE.values())
+    while total > GRID_CACHE_BYTES and len(_CACHE) > 1:
+        _, (evicted, evicted_size) = _CACHE.popitem(last=False)
+        total -= evicted_size
+        logger.info(
+            "Grid cache over budget: evicted %s (%.0f MB), %.0f MB now held",
+            evicted.attrs.get("name", "grid"), evicted_size / 1e6, total / 1e6,
+        )
 
 
 def _distance_from_redshift(z: float) -> float:
@@ -262,14 +320,20 @@ def load_grid(
         str(path.resolve()), path.stat().st_mtime,
         tuple(columns or ()), tuple(bands or ()), min_time, max_time, max_abs_mag, mode,
     )
-    if use_cache and key in _CACHE:
-        return _CACHE[key]
+    if use_cache:
+        cached = _cache_get(key)
+        if cached is not None:
+            return cached
 
     cols = list(columns) if columns else None
-    if cols and "redshift" not in cols:
+    cols_read = cols
+    if cols and "redshift" not in cols and not _is_parquet(path):
+        # A grid is generated at one redshift, so this column is tens of
+        # millions of copies of a single value -- 376 MB on a 47M-row selection,
+        # read and then immediately dropped. For Parquet the distance comes from
+        # the file instead (one row group), so it is never read. CSV has no
+        # cheap way to sample one value, so there it still rides along.
         cols_read = cols + ["redshift"]
-    else:
-        cols_read = cols
 
     if _is_parquet(path):
         import pyarrow.parquet as pq
@@ -300,7 +364,75 @@ def load_grid(
             filters.append(("band", "in", list(bands)))
         if max_time is not None and "time" in available:
             filters.append(("time", "<=", float(max_time)))
-        df = pd.read_parquet(path, columns=cols_read, filters=filters or None)
+        # Stream the read in batches rather than materialising one table.
+        #
+        # `pq.read_table(...).to_pandas(self_destruct=True)` builds the entire
+        # filtered result as Arrow first -- at float64, and with `band` as
+        # strings -- and only then hands it to pandas for the float32/categorical
+        # narrowing below. The peak is therefore the *wide* representation of the
+        # whole selection, several times the frame that comes back: measured on
+        # this 380M-row rung, a 5-band selection (47M rows, an 865 MB frame)
+        # peaked over 4.5 GB and tripped the OOM guard, even though it fits in
+        # memory comfortably once narrowed.
+        #
+        # Scanning batch by batch and narrowing each one before it is retained
+        # bounds the peak to (final frame + one batch + the concat copy). Same
+        # rows, same dtypes, same order -- the scanner reads row groups in file
+        # order and the filters are the identical pushdown expression.
+        #
+        # This is what makes a load that cannot be split by band survivable: a
+        # single candidate observed in more bands than `max_bands_per_load`
+        # forces all of them into one load, so the reader has to be the thing
+        # that stays bounded.
+        import pyarrow.dataset as pds
+
+        try:
+            expr = pq.filters_to_expression(filters) if filters else None
+        except AttributeError:  # pyarrow < 13
+            expr = pq._filters_to_expression(filters) if filters else None
+
+        # Fixing the category list up front keeps `band` categorical in every
+        # batch, so concat can stay categorical. As plain strings this column is
+        # ~2 GB on a 47M-row selection -- more than everything else combined.
+        cats = sorted(bands) if bands else None
+
+        # Readahead has to be pinned down or streaming loses to read_table. The
+        # scanner defaults to 16 batches x 4 fragments in flight, and since every
+        # row group here contains every band, the band filter prunes nothing --
+        # each prefetched batch is a fully decompressed row group. Measured on a
+        # 1-band selection (a 131 MB frame): 3.29 GB peak at the defaults against
+        # 14.7 s / 1.26 GB for the old read_table path. One batch at a time, one
+        # fragment at a time, is what actually bounds the read.
+        scanner = pds.dataset(path, format="parquet").scanner(
+            columns=cols_read,
+            filter=expr,
+            batch_size=250_000,
+            batch_readahead=1,
+            fragment_readahead=1,
+            use_threads=False,
+        )
+        parts = []
+        for batch in scanner.to_batches():
+            if batch.num_rows == 0:
+                continue
+            part = batch.to_pandas(self_destruct=True, split_blocks=True)
+            del batch
+            for col in ("time", "absolute_magnitude"):
+                if col in part.columns:
+                    part[col] = part[col].astype("float32")
+            if "sample_id" in part.columns:
+                part["sample_id"] = part["sample_id"].astype("int32")
+            if cats is not None and "band" in part.columns:
+                part["band"] = pd.Categorical(part["band"], categories=cats)
+            parts.append(part)
+
+        if not parts:
+            raise ValueError(
+                f"Grid {path.name} returned no rows for bands={list(bands or [])}, "
+                f"max_time={max_time}"
+            )
+        df = pd.concat(parts, ignore_index=True, copy=False) if len(parts) > 1 else parts[0]
+        del parts  # drop the per-batch references so concat's inputs can be freed
     else:
         available = set(pd.read_csv(path, nrows=0).columns)
         if cols_read:
@@ -316,7 +448,7 @@ def load_grid(
     if missing:
         raise ValueError(f"Grid {path.name} is missing required column(s): {sorted(missing)}")
 
-    distance = grid_distance_mpc(df)
+    distance = grid_distance_mpc(df if "redshift" in df.columns else path)
     df = df.drop(columns=[c for c in ("redshift",) if cols and c not in cols and c in df.columns])
 
     # Narrow the two big float columns; float32 is ~7 significant digits, far
@@ -362,7 +494,7 @@ def load_grid(
     df.attrs["distance_mpc"] = distance
 
     if use_cache:
-        _CACHE[key] = df
+        _cache_put(key, df)
     logger.info(
         "Loaded %s: %d/%d rows, %d simulations, t=[%.3f, %.2f] d, "
         "M=[%.2f, %.2f], D_L=%s Mpc, %.0f MB in memory",

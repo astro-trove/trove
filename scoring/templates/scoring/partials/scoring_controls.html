@@ -1,0 +1,35 @@
+{# Scoring controls module -- see scoring/templatetags/scoring_controls.py. #}
+{# Rendered by {% scoring_controls %}; every value it needs comes from the tag, #}
+{# never from the including page's context, so it can be dropped anywhere. #}
+{% if request.user.is_authenticated %}
+  <span class="scoring-controls">
+    <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if nle_id %}?nonlocalizedevent={{ nle_id }}{% endif %}"
+       class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2"
+       title="Whether an AGN match penalises a candidate's score. Applies site-wide.">
+      {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
+    </a>
+
+    {# One click flips the ranking between the two photometry methods. The #}
+    {# method is stored per event, so this needs an event to act on. #}
+    {% if nle_id %}
+      <a href="{% url 'trove_nonlocalizedevents:toggle-phot-scoring-method' %}?nonlocalizedevent={{ nle_id }}"
+         class="btn {% if phot_method_is_kilonova %}btn-success{% else %}btn-light{% endif %} mb-2"
+         title="Supplies the photometry factor of the KN score. Click to switch to {% if phot_method_is_kilonova %}TROVE photometry scoring{% else %}KilonovaSCORER{% endif %}.">
+        <i class="fa fa-line-chart"></i>
+        Photometry Scoring: {% if phot_method_is_kilonova %}KilonovaSCORER{% else %}TROVE{% endif %}
+      </a>
+    {% endif %}
+  </span>
+
+  {# Stated on the page, not just enforced in scoring/util.py: the grids are #}
+  {# populations of bare kilonovae, so the score means nothing for the two #}
+  {# transients whose defining feature is extra flux on top of one. #}
+  {% if phot_method_is_kilonova %}
+    <div class="text-muted mb-2" style="font-size:0.85em">
+      KilonovaSCORER supplies the <strong>KN</strong> score only &mdash; KN-in-SN
+      and super-KN keep TROVE photometry scoring.
+    </div>
+  {% endif %}
+
+  {% if show_status %}{% include "scoring/partials/scoring_status.html" %}{% endif %}
+{% endif %}

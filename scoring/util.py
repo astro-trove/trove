@@ -25,7 +25,12 @@ from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 from .models import ScoreFactor
-from .phot_method import KILONOVA, KILONOVA_SCORE_KEY, get_phot_method
+from .phot_method import (
+    KILONOVA,
+    KILONOVA_SCORE_KEY,
+    KILONOVA_TRANSIENT,
+    get_phot_method,
+)
 
 import time
 
@@ -38,6 +43,10 @@ DICT_TRANSIENTS_PARAM_RANGES = {
     "KN-in-SN": KN_IN_SN_PARAM_RANGES,
     "super-KN": SUPER_KN_PARAM_RANGES,
 }
+
+# KILONOVA_TRANSIENT -- the one entry of TRANSIENTS KilonovaSCORER may score --
+# is defined in phot_method and re-exported here, where the loop that uses it
+# lives.
 
 
 # default subscore names
@@ -223,11 +232,21 @@ def get_event_candidate_scores(
                 ]
             )
 
-            if phot_method == KILONOVA:
+            if phot_method == KILONOVA and transient == KILONOVA_TRANSIENT:
                 # KilonovaSCORER's cumulative P_tail_KNe, in [0, 1], written by
                 # the background run, used raw: a score of 0 means every epoch
                 # falls outside the simulated kilonova population, and zeroing
                 # the total score is the intended reading of that.
+                #
+                # Only the plain "KN" score may use it. The grids it scores
+                # against are populations of bare kilonovae (see
+                # ``KilonovaScorer/simulation.py``), so P_tail_KNe answers "is
+                # this light curve consistent with a kilonova?" -- not "is it a
+                # kilonova sitting on a supernova?" (KN-in-SN) or "is it a
+                # kilonova far brighter than the simulated population?"
+                # (super-KN). Applying it to those would penalise exactly the
+                # excess flux that defines them, so they keep the TROVE
+                # parameter-range check with their own PARAM_RANGES.
                 #
                 # A candidate with no score at all is a different thing -- not
                 # yet run, too sparse, no usable distance, no band in common

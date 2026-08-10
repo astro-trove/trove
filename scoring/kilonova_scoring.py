@@ -305,6 +305,10 @@ class KilonovaScore:
     per_observation: Optional[pd.DataFrame] = None
     binned: Optional[pd.DataFrame] = None
     survivors: Optional[pd.DataFrame] = None
+    #: Joint cross-band ABC survival chain (paper eq. 18) and the epoch, if
+    #: any, at which |S_t| hit zero. See :func:`abc_survival_chain`.
+    abc_chain: List[Dict[str, Any]] = field(default_factory=list)
+    abc_collapse_time: Optional[float] = None
 
     @property
     def scored(self) -> bool:
@@ -328,6 +332,7 @@ class KilonovaScore:
                 min(self.final_survivors.values()) if self.final_survivors else np.nan
             ),
             "grid": self.grid,
+            "abc_collapse_time": self.abc_collapse_time,
             "skip_reason": self.skip_reason,
             "score_note": self.score_note,
         }
@@ -336,6 +341,68 @@ class KilonovaScore:
 # ---------------------------------------------------------------------------
 # Scoring
 # ---------------------------------------------------------------------------
+def abc_survival_chain(per_obs: pd.DataFrame) -> Tuple[List[Dict[str, Any]], Optional[float]]:
+    """The paper's sequential ABC survival filter, intersected across all bands.
+
+    Implements eq. 18 of Darc & Kilpatrick (2026)::
+
+        S_t = S_{t-1} INTERSECT {i : M_rep,i(t) in ROPE(M_obs(t), k_ABC*sigma_obs)}
+
+    ``kilonovascorer_v3`` already runs ``overlap_chain`` and reports
+    ``final_n_survivors``, but it does so **per band**: each band gets its own
+    independent chain. The paper is explicit that the filter is joint -- "As
+    each subsequent observation is incorporated *across all available
+    photometric bands*, only simulations that satisfy all previous ROPE
+    criteria are retained" (Section 3.5). A simulation must therefore explain
+    the candidate in *every* band at *every* epoch, and per-band chains are
+    strictly more permissive: a simulation that fails in g but survives in r
+    is kept by the per-band version and discarded by the paper's.
+
+    Rebuilding the chain here rather than in the vendored scorer keeps this a
+    boundary decision in the integration layer, the same way
+    ``zero_on_total_rejection`` is (see ``score_candidate``).
+
+    ``sample_id`` labels a parameter draw and is shared across bands, so
+    intersecting id sets from different bands is meaningful.
+
+    Returns ``(chain, collapse_time)`` -- one entry per epoch in time order,
+    and the time of the first epoch where the running intersection is empty
+    (``None`` if it never collapses).
+    """
+    if per_obs.empty or not {"consistent_ids", "obs_time"} <= set(per_obs.columns):
+        return [], None
+
+    # One step per epoch, pooling every band observed at that epoch: the filter
+    # advances in time, not in (time, band) pairs.
+    chain: List[Dict[str, Any]] = []
+    survivors: Optional[set] = None
+    collapse_time: Optional[float] = None
+
+    for t_obs, group in per_obs.groupby("obs_time", sort=True):
+        # |A_t| is an INTERSECTION over the bands observed at this epoch, not a
+        # union: eq. 18 retains a simulation only if it satisfies the ROPE
+        # criterion of every observation, so one that matches in r but misses
+        # in g has not explained the epoch.
+        accepted: Optional[set] = None
+        for ids in group["consistent_ids"]:
+            s = set(ids) if ids is not None else set()
+            accepted = s if accepted is None else (accepted & s)
+        accepted = accepted or set()
+        survivors = set(accepted) if survivors is None else (survivors & accepted)
+
+        chain.append({
+            "time": float(t_obs),
+            # |A_t| -- accepted at this epoch alone, the denominator of the
+            # paper's relative survival fraction f_surv (eq. 19)
+            "n_accepted": len(accepted),
+            "n_survivors": len(survivors),          # |S_t|
+        })
+        if not survivors and collapse_time is None:
+            collapse_time = float(t_obs)
+
+    return chain, collapse_time
+
+
 def _cumulative_score(per_obs: pd.DataFrame, bin_size: float) -> Tuple[Optional[pd.DataFrame], Optional[str]]:
     """Run the logit-space cumulative aggregation, guarding its edge cases.
 
@@ -387,6 +454,7 @@ def score_candidate(
     band_list: Optional[Sequence[str]] = None,
     keep_frames: bool = True,
     zero_on_total_rejection: bool = True,
+    abc_penalty: bool = True,
     random_state=42,
     **scorer_kwargs,
 ) -> KilonovaScore:
@@ -487,7 +555,14 @@ def score_candidate(
             from .KilonovaScorer.core import FILTER_LOOKUP
 
             grid_bands = [k for k, v in FILTER_LOOKUP.items() if v in result.bands]
-        grid = load_simulation_grid(path, bands=grid_bands or None, mode=mode)
+        # Same time-axis trim as score_event_by_distance: nothing past the last
+        # observed epoch (plus one bin, since the last bin ends at t+width) can
+        # affect the score, so it is not worth reading.
+        obs_tmax = float(data_obs["time_after_gw"].max())
+        grid = load_simulation_grid(
+            path, bands=grid_bands or None, mode=mode,
+            max_time=obs_tmax + time_bin_width if np.isfinite(obs_tmax) else None,
+        )
         result.grid = Path(path).name
     else:
         result.grid = getattr(grid, "attrs", {}).get("name", result.grid)
@@ -568,6 +643,39 @@ def score_candidate(
         result.score_note = (
             f"all {len(per_obs)} epoch(s) fall outside the simulated population "
             "(p_tail = 0): categorical rejection, not missing data"
+        )
+
+    # ------------------------------------------------------------------
+    # ABC hard penalisation (paper Section 3.5).
+    #
+    # "In cases where |S_t| = 0 at any epoch t, the candidate is flagged as
+    # temporally inconsistent with the kilonova model grid. Even if a high
+    # P_near or P_tail score is recorded for a subsequent isolated
+    # observation, the cumulative kilonova score is penalized and set to
+    # zero."
+    #
+    # This is the mechanism that separates a kilonova from an impostor whose
+    # individual epochs look fine -- it is what collapses SN 2025ulz at
+    # t ~ 6 d (paper Figure 5) and every simulated supernova class by 3-4 d
+    # (Figure 7). Without it the ranking is the paper's "Base (Uncorrected)"
+    # curve, which is not what the validation plots report.
+    #
+    # It runs last, and deliberately overrides a finite score: a candidate
+    # that no single simulation can explain across all its epochs is rejected
+    # however plausible any one epoch looked in isolation.
+    # ------------------------------------------------------------------
+    chain, collapse_time = abc_survival_chain(per_obs)
+    result.abc_chain = chain
+    result.abc_collapse_time = collapse_time
+    if abc_penalty and collapse_time is not None:
+        prior = result.score
+        result.score = 0.0
+        result.score_err = 0.0
+        result.skip_reason = None
+        was = f" (uncorrected {prior:.4g})" if prior is not None else ""
+        result.score_note = (
+            f"ABC survival collapsed at t = {collapse_time:.2f} d: no simulated "
+            f"kilonova is consistent with every epoch{was}"
         )
 
     if keep_frames:
@@ -807,7 +915,7 @@ def score_event_by_distance(
     for rung_i, path in enumerate(ordered, start=1):
         members = buckets[path]
 
-        # the bands each candidate at this rung needs
+        # the bands -- and the last epoch -- each candidate at this rung needs
         bands_by_member = []
         for member in members:
             frame = to_scorer_frame(member[1], map_wide_bands=map_wide_bands, mode=mode)
@@ -816,20 +924,25 @@ def score_event_by_distance(
                 if not frame.empty
                 else frozenset()
             )
-            bands_by_member.append((member, bands))
+            tmax = (
+                float(frame["time_after_gw"].max())
+                if not frame.empty and "time_after_gw" in frame.columns
+                else None
+            )
+            bands_by_member.append((member, bands, tmax))
 
-        no_band = [m for m, b in bands_by_member if not b]
+        no_band = [m for m, b, _ in bands_by_member if not b]
         for cand, lc, d, derr in no_band:
             results.append(
                 KilonovaScore(event_id, cand.target.name, target_id=cand.target_id,
                               dist_mpc=d, dist_err_mpc=derr, n_obs_supplied=len(lc),
                               skip_reason="no observations in a modelled band")
             )
-        with_band = [(m, b) for m, b in bands_by_member if b]
+        with_band = [(m, b, t) for m, b, t in bands_by_member if b]
         if not with_band:
             continue
 
-        for chunk_i, (chunk, chunk_bands) in enumerate(
+        for chunk_i, (chunk, chunk_bands, chunk_tmax) in enumerate(
             _chunk_by_bands(with_band, max_bands_per_load), start=1
         ):
             if mode != "survey":
@@ -839,12 +952,27 @@ def score_event_by_distance(
             else:
                 grid_bands = sorted(chunk_bands)
 
+            # Read only the part of the time axis these candidates can reach.
+            # The scorer bins observations into [t, t+time_bin_width) windows and
+            # never looks past the last one, so simulation rows beyond that are
+            # decompressed, converted and binned for nothing. A grid spans 0-10 d
+            # at 0.01 d resolution, so a chunk whose last epoch is 3 d reads ~30%
+            # of the rows -- which is what keeps a load that cannot be split by
+            # band (a single candidate observed in more than max_bands_per_load
+            # bands forces its own band count) inside the memory budget.
+            load_max_time = (
+                chunk_tmax + time_bin_width if chunk_tmax is not None and np.isfinite(chunk_tmax)
+                else None
+            )
             logger.info(
-                "[rung %d/%d load %d] %s: %d candidates, %d band(s)",
+                "[rung %d/%d load %d] %s: %d candidates, %d band(s), t<=%s",
                 rung_i, len(ordered), chunk_i, path.name, len(chunk), len(grid_bands),
+                f"{load_max_time:.2f} d" if load_max_time is not None else "all",
             )
             try:
-                grid = load_simulation_grid(path, bands=grid_bands, mode=mode)
+                grid = load_simulation_grid(
+                    path, bands=grid_bands, mode=mode, max_time=load_max_time
+                )
             except Exception as exc:  # noqa: BLE001 - one bad load must not stop the event
                 logger.exception("Loading %s failed", path.name)
                 for cand, lc, d, derr in chunk:
@@ -904,17 +1032,38 @@ def _chunk_by_bands(with_band, max_bands: int):
     ``max_bands`` at or above the rung's union size collapses to exactly one
     load, i.e. the unbounded behaviour, so this only ever costs extra reads
     where an unbounded read would not have fit.
+
+    ``max_bands`` is a target, not a guarantee: a *single* candidate observed in
+    more bands than that still needs all of them in one grid to be scored, so it
+    forms an oversized load of its own. The caller bounds those with ``max_time``
+    instead.
+
+    Parameters
+    ----------
+    with_band : sequence of (member, bands, tmax)
+        ``tmax`` is the candidate's last epoch in days after the GW, or None.
+
+    Returns
+    -------
+    list of (members, bands, tmax)
+        ``tmax`` is the latest epoch over the chunk -- the point past which no
+        candidate in it can use a simulation row -- or None if unknown for any
+        member, in which case the caller must read the whole time axis.
     """
     chunks = []
-    current, current_bands = [], set()
-    for member, bands in sorted(with_band, key=lambda mb: sorted(mb[1])):
+    current, current_bands, current_tmax = [], set(), 0.0
+    for member, bands, tmax in sorted(with_band, key=lambda mb: sorted(mb[1])):
         if current and len(current_bands | bands) > max_bands:
-            chunks.append((current, current_bands))
-            current, current_bands = [], set()
+            chunks.append((current, current_bands, current_tmax))
+            current, current_bands, current_tmax = [], set(), 0.0
         current.append(member)
         current_bands |= bands
+        # One unknown epoch poisons the chunk: without it there is no safe
+        # ceiling, so the whole axis has to be read.
+        if current_tmax is not None:
+            current_tmax = None if tmax is None else max(current_tmax, tmax)
     if current:
-        chunks.append((current, current_bands))
+        chunks.append((current, current_bands, current_tmax))
     return chunks
 
 
