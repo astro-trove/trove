@@ -4,7 +4,7 @@
 {% load i18n %}
 {% load crispy_forms_tags %}
 
-{% block title %}Targets{% endblock %}
+{% block title %}Candidates{% endblock %}
 
 {% block content %}
 <h1>
@@ -20,7 +20,7 @@
 	<span class="float-right">
         <a href="{% url 'targets:create' %}" title="Create a Target">
 	<button class="btn btn-primary" type="button">
-          Create a New Target
+          Create a New Candidate
         </button>
 	</a>
         {% catalog_query_menu %}
