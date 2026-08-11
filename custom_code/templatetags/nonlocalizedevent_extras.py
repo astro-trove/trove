@@ -78,11 +78,13 @@ def format_area(area):
 def get_most_likely_class(details):
     if not details:
         return
-    elif details["search"] == "SSM":
+    elif "search" in details and details["search"] == "SSM":
         return details["search"]
-    elif details["group"] == "CBC":
+    elif "group" in details and details["group"] == "CBC":
         classification = details["classification"]
         return max(classification, key=classification.get)
+    elif "group" not in details:
+        return "FXT" # I think these are only ever EP events
     else:  # burst
         return details["group"]
 
