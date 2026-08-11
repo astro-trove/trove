@@ -14,8 +14,7 @@ from tom_targets.models import Target
 
 register = template.Library()
 
-
-@register.inclusion_tag('comments/list.html', takes_context=True)
+@register.inclusion_tag('custom_code/comment_list.html', takes_context=True)
 def recent_comments(context, limit=10):
     """
     Displays recent comments for targets the user can view. Safe when the
