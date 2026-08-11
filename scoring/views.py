@@ -59,9 +59,9 @@ class TargetVettingFormView(FormView):
 
         # if NLE was provided by referer, use it to choose what vetting is allowed
         nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
-        if nle_name_or_id.isdigit():
+        try:
             nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
-        else:
+        except NonLocalizedEvent.DoesNotExist:
             try:
                 nle = NonLocalizedEvent.objects.get(event_id=nle_name_or_id)
             except NonLocalizedEvent.DoesNotExist:
