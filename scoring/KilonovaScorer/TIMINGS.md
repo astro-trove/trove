@@ -309,6 +309,49 @@ its job — candidates are packed into groups whose band union stays under
 > between the two cannot be recovered from the log, which carries no
 > timestamps — add them before trying to attribute the difference.
 
+### The same run on the Postgres grid backend
+
+Same event, same task, same params except the backend and
+`max_bands_per_load`. See `DB.md` for the store itself.
+
+| | Parquet | Postgres |
+|---|---|---|
+| `max_bands_per_load` | 6 | 10 |
+| Wall clock | 1,746 s | **983 s (16 min 23 s)** |
+| Grid loads | 11 | **3** |
+| Per candidate | 3.94 s | **2.22 s** |
+| Peak worker RSS | 2.5 GB | 2.66 GB |
+| Scored | 423 / 457 | 423 / 457 |
+
+**1.78× faster, 763 s saved, and all 423 scores are bit-identical** — the
+backend changes where the numbers come from, not what they are.
+
+Nearly all of the saving is I/O. Loads went from 11 × ~60 s to 3 × ~10 s, about
+630 s; the remaining ~130 s is unattributed, plausibly less GC and page-cache
+pressure from not decompressing 3.6 GB eleven times. The log has no timestamps,
+so that last part is inference, not measurement.
+
+**Raising `max_bands_per_load` is no longer the lever it was.** Measured load
+cost on Postgres, full time axis:
+
+| bands/load | load | peak RSS |
+|---|---|---|
+| 6 | 4.8 s | 1.64 GB |
+| 8 | 6.0 s | 2.13 GB |
+| 10 | 9.2 s | 2.62 GB |
+| 15 (all) | 12.0 s | 3.84 GB |
+
+Under Parquet a load cost ~60 s whatever it read, so few large loads was the
+only sane policy. Here cost scales with what is asked for, so 11 small loads
+would have cost ~53 s and one big one ~12 s — a ~40 s difference in a ~1,000 s
+run. 10 was chosen over 15 because the scorer's per-band sorted index cache
+adds ~1.7 GB on top of the load peak, and 3.84 + 1.7 GB exceeds what was free.
+
+**The bottleneck is now unambiguously the scorer, not I/O.** ~950 s of the
+983 s is Monte-Carlo work on 443 candidates, single-threaded on a 7-core
+machine. Candidates within a load are independent, so a process pool over the
+candidate loop is the next real win — bigger than anything left in storage.
+
 ---
 
 ## 8. How to measure

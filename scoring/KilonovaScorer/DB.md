@@ -462,10 +462,33 @@ Faster and leaner than §4's layout C figures (3.05 s / 847 MB and 11.7 s /
 > for Postgres — the bulk read is CPU-bound in tuple materialisation, not I/O —
 > but these specific numbers are not cold measurements.
 
+### End to end: a full event on the store
+
+`S251112cm`, Vet All, `max_bands_per_load=10`, 15 bands ingested (the union the
+event's photometry actually uses), against the Parquet run of the same task.
+
+| | Parquet | Postgres |
+|---|---|---|
+| Wall clock | 1,746 s | **983 s (16 min 23 s)** |
+| Grid loads | 11 | **3** |
+| Per candidate | 3.94 s | **2.22 s** |
+| Peak worker RSS | 2.5 GB | 2.66 GB |
+| Scored | 423 / 457 | 423 / 457 |
+
+**1.78× faster, and all 423 scores are bit-identical.** Ingest of the 12
+missing bands took 4 min 4 s (20 s/band once the axis pass is amortised) at a
+2.54 GB peak, and 15 bands occupy 592 MB — which projects to **1.5 GB for all
+38**, better than §4's 2.1 GB estimate.
+
+The saving is I/O and nothing else: ~630 s of it is loads going from 11 × ~60 s
+to 3 × ~10 s. What remains is the scorer, single-threaded on 7 cores; storage
+has stopped being the constraint.
+
 ### What is still open
 
-* **Only 3 of 38 bands have ever been in the store.** The 2.1 GB and ~12 min
-  per rung in §4 remain projections; no full rung has been ingested.
+* **23 of 38 bands have still never been in the store** — only the 15 this
+  event needs. The all-38 figure is now projected from 15 measured bands
+  (592 MB) rather than 3, but it is still a projection.
 * **`ingest_parquet` scans the whole file once per band**, because every row
   group contains every band and the filter prunes nothing. That is the same
   property that makes Parquet's *read* cost fixed, and it makes a 38-band
