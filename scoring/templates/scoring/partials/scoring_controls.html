@@ -10,15 +10,14 @@
     </a>
 
     {# One click flips the ranking between the two photometry methods. The #}
-    {# method is stored per event, so this needs an event to act on. #}
-    {% if nle_id %}
-      <a href="{% url 'trove_nonlocalizedevents:toggle-phot-scoring-method' %}?nonlocalizedevent={{ nle_id }}"
-         class="btn {% if phot_method_is_kilonova %}btn-success{% else %}btn-light{% endif %} mb-2"
-         title="Supplies the photometry factor of the KN score. Click to switch to {% if phot_method_is_kilonova %}TROVE photometry scoring{% else %}KilonovaSCORER{% endif %}.">
-        <i class="fa fa-line-chart"></i>
-        Photometry Scoring: {% if phot_method_is_kilonova %}KilonovaSCORER{% else %}TROVE{% endif %}
-      </a>
-    {% endif %}
+    {# method is site-wide, like the AGN toggle, so this needs no event and #}
+    {# works on the cross-event list too. #}
+    <a href="{% url 'trove_nonlocalizedevents:toggle-phot-scoring-method' %}{% if nle_id %}?nonlocalizedevent={{ nle_id }}{% endif %}"
+       class="btn {% if phot_method_is_kilonova %}btn-success{% else %}btn-light{% endif %} mb-2"
+       title="Supplies the photometry factor of the KN score, site-wide. Click to switch to {% if phot_method_is_kilonova %}TROVE photometry scoring{% else %}KilonovaSCORER{% endif %}.">
+      <i class="fa fa-line-chart"></i>
+      Photometry Scoring: {% if phot_method_is_kilonova %}KilonovaSCORER{% else %}TROVE{% endif %}
+    </a>
   </span>
 
   {# Stated on the page, not just enforced in scoring/util.py: the grids are #}
@@ -31,5 +30,4 @@
     </div>
   {% endif %}
 
-  {% if show_status %}{% include "scoring/partials/scoring_status.html" %}{% endif %}
 {% endif %}

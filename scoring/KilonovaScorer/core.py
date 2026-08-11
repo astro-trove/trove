@@ -1,26 +1,24 @@
 """
-core2.py — KilonovaScorer core pipeline (single scorer).
+core.py — KilonovaScorer core pipeline (single scorer).
 
-This is the sole scoring module.  The former core.py (kilonovascorer_v1) was
-removed during the ISSUE #15 consolidation (IMPROVEMENTS.md §15): v3 is the
-retained base (KDE cache, pre-grouping, paper-aligned _KNe column naming), and
-__init__.py now imports explicitly from this module only -- no wildcard, no
-import-order-dependent shadowing.  plotting.py and the notebook use the _KNe
-column names.
+This is the sole scoring module.  The former kilonovascorer_v1 was removed
+during the ISSUE #15 consolidation (IMPROVEMENTS.md §15): v3 is the retained
+base (KDE cache, pre-grouping, paper-aligned _KNe column naming), and
+__init__.py imports explicitly from this module only -- no wildcard, no
+import-order-dependent shadowing.
 
 ISSUE #15 residual (not yet done): add a minimal pytest suite (synthetic grid
 with known answers -- P_tail ~ 1 at the population median, ~ 0 at 10 sigma;
 MC-vs-analytic agreement gating #6; ivw_stats_logit schema consistency gating
-#1; monotone survivor counts; same seed -> identical output gating #11), delete
-the remaining commented-out blocks in utils.py / simulation.py (they are in git
-history), and pin pandas (or at least test against 2.x).  Issues #1, #6, #7, #8
-change reported scores -- add the tests BEFORE applying them so a regression is
+#1; monotone survivor counts; same seed -> identical output gating #11), and
+pin pandas (or at least test against 2.x).  Issues #1, #6, #7, #8 change
+reported scores -- add the tests BEFORE applying them so a regression is
 distinguishable from an intended change.
 
 Implements:
   - JSON / CSV photometry loading with absolute magnitude computation
   - LSST-like cadence downsampling
-  - P_tail_KNe and P_near_KNe scoring via noise-convolved KDE (predictive_tail_kde)
+  - P_tail_KNe scoring via noise-convolved KDE (predictive_tail_kde)
   - ABC sequential survival diagnostic (overlap_chain)
   - Logit-space inverse-variance weighted cumulative scoring
 """
@@ -297,42 +295,43 @@ def preprocess_lsst_like(
 
 
 # ---------------------------------------------------------------------------
-# Core scoring: P_tail_KNe and P_near_KNe
+# Core scoring: P_tail_KNe
 # ---------------------------------------------------------------------------
 
 def predictive_tail_kde(
     sim_values: np.ndarray,
     M_obs: float,
     sigma_obs: float,
-    k: float = 1.5,
+    is_limit: bool = False,
     n_sim: int = 50000,
     n_obs: int = 100,
     kde: Optional[gaussian_kde] = None,
     rng: Optional[np.random.Generator] = None,
 ) -> Dict[str, float]:
     """
-    Compute P_tail_KNe and P_near_KNe from the noise-convolved prior predictive
-    distribution (PPD) via KDE.
+    Compute P_tail_KNe from the noise-convolved prior predictive distribution
+    (PPD) via KDE.
 
     Implements the two-sided tail-area probability (paper eq. 2)::
 
         F(M_obs) = Pr(M_rep <= M_obs)
         P_tail_KNe = 2 * min(F(M_obs), 1 - F(M_obs))
 
-    and the ROPE-based local consistency score (paper eq. 4)::
+    and, for a non-detection (``is_limit=True``), the one-sided consistency
+    probability that the source was fainter than the limit::
 
-        P_near_KNe = Pr(M_rep in [M_obs - k*sigma_obs, M_obs + k*sigma_obs])
+        P_consistent = Pr(M_rep > M_lim) = 1 - F(M_lim)
 
-    Both are evaluated on the noise-convolved PPD:
+    evaluated on the noise-convolved PPD:
         Y = X* + epsilon,  X* ~ KDE(sim_values),  epsilon ~ N(0, sigma_obs)
 
     Uncertainty on P_tail_KNe is propagated by sampling N_obs realisations of
     M_obs from N(M_obs, sigma_obs), as described in the paper.  The broadcast
     comparison (N_obs, 1) vs (n_sim,) -> (N_obs, n_sim) is fully vectorised.
 
-    P_near_KNe is a *local*, per-observation score and is intentionally not
-    aggregated across bands or epochs (paper Section 2).  Only P_tail_KNe
-    (via p_tail_mean / p_tail_std) feeds into the cumulative logit-space score.
+    The paper's P_near_KNe (Section 3.4.2) is not computed here -- see the note
+    in the body for why.  Only P_tail_KNe (via p_tail_mean / p_tail_std) feeds
+    the cumulative logit-space score.
 
     A pre-fitted KDE can be supplied via ``kde`` to avoid redundant fitting when
     multiple observations share the same simulation time bin.
@@ -344,9 +343,12 @@ def predictive_tail_kde(
     M_obs : float
         Observed absolute magnitude (paper notation: M_obs).
     sigma_obs : float
-        Observational uncertainty on M_obs (paper notation: sigma_obs).
-    k : float
-        ROPE half-width factor.  Paper fiducial value: 1.5.
+        Observational uncertainty on M_obs (paper notation: sigma_obs). For a
+        non-detection this is the depth uncertainty of the limit.
+    is_limit : bool
+        True when the "observation" is a non-detection and ``M_obs`` is its
+        limiting magnitude. Switches the score from the two-sided tail
+        probability to the one-sided ``Pr(M_rep > M_lim) = 1 - F(M_lim)``.
     n_sim : int
         Number of Monte Carlo draws for the noise-convolved PPD.
     n_obs : int
@@ -362,7 +364,6 @@ def predictive_tail_kde(
         p_tail_KNe   – two-sided tail probability at M_obs (point estimate).
         p_tail_mean  – mean P_tail_KNe over n_obs M_obs uncertainty samples.
         p_tail_std   – std  P_tail_KNe over n_obs M_obs uncertainty samples.
-        p_near_KNe   – ROPE-based local consistency score P_near_KNe.
 
     Raises
     ------
@@ -460,12 +461,45 @@ def predictive_tail_kde(
     # np.mean() determines the ratio of sampled y greater than M_obs
     # exactly a monte carlo estimate of F, the precise integral
     F_hat = float(np.mean(y_dist <= M_obs))
-    p_tail_KNe = 2.0 * min(F_hat, 1.0 - F_hat)
+    if is_limit:
+        # Non-detection at limiting magnitude M_obs. The source was FAINTER
+        # than the limit, so a simulation is consistent with this observation
+        # when its replicated magnitude is fainter too -- larger in magnitude:
+        #
+        #     P_consistent = Pr(M_rep > M_lim) = 1 - F(M_lim)
+        #
+        # One-sided, and on the same [0, 1] scale as the two-sided P_tail, so
+        # it enters the logit-space aggregation unchanged. A deep limit that
+        # most of the population violates drives this toward 0 exactly as an
+        # inconsistent detection does.
+        p_tail_KNe = 1.0 - F_hat
+    else:
+        p_tail_KNe = 2.0 * min(F_hat, 1.0 - F_hat)
 
-    # 3. P_near_KNe — fraction of noise-convolved PPD draws within the ROPE
-    #    (paper eq. 4; k=1.5 fiducial).  Not aggregated across epochs.
-    # Similarly, a monte carlo estimate of the number of y in the ROPE of M_obs
-    p_near_KNe = float(np.mean(np.abs(y_dist - M_obs) <= k * sigma_obs))
+    # P_near_KNe (paper Section 3.4.2, eqs. 15-17) is deliberately NOT computed.
+    #
+    # It is a ROPE-based *local* consistency measure: the fraction of the
+    # noise-convolved PPD lying within k_near*sigma_obs of the observation. The
+    # paper is explicit that it is "evaluated independently for each observation
+    # and is not aggregated across bands or epochs, reflecting its role as a
+    # local consistency measure rather than a cumulative score", so it never
+    # enters P_tail's logit-space aggregation and cannot move a candidate's
+    # ranking. Verified empirically: changing k_near from 3.0 to 1.5 moved
+    # P_near from [0.87, 0.76, 0.34, 0.18] to [0.53, 0.38, 0.18, 0.07] while the
+    # score stayed identical to ten decimal places.
+    #
+    # In TROVE it was not merely unused but discarded: it was written to the
+    # per-observation frame, and scoring.tasks.async_kilonova_score calls
+    # score_event(keep_frames=False), which builds the results table from
+    # KilonovaScore.as_row() alone -- and as_row carries no p_near. Only `score`
+    # reaches the ScoreFactor row. So every observation paid ~479 us (about 14%
+    # of per-observation time, against 38 us for the P_tail point estimate) for
+    # a number that was thrown away microseconds later.
+    #
+    # Restore from git history if a per-candidate diagnostic view is ever built
+    # that displays per-epoch consistency; it is a few lines plus the k_near
+    # parameter. Until such a consumer exists, computing it is pure cost.
+
 
     # =====================================================================
     # ISSUE #8 — sigma_obs enters the p_tail_std calculation TWICE.
@@ -514,18 +548,26 @@ def predictive_tail_kde(
     # calibration under each variant and see which yields a uniform result.
     # =====================================================================
     # 4. P_tail_KNe uncertainty — sample N_obs realisations of M_obs (paper Section 2)
-    #    Broadcast: (n_obs, 1) vs (n_sim,) -> (n_obs, n_sim)
-    # Monte Carlo estimates of the uncertainties
+    #
+    # Sorting y_dist once and binary-searching the N_obs draws replaces the old
+    # (n_obs, 1) vs (n_sim,) broadcast, which materialised an (n_obs, n_sim)
+    # boolean array -- 5,000,000 elements per observation at the previous
+    # defaults. searchsorted(side="right") counts y <= M, so the result is
+    # EXACTLY the same as the broadcast's .mean(axis=1); verified bit-identical
+    # (max abs diff 0.0), not merely close.
+    y_sorted = np.sort(y_dist)
     M_obs_samples = rng.normal(M_obs, sigma_obs, n_obs)
-    F_hat_samples = (y_dist <= M_obs_samples[:, np.newaxis]).mean(axis=1)
-    p_tail_samples = 2.0 * np.minimum(F_hat_samples, 1.0 - F_hat_samples)
+    F_hat_samples = np.searchsorted(y_sorted, M_obs_samples, side="right") / n_sim
+    if is_limit:
+        p_tail_samples = 1.0 - F_hat_samples
+    else:
+        p_tail_samples = 2.0 * np.minimum(F_hat_samples, 1.0 - F_hat_samples)
 
     return {
         "F_hat": F_hat,
         "p_tail_KNe": p_tail_KNe,
         "p_tail_mean": float(np.mean(p_tail_samples)),
         "p_tail_std": float(np.std(p_tail_samples)),
-        "p_near_KNe": p_near_KNe,
     }
 
 
@@ -533,12 +575,80 @@ def predictive_tail_kde(
 # ABC diagnostic helpers
 # ---------------------------------------------------------------------------
 
+#: Per-band, time-sorted views of the most recently scored grid.
+#:
+#: Keyed by a weak reference to the grid frame, NOT stored on the frame itself:
+#: pandas deep-copies ``DataFrame.attrs`` inside ``__finalize__``, so parking
+#: multi-million-row frames there makes every downstream slice pay to copy
+#: them. Measured, that mistake cost 13.1 s out of 17.7 s -- slower than the
+#: recomputation it was meant to avoid.
+#:
+#: One grid at a time, which matches how ``score_event_by_distance`` works: it
+#: reads a chunk, scores every candidate against it, then moves on. The weakref
+#: means a dead grid can never be mistaken for a live one through id() reuse,
+#: and dropping the entry frees the band views with it.
+_BAND_INDEX_CACHE: Dict[str, Any] = {"ref": None, "bands": {}}
+
+#: Columns a band view needs. Everything else in the grid is dead weight here.
+_BAND_INDEX_COLUMNS = ("sample_id", "time", "absolute_magnitude")
+
+
+def _band_time_index(data_sim: pd.DataFrame, band: str):
+    """The grid rows for one band, sorted by time, cached across candidates.
+
+    Slicing a band out of a loaded grid costs ~0.48 s on a 27M-row frame, and
+    the digitize + groupby that followed it another ~1.5 s -- all of it
+    recomputed for every candidate even though none of it depends on the
+    candidate. This computes it once per (grid, band).
+
+    Sorting by time is what lets :func:`_bin_slice` replace the groupby with
+    two binary searches, since a uniform time bin is then a contiguous range.
+
+    Returns ``(sim_band, times)`` -- the sorted frame and its ``time`` column
+    as a numpy array, ready for ``searchsorted``.
+    """
+    ref = _BAND_INDEX_CACHE["ref"]
+    current = ref() if ref is not None else None
+    if current is not data_sim:
+        import weakref
+
+        _BAND_INDEX_CACHE["ref"] = weakref.ref(data_sim)
+        _BAND_INDEX_CACHE["bands"] = {}
+
+    hit = _BAND_INDEX_CACHE["bands"].get(band)
+    if hit is None:
+        cols = [c for c in _BAND_INDEX_COLUMNS if c in data_sim.columns]
+        sb = data_sim.loc[data_sim["filter_mapped"] == band, cols]
+        sb = sb.sort_values("time", kind="stable").reset_index(drop=True)
+        hit = (sb, sb["time"].to_numpy())
+        _BAND_INDEX_CACHE["bands"][band] = hit
+    return hit
+
+
+def _bin_slice(times: np.ndarray, bins: np.ndarray, bin_idx: int):
+    """Row range of one time bin in a time-sorted band frame.
+
+    Exactly equivalent to selecting ``np.digitize(time, bins) == bin_idx``:
+    digitize puts ``x`` in bin ``i`` when ``bins[i-1] <= x < bins[i]``, and on
+    sorted times that is the contiguous range between the two edges. Bin 0 is
+    everything below the first edge, bin ``len(bins)`` everything at or above
+    the last.
+    """
+    n = times.size
+    lo = 0 if bin_idx == 0 else int(np.searchsorted(times, bins[bin_idx - 1], side="left"))
+    hi = n if bin_idx >= len(bins) else int(np.searchsorted(times, bins[bin_idx], side="left"))
+    return lo, hi
+
+
 def compute_consistent_ids_anyhit(
     sim_band: pd.DataFrame,
     bin_idx: int,
     M_obs: float,
     sigma_obs: float,
     overlap_k: float = 2.0,
+    M_lim: Optional[float] = None,
+    is_limit: bool = False,
+    sim_bin: Optional[pd.DataFrame] = None,
 ) -> List:
     """
     Return simulation IDs whose predicted magnitude falls within the ROPE at
@@ -560,6 +670,34 @@ def compute_consistent_ids_anyhit(
         Observational uncertainty.
     overlap_k : float
         ROPE half-width multiplier (sigma units).
+    is_limit : bool
+        True when this "observation" is a non-detection and ``M_obs`` is its
+        limiting magnitude. Switches the acceptance region from the two-sided
+        ROPE to the one-sided ``M_rep > M_lim - overlap_k*sigma``, and disables
+        detectability truncation (which would invert the test). See the body.
+    M_lim : float or None
+        Absolute-magnitude detection limit for THIS observation
+        (``m_lim - mu``). When given, simulations fainter than it are dropped
+        before the ROPE test, so the survivor set is conditioned on
+        detectability exactly as the truncated PPD is (IMPROVEMENTS.md §19).
+        ``None`` keeps the untruncated behaviour.
+
+        This is not redundant with the ROPE. The kernel is local, so the
+        intuition is that the undetectable faint bulk cannot reach it -- but a
+        detected object sits near ``M_lim`` by construction, so its ROPE window
+        *straddles* the limit. Measured on the 259 Mpc grid, truncation removes
+        ~27% of the survivor set at ``M_lim = -16.5`` against ~0.2% at
+        ``M_lim = -11.5`` (``diagnostics/09_abc_truncation.py``). Conditioning
+        ``P_tail`` but not this would leave the two diagnostics on the
+        per-observation frame describing different populations.
+
+        An empty result under truncation is a REJECTION, not missing data: it
+        says no *detectable* simulated kilonova explains the observation, which
+        is the strongest evidence this diagnostic can give. ``overlap_chain``
+        intersecting it away permanently is therefore correct behaviour. The
+        distinct case that IS non-coverage -- the truncated population being
+        too small to say anything -- is caught by ``min_sim_points`` in
+        :func:`kilonovascorer_v3`, before this is reached.
 
     Returns
     -------
@@ -619,14 +757,40 @@ def compute_consistent_ids_anyhit(
     # Until fixed, document as a known systematic and demonstrate the
     # sensitivity by rerunning a candidate against grids of differing ntime.
     # =====================================================================
-    sim_bin = sim_band.loc[
-        sim_band["time_bin"] == bin_idx, ["sample_id", "absolute_magnitude"]
-    ]
+    # ISSUE #13 FIXED. `sim_bin` is the caller's already-selected bin. The old
+    # path re-derived it here with `sim_band["time_bin"] == bin_idx`, a mask
+    # over every row of the band -- ~9.6M rows -- for EVERY observation, which
+    # is what made this the dominant cost in v3. Passing the bin makes it O(bin).
+    if sim_bin is None:
+        sim_bin = sim_band.loc[
+            sim_band["time_bin"] == bin_idx, ["sample_id", "absolute_magnitude"]
+        ]
     if sim_bin.empty:
         return []
 
-    rope_half_width = overlap_k * sigma_obs
-    inside = np.abs(sim_bin["absolute_magnitude"].to_numpy() - M_obs) <= rope_half_width
+    mags = sim_bin["absolute_magnitude"].to_numpy()
+    if is_limit:
+        # Non-detection: M_obs is a limiting magnitude. A simulation explains
+        # it whenever the source would have been too faint to see, so the
+        # acceptance region is one-sided and open-ended rather than a ROPE
+        # centred on the value:
+        #
+        #     accept  <=>  M_rep > M_lim - overlap_k * sigma_lim
+        #
+        # The sigma term keeps it conservative: a simulation marginally
+        # brighter than a noisy limit is not rejected, mirroring the tolerance
+        # the two-sided kernel gives a detection.
+        #
+        # Detectability truncation is deliberately NOT applied here. It exists
+        # to condition a *detection* on the population that could have been
+        # seen; for a non-detection the informative simulations are precisely
+        # the faint ones it would discard, so applying it would invert the
+        # meaning of the test.
+        inside = mags > (M_obs - overlap_k * sigma_obs)
+    else:
+        inside = np.abs(mags - M_obs) <= overlap_k * sigma_obs
+        if M_lim is not None and np.isfinite(M_lim):
+            inside &= mags < M_lim
     return sim_bin.loc[inside, "sample_id"].dropna().unique().tolist()
 
 
@@ -832,7 +996,6 @@ def kilonovascorer_v3(
     candidate_name: str,
     time_bin_width: float = 0.2,
     band_list: Tuple[str, ...] = ("g-band", "r-band", "i-band", "z-band"),
-    k_near: float = 1.5,
     n_kde_sim: int = 50000,
     min_sim_points: int = 20,
     overlap_k: float = 2.0,
@@ -845,7 +1008,6 @@ def kilonovascorer_v3(
 
     - **P_tail_KNe** — two-sided tail probability of M_obs under the
       noise-convolved PPD (with uncertainty via observation sampling).
-    - **P_near_KNe** — ROPE-based local consistency score.
     - **ABC survival diagnostic** — sequential intersection of consistent
       simulation IDs across epochs (|S_t| from paper Section 3).
 
@@ -864,8 +1026,6 @@ def kilonovascorer_v3(
         Width of time bins used to match observations to simulations (days).
     band_list : tuple of str
         Photometric bands to score.
-    k_near : float
-        ROPE half-width factor for P_near_KNe (paper fiducial: 1.5).
     n_kde_sim : int
         Monte Carlo samples for the noise-convolved KDE.
     min_sim_points : int
@@ -887,7 +1047,7 @@ def kilonovascorer_v3(
     Returns
     -------
     results_df : pd.DataFrame
-        Per-observation metrics including P_tail_KNe, P_near_KNe, and ABC
+        Per-observation metrics including P_tail_KNe and ABC
         diagnostics.
     summary_df : pd.DataFrame
         Per-band overlap chain summary.
@@ -929,7 +1089,7 @@ def kilonovascorer_v3(
     # =====================================================================
     for band in band_list:
         # 1. Filter data for this band
-        sim_band = data_sim[data_sim["filter_mapped"] == band].copy()
+        sim_band, sim_times = _band_time_index(data_sim, band)
         obs_band = data_obs[data_obs["filter_mapped"] == band].copy()
 
         if sim_band.empty or obs_band.empty:
@@ -975,12 +1135,13 @@ def kilonovascorer_v3(
         # assert bins[0] < t_first < bins[1],  "First observation not centred in first bin."
         # assert bins[-2] < t_last < bins[-1], "Last observation not centred in last bin."
 
-        sim_band["time_bin"] = np.digitize(sim_band["time"], bins)
-
-        # Pre-group simulations by time bin for O(1) lookup per observation
-        sim_groups: Dict[int, pd.DataFrame] = {
-            k: v for k, v in sim_band.groupby("time_bin")
-        }
+        # Bins are candidate-specific (the edges are anchored on this
+        # candidate's first and last epoch), so they cannot be cached -- but
+        # they no longer need to be materialised. `sim_band` is time-sorted by
+        # _band_time_index, so each bin is a contiguous row range found with
+        # two binary searches (_bin_slice). The old digitize + groupby over the
+        # whole band cost ~1.5 s per candidate per band and produced 51 bins
+        # when ~3 were needed.
 
         # Per-band tracking for ABC overlap chain
         band_times: List[float] = []
@@ -988,7 +1149,7 @@ def kilonovascorer_v3(
         band_row_indices: List[int] = []
 
         # KDE cache: fitted once per bin_idx, reused across observations in the same bin
-        kde_cache: Dict[int, gaussian_kde] = {}
+        kde_cache: Dict[tuple, gaussian_kde] = {}
 
         # 3. Process observations in chronological order
         obs_band = obs_band.sort_values("time_after_gw")
@@ -1005,7 +1166,45 @@ def kilonovascorer_v3(
                 continue
 
             bin_idx = int(np.digitize(t_obs, bins))
-            sim_bin = sim_groups.get(bin_idx, pd.DataFrame())
+            _lo, _hi = _bin_slice(sim_times, bins, bin_idx)
+            sim_bin = sim_band.iloc[_lo:_hi]
+            # kept untruncated for the ABC kernel, which applies M_lim itself
+            sim_bin_abc = sim_bin
+
+            # Non-detection? Then M_obs is a limiting magnitude, not a
+            # measurement, and the observation is scored one-sided as
+            # Pr(M_rep > M_lim) rather than by the two-sided tail. Opt-in the
+            # same way as the truncation below: with no `is_limit` column on
+            # data_obs every row is a detection and behaviour is unchanged.
+            is_limit = bool(getattr(obs_row, "is_limit", False))
+
+            # =============================================================
+            # Detectability conditioning (IMPROVEMENTS.md §19).
+            #
+            # An observation exists only because it was detected, so the
+            # reference population it is compared against must carry the same
+            # cut:  F_det(M) = Pr(M_rep <= M | M_rep < M_lim).  Without it a
+            # real kilonova is forced into the bright tail of a population
+            # dominated by undetectable draws, and 2*min(F, 1-F) reads a bright
+            # tail as inconsistency.
+            #
+            # M_lim is PER-OBSERVATION, not per-candidate: it is m_lim - mu,
+            # and m_lim is a property of the exposure (facility x band x
+            # conditions).  That is what lets heterogeneous multi-facility
+            # photometry work without reconciling depths -- each point is
+            # scored against the population its own exposure could have seen.
+            #
+            # Opt-in: with no `absolute_magnitude_limit` column on data_obs,
+            # M_lim is None everywhere and behaviour is exactly the old one.
+            # =============================================================
+            M_lim = getattr(obs_row, "absolute_magnitude_limit", None)
+            M_lim = (
+                float(M_lim)
+                if M_lim is not None and np.isfinite(M_lim)
+                else None
+            )
+            if M_lim is not None and not sim_bin.empty:
+                sim_bin = sim_bin[sim_bin["absolute_magnitude"] < M_lim]
 
             # =============================================================
             # ISSUE #10 — Silently skipped epochs.
@@ -1034,25 +1233,40 @@ def kilonovascorer_v3(
             # "outside the grid's temporal coverage", reported as such.
             # =============================================================
             if len(sim_bin) < min_sim_points:
+                # Under truncation this is the NON-COVERAGE case, and it is
+                # categorically different from a rejection: the grid holds too
+                # few DETECTABLE draws in this bin to say anything at all.
+                # Skipping reports "cannot say" instead of manufacturing a
+                # zero. (An empty ROPE set below, by contrast, IS a rejection --
+                # see compute_consistent_ids_anyhit.)
                 logger.debug(
-                    "Bin %d has %d simulations (< %d) — skipping.",
+                    "Bin %d has %d simulations (< %d)%s — skipping.",
                     bin_idx, len(sim_bin), min_sim_points,
+                    "" if M_lim is None else f" after truncating at M_lim={M_lim:.2f}",
                 )
                 continue
 
-            # 3a. Fit KDE once per bin; reuse if another observation shares the same bin
-            if bin_idx not in kde_cache:
-                kde_cache[bin_idx] = gaussian_kde(
+            # 3a. Fit KDE once per bin; reuse if another observation shares it.
+            #     The truncated reference depends on M_lim as well as the bin,
+            #     so the key must carry both -- otherwise a second observation
+            #     in the same bin at a different depth silently reuses the
+            #     wrong KDE. Rounding to 0.05 mag keeps the hit rate high
+            #     (points from one facility cluster tightly in depth) while
+            #     staying far finer than the ~0.5 mag accuracy the truncation
+            #     actually needs (diagnostics/08_broadening_and_mlim.py).
+            cache_key = (bin_idx, None if M_lim is None else round(M_lim / 0.05))
+            if cache_key not in kde_cache:
+                kde_cache[cache_key] = gaussian_kde(
                     sim_bin["absolute_magnitude"].to_numpy()
                 )
-            cached_kde = kde_cache[bin_idx]
+            cached_kde = kde_cache[cache_key]
 
-            # 3b. Compute P_tail_KNe and P_near_KNe (paper eqs. 2 and 4)
+            # 3b. Compute P_tail_KNe (paper eq. 2)
             metric = predictive_tail_kde(
                 sim_bin["absolute_magnitude"].to_numpy(),
                 M_obs=M_obs,
                 sigma_obs=sigma_obs,
-                k=k_near,
+                is_limit=is_limit,
                 n_sim=n_kde_sim,
                 n_obs=100,      # N_obs = 100 per paper Section 2
                 kde=cached_kde,
@@ -1071,9 +1285,12 @@ def kilonovascorer_v3(
             consistent_ids = compute_consistent_ids_anyhit(
                 sim_band=sim_band,
                 bin_idx=bin_idx,
+                sim_bin=sim_bin_abc,
                 M_obs=M_obs,
                 sigma_obs=sigma_obs,
                 overlap_k=overlap_k,
+                M_lim=M_lim,
+                is_limit=is_limit,
             )
 
             # 3d. Safe time-bin edge lookup
@@ -1088,10 +1305,13 @@ def kilonovascorer_v3(
                 "time_bin_high": bin_high,
                 "observed_mag": M_obs,
                 "observed_mag_err": sigma_obs,
+                # carried so callers can separate non-detections from
+                # measurements downstream -- the cumulative aggregation
+                # excludes them (see kilonova_scoring._cumulative_score)
+                "is_limit": is_limit,
                 "p_tail_KNe": metric["p_tail_KNe"],
                 "p_tail_mean": metric["p_tail_mean"],
                 "p_tail_std": metric["p_tail_std"],
-                "p_near_KNe": metric["p_near_KNe"],
                 "n_sim_bin": len(sim_bin),
                 "n_consistent_lcs": len(consistent_ids),
                 "consistent_ids": consistent_ids,

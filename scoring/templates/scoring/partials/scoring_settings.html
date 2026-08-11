@@ -1,0 +1,77 @@
+{# Scoring-settings panel -- see scoring/templatetags/scoring_controls.py.        #}
+{# "What settings produced the scores on this page?", which is not the same #}
+{# question as "what is selected?" -- render-time settings and the run that #}
+{# wrote the stored scores can disagree, so they are reported separately.   #}
+{% if request.user.is_authenticated %}
+  <div class="card mt-4 mb-3">
+    <div class="card-body py-2">
+      <h6 class="card-title text-muted mb-2" style="font-size:0.9em">
+        Scoring settings for the displayed scores
+      </h6>
+
+      <div style="font-size:0.85em">
+        {# --- applied at render time ------------------------------------- #}
+        <div>
+          <strong>Photometry scoring:</strong> {{ phot_method_label }}
+          {% if kilonova_selected %}
+            <span class="text-muted">
+              &mdash; KN score only; KN-in-SN and super-KN use TROVE photometry
+            </span>
+          {% endif %}
+        </div>
+        <div>
+          <strong>AGN score:</strong>
+          {% if agn_toggle %}included in the total{% else %}excluded from the total{% endif %}
+        </div>
+
+        {# --- where the stored KilonovaSCORER scores came from -------------- #}
+        {% if kilonova_selected %}
+          {% if not nle_id %}
+            <div class="mt-2 text-muted">
+              This list spans multiple events. KilonovaSCORER scores are produced
+              per event, so only candidates whose own event has been run carry one.
+            </div>
+          {% elif kilonova_finished %}
+            <div class="mt-2">
+              <strong>KilonovaSCORER run:</strong>
+              scored {{ n_scored }} of {{ n_scored|add:n_skipped }} candidates
+              {# ISO 8601 from the task: split rather than cut:"T", which would #}
+              {# butt the date against the time as "2026-08-1116:05". #}
+              {% if kilonova_status.finished_at %}
+                on {{ kilonova_status.finished_at|slice:":10" }}
+                at {{ kilonova_status.finished_at|slice:"11:16" }}
+              {% endif %}
+            </div>
+            {% if n_fallback %}
+              <div class="text-warning">
+                {{ n_fallback }} candidate{{ n_fallback|pluralize }} could not be
+                scored (no photometry, no usable distance, or no band in common
+                with the grid) and {{ n_fallback|pluralize:"falls,fall" }} back to
+                TROVE photometry scoring in the totals above.
+              </div>
+            {% endif %}
+            {% if shown_params %}
+              <div class="text-muted mt-1">
+                <strong>Parameters:</strong>
+                {% for p in shown_params %}{{ p.label }} {{ p.value }}{% if not forloop.last %} &middot; {% endif %}{% endfor %}
+                {% if kilonova_status.grid_path %}
+                  &middot; grid {{ kilonova_status.grid_path }}
+                {% else %}
+                  &middot; grid: nearest rung per candidate distance
+                {% endif %}
+              </div>
+            {% endif %}
+          {% else %}
+            {# Selected but never run: the scores on screen are NOT KilonovaSCORER. #}
+            <div class="mt-2 text-warning">
+              No KilonovaSCORER run has finished for this event, so every score
+              shown above still comes from <strong>TROVE photometry scoring</strong>.
+              Press <em>Vet All</em> to score these candidates against the
+              simulation grid.
+            </div>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+{% endif %}

@@ -1,5 +1,3 @@
-import logging
-
 from django import forms
 from django.urls import reverse
 
@@ -7,8 +5,6 @@ from tom_nonlocalizedevents.models import EventCandidate
 from trove_targets.models import Target
 
 from dal import autocomplete
-
-logger = logging.getLogger(__name__)
 
 
 class EventCandidateSearchForm(forms.Form):

@@ -55,6 +55,7 @@ import pandas as pd
 from .KilonovaScorer.core import binned_stats_cumulative_ptail, kilonovascorer_v3
 from .KilonovaScorer.utils import compute_abs_mag_samples
 from .candidate_photometry import (
+    DEFAULT_MAGERR,
     get_candidate_distance,
     get_candidates,
     get_event,
@@ -74,6 +75,7 @@ DATA_OBS_COLUMNS = (
     "time_after_gw",
     "absolute_magnitude",
     "absolute_magnitude_error",
+    "is_limit",
 )
 
 #: Columns ``kilonovascorer_v3`` requires on the simulation grid.
@@ -85,146 +87,16 @@ DATA_SIM_COLUMNS = ("filter_mapped", "time", "absolute_magnitude", "sample_id")
 #
 # Grid loading, the distance ladder and the artifact filtering all live in
 # KilonovaScorer.grids, next to the data. These are thin aliases so callers of
-# this module do not need to reach into the package, plus the CSV->Parquet
-# converter for grids produced before the switch.
+# this module do not need to reach into the package.
 # ---------------------------------------------------------------------------
 from .KilonovaScorer.grids import GRID_DIR  # noqa: E402
 from .KilonovaScorer.grids import available_grids as simulation_grids  # noqa: E402
 from .KilonovaScorer.grids import clear_cache as clear_grid_cache  # noqa: E402
 from .KilonovaScorer.grids import grid_distance_mpc  # noqa: E402
 from .KilonovaScorer.grids import grid_for_distance as select_grid_for_distance  # noqa: E402
+from .KilonovaScorer.grids import grid_name  # noqa: E402
 from .KilonovaScorer.grids import load_grid as load_simulation_grid  # noqa: E402
-
-
-def _parquet_columns(path: Path) -> List[str]:
-    """Column names from a parquet footer, without reading any data."""
-    import pyarrow.parquet as pq
-
-    return list(pq.ParquetFile(path).schema_arrow.names)
-
-
-def convert_grid_to_parquet(
-    csv_path,
-    parquet_path=None,
-    chunksize: int = 1_000_000,
-    compression: str = "zstd",
-    verify: bool = True,
-) -> Path:
-    """Convert a simulation-grid CSV to Parquet, losslessly.
-
-    Grids are written by redback as multi-GB CSVs. Parquet stores the same
-    numbers column-wise in typed binary, which compresses ~14x on this data and
-    loads far faster, and lets :func:`load_simulation_grid` read only the
-    columns it needs.
-
-    **All** columns are kept at their native dtypes -- no float32 narrowing --
-    so the parquet is a faithful replacement for the CSV and the model
-    parameter columns stay available for the posterior plots in
-    ``KilonovaScorer.plotting``.
-
-    The CSV is streamed in chunks of ``chunksize`` rows, so peak memory stays
-    flat regardless of grid size; a 6 GB CSV never has to fit in RAM.
-
-    With ``verify`` (default), the parquet is read back and checked against the
-    CSV -- row count, column names, dtypes, and full numeric equality on a
-    chunk-by-chunk pass. Returns the parquet path. Does **not** delete the CSV;
-    that is left to the caller, after the verification result has been seen.
-    """
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    csv_path = Path(csv_path)
-    if parquet_path is None:
-        parquet_path = csv_path.with_suffix(".parquet")
-    parquet_path = Path(parquet_path)
-    parquet_path.parent.mkdir(parents=True, exist_ok=True)
-
-    logger.info("Converting %s -> %s", csv_path.name, parquet_path)
-    writer = None
-    n_rows = 0
-    try:
-        for chunk in pd.read_csv(csv_path, chunksize=chunksize):
-            table = pa.Table.from_pandas(chunk, preserve_index=False)
-            if writer is None:
-                writer = pq.ParquetWriter(parquet_path, table.schema, compression=compression)
-            writer.write_table(table)
-            n_rows += len(chunk)
-            logger.info("  %d rows written", n_rows)
-    finally:
-        if writer is not None:
-            writer.close()
-
-    csv_mb = csv_path.stat().st_size / 1e6
-    pq_mb = parquet_path.stat().st_size / 1e6
-    logger.info(
-        "Wrote %s: %d rows, %.1f MB (was %.1f MB, %.1fx smaller)",
-        parquet_path.name, n_rows, pq_mb, csv_mb, csv_mb / pq_mb,
-    )
-
-    if verify:
-        ok, detail = verify_grid_conversion(csv_path, parquet_path, chunksize=chunksize)
-        if not ok:
-            raise ValueError(f"Verification FAILED for {parquet_path.name}: {detail}")
-        logger.info("Verified: %s", detail)
-
-    return parquet_path
-
-
-def verify_grid_conversion(csv_path, parquet_path, chunksize: int = 1_000_000) -> Tuple[bool, str]:
-    """Check a parquet is a faithful copy of the CSV it came from.
-
-    Compares row count, column names, dtypes, and every value, streaming both
-    sides in chunks. Returns ``(ok, detail)`` rather than raising, so the caller
-    can decide what to do before deleting anything.
-    """
-    import pyarrow.parquet as pq
-
-    csv_path, parquet_path = Path(csv_path), Path(parquet_path)
-    pf = pq.ParquetFile(parquet_path)
-    n_pq = pf.metadata.num_rows
-
-    csv_cols = list(pd.read_csv(csv_path, nrows=0).columns)
-    pq_cols = list(pf.schema_arrow.names)
-    if csv_cols != pq_cols:
-        return False, f"column mismatch: csv={csv_cols} parquet={pq_cols}"
-
-    # Value comparison, streamed: parquet row groups against CSV chunks. The
-    # row count falls out of this pass, so there is no separate counting read.
-    n_csv = 0
-    csv_iter = pd.read_csv(csv_path, chunksize=chunksize)
-    csv_buf = pd.DataFrame()
-    for rg in range(pf.num_row_groups):
-        pq_chunk = pf.read_row_group(rg).to_pandas()
-        while len(csv_buf) < len(pq_chunk):
-            try:
-                csv_buf = pd.concat([csv_buf, next(csv_iter)], ignore_index=True)
-            except StopIteration:
-                break
-        head, csv_buf = csv_buf.iloc[: len(pq_chunk)], csv_buf.iloc[len(pq_chunk) :].reset_index(drop=True)
-        if len(head) != len(pq_chunk):
-            return False, f"row group {rg}: csv ran out ({len(head)} vs {len(pq_chunk)})"
-        n_csv += len(head)
-        for col in pq_cols:
-            a, b = head[col].to_numpy(), pq_chunk[col].to_numpy()
-            if a.dtype.kind in "fc" or b.dtype.kind in "fc":
-                same = np.array_equal(a, b, equal_nan=True)
-            else:
-                same = np.array_equal(a, b)
-            if not same:
-                return False, f"values differ in column '{col}' (row group {rg})"
-
-    # Anything left in the CSV means the parquet is short.
-    leftover = len(csv_buf) + sum(len(c) for c in csv_iter)
-    if leftover:
-        return False, f"csv has {leftover} rows beyond the parquet's {n_pq}"
-    if n_csv != n_pq:
-        return False, f"row count mismatch: csv={n_csv} parquet={n_pq}"
-
-    return True, (
-        f"{n_pq} rows, {len(pq_cols)} columns, all values identical; "
-        f"{csv_path.stat().st_size / 1e6:.0f} MB CSV -> "
-        f"{parquet_path.stat().st_size / 1e6:.0f} MB parquet"
-    )
+from .KilonovaScorer.grids import resolve_grid  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -254,9 +126,22 @@ def build_data_obs(
     if scorer.empty:
         return scorer
 
+    # Non-detections carry no photometric error -- there is no measurement to
+    # have one. They still need a sigma: it is the depth uncertainty of the
+    # limit, used both to convolve the PPD and to soften the ABC acceptance
+    # edge. DEFAULT_MAGERR is the module's existing 3-sigma convention,
+    # 2.5/(3 ln 10) ~ 0.36 mag, i.e. the error a source detected exactly at the
+    # limit would have had. Surveys differ on whether a quoted limit is 3- or
+    # 5-sigma; 3-sigma is the conservative reading (wider sigma, more tolerant
+    # test) and matches what _parse_datum already assumes for a detection with
+    # a missing error.
+    mag_err = scorer["e_magnitude"].to_numpy(dtype=float).copy()
+    is_limit = scorer["is_limit"].to_numpy(dtype=bool)
+    mag_err[is_limit & ~np.isfinite(mag_err)] = DEFAULT_MAGERR
+
     abs_mag, abs_err = compute_abs_mag_samples(
         scorer["magnitude"].to_numpy(),
-        scorer["e_magnitude"].to_numpy(),
+        mag_err,
         dist_mpc=dist_mpc,
         dist_err_mpc=dist_err_mpc,
         n_samples=n_samples,
@@ -414,6 +299,31 @@ def _cumulative_score(per_obs: pd.DataFrame, bin_size: float) -> Tuple[Optional[
     if per_obs.empty:
         return None, "no epochs scored"
 
+    # Non-detections inform the ABC survival filter but never this average.
+    #
+    # A limit's score is Pr(M_rep > M_lim), which is ~1 whenever the limit is
+    # shallower than the simulated population -- i.e. precisely when the
+    # observation carries NO information. Averaged in, "we did not look deep
+    # enough to see anything" reads as "maximally consistent with a kilonova",
+    # and it dominates: with limits aggregated, two S251112cm candidates that
+    # were never detected at all scored 0.948 and 0.944, above the 0.804 of the
+    # best candidate with real detections. The framework has no way to express
+    # "neutral" -- 1-F is high for an uninformative limit and there is no
+    # weighting that fixes that, because the value itself, not its weight, is
+    # what is wrong (measured IVW weights were an unremarkable 0.5-2.8).
+    #
+    # The real information in a non-detection is exclusionary: a DEEP limit
+    # rules out simulations bright enough to have been seen. That is exactly
+    # what the ABC kernel does with it in compute_consistent_ids_anyhit, and a
+    # shallow limit correctly excludes nothing there. So limits can shrink the
+    # survivor set and trigger the collapse penalty, but can never raise the
+    # score -- which is the honest reading of a non-detection.
+    if "is_limit" in per_obs.columns:
+        detections = per_obs[~per_obs["is_limit"].astype(bool)]
+        if detections.empty:
+            return None, "only non-detections in the grid's time window"
+        per_obs = detections
+
     # NOTE: this used to short-circuit when every epoch had p_tail_std == 0,
     # because the aggregation divided by zero and returned NaN. `ivw_stats_logit`
     # now floors the std (IMPROVEMENTS.md §1c), so an all-zero-spread candidate
@@ -492,7 +402,7 @@ def score_candidate(
         this is the one place this module departs from raw upstream behaviour.
 
     Remaining keyword arguments are passed to ``kilonovascorer_v3``
-    (``k_near``, ``n_kde_sim``, ``min_sim_points``, ``overlap_k``).
+    (``n_kde_sim``, ``min_sim_points``, ``overlap_k``).
     """
     result = KilonovaScore(event_id=event_id, target_name=target_name)
 
@@ -503,7 +413,7 @@ def score_candidate(
             target_names=[target_name],
             dt_min=dt_min,
             dt_max=dt_max,
-            include_limits=False,
+            include_limits=True,
             snr_min=snr_min,
         )
     phot = phot[phot["target_name"] == target_name]
@@ -543,7 +453,7 @@ def score_candidate(
 
     # --- grid --------------------------------------------------------------
     if grid is None:
-        path = Path(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
+        path = resolve_grid(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
         # The filter applies to the grid's own `band` column. In survey mode the
         # observation's filter_mapped IS that band id; in canonical mode it is
         # 'g-band'/'r-band'/..., so it has to be inverted through FILTER_LOOKUP
@@ -563,7 +473,7 @@ def score_candidate(
             path, bands=grid_bands or None, mode=mode,
             max_time=obs_tmax + time_bin_width if np.isfinite(obs_tmax) else None,
         )
-        result.grid = Path(path).name
+        result.grid = grid_name(path)
     else:
         result.grid = getattr(grid, "attrs", {}).get("name", result.grid)
 
@@ -691,7 +601,7 @@ def score_event(
     grid_path=None,
     viable_only: bool = False,
     target_names: Optional[Iterable[str]] = None,
-    min_obs: int = 3,
+    min_obs: int = 1,
     min_bands: int = 1,
     dt_min: float = 0.0,
     dt_max: Optional[float] = None,
@@ -708,10 +618,15 @@ def score_event(
     candidate, so this costs the same two database round-trips as extracting
     the photometry alone.
 
-    ``min_obs`` / ``min_bands`` pre-filter candidates whose light curves are
-    too sparse to score meaningfully; they still appear in the output with a
-    ``skip_reason`` so nothing silently disappears. Sorted by score, highest
-    first, unscored candidates last.
+    ``min_obs`` / ``min_bands`` are a floor on how much photometry a candidate
+    must have, defaulting to **one point in one band** -- the scorer's whole
+    point is that it works in the sparse regime GW follow-up actually produces.
+    P_tail_KNe is evaluated per observation against the simulated population,
+    so a single detection already yields a score; more observations sharpen it
+    through the sequential update rather than being required for it. Raise
+    these only to deliberately exclude thin light curves. Candidates below the
+    floor still appear in the output with a ``skip_reason``, so nothing
+    silently disappears. Sorted by score, highest first, unscored last.
     """
     event = get_event(event_id)
     candidates = list(get_candidates(event, viable_only=viable_only, target_names=target_names))
@@ -725,7 +640,12 @@ def score_event(
         target_names=target_names,
         dt_min=dt_min,
         dt_max=dt_max,
-        include_limits=False,
+        # Non-detections are kept and scored one-sided as Pr(M_rep > M_lim);
+        # see predictive_tail_kde(is_limit=True). For many candidates they are
+        # the only photometry inside the grid's 0-10 d window: of the 30
+        # S251112cm candidates previously skipped as "no photometry", 98% of
+        # their 2,738 points were limits and not one detection fell in window.
+        include_limits=True,
         snr_min=snr_min,
     )
 
@@ -782,7 +702,7 @@ def score_event_by_distance(
     grid_path=None,
     viable_only: bool = False,
     target_names: Optional[Iterable[str]] = None,
-    min_obs: int = 3,
+    min_obs: int = 1,
     min_bands: int = 1,
     dt_min: float = 0.0,
     dt_max: Optional[float] = None,
@@ -821,8 +741,11 @@ def score_event_by_distance(
     would otherwise re-derive each one, which is a database round trip per
     candidate.
 
-    Candidates too sparse to score never reach any of this: they are filtered
-    before the distance pass, so they cost one dictionary lookup each.
+    Candidates below the ``min_obs``/``min_bands`` floor never reach any of
+    this: they are filtered before the distance pass, so they cost one
+    dictionary lookup each. That floor defaults to a single point in a single
+    band, so in practice only candidates with no usable photometry at all are
+    dropped here.
     """
     from .KilonovaScorer.grids import clear_cache
 
@@ -838,7 +761,12 @@ def score_event_by_distance(
         target_names=target_names,
         dt_min=dt_min,
         dt_max=dt_max,
-        include_limits=False,
+        # Non-detections are kept and scored one-sided as Pr(M_rep > M_lim);
+        # see predictive_tail_kde(is_limit=True). For many candidates they are
+        # the only photometry inside the grid's 0-10 d window: of the 30
+        # S251112cm candidates previously skipped as "no photometry", 98% of
+        # their 2,738 points were limits and not one detection fell in window.
+        include_limits=True,
         snr_min=snr_min,
     )
     by_target = dict(tuple(phot.groupby("target_name"))) if not phot.empty else {}
@@ -900,7 +828,7 @@ def score_event_by_distance(
             continue
 
         try:
-            path = Path(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
+            path = resolve_grid(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
         except Exception as exc:  # noqa: BLE001 - no grid at all, or none close enough
             results.append(
                 KilonovaScore(event_id, name, target_id=cand.target_id, dist_mpc=dist_mpc,
@@ -966,7 +894,7 @@ def score_event_by_distance(
             )
             logger.info(
                 "[rung %d/%d load %d] %s: %d candidates, %d band(s), t<=%s",
-                rung_i, len(ordered), chunk_i, path.name, len(chunk), len(grid_bands),
+                rung_i, len(ordered), chunk_i, grid_name(path), len(chunk), len(grid_bands),
                 f"{load_max_time:.2f} d" if load_max_time is not None else "all",
             )
             try:
@@ -974,7 +902,7 @@ def score_event_by_distance(
                     path, bands=grid_bands, mode=mode, max_time=load_max_time
                 )
             except Exception as exc:  # noqa: BLE001 - one bad load must not stop the event
-                logger.exception("Loading %s failed", path.name)
+                logger.exception("Loading %s failed", grid_name(path))
                 for cand, lc, d, derr in chunk:
                     results.append(
                         KilonovaScore(event_id, cand.target.name, target_id=cand.target_id,

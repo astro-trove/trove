@@ -11,6 +11,7 @@ import numpy as np
 
 from django_tasks import task
 from django.conf import settings
+from django.utils import timezone
 
 from candidate_vetting.public_catalogs.phot_catalogs import ATLAS_Forced_Phot
 from candidate_vetting.vet import run_mpc
@@ -269,7 +270,7 @@ def async_generate_grid_rung(distance_mpc: float, nle_id: int | None = None) -> 
 
     if nle_id is not None:
         # now that the rung exists, score the event against it
-        async_kilonova_score.enqueue(nle_id=nle_id, params=get_kilonova_params(nle_id))
+        async_kilonova_score.enqueue(nle_id=nle_id, params=get_kilonova_params())
 
 
 @task(queue_name="kilonova_scoring", priority=settings.PRIORITY_HIGH)
@@ -445,6 +446,13 @@ def async_kilonova_score(nle_id: int, params: dict) -> None:
         scored=n_scored,
         total=int(len(table)),
         message=f"Scored {n_scored} of {len(table)} candidates of {nle.event_id}.",
+        # Recorded for the scoring-settings panel at the foot of the candidate list. Recorded
+        # here, at the moment the scores are written, rather than read back from
+        # DEFAULT_KILONOVA_PARAMS at render time: the point is to say what
+        # produced *these* numbers, and the defaults may have been edited since.
+        finished_at=timezone.now().isoformat(),
+        params=dict(params),
+        grid_path=grid_path or "",
     )
 
     # the scores just changed, so every cached ranking for them is stale

@@ -12,10 +12,11 @@ Everything except the distance is imported from ``generate_ladder``, so a rung
 made here is constructed identically to the ladder's own and the two are
 directly comparable. Do not duplicate N_SIM / MODEL / BANDS here.
 
-Run with the `kn-sim` environment (redback + bilby + lalsuite), which is kept
+Run with the grid-generation environment (`KN_SIM_PYTHON` in
+settings_local.py; see KilonovaScorer/README.md) (redback + bilby + lalsuite), which is kept
 separate from `t-env` so redback's pins cannot disturb the TROVE Django stack::
 
-    /home/sopanda25/miniconda3/envs/kn-sim/bin/python \
+    "$KN_SIM_PYTHON" \
         scoring/KilonovaScorer/generate_rung.py --distance 1200
 
 This is why :func:`scoring.tasks.async_generate_grid_rung` shells out to a

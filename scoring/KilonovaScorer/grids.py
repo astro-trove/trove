@@ -25,6 +25,23 @@ corrected after the fact. Grids therefore come in a distance ladder, and
 
     available_grids()                       # what's on disk
     grid = load_grid(grid_for_distance(310))  # nearest grid to 310 Mpc
+
+Two backends
+------------
+A grid can also live in a local PostgreSQL database instead of a file -- one
+row per lightcurve, magnitudes as a ``bytea``, benchmarked in ``DB.md`` and
+implemented in :mod:`.grid_db`. It reads a single band in 3.0 s / 847 MB where
+the Parquet file needs 8.5 s / 2,840 MB, because the file's row groups each
+contain every band so a band filter prunes nothing.
+
+Everything in this module dispatches on ``TROVE_GRID_BACKEND``, and the three
+public entry points return and accept the same things either way -- a grid is
+identified by a :class:`Path` under Parquet and a :class:`GridRef` under
+Postgres, both of which have a ``.name`` and hash. Parquet stays the default,
+so nothing changes until the environment says so:
+
+    export TROVE_GRID_BACKEND=postgres
+    export TROVE_GRID_DSN='postgresql://bench@127.0.0.1:55432/gridbench'
 """
 
 from __future__ import annotations
@@ -33,8 +50,9 @@ import logging
 import os
 import re
 from collections import OrderedDict
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
@@ -42,6 +60,56 @@ import pandas as pd
 from .core import FILTER_LOOKUP
 
 logger = logging.getLogger(__name__)
+
+#: ``'parquet'`` (default) or ``'postgres'``. The default matters: a grid store
+#: has to be populated by ``manage.py ingest_kn_grid`` before it holds anything,
+#: so flipping this on an unprepared deployment would break scoring outright.
+GRID_BACKEND = (os.environ.get("TROVE_GRID_BACKEND") or "parquet").strip().lower()
+
+
+@dataclass(frozen=True)
+class GridRef:
+    """A grid in the database, standing where a :class:`Path` stands otherwise.
+
+    Frozen so it is hashable: the scoring loop buckets candidates into a dict
+    keyed on their grid, and sorts those keys by distance, so whatever
+    identifies a grid has to work as a dict key. ``name`` mirrors
+    ``Path.name`` for the sake of log lines that report which grid was used.
+    """
+
+    name: str
+    distance_mpc: float
+    backend: str = "postgres"
+
+    def __str__(self) -> str:
+        return self.name
+
+
+#: Either kind of grid identifier.
+GridId = Union[Path, GridRef]
+
+
+def resolve_grid(spec) -> GridId:
+    """Normalise a grid identifier to a :class:`Path` or a :class:`GridRef`.
+
+    Strings are ambiguous -- a filename under Parquet, a grid name under
+    Postgres -- so they are read according to the active backend. Anything
+    already resolved passes through, which lets a caller pin one backend's grid
+    explicitly regardless of the default.
+    """
+    if isinstance(spec, (GridRef, Path)):
+        return spec
+    if GRID_BACKEND == "postgres":
+        from . import grid_db
+
+        _axis, distance, _n = grid_db.grid_axis(str(spec))
+        return GridRef(name=str(spec), distance_mpc=distance)
+    return Path(spec)
+
+
+def grid_name(spec) -> str:
+    """Display name of a grid, whichever backend identifies it."""
+    return getattr(spec, "name", None) or str(spec)
 
 #: Where grids live. Defaults to a gitignored directory inside the package --
 #: they are generated artifacts, not source -- but the ladder is ~12 GB, which
@@ -155,6 +223,11 @@ def grid_distance_mpc(source) -> float:
     Falls back to the filename when there is no ``redshift`` column, and returns
     NaN if neither is available.
     """
+    if isinstance(source, GridRef):
+        # The database stores the distance alongside the axis, so there is
+        # nothing to parse or sample.
+        return float(source.distance_mpc)
+
     if isinstance(source, pd.DataFrame):
         if "redshift" in source.columns:
             # head(_Z_SAMPLE_ROWS), not the whole column: on a loaded rung this
@@ -189,10 +262,21 @@ def _is_parquet(path: Path) -> bool:
 
 
 def available_grids(directory=None) -> pd.DataFrame:
-    """Inventory of grids on disk: ``path``, ``distance_mpc``, ``size_mb``.
+    """Inventory of available grids: ``path``, ``distance_mpc``, ``size_mb``.
 
-    Sorted by distance so the ladder is obvious at a glance.
+    Sorted by distance so the ladder is obvious at a glance. Under the Postgres
+    backend ``path`` holds a :class:`GridRef` rather than a filesystem path, and
+    ``size_mb`` is the stored size of the magnitude column; callers that read
+    only ``distance_mpc`` are unaffected either way.
+
+    An explicit ``directory`` always means the filesystem -- it is how a caller
+    asks about Parquet files specifically.
     """
+    if GRID_BACKEND == "postgres" and directory is None:
+        from . import grid_db
+
+        return grid_db.available_grids_db()
+
     directory = Path(directory) if directory else GRID_DIR
     if not directory.exists():
         return pd.DataFrame(columns=["path", "distance_mpc", "size_mb"])
@@ -221,9 +305,15 @@ def grid_for_distance(dist_mpc: float, directory=None, max_frac_offset: Optional
     grids = available_grids(directory)
     grids = grids[grids["distance_mpc"].notna()] if len(grids) else grids
     if grids.empty:
+        where = (
+            "the grid database (TROVE_GRID_DSN)"
+            if GRID_BACKEND == "postgres" and directory is None
+            else str(Path(directory) if directory else GRID_DIR)
+        )
         raise FileNotFoundError(
-            f"No grids found in {Path(directory) if directory else GRID_DIR}. "
-            "Generate one with KilonovaScorer.simulation.simulate_kilonova()."
+            f"No grids found in {where}. Generate one with "
+            "KilonovaScorer.simulation.simulate_kilonova(), and under the postgres "
+            "backend load it with `manage.py ingest_kn_grid <parquet>`."
         )
     if not np.isfinite(dist_mpc) or dist_mpc <= 0:
         raise ValueError(f"Cannot select a grid for distance {dist_mpc}")
@@ -309,7 +399,31 @@ def load_grid(
     pd.DataFrame
         With ``attrs['name']`` and ``attrs['distance_mpc']`` set.
     """
-    path = Path(path)
+    path = resolve_grid(path)
+
+    if isinstance(path, GridRef):
+        # The database backend. `columns` and `max_rows` have no analogue: the
+        # store holds exactly the four scoring columns, and a read is bounded
+        # by the bands and time window asked for rather than needing a guard
+        # against materialising the whole rung.
+        from . import grid_db
+
+        key = (
+            "postgres", path.name, tuple(bands or ()),
+            min_time, max_time, max_abs_mag, mode, add_filter_mapped,
+        )
+        if use_cache:
+            cached = _cache_get(key)
+            if cached is not None:
+                return cached
+        df = grid_db.load_grid_db(
+            path.name, bands=bands, min_time=min_time, max_time=max_time,
+            max_abs_mag=max_abs_mag, add_filter_mapped=add_filter_mapped, mode=mode,
+        )
+        if use_cache:
+            _cache_put(key, df)
+        return df
+
     if not path.exists():
         raise FileNotFoundError(
             f"Simulation grid not found: {path}\n"

@@ -1,6 +1,17 @@
 from django.db import models
 from tom_nonlocalizedevents.models import EventCandidate
 
+# KilonovaSCORER's simulation grids deliberately have no models here. They live
+# in their own local PostgreSQL database, reached by DSN rather than through
+# `DATABASES`, with the schema created on demand by
+# `KilonovaScorer.grid_db.ensure_schema()`. See KilonovaScorer/DB.md.
+#
+# Two reasons they are kept out of Django's hands. A rung is ~2 GB of pure
+# simulation, which is not TROVE data and has no business in TROVE's database
+# or its migration history; and the schema is tuned in ways the ORM cannot
+# express -- a composite primary key, no surrogate id or sequence, and LZ4
+# compression on the bytea column that holds the magnitudes.
+
 
 ## score factors
 class ScoreFactor(models.Model):

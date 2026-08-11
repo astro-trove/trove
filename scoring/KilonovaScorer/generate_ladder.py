@@ -1,10 +1,11 @@
 """
 Generate the kilonova simulation grid ladder.
 
-Run with the `kn-sim` environment (redback + bilby + lalsuite), which is kept
+Run with the grid-generation environment (`KN_SIM_PYTHON` in
+settings_local.py; see KilonovaScorer/README.md) (redback + bilby + lalsuite), which is kept
 separate from `t-env` so redback's pins cannot disturb the TROVE Django stack:
 
-    /home/sopanda25/miniconda3/envs/kn-sim/bin/python \
+    "$KN_SIM_PYTHON" \
         scoring/KilonovaScorer/generate_ladder.py
 
 Resumable: any rung whose Parquet already exists is skipped, so an interrupted

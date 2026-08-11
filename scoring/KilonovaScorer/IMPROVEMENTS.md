@@ -44,9 +44,9 @@ location, the mechanism, why it matters, one or more candidate fixes, and an eff
 > before/after numbers, and how to revert. The rest of this section is preserved as the
 > original diagnosis so the reasoning behind the change stays readable.
 
-**Location:** [`ivw_stats_logit`](src/KilonovaScorer/utils.py#L128) lines 160–165;
-[`binned_stats_cumulative_ptail`](src/KilonovaScorer/core2.py#L478) line 526 (and the
-equivalent [core.py:359](src/KilonovaScorer/core.py#L359)).
+**Location:** [`ivw_stats_logit`](scoring/KilonovaScorer/utils.py#L128) lines 160–165;
+[`binned_stats_cumulative_ptail`](scoring/KilonovaScorer/core.py#L478) line 526 (and the
+equivalent [core.py:359](scoring/KilonovaScorer/core.py#L359)).
 
 ### Mechanism
 
@@ -85,7 +85,7 @@ the returned Series into a DataFrame using the union of index labels, so this ro
 `count = NaN`. The very next statement is:
 
 ```python
-binned_stats = binned_stats.dropna()   # core2.py:526
+binned_stats = binned_stats.dropna()   # core.py:526
 ```
 
 `dropna()` defaults to `how="any"`, so **the entire bin row is removed** on the strength of
@@ -98,7 +98,7 @@ be rejecting most confidently.
 
 **1c. The alternative branch is also broken.** If the row were *not* dropped (different
 pandas version, or `dropna` removed), `std = 0.0` propagates into
-[`calculate_sequential_score_logit`](src/KilonovaScorer/utils.py#L194):
+[`calculate_sequential_score_logit`](scoring/KilonovaScorer/utils.py#L194):
 
 ```python
 z_std = stds / (means_clipped * (1.0 - means_clipped))   # → 0.0
@@ -167,7 +167,7 @@ if not np.isfinite(z[i]) or not np.isfinite(z_std[i]) or z_std[i] <= 0:
 and apply the same check when initialising from bin 0 (line 239) rather than assuming it
 is valid.
 
-**Effort:** Low — a few lines in [utils.py](src/KilonovaScorer/utils.py) plus one line in
+**Effort:** Low — a few lines in [utils.py](scoring/KilonovaScorer/utils.py) plus one line in
 each `binned_stats_cumulative_ptail`.
 **Risk:** Changes published scores. Any existing numbers (including the AT2017gfo and
 AT2025ulz results) will need regenerating, and the change should be characterised before/after.
@@ -261,8 +261,8 @@ change 5's guard in `kilonova_scoring.py` will reintroduce NaN scores.
 
 ## 2. The distance systematic is treated as independent per-epoch noise
 
-**Location:** [`compute_abs_mag_samples`](src/KilonovaScorer/utils.py#L28) lines 94–117;
-[`calculate_sequential_score_logit`](src/KilonovaScorer/utils.py#L194) lines 243–259.
+**Location:** [`compute_abs_mag_samples`](scoring/KilonovaScorer/utils.py#L28) lines 94–117;
+[`calculate_sequential_score_logit`](scoring/KilonovaScorer/utils.py#L194) lines 243–259.
 
 ### Mechanism
 
@@ -449,9 +449,9 @@ than the method.
 
 ## 4. Colour information is never used
 
-**Location:** [`kilonovascorer_v1`](src/KilonovaScorer/core.py#L511) line 543 /
-[`kilonovascorer_v3`](src/KilonovaScorer/core2.py#L542) line 599 — the `for band in band_list`
-loop, and the per-band `overlap_chain` call at [core2.py:724](src/KilonovaScorer/core2.py#L724).
+**Location:** [`kilonovascorer_v1`](scoring/KilonovaScorer/core.py#L511) line 543 /
+[`kilonovascorer_v3`](scoring/KilonovaScorer/core.py#L542) line 599 — the `for band in band_list`
+loop, and the per-band `overlap_chain` call at [core.py:724](scoring/KilonovaScorer/core.py#L724).
 
 ### Mechanism
 
@@ -532,9 +532,9 @@ to retune `overlap_k` and regenerate published figures.
 
 ## 5. The hard ABC intersection is fragile to single outliers
 
-**Location:** [`compute_consistent_ids_anyhit`](src/KilonovaScorer/core2.py#L353) and
-[`overlap_chain`](src/KilonovaScorer/core2.py#L397) (duplicated at
-[core.py:278](src/KilonovaScorer/core.py#L278) and [core.py:294](src/KilonovaScorer/core.py#L294)).
+**Location:** [`compute_consistent_ids_anyhit`](scoring/KilonovaScorer/core.py#L353) and
+[`overlap_chain`](scoring/KilonovaScorer/core.py#L397) (duplicated at
+[core.py:278](scoring/KilonovaScorer/core.py#L278) and [core.py:294](scoring/KilonovaScorer/core.py#L294)).
 
 ### Mechanism
 
@@ -616,8 +616,8 @@ justification. Both are defensible but must be stated and their sensitivity show
 
 ## 6. The Monte Carlo estimates a quantity available in closed form
 
-**Location:** [`predictive_tail_kde_python`](src/KilonovaScorer/core.py#L207) lines 248–258;
-[`predictive_tail_kde`](src/KilonovaScorer/core2.py) around lines 320–338.
+**Location:** [`predictive_tail_kde_python`](scoring/KilonovaScorer/core.py#L207) lines 248–258;
+[`predictive_tail_kde`](scoring/KilonovaScorer/core.py) around lines 320–338.
 
 ### Mechanism
 
@@ -718,8 +718,8 @@ plotting a few bins against their histograms.
 
 ## 7. Time binning instead of interpolation
 
-**Location:** [core.py:552–556](src/KilonovaScorer/core.py#L552),
-[core2.py:615–629](src/KilonovaScorer/core2.py#L615).
+**Location:** [core.py:552–556](scoring/KilonovaScorer/core.py#L552),
+[core.py:615–629](scoring/KilonovaScorer/core.py#L615).
 
 ### Mechanism
 
@@ -779,8 +779,8 @@ so use float32 and/or subset the time range at load. Worth benchmarking before c
 
 ## 8. `sigma_obs` enters the `p_tail_std` calculation twice
 
-**Location:** [core.py:251–268](src/KilonovaScorer/core.py#L251),
-[core2.py:336](src/KilonovaScorer/core2.py#L336).
+**Location:** [core.py:251–268](scoring/KilonovaScorer/core.py#L251),
+[core.py:336](scoring/KilonovaScorer/core.py#L336).
 
 ### Mechanism
 
@@ -845,8 +845,8 @@ principled way to settle it — run 3a under each variant and see which yields a
 
 ## 9. Upper limits and non-detections are discarded
 
-**Location:** `parse_json_photometry` in both [core.py](src/KilonovaScorer/core.py#L53) and
-[core2.py](src/KilonovaScorer/core2.py) — entries flagged `upper_limit` are dropped, as are
+**Location:** `parse_json_photometry` in both [core.py](scoring/KilonovaScorer/core.py#L53) and
+[core2.py](scoring/KilonovaScorer/core.py) — entries flagged `upper_limit` are dropped, as are
 pre-merger points.
 
 ### Mechanism
@@ -913,8 +913,8 @@ to whichever likelihood formulation is adopted.
 
 ## 10. Silently skipped epochs
 
-**Location:** [core.py:583–584](src/KilonovaScorer/core.py#L583),
-[core2.py:656–661](src/KilonovaScorer/core2.py#L656).
+**Location:** [core.py:583–584](scoring/KilonovaScorer/core.py#L583),
+[core.py:656–661](scoring/KilonovaScorer/core.py#L656).
 
 ### Mechanism
 
@@ -985,9 +985,9 @@ on `scored` before consuming rows.)
 >
 > Pass `random_state=None` for the original non-deterministic behaviour.
 
-**Location:** [core.py:253](src/KilonovaScorer/core.py#L253),
-[core.py:262](src/KilonovaScorer/core.py#L262), [core2.py:336](src/KilonovaScorer/core2.py#L336),
-[utils.py:94](src/KilonovaScorer/utils.py#L94), [utils.py:113](src/KilonovaScorer/utils.py#L113).
+**Location:** [core.py:253](scoring/KilonovaScorer/core.py#L253),
+[core.py:262](scoring/KilonovaScorer/core.py#L262), [core.py:336](scoring/KilonovaScorer/core.py#L336),
+[utils.py:94](scoring/KilonovaScorer/utils.py#L94), [utils.py:113](scoring/KilonovaScorer/utils.py#L113).
 
 ### Mechanism
 
@@ -1027,7 +1027,7 @@ the distance marginalisation of #2.
 
 ## 12. The `anyhit` criterion depends on the grid's time resolution
 
-**Location:** [`compute_consistent_ids_anyhit`](src/KilonovaScorer/core2.py#L353).
+**Location:** [`compute_consistent_ids_anyhit`](scoring/KilonovaScorer/core.py#L353).
 
 ### Mechanism
 
@@ -1082,8 +1082,8 @@ demonstrated by rerunning a candidate against grids of differing `ntime`.
 
 ## 13. v3's ABC helper defeats its own pre-grouping optimisation
 
-**Location:** [core2.py:626–629](src/KilonovaScorer/core2.py#L626) versus
-[core2.py:386–388](src/KilonovaScorer/core2.py#L386).
+**Location:** [core.py:626–629](scoring/KilonovaScorer/core.py#L626) versus
+[core.py:386–388](scoring/KilonovaScorer/core.py#L386).
 
 ### Mechanism
 
@@ -1201,8 +1201,8 @@ non-trivial.
 
 ### Mechanism
 
-- `kilonovascorer_v1` ([core.py](src/KilonovaScorer/core.py#L511)) and `kilonovascorer_v3`
-  ([core2.py](src/KilonovaScorer/core2.py#L542)) coexist with **different output column
+- `kilonovascorer_v1` ([core.py](scoring/KilonovaScorer/core.py#L511)) and `kilonovascorer_v3`
+  ([core2.py](scoring/KilonovaScorer/core.py#L542)) coexist with **different output column
   names** (`p_tail`/`prob_near` vs `p_tail_KNe`/`p_near_KNe`). There is no v2.
 - `__init__.py` does `from .core import ...` followed by `from .core2 import *`, so core2's
   definitions silently win for the six names defined in both. Which implementation runs
@@ -1230,7 +1230,8 @@ Sequencing matters here — this should come **before** the substantive changes,
 
 1. **Choose one scorer.** v3 is the better base (KDE cache, pre-grouping, better docstrings,
    paper-aligned naming). Delete v1 or keep it as a thin deprecated alias that renames columns.
-2. **Standardise column names** on the `_KNe` convention and update `plotting.py` accordingly.
+2. **Standardise column names** on the `_KNe` convention. (Done; `plotting.py` was
+   removed as unused -- recover from git history if diagnostics are needed.)
    This currently requires a manual rename to use v3 with the plots at all.
 3. **Fix `__init__.py`** to import explicitly from one module. Remove the wildcard import so
    the resolution is visible rather than order-dependent.

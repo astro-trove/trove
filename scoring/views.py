@@ -65,8 +65,14 @@ class TargetVettingFormView(FormView):
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
 
-        # if NLE was provided by referer, use it to choose what vetting is allowed
-        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+        # if NLE was provided by referer, use it to choose what vetting is
+        # allowed. Optional by design -- this view is reached at
+        # targets/<pk>/vetchoice/, where pk is the *target*, so there may be no
+        # event in context at all. Read with .get: the key is absent whenever
+        # the request arrived without a referer, and form_valid() pops it, so
+        # requiring it raised KeyError on a reload or a second visit. The empty
+        # string flows through to nle = None, which is already handled below.
+        nle_name_or_id = self.request.session.get("nle_id", "").split("=")[-1].split("/")[0]
         if nle_name_or_id.isdigit():
             nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
         else:
@@ -252,8 +258,10 @@ class TargetRedshiftUpdateFormView(FormView):
         # re-run host association
         host_association(target_id=pk)
 
-        # re-run vetting if NLE was provided by referer
-        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+        # re-run vetting if NLE was provided by referer. Optional -- see the
+        # note in TargetVettingFormView.get_form; the key is absent without a
+        # referer and after form_valid() pops it, so this must not require it.
+        nle_name_or_id = self.request.session.get("nle_id", "").split("=")[-1].split("/")[0]
         if nle_name_or_id.isdigit():
             nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
         else:
@@ -311,7 +319,17 @@ class TargetVettingAllFormView(FormView):
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
-        nle_id = self.request.session["nle_id"].split("=")[-1]
+        # The URL is eventcandidates/?nonlocalizedevent=<int:pk>/vetallchoice/,
+        # so pk IS the non-localized event -- TargetVettingAllView resolves the
+        # same value with NonLocalizedEvent.objects.filter(id=pk).
+        #
+        # This used to read self.request.session["nle_id"], which raised
+        # KeyError: 'nle_id' whenever the key was missing: get() only sets it
+        # when the request carries a referer, and form_valid() *pops* it, so
+        # pressing Vet All once and then reloading or revisiting the form blew
+        # up. The URL always has it; the session copy exists only to carry the
+        # query string onto the redirect.
+        nle_id = self.kwargs["pk"]
         nle_eventseq = localization_sequence_from_name(
             NonLocalizedEvent.objects.get(id=nle_id)
         )
@@ -394,8 +412,8 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
         # toggle is clicked. The toggle only records the choice, so a user can
         # set up several scoring changes and pay for one pass over the
         # candidates here, rather than one run per click.
-        if get_phot_method(nle.id) == KILONOVA:
-            params = get_kilonova_params(nle.id)
+        if get_phot_method() == KILONOVA:
+            params = get_kilonova_params()
             set_kilonova_status(
                 nle.id,
                 state="running",
@@ -430,8 +448,11 @@ class NonLocalizedEventAssociateTargetsFormView(FormView):
         # set a default SNR_min
         form.fields["snr_min"].initial = 5
 
-        # get NLE
-        nle_id = self.request.session["nle_id"].split("=")[-1]
+        # get NLE. Same reasoning as TargetVettingAllFormView.get_form: this
+        # view is routed as .../?nonlocalizedevent=<int:pk>/associatetargetschoice/,
+        # so pk is the event, and the session copy was a KeyError waiting to
+        # happen on any request without a referer.
+        nle_id = self.kwargs["pk"]
         nle_eventseq = localization_sequence_from_name(
             NonLocalizedEvent.objects.get(id=nle_id)
         )

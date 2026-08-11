@@ -225,6 +225,7 @@ SCORER_COLUMNS = [
     "time",             # MJD
     "magnitude",
     "e_magnitude",
+    "is_limit",         # True => `magnitude` is a limiting magnitude
     "band",             # raw-ish filter name
     "filter_mapped",    # canonical band, required before scoring
     "time_after_gw",    # days since the GW trigger (load_observations recomputes)
@@ -654,6 +655,9 @@ def to_scorer_frame(
             "time": df["mjd"],
             "magnitude": df["mag"],
             "e_magnitude": df["magerr"],
+            # carried so the scorer can tell a non-detection from a
+            # measurement; see build_data_obs and predictive_tail_kde
+            "is_limit": df["upperlimit"].astype(bool),
             "band": df["filter"],
             "filter_mapped": mapped,
             "time_after_gw": df["dt"],

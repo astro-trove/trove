@@ -1,4 +1,3 @@
-import sys
 import time
 import multiprocessing
 from multiprocessing import Pool, cpu_count
@@ -15,18 +14,6 @@ from bilby.core.prior import Uniform
 import warnings
 warnings.filterwarnings("ignore", "Wswiglal-redir-stdio")
 import lal
-
-def arcade_progress_bar(current, total, bar_length=30):
-    """
-    Prints an arcade-style progress bar to the console.
-    """
-    percent = current / total
-    filled_length = int(bar_length * percent)
-    bar = '█' * filled_length + '-' * (bar_length - filled_length)
-    sys.stdout.write(f'\r[ {bar} ] {percent*100:6.2f}% ⬛')
-    sys.stdout.flush()
-    if current == total:
-        sys.stdout.write('\n')
 
 def _prewarm_bandpasses(bands):
     """Download and cache every bandpass once, serially, in this process.

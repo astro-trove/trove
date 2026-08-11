@@ -18,7 +18,6 @@ from scoring.models import ScoreFactor
 from scoring.phot_method import (
     KILONOVA,
     TROVE,
-    get_kilonova_params,
     get_phot_method,
     scored_candidates_cache_key,
     set_phot_method,
@@ -88,12 +87,13 @@ class EventCandidateListView(FilterView):
 
         agn_toggle = cache.get("agn_toggle", True)
 
-        # The photometry method belongs to the event being viewed, not the site:
-        # a KilonovaSCORER run scores one event's candidates, and only that
-        # event has kilonova_score rows. Without an event in the URL this is the
-        # cross-event list, which has no run behind it and stays on TROVE.
+        # Site-wide, like agn_toggle: it selects which of two already-computed
+        # numbers becomes the photometry factor, so it costs nothing to apply
+        # here. Candidates whose event has no finished run simply have no
+        # kilonova_score row and fall back to the TROVE check -- reported by the
+        # scoring-settings panel at the foot of the list.
         nle_id = self.request.GET.get("nonlocalizedevent")
-        phot_method = get_phot_method(nle_id)
+        phot_method = get_phot_method()
 
         # Create cache key from filters (excluding page number)
         query_params = self.request.GET.copy()
@@ -121,9 +121,6 @@ class EventCandidateListView(FilterView):
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
         context["phot_method"] = phot_method
-        # the KNS column of the score cell; the toggles and the run status come
-        # from {% scoring_controls %}, which reads its own state
-        context["phot_method_is_kilonova"] = phot_method == KILONOVA
 
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
@@ -320,10 +317,10 @@ We encourage additional follow up of these candidates to determine whether they 
 def scoring_control_redirect(request, nle_id=None):
     """Where a scoring toggle sends you after it has done its work.
 
-    Back to the page the toggle was clicked on. The controls are a pluggable
-    module (``{% scoring_controls %}``) that may be rendered on any page, so
-    they cannot assume the candidate list -- landing somewhere else would make
-    them unusable everywhere but there. The referer is checked against the
+    Back to the page the toggle was clicked on. The controls
+    (``{% scoring_controls %}``) can be added to any page, so they cannot
+    assume the candidate list -- landing somewhere else would make them
+    unusable everywhere but there. The referer is checked against the
     site's own hosts before being trusted, since it is attacker-controllable.
 
     The candidate list is the fallback for a missing or foreign referer.
@@ -361,11 +358,12 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
 
 
 class TogglePhotScoringMethodView(LoginRequiredMixin, View):
-    """Record which photometry method one event's candidate list should rank by.
+    """Flip the site-wide photometry scoring method.
 
     **This starts no computation.** It writes the choice to the cache and
-    returns; the KilonovaSCORER run is launched by ``Vet All``
-    (:class:`scoring.views.TargetVettingAllView`), which reads the choice back.
+    returns; a KilonovaSCORER run is launched per event by that event's
+    ``Vet All`` (:class:`scoring.views.TargetVettingAllView`), which reads the
+    choice back.
 
     That split is the whole point of the control. Scoring a large event is tens
     of minutes, so a user setting up a comparison wants to flip this, change
@@ -373,24 +371,17 @@ class TogglePhotScoringMethodView(LoginRequiredMixin, View):
     the candidates. Kicking off a run per click would charge them for every
     intermediate state they never intended to keep.
 
-    Flipping to KilonovaSCORER before any run has happened is therefore
-    harmless but also inert: with no ``kilonova_score`` rows to read, every
-    candidate falls back to the TROVE photometry check
-    (:func:`scoring.util.get_event_candidate_scores`) until Vet All is pressed.
+    The setting is site-wide, so this needs no event and works from any page
+    that renders ``{% scoring_controls %}`` -- including the cross-event
+    candidate list. Selecting KilonovaSCORER before a run has finished is
+    harmless but inert for that event: with no ``kilonova_score`` rows to read,
+    its candidates fall back to the TROVE photometry check
+    (:func:`scoring.util.get_event_candidate_scores`). The scoring-settings panel at
+    the foot of the candidate list reports exactly that, so the list is never
+    labelled with a method it is not really using.
     """
 
     def get(self, request, *args, **kwargs):
-        nle_id = request.GET.get("nonlocalizedevent")
-        redirect_url = scoring_control_redirect(request, nle_id)
-        if not nle_id:
-            # the setting belongs to an event; the cross-event list has none
-            messages.warning(
-                request,
-                "The photometry scoring method is set per non-localized event. "
-                "Open an event's candidate list and toggle it there.",
-            )
-            return redirect(redirect_url)
-
         # No messages here. The toggle is reached over htmx (the candidate list
         # is inside an hx-boost container and serves candidate_table_body.html
         # to htmx requests), and that fragment does not render
@@ -399,12 +390,10 @@ class TogglePhotScoringMethodView(LoginRequiredMixin, View):
         # here would survive the swap, pile up in the session, and land as a
         # stack of blue alerts on the next full page load. The button's own
         # label already reports the method.
-        new_method = TROVE if get_phot_method(nle_id) == KILONOVA else KILONOVA
-        # the parameters are stored with the choice so the run Vet All starts
-        # uses whatever was configured at the time the method was picked
-        params = get_kilonova_params(nle_id) if new_method == KILONOVA else None
-        set_phot_method(new_method, nle_id, params)
-        return redirect(redirect_url)
+        set_phot_method(TROVE if get_phot_method() == KILONOVA else KILONOVA)
+        return redirect(
+            scoring_control_redirect(request, request.GET.get("nonlocalizedevent"))
+        )
 
 
 class SkymapPartialView(View):

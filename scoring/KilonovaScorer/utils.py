@@ -1,7 +1,3 @@
-import time
-from functools import wraps
-from scipy.stats import gaussian_kde
-
 """
 utils.py — KilonovaScorer utility functions.
 
@@ -11,6 +7,8 @@ Implements:
   - Logit-space inverse-variance weighted aggregation (ivw_stats_logit).
   - Sequential logit-space score updating (calculate_sequential_score_logit).
 """
+
+from scipy.stats import gaussian_kde
 
 import logging
 from typing import Optional
@@ -392,28 +390,3 @@ def calculate_sequential_score_logit(
         running_error[i] = score_i * (1.0 - score_i) * np.sqrt(1.0 / updated_prec)
 
     return running_score, running_error
-
-def timer_warp(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.perf_counter()
-        
-        # This executes your actual function
-        result = func(*args, **kwargs)
-        
-        end_time = time.perf_counter()
-        duration = end_time - start_time
-        print(f"DEBUG: '{func.__name__}' executed in {duration:.4f} seconds")
-        
-        return result
-    return wrapper
-
-def time_plot(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        start = time.perf_counter()
-        result = func(*args, **kwargs)
-        end = time.perf_counter()
-        print(f"DEBUG: '{func.__name__}' rendered in {end - start:.3f}s")
-        return result
-    return wrapper

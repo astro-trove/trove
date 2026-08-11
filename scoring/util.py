@@ -147,7 +147,7 @@ def get_event_candidate_scores(
     # the same event whenever the list is filtered by one, which is the only
     # case the setting applies to.
     if phot_method is None:
-        phot_method = get_phot_method(event_candidates_list[0].nonlocalizedevent_id)
+        phot_method = get_phot_method()
 
     if most_likely_class == "SSM":
         transients = TRANSIENTS
@@ -193,10 +193,6 @@ def get_event_candidate_scores(
             for subscore_key, param_range_key in val_not_score_keys.items()
             if subscore_key in sf_dict
         }
-
-        # the raw KilonovaSCORER score, so the candidate list can show it next
-        # to the total it went into; None when the candidate has none
-        ec.kilonova_score = sf_dict.get(KILONOVA_SCORE_KEY)
 
         # now get all the scores stored in TargetExtra objects
         te = target_extras_by_id.get(ec.target_id, {})

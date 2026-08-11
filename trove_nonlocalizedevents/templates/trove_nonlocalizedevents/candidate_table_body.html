@@ -3,16 +3,17 @@
 <div class="row">
   <div class="col-md-10">
   {% if request.user.is_authenticated %}
-      <div style="display:flex; justify-content:space-between; width:100%">
+      {# align-items:flex-start keeps the Refresh button its natural height: the #}
+      {# left column can grow (helper text under the scoring buttons) and the #}
+      {# default `stretch` would otherwise blow the button up to match it. #}
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; width:100%">
         <div>
-          {% scoring_controls show_status=False %}
+          {% scoring_controls %}
         </div>
         <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn btn-outline-secondary mb-2">
           <i class="fa fa-refresh"></i> Refresh
         </a>
       </div>
-      {# status sits under the flex row, not inside it, so it spans the width #}
-      {% scoring_status %}
    {% endif %}
     </br>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
@@ -41,15 +42,6 @@
 	    {% for transient, score in candidate.score.items %}
             {{ transient }} {{score|floatformat:2}}<br>
             {% endfor %}
-            {% if phot_method_is_kilonova %}
-              <small class="text-muted">
-                {% if candidate.kilonova_score is not None %}
-                  KNS {{ candidate.kilonova_score|floatformat:3 }}
-                {% else %}
-                  KNS &mdash;
-                {% endif %}
-              </small>
-            {% endif %}
           </td>
         </tr>
         {% empty %}
@@ -66,6 +58,10 @@
       </tbody>
     </table>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+
+  {# What produced the scores in the table above. Rendered after the list so it #}
+  {# reads as a footnote to the numbers rather than another control. #}
+  {% scoring_settings %}
   </div>
 </div>
 
