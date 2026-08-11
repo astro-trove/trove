@@ -5,7 +5,7 @@ from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView
 from django.conf import settings
 from django.db.models import Value, CharField, Min, Q
-from django.db.models.functions import Cast, Replace
+from django.db.models.functions import Cast, Replace, Round
 from django.contrib.postgres.aggregates import StringAgg
 from dal import autocomplete
 
@@ -170,5 +170,12 @@ class TroveTargetListView(TargetListView):
             )
         )
 
+        # round the RA/Dec columns to consistent decimal places
+        radec_precision = 6
+        qs = qs.annotate(
+            _ra=Round("ra", precision=radec_precision),
+            _dec=Round("dec", precision=radec_precision),
+        )
+        
         return qs
     

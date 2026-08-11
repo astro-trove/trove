@@ -34,10 +34,12 @@ class TroveTargetTable(HTMXTable):
         attrs={"a": {"hx-boost": "false"}}
     )
     associated_events = _EventIDListColumn()
+    _ra = tables.Column(verbose_name="RA")
+    _dec = tables.Column(verbose_name="Dec")
     
     class Meta(HTMXTable.Meta):
         model = Target # the model to pull the table info from
-        fields = ['name', 'ra', 'dec', 'first_detection', '_z', 'associated_events'] # the columns in the table
+        fields = ['name', '_ra', '_dec', 'first_detection', '_z', 'associated_events'] # the columns in the table
         exclude = ["selection"]
         template_name = "django_tables2/bootstrap5.html"
         partial_template_name = "trove_targets/partials/target_table_partial.html"
