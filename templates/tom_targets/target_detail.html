@@ -67,7 +67,7 @@
 	  {% get_spectroscopy_data object %}
 	</details>
       </div>
-      <div class="tab-pane" id="comments">
+      <div class="tab-pane text-break" id="comments">
 	{% render_comment_list for object %}
 	{% url 'targets:detail' object.id as next %}
 	{% if user.is_authenticated %}
