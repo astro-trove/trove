@@ -119,11 +119,18 @@ def get_event_candidate_scores(
         most_likely_class = get_most_likely_class(nle_eventseq.details)
     except IndexError:
         return []
-
+    
     if most_likely_class == "SSM":
         transients = TRANSIENTS
-    else:
+    elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
         transients = ["KN"]
+    elif most_likely_class == "LGRB":
+        transients = ["KN", "SN"] # SN is not yet implemented as a vetting mode
+    elif most_likely_class == "FXT":
+        transients = ["KN", "SN", "TDE"] # SN and TDE are not yet implemented as a vetting mode
+    else:
+        return []
+        
 
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
@@ -198,6 +205,8 @@ def get_event_candidate_scores(
         # now for EM transient/model specific scores
         for transient in transients:
             # allowed parameter ranges for given transient
+            if transient not in dict_transients_param_ranges:
+                continue # this is fine, some transient scoring algorithms aren't implemented yet
             param_ranges = dict_transients_param_ranges[transient]
 
             # compute the photometry score
