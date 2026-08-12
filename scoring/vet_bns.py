@@ -119,7 +119,7 @@ def vet_bns(
 
     ## AGN scoring
     if len(agn_df) != 0:
-        agn_assoc_score = 0  # association with an AGN is bad
+        agn_assoc_score = 0.1  # association with an AGN is bad
     else:
         agn_assoc_score = 1
     agn_score = agn_assoc_score  # don't bother with 3D AGN scoring, for now

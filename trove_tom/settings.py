@@ -510,3 +510,6 @@ PRIORITY_LOW = 0
 
 # skymap probability contour within which we may consider a target and nonlocalized event associated
 SKYMAP_PROB_CONTOUR = 0.95
+
+
+SHOW_PAGINATION_INFO = False
