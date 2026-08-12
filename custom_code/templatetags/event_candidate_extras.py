@@ -8,6 +8,7 @@ from functools import partial
 from django import template
 from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
+from django.conf import settings
 from django.utils.safestring import mark_safe
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
@@ -25,26 +26,21 @@ def get_agn_toggle():
     """Current value of the site-wide, cache-backed agn_toggle flag."""
     return cache.get("agn_toggle", True)
 
-
 @register.simple_tag
 def get_event_candidate_scores(*args, **kwargs):
     """A wrapper on the imported _get_event_candidate_scores, but registered as a tag"""
     return _get_event_candidate_scores(*args, **kwargs)
-
 
 @register.simple_tag
 def get_target_score(*args, **kwargs):
     """A wrapper on the imported _get_target_score, but registered as a tag"""
     return _get_target_score(*args, **kwargs)
 
-
-from django import template
-from collections import OrderedDict
-from functools import partial
-import numpy as np
-from django.utils.safestring import mark_safe
-
-register = template.Library()
+@register.simple_tag(takes_context=True)
+def vet_all_is_allowed(context):
+    request = context['request']
+    nle_id = request.GET.get('nonlocalizedevent')
+    cooldown_cache_key = settings.VETTING_COOLDOWN_KEY+"_"+nle_id
 
 @register.simple_tag(takes_context=True)
 def display_score_details(context, target_id):
