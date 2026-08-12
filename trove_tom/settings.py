@@ -434,8 +434,29 @@ def _dust_map_noop(*args):
 
 def _load_dust_map():
     if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
+        print(f"SKIP_DUSTMAP={SKIP_DUSTMAP} so we are skipping loading the dustmap "+
+              "and setting extinction to 0!")
         return _dust_map_noop
 
+    # point dustmaps to the local version if the path is defined
+    if ("DUSTMAPS_DIR" in globals() or "DUSTMAPS_DIR" in locals()) and DUSTMAPS_DIR is not None:
+
+        # some checks
+        if not os.path.exists(DUSTMAPS_DIR):
+            raise FileNotFoundError(f"DUSTMAPS_DIR is set in settings_local to {DUSTMAPS_DIR} which is a nonexistent directory!")
+        if not os.path.exists(os.path.join(DUSTMAPS_DIR, "sfd")):
+            raise FileNotFoundError(f"DUSTMAPS_DIR is set in settings_local to {DUSTMAPS_DIR} but the sfd subdirectory does not exist!")
+        
+        from dustmaps.config import config
+        config["data_dir"] = DUSTMAPS_DIR
+
+        print(f"Set the dustmaps directory to the local copy at {config['data_dir']}")
+
+    else:
+        print(f"DUSTMAPS_DIR is not set in settings_local, we will try to use cached "+
+              "versions and if they don't exist try to download the SFD files from "+
+              "dataverse...")
+        
     os.environ.setdefault(
         "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
     )
@@ -446,7 +467,11 @@ def _load_dust_map():
         sfd_query = sfd.SFDQuery()
     except FileNotFoundError:
         if os.getenv("FETCH_DUSTMAPS", "").lower() not in ("1", "true", "yes"):
+            print(f"FETCH_DUSTMAPS={FETCH_DUSTMAPS} so we are skipping loading the " +
+                  "dustmap and setting extinction to 0!")
             return _dust_map_noop
+        
+        print("Trying to fetch the SFD dustmap from dataverse...")
         sfd.fetch()
         sfd_query = sfd.SFDQuery()
 
@@ -458,7 +483,8 @@ def _load_dust_map():
 
 try:
     DUST_MAP = _load_dust_map()
-except Exception:
+except Exception as exc:
+    print(f"loading the dustmap failed with {exc}. Skipping and setting extinction to 0!")
     DUST_MAP = _dust_map_noop
 COMMENTS_ENABLED = False
 
