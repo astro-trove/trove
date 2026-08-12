@@ -6,12 +6,13 @@ import numpy as np
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
+from django.core.cache import cache
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponseForbidden
 from django.urls import reverse
 from django.shortcuts import redirect
 from dal import autocomplete
@@ -101,6 +102,7 @@ class TargetVettingFormView(FormView):
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
+        # and now we can actually perform the vetting and redirect
         pk = self.kwargs["pk"]
         vetting_mode = form.cleaned_data["vetting_method"]
 
@@ -333,10 +335,35 @@ class TargetVettingAllFormView(FormView):
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
         if referer:
+            self.request.session["event_candidate_referer"] = referer
             self.request.session["nle_id"] = urlparse(referer).query
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
+        referer = self.request.META.get("HTTP_REFERER")
+        nle_id = self.request.session.get("nle_id","").split("=")[-1]
+        cooldown_cache_key = settings.VETTING_COOLDOWN_KEY+"_"+nle_id
+        
+        # first check that no user has clicked this button
+        if cache.get(cooldown_cache_key):
+            messages.warning(
+                self.request,
+                "A user has recently run vetting on all candidates, placing it on "+
+                "cooldown. The vetting results will update for all users. Please try "+
+                "again later if you need to re-vet *everything* again (you can still "+
+                "vet individual targets via the target pages)."
+            )
+            # Redirect back to the event candidate page
+            return redirect(self.request.session["event_candidate_referer"]) 
+
+        # since the button was clicked we need to start the cooldown
+        cache.set(
+            cooldown_cache_key,
+            True,
+            timeout=settings.VETTING_COOLDOWN_PERIOD
+        )
+
+
         pk = self.kwargs["pk"]
         vetting_mode = form.cleaned_data["vetting_method"]
 

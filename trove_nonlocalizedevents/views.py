@@ -8,6 +8,7 @@ from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.base import View
+from django.contrib import messages
 
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
@@ -327,3 +328,13 @@ class RefreshCandidateList(LoginRequiredMixin, View):
         if nle_id:
             return redirect(reverse('custom_code:event-candidates') + f'?nonlocalizedevent={nle_id}')
         return redirect(reverse('curstom_code:event-candidates'))
+
+def vet_all_cooldown_notice(request):
+    messages.warning(
+        request,
+        "A user has recently run vetting on all candidates, placing it on "+
+        "cooldown. The vetting results will update for all users. Please try "+
+        "again later if you need to re-vet *everything* again (you can still "+
+        "vet individual targets via the target pages)."
+    )
+    return redirect(request.META.get('HTTP_REFERER', '/'))

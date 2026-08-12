@@ -5,6 +5,7 @@ from .views import (
     ToggleAgnCacheView,
     RefreshCandidateList,
     SkymapPartialView,
+    vet_all_cooldown_notice
 )
 
 app_name = "trove_nonlocalizedevents"
@@ -30,5 +31,10 @@ urlpatterns = [
         "skymap/",
         SkymapPartialView.as_view(),
         name="skymap"
+    ),
+    path(
+        'vet-all-cooldown/',
+        vet_all_cooldown_notice,
+        name='vet_all_cooldown_notice'
     ),
 ]
