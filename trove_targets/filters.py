@@ -18,7 +18,7 @@ class TroveTargetListFilterSet(TargetFilterSet):
     target_name_search = django_filters.CharFilter(
         field_name='name',
         method='general_search',
-        label='Candidate Name (Fuzzy)',
+        label='Target Name',
         widget=forms.TextInput
     )
 
@@ -26,14 +26,14 @@ class TroveTargetListFilterSet(TargetFilterSet):
     has_associated_events = django_filters.BooleanFilter(
         field_name='associated_events',
         method='filter_has_associated_events',
-        label='MMA-associated Events Only',
+        label='Only show candidates associated with events',
         widget=forms.CheckboxInput,
     )
     
     associated_event = django_filters.CharFilter(
         field_name="associated_events",
         method="filter_associated_event",
-        label="Associated MMA Event (Fuzzy)",
+        label="Associated Event",
         widget=forms.TextInput
     )
     
@@ -90,7 +90,7 @@ class TroveTargetListFilterSet(TargetFilterSet):
                 <div class="col-md-12 mb-2">
                 <a class="btn btn-link p-0" data-toggle="collapse"
                 href="#advancedFilters"
-                role="button" aria-expanded="false" aria-controls="advancedFilters">Advanced &rsaquo;</a>
+                role="button" aria-expanded="false" aria-controls="advancedFilters">Advanced Filters &rsaquo;</a>
                 </div>
                 </div>
                 """),
