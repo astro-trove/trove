@@ -1,4 +1,4 @@
-from tom_targets.tables import TargetTable
+# from tom_targets.tables import TargetTable
 from trove_targets.models import Target
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_common.htmx_table import HTMXTable
@@ -33,10 +33,13 @@ class TroveTargetTable(HTMXTable):
         linkify=True,
         attrs={"a": {"hx-boost": "false"}}
     )
-    associated_events = _EventIDListColumn()
+
     _ra = tables.Column(verbose_name="RA")
     _dec = tables.Column(verbose_name="Dec")
-    
+    _z = tables.Column(verbose_name="Redshift z")
+    first_detection = tables.Column(verbose_name="First Detection")
+    associated_events = _EventIDListColumn(verbose_name="Associated Events")
+
     class Meta(HTMXTable.Meta):
         model = Target # the model to pull the table info from
         fields = ['name', '_ra', '_dec', 'first_detection', '_z', 'associated_events'] # the columns in the table

@@ -18,7 +18,7 @@ class TroveTargetListFilterSet(TargetFilterSet):
     target_name_search = django_filters.CharFilter(
         field_name='name',
         method='general_search',
-        label='Target Name',
+        label='Candidate Name',
         widget=forms.TextInput
     )
 
@@ -74,7 +74,7 @@ class TroveTargetListFilterSet(TargetFilterSet):
             self._form.helper.layout = Layout(
                 # Row 1: Primary Search parameters
                 Row(
-                    Column('target_name_search', css_class='form-group col-md-4'),
+                    Column('target_name_search', css_class='form-group col-md-4', title="Candidate Name"),
                     Column('associated_event', css_class='form-group col-md-4'),
                 ),
                 Row(
