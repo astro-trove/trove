@@ -125,7 +125,7 @@ def get_event_candidate_scores(
     elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
         transients = ["KN"]
     elif most_likely_class == "LGRB":
-        transients = ["SN"] # this is not yet implemented as a vetting mode
+        transients = ["KN", "SN"] # SN is not yet implemented as a vetting mode
     elif most_likely_class == "FXT":
         transients = ["KN", "SN", "TDE"] # SN and TDE are not yet implemented as a vetting mode
     else:
