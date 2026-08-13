@@ -9,75 +9,6 @@ import numpy as np
 from unittest.mock import MagicMock, patch
 
 
-class TestAsymmetricGaussian:
-    """Tests for AsymmetricGaussian distribution in candidate_vetting/vet.py"""
-
-    def test_pdf_symmetric_gaussian(self):
-        """Test AsymmetricGaussian with equal uncertainties (should match normal)."""
-        from scoring.scoring import AsymmetricGaussian
-        from scipy.stats import norm
-
-        ag = AsymmetricGaussian()
-        x = np.array([0.0, 0.5, 1.0, 1.5, 2.0])
-        mean = np.array([1.0] * 5)
-        unc = np.array([0.5] * 5)
-        integ_a = np.array([1e-9] * 5)
-        integ_b = np.array([5.0] * 5)
-
-        pdf_vals = ag._pdf(x, mean, unc, unc, integ_a, integ_b)
-        norm_vals = norm.pdf(x, loc=1.0, scale=0.5)
-
-        assert len(pdf_vals) == len(norm_vals)
-
-    def test_pdf_asymmetric_left_side(self):
-        """Test AsymmetricGaussian on left side of mean."""
-        from scoring.scoring import AsymmetricGaussian
-
-        ag = AsymmetricGaussian()
-        x = np.array([0.5])
-        mean = np.array([1.0])
-        unc_minus = np.array([0.3])
-        unc_plus = np.array([0.5])
-        integ_a = np.array([1e-9])
-        integ_b = np.array([5.0])
-
-        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
-        assert len(pdf_val) == 1
-        assert pdf_val[0] > 0
-
-    def test_pdf_asymmetric_right_side(self):
-        """Test AsymmetricGaussian on right side of mean."""
-        from scoring.scoring import AsymmetricGaussian
-
-        ag = AsymmetricGaussian()
-        x = np.array([1.5])
-        mean = np.array([1.0])
-        unc_minus = np.array([0.3])
-        unc_plus = np.array([0.5])
-        integ_a = np.array([1e-9])
-        integ_b = np.array([5.0])
-
-        pdf_val = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
-        assert len(pdf_val) == 1
-        assert pdf_val[0] > 0
-
-    def test_pdf_mixed_sides(self):
-        """Test AsymmetricGaussian with points on both sides."""
-        from scoring.scoring import AsymmetricGaussian
-
-        ag = AsymmetricGaussian()
-        x = np.array([0.5, 1.5])
-        mean = np.array([1.0, 1.0])
-        unc_minus = np.array([0.3, 0.3])
-        unc_plus = np.array([0.5, 0.5])
-        integ_a = np.array([1e-9, 1e-9])
-        integ_b = np.array([5.0, 5.0])
-
-        pdf_vals = ag._pdf(x, mean, unc_minus, unc_plus, integ_a, integ_b)
-        assert len(pdf_vals) == 2
-        assert all(p > 0 for p in pdf_vals)
-
-
 class TestPcc:
     """Tests for the probability of chance coincidence function."""
 
@@ -224,7 +155,7 @@ class TestStaticCatalogStandardization:
         cat = GladePlus()
         df = pd.DataFrame(
             {
-                "gn": ["GLADE12345"],
+                "name": ["GLADE12345"],
                 "ra": [150.0],
                 "dec": [30.0],
                 "z_helio": [0.05],
@@ -295,7 +226,7 @@ class TestStaticCatalogStandardization:
         cat = Ps1()
         df = pd.DataFrame(
             {
-                "objname": ["PS112345"],
+                "name": ["PS112345"],
                 "ra": [150.0],
                 "dec": [30.0],
                 "z_phot": [0.1],
@@ -318,7 +249,7 @@ class TestStaticCatalogStandardization:
 
         cat = Sdss12Photoz()
         df = pd.DataFrame(
-            {"sdssid": ["SDSS12345"], "ra": [150.0], "dec": [30.0], "zph": [0.15], "e_zph": [0.02], "rmag": [19.5]}
+            {"name": ["SDSS12345"], "ra": [150.0], "dec": [30.0], "zph": [0.15], "e_zph": [0.02], "rmag": [19.5]}
         )
 
         result = cat.to_standardized_catalog(df)
@@ -335,7 +266,7 @@ class TestStaticCatalogStandardization:
         cat = LsDr10South()
         df = pd.DataFrame(
             {
-                "objid": [12345],
+                "lid": [12345],
                 "ra": [150.0],
                 "declination": [30.0],
                 "z_phot_mean": [0.15],

@@ -84,9 +84,13 @@ def display_score_details(target_id):
     # NLE-specific scores/details
     score_details = []
     for event_candidate in target.eventcandidate_set.all():
+        # TODO: show localization_id in the scoring info card being built on
+        # the kilonovaSCORER-implementation branch 
+
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
-            + ["mpc_score", "predetection_score"]  # exclude keys in TargetExtra + exclude mpc_score, predetection_score
+            # exclude keys in TargetExtra + exclude mpc_score, predetection_score
+            + ["mpc_score", "predetection_score", "localization_id"]
         ).all()
         # reorder them for user-friendly printing later
         sf_set = sorted(sf_set, key=lambda sf: order.index(sf.key))

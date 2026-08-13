@@ -12,9 +12,11 @@ import numpy as np
 from .scoring import (
     update_score_factor,
     delete_score_factor,
+    clean_host_df,
     host_distance_match,
     get_distance_score,
     skymap_association,
+    _localization_from_name,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -77,17 +79,27 @@ def vet_super_kn(
         nonlocalized_event_name, target_id, max_time=max_time
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
+
+    # record which localization these NLE-dependent scores were computed
+    # against. Both the skymap score above and the distance score below are
+    # only meaningful for one particular skymap -- a later one moves the
+    # credible region and the distance at this target's healpix -- and until
+    # now nothing stored alongside the scores said which skymap that was. See
+    # the TODO in custom_code.alertstream_handlers about acting on this.
+    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
+    update_score_factor(event_candidate, "localization_id", localization.id)
     if skymap_score < 1e-2:
         return
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    if not keep_vetting:
+        # a point source or minor planet match already zeroes this candidate's
+        # score, so the slower checks below cannot change its ranking
+        return
+
     # some cleanup
-    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
-        host_df = host_df[host_df.z != -99.0] # LS DR9 North
-        host_df = host_df[host_df.z != -999.0] # PS1-STRM
-        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
-        host_df = host_df[~np.isnan(host_df.z)]
+    host_df = clean_host_df(host_df)
 
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
