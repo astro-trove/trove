@@ -99,27 +99,43 @@ KILONOVA_SKIP_KEY = "kilonova_skip_reason"
 #:
 #: **This is the only place these are set.** The UI offers the choice of
 #: scoring method and nothing else. The numbers below are the paper's
-#: recommended values, plus automatic per-candidate grid selection; letting a
-#: vetter change them in a form mostly gave worse results than the defaults.
-#: Change a value here to change it for every run.
+#: recommended values; letting a vetter change them in a form mostly gave worse
+#: results than the defaults. Change a value here to change it for every run.
 DEFAULT_KILONOVA_PARAMS = {
-    "grid_path": "",        # "" means pick the nearest grid per candidate distance
-    "max_grid_offset": 0.5,
-    # What to do with a candidate further than max_grid_offset (as a fraction of
-    # its own distance) from every rung of the ladder. Read by
-    # scoring.tasks.async_kilonova_score, which compares against these literals:
-    #   "score"    -- score against the nearest rung anyway
-    #   "skip"     -- leave it unscored, recording the offset as the skip reason
-    #   "generate" -- generate a rung at its distance first (~30 min each)
-    # A grid is distance-specific because the k-correction and time dilation
-    # change the SHAPE of the magnitude distribution per band and epoch, so a
-    # badly matched rung cannot be corrected for after the fact -- see
-    # KilonovaScorer/generate_ladder.py.
-    "grid_offset_action": "score",
+    # The grid every candidate is scored against. Required -- there is no
+    # fallback, and an empty value is an error rather than a cue to guess.
+    #
+    # This used to be optional, meaning "pick the rung nearest this candidate's
+    # distance" from a ladder of grids. The ladder was removed on 2026-08-12:
+    # there is one 259 Mpc grid, and a candidate at 741 Mpc is scored against it
+    # too. That is a real error, not a tidy simplification -- the k-correction
+    # and time dilation at the wrong redshift change the SHAPE of the simulated
+    # magnitude distribution per band and epoch, which nothing downstream can
+    # undo. IMPROVEMENTS.md section 18 measures it: ~0.12 median dP_tail with one
+    # grid, against a 0.057 mag distance uncertainty for the best quarter of
+    # candidates. Restoring selection means generating rungs with
+    # `generate_rung.py --distance <Mpc>` and reinstating a nearest-rung lookup.
+    "grid_path": "simulations_two_component_kilonova_model_259Mpc_30d",
     "dt_min": 0.0,
-    # The grids simulate 0-10 days (simulation.py: TIME = linspace(0, 10, 1000)),
-    # so an epoch past 10 days falls outside every time bin the scorer has and is
-    # dropped after being fetched and converted. Cutting here instead.
+    # Must not exceed the span of the grid being scored against: an epoch past
+    # the grid's last time bin is dropped after being fetched and converted, so
+    # cutting here saves the fetch. The default 10-day rung is
+    # simulation.TIME = linspace(0, 10, 1000).
+    #
+    # THIS IS NOT A FREE PARAMETER -- it is coupled to the grid, and at 10.0 it
+    # is discarding most of the discriminating data. On S251112cm, 45% of the
+    # photometry in modelled bands falls in 10-30 d, every candidate has some,
+    # and 12 are unscoreable solely because their data starts after day 10.
+    # Scored against a 30-day rung at dt_max=30, the ABC filter rejects 15 more
+    # contaminants -- candidates that look kilonova-like on a few early points
+    # and clearly do not once late epochs are included.
+    #
+    # Raising it requires a grid that spans the wider window; a 30-day rung at
+    # dt_max=10 is strictly worse than this one (same data, a third of the time
+    # resolution). Note also that the model's late-time reliability degrades:
+    # ~43-50% of simulated lightcurves are flux-underflow artifacts by 20-30 d,
+    # against 27-37% at 10-20 d. IMPROVEMENTS.md section 21 has the measurements
+    # and recommends dt_max=20 with a 30-day grid.
     "dt_max": 10.0,
     "snr_min": None,
     # One detection in one band is enough. P_tail_KNe is evaluated per
@@ -156,9 +172,22 @@ DEFAULT_KILONOVA_PARAMS = {
     # docstring; on WSL that is not a clean failure, the VM's OOM killer picks
     # an arbitrary victim and has taken the VS Code server with it.
     #
-    # Band-partitioning the parquet would remove the trade-off entirely: the
+    # Band-partitioning the store would remove the trade-off entirely: the
     # fixed ~19 s full-file scan per load is what makes extra loads expensive.
     "max_bands_per_load": 6,
+    # Processes the per-candidate scoring is spread over, within one grid load.
+    # None/"auto" leaves two cores for the rest of the machine and caps at 4 --
+    # the cap is a MEMORY limit, not a core count. See _resolve_workers.
+    #
+    # This is the dominant cost: on S251112cm, ~950 s of a 983 s run is scoring
+    # and ~30 s is grid loads. Candidates are independent once the grid is
+    # loaded and touch no database, so the loop parallelises cleanly. Workers
+    # are forked, sharing the grid and its band index copy-on-write, so the
+    # memory cost is per-candidate working set rather than a grid per worker.
+    #
+    # Set to 1 to score serially -- results are identical, since every
+    # candidate is seeded independently by random_state.
+    "n_workers": None,
     "time_bin_width": 0.2,
     # Monte-Carlo draws from the noise-convolved PPD, per observation. This is
     # the single biggest cost in the scorer -- kde.resample() measured 10.65 ms
@@ -180,7 +209,7 @@ DEFAULT_KILONOVA_PARAMS = {
     # Appendix A measures the minimum viable threshold on AT 2017gfo as
     # k_ABC,min = 1.5 for the gold-standard 10^5 set, and 2.0 / 2.5 / 2.0 for
     # the high (10^4) / medium (10^3) / low (10^2) sets. Our grids are 10^4
-    # (generate_ladder.N_SIM), so 2.0 is the calibrated value. Dropping to a
+    # (generate_rung.N_SIM), so 2.0 is the calibrated value. Dropping to a
     # 10^3 grid to save space would require raising this to 2.5.
     "overlap_k": 2.0,
     # Seeds every Monte-Carlo draw, per candidate, so a re-run reproduces the
@@ -205,8 +234,10 @@ _SCORE_EVENT_KEYS = (
     "min_bands",
     "map_wide_bands",
     "mode",
-    # score_event_by_distance only -- the memory guard on grid reads
+    # score_event_by_distance only -- the memory guard on grid reads and the
+    # size of the process pool the candidate loop runs on
     "max_bands_per_load",
+    "n_workers",
     # passed through score_candidate
     "time_bin_width",
     "random_state",

@@ -318,8 +318,9 @@ CREATE TABLE kn_grid_axis (
 ```
 
 `distance_mpc` on the axis table replaces the filename-parsing and
-`redshift`-sampling that `grids.grid_for_distance()` does today — the ladder
-becomes `SELECT grid FROM kn_grid_axis ORDER BY abs(distance_mpc - %s) LIMIT 1`.
+`redshift`-sampling selection used to do — a ladder would become
+`SELECT grid FROM kn_grid_axis ORDER BY abs(distance_mpc - %s) LIMIT 1`. (There
+is no ladder now; see "The ladder was removed" below.)
 
 Read path, per band set:
 
@@ -400,7 +401,7 @@ cache retained — the three conditions in §6.
 | File | What it holds |
 |---|---|
 | `KilonovaScorer/grid_db.py` | the backend: DSN connection, `ensure_schema`, binary `COPY` in and out, `ingest_parquet`, `verify_band` |
-| `KilonovaScorer/grids.py` | `GridRef`, `resolve_grid`, `grid_name`, and `TROVE_GRID_BACKEND` dispatch inside `available_grids` / `grid_for_distance` / `load_grid` / `grid_distance_mpc` |
+| `KilonovaScorer/grids.py` | `GridRef`, `resolve_grid`, `grid_name`, `available_grids` (cached), `load_grid`, `grid_distance_mpc` |
 | `scoring/management/commands/ingest_kn_grid.py` | `ingest_kn_grid <parquet>`, `--list`, `--verify BAND`, `--drop GRID` |
 | `scoring/kilonova_scoring.py` | the four call sites that assumed a filesystem `Path` now go through `resolve_grid()` / `grid_name()` |
 
@@ -413,13 +414,18 @@ nothing downstream can tell which backend served it.
 ### Configuration
 
 ```bash
-export TROVE_GRID_DSN='postgresql://bench@127.0.0.1:55432/gridbench'
+export TROVE_GRID_DSN='postgresql://trove@127.0.0.1:5433/kn_grids'
 export TROVE_GRID_BACKEND=postgres     # default is parquet
 ```
 
 **Parquet stays the default.** A grid store is empty until something ingests a
 rung, so a deployment that flipped the backend before loading data would lose
 scoring outright rather than degrade.
+
+The live store is the full 38-band rung: **2,076 MB on disk, 1,520 MB of
+magnitudes**, 380,000 lightcurves of 10,000 samples x 1,000 epochs at 259 Mpc.
+That lands almost exactly on the 2.1 GB projected in §4 from three measured
+bands.
 
 ### Deliberately not done
 
@@ -484,19 +490,209 @@ The saving is I/O and nothing else: ~630 s of it is loads going from 11 × ~60 s
 to 3 × ~10 s. What remains is the scorer, single-threaded on 7 cores; storage
 has stopped being the constraint.
 
+### The corrected grid, full 38 bands, with the process pool
+
+The rung above had light curves that froze at t = 6.3 d. Regenerated so the
+decay continues to 10 d, ingested at all 38 bands, and scored with the process
+pool (TIMINGS.md §7):
+
+| | |
+|---|---|
+| Wall clock | 1,216 s (20 min 16 s) |
+| Scored | 425 / 457 |
+| Grid loads | 11 (`max_bands_per_load=6`) |
+| Workers | 4 |
+| Memory floor | 1.94 GB available |
+| Errors | 0 |
+
+**Do not read this as a regression against the 983 s above.** Only ~350 s of it
+is scoring; ~570 s is the serial per-candidate distance pass over the SSH
+tunnel, which was several times slower after the tunnel was restarted
+mid-session. The two totals were measured against different network conditions
+and are not comparable. The storage layer is not what changed.
+
+Against the previous grid, 358 of 423 scores are unchanged, 65 moved, max shift
+0.708, and 2 candidates became scoreable. A minority shifting sharply while the
+median holds at 0.0000 is what a late-time-only fix should look like.
+
+### Sizing, measured
+
+Per rung, 10,000 samples x 38 bands x 1,000 epochs:
+
+```
+kn_grid_lightcurve   ~2,050 MB   = 1,450 MB magnitudes + ~550 MB TOAST chunking + index
+kn_grid_axis              40 kB
+```
+
+A 4 KB value spans three ~2 KB TOAST chunks, each with its own row header and
+index entry -- that is the ~550 MB.
+
+**Do not budget for compression.** `pg_column_compression` reports `NULL` for
+759,999 of 760,000 rows: Postgres tried pglz, could not shrink float32
+magnitudes enough to be worth it, and stored them raw. LZ4 will do the same.
+Section 3's hope that a production build with LZ4 would shrink this does not
+survive contact with the data -- float32 noise is high entropy.
+
+| | |
+|---|---|
+| one rung | ~2.05 GB |
+| ladder (150 / 259 / 400 / 800 Mpc) | ~8.2 GB |
+| ...with 30-day variants of each | ~16.4 GB |
+| `shared_buffers` | 2 GB is ample -- a run touches one band set (~250 MB) at a time |
+| worker process peak | ~4 GB at 6 workers, `max_bands_per_load=6` |
+
+### Where it should live in production
+
+Not a separate Postgres *instance* -- that was a benchmark artifact.
+`grid_db.py` takes a plain DSN and has no Django dependency, so it works
+against a separate instance, a separate database, or tables sitting in an
+existing one.
+
+**The `catalogs` database is the right home.** It is on the same Postgres
+instance as `trove_test` (`localhost:5432`), and it is already what a
+simulation grid is -- large, regenerable, read-only reference data:
+
+```
+catalogs      11 TB    delve_dr3 4,059 GB | ls_dr10south 1,629 GB
+                       sdss12photoz 1,526 GB | allwise 1,443 GB | ps1 1,415 GB
+trove_test   169 GB
+```
+
+A rung is 0.02% of it; the whole ladder 0.07%. It also dissolves the backup
+objection to keeping grids beside application data: nobody routinely
+`pg_dump`s 11 TB of DELVE and AllWISE, so grids there add nothing to TROVE's
+backup weight, where in `trove_test` they would.
+
+**Blocker:** `has_database_privilege(trove, catalogs, 'CREATE')` is **false**.
+The app user can read those catalogs but not create tables. An admin has to
+either grant CREATE, or create the two tables and grant rights on just those:
+
+```sql
+-- as an admin, in the catalogs database
+\i schema.sql   -- the contents of grid_db.SCHEMA_SQL
+GRANT SELECT, INSERT, UPDATE, DELETE ON kn_grid_axis, kn_grid_lightcurve TO trove;
+```
+
+The second is tidier: `trove` stays unable to create arbitrary tables in an
+11 TB database while owning these two.
+
+### Migrating an existing store into `catalogs`
+
+Assumes the grid is already in a local store (this is the situation after
+developing against `localhost:5433/kn_grids`).
+
+```bash
+# 1. schema, once, by whoever holds CREATE (see above)
+
+# 2. stream one rung across, filtered -- pg_dump cannot exclude rows, so it
+#    would ship every rung and need a DELETE afterwards
+psql -h 127.0.0.1 -p 5433 -U trove -d kn_grids -c \
+  "\copy (SELECT * FROM kn_grid_axis WHERE grid = '<rung>') TO STDOUT (FORMAT binary)" \
+| psql -h localhost -p 5432 -U trove -d catalogs -c \
+  "\copy kn_grid_axis FROM STDIN (FORMAT binary)"
+
+psql -h 127.0.0.1 -p 5433 -U trove -d kn_grids -c \
+  "\copy (SELECT * FROM kn_grid_lightcurve WHERE grid = '<rung>') TO STDOUT (FORMAT binary)" \
+| psql -h localhost -p 5432 -U trove -d catalogs -c \
+  "\copy kn_grid_lightcurve FROM STDIN (FORMAT binary)"
+
+# 3. verify -- expect 38 bands, 10000 x 1000, ~1,520 MB
+TROVE_GRID_DSN='postgresql://trove@localhost:5432/catalogs' \
+  ./manage.py ingest_kn_grid --list
+```
+
+~1.45 GB on the wire per rung, and it moves exactly the bytes that were
+validated -- no regeneration, no re-ingest. Do it over the local socket on the
+database host if possible rather than through an SSH tunnel.
+
+Then point the worker at it:
+
+```bash
+export TROVE_GRID_DSN='postgresql://trove@localhost:5432/catalogs'
+export TROVE_GRID_BACKEND=postgres
+```
+
+The `CatalogRouter` is irrelevant here -- these tables have no Django models,
+so nothing routes to them.
+
+**Check the band list on arrival.** `--list` must show `atlasc` and `atlaso`:
+87% of TROVE photometry is ATLAS, and an LSST-only grid covers ~1% of an event
+while failing silently.
+
+### Two grids at the same distance is a coin flip
+
+Worse than the stray-axis-row case below, because both grids are real.
+
+A 30-day rung was added at the same distance as the 10-day one:
+
+```
+simulations_..._259Mpc       distance_mpc = 258.9999995535565
+simulations_..._259Mpc_30d   distance_mpc = 259.0
+```
+
+Selection took `abs(distance - d).argmin()`, so that 4.5e-7 Mpc difference
+decided: candidates **above** 259 Mpc went to the 30-day rung, candidates
+**below** to the 10-day one. Most of `S251112cm` sits above 259, so an event
+would silently split across two grids with different time resolutions, and
+nothing anywhere would report it. It was caught only by printing the axis table
+before a run.
+
+Two guards were written for this — require a grid whose span covers `dt_max`,
+and refuse to argmin between rungs within 1% of the same distance — and both
+went away with selection itself. **The hazard is gone because the mechanism is
+gone**, not because it was solved: with one pinned grid there is nothing to
+tie-break. If per-candidate selection is ever restored, this is the first thing
+that has to come back with it, because a store holding two rungs at nominally
+the same distance is exactly what a ladder produces.
+
+### A stray axis row can capture an event
+
+Selection trusted `kn_grid_axis` alone. An axis row with no
+lightcurves — a half-finished or abandoned ingest — was therefore selectable,
+and one sitting at the same 259 Mpc as the good grid took roughly half an
+event's candidates before failing with one `FileNotFoundError` per candidate,
+deep in the scoring loop rather than at selection time.
+
+`available_grids_db` now inner-joins `kn_grid_lightcurve` and requires
+`count(*) > 0`, so a grid with no data is simply not available. Cheap query
+change; turns a silent per-candidate failure into a grid that never gets
+picked.
+
+### The ladder was removed
+
+On 2026-08-12 the distance ladder went away: `grid_for_distance`, the
+`max_grid_offset` / `grid_offset_action` parameters, the `async_generate_grid_rung`
+task and its `kilonova_grids` queue, and `generate_ladder.py`. There is one grid
+— the 259 Mpc 30-day rung — named in `DEFAULT_KILONOVA_PARAMS["grid_path"]`, and
+`grid_path` is now **required**: empty raises rather than falling back to a guess.
+
+Two things follow for this document. The tie-break and stray-axis hazards above
+are unreachable, but only because nothing selects any more. And two of the
+per-candidate round trips measured against `catalogs` came from selection
+machinery running once per candidate to answer a question with one possible
+answer — see TIMINGS.md. Both are now cached rather than removed, so they stay
+fixed if selection returns.
+
+The scientific cost is real and is recorded in IMPROVEMENTS.md §18: every
+candidate is scored against a 259 Mpc population regardless of its own distance,
+which for `S251112cm` means candidates from 188 to 741 Mpc. `generate_rung.py
+--distance <Mpc>` still builds a rung at any distance, so the store side of a
+ladder needs no new code — only the selection.
+
 ### What is still open
 
-* **23 of 38 bands have still never been in the store** — only the 15 this
-  event needs. The all-38 figure is now projected from 15 measured bands
-  (592 MB) rather than 3, but it is still a projection.
 * **`ingest_parquet` scans the whole file once per band**, because every row
   group contains every band and the filter prunes nothing. That is the same
   property that makes Parquet's *read* cost fixed, and it makes a 38-band
   ingest 38 full scans. Band-partitioning the Parquet file at generation time
   (§7) would fix the ingest and the Parquet read together.
-* **The remote question from §5 is still unanswered.** These numbers are a
-  local socket. If the `kilonova_scoring` worker runs on the datatrove host
-  they stand as they are; if it runs remotely, §5's wire costs apply.
+* **The remote question from §5 is answered: 2.1x.** The same event scored
+  123.3 s against the local store and 261.3 s against `catalogs` through the
+  SSH tunnel, all of the difference in the grid reads (26.7 s -> 150.7 s, about
+  16 MB/s over the wire against ~100 MB/s from a warm local page cache). Scores
+  were 457/457 identical. Co-locating the `kilonova_scoring` worker with the
+  database recovers that ~124 s; it cannot touch the ~70 s of CPU. TIMINGS.md
+  has the phase table.
 
 ---
 

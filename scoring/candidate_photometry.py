@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -531,7 +531,14 @@ def _scalar_distance(value, what: str, target_id: int) -> float:
         return np.nan
 
 
-def get_candidate_distance(target_id: int, event_id: str) -> tuple[float, float]:
+def get_candidate_distance(
+    target_id: int,
+    event_id: str,
+    *,
+    target=None,
+    host_json=None,
+    localization=None,
+) -> tuple[float, float]:
     """Luminosity distance and its 1-sigma error, in Mpc, for one candidate.
 
     Thin wrapper around
@@ -543,11 +550,22 @@ def get_candidate_distance(target_id: int, event_id: str) -> tuple[float, float]
     ``dist_err_mpc``.
 
     Both values are coerced to plain floats -- see :func:`_scalar_distance`.
+
+    ``target`` / ``host_json`` / ``localization`` are prefetched inputs passed
+    straight through to the resolver; they change nothing about the answer and
+    exist so :func:`get_candidate_distances` can avoid a per-candidate query
+    for each. Leave them unset for the single-candidate case.
     """
     from scoring.scoring import get_eventcandidate_default_distance
 
     try:
-        dist, dist_err = get_eventcandidate_default_distance(target_id, event_id)
+        dist, dist_err = get_eventcandidate_default_distance(
+            target_id,
+            event_id,
+            target=target,
+            host_json=host_json,
+            localization=localization,
+        )
     except AttributeError as exc:
         # get_eventcandidate_default_distance indexes host_df.z_type without
         # checking the column exists (scoring/scoring.py). Targets whose stored
@@ -577,6 +595,79 @@ def get_candidate_distance(target_id: int, event_id: str) -> tuple[float, float]
         dist_err = np.nan
 
     return dist, dist_err
+
+
+def get_candidate_distances(
+    target_ids: Sequence[int], event_id: str
+) -> dict[int, tuple[float, float]]:
+    """``{target_id: (distance_mpc, error_mpc)}`` for many candidates at once.
+
+    Same answers as calling :func:`get_candidate_distance` in a loop -- it runs
+    the same resolver, with the same fallback order and the same error
+    handling -- but it fetches what that resolver needs in bulk first, instead
+    of once per candidate.
+
+    The loop version issues roughly 16 round trips per candidate: a ``Target``
+    fetch, a ``TargetExtra`` ``.count()`` and read, and then, for anything
+    falling through to the skymap, a ``NonLocalizedEvent`` query plus a query
+    and sort over *every* ``EventLocalization`` of the event -- identical work
+    repeated for each candidate. At the ~79 ms round trip of the SSH tunnel
+    that measured **117 s for 40 candidates**, more than the scoring itself.
+
+    Three bulk fetches replace almost all of it:
+
+    * every ``Target`` in one query,
+    * every "Host Galaxies" ``TargetExtra`` in one query,
+    * the event's localization once, reused for all of them.
+
+    What is left per candidate is at most the skymap-tile query, for those with
+    neither a redshift nor a usable host.
+    """
+    from django.db.models import Q  # noqa: F401  (kept for symmetry with callers)
+    from tom_targets.models import TargetExtra
+
+    from trove_targets.models import Target
+
+    ids = list(dict.fromkeys(int(t) for t in target_ids))
+    if not ids:
+        return {}
+
+    targets = {t.id: t for t in Target.objects.filter(id__in=ids)}
+
+    # `hosts[0]` in the resolver means "first row for this target", so keep the
+    # first of any duplicates and preserve the queryset's own ordering.
+    host_json: dict[int, str] = {}
+    for tid, value in TargetExtra.objects.filter(
+        target_id__in=ids, key="Host Galaxies"
+    ).values_list("target_id", "value"):
+        host_json.setdefault(tid, value)
+
+    # Resolved once rather than per candidate. A failure here is not fatal:
+    # the resolver falls back to looking it up itself.
+    localization = None
+    try:
+        from scoring.scoring import _localization_from_name
+
+        localization = _localization_from_name(event_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not pre-resolve the localization for %s: %r", event_id, exc)
+
+    out: dict[int, tuple[float, float]] = {}
+    for tid in ids:
+        target = targets.get(tid)
+        if target is None:
+            # Same outcome the loop version reaches via Target.DoesNotExist.
+            logger.warning("target %s: not found -- treating the distance as unknown", tid)
+            out[tid] = (np.nan, np.nan)
+            continue
+        out[tid] = get_candidate_distance(
+            tid,
+            event_id,
+            target=target,
+            host_json=host_json.get(tid, ""),
+            localization=localization,
+        )
+    return out
 
 
 def match_band(filter_raw: str, lookup: dict) -> Optional[str]:
@@ -616,7 +707,7 @@ def to_scorer_frame(
         Each observation keeps its own bandpass -- ATLAS orange stays
         ``atlaso``, ZTF g stays ``ztfg`` -- and is scored against simulations
         through the *same* filter. Requires a grid generated in those
-        bandpasses (see ``KilonovaScorer/generate_ladder.py``).
+        bandpasses (see ``BANDS`` in ``KilonovaScorer/generate_rung.py``).
     ``'canonical'``
         The older behaviour: everything is approximated onto ``g-band`` /
         ``r-band`` / ``i-band`` / ``z-band`` via :data:`FILTER_LOOKUP`. Needed

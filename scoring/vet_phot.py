@@ -3,6 +3,7 @@ Some general functions useful for vetting photometry
 """
 
 import logging
+import os
 from typing import Tuple, Optional, Iterable
 from datetime import datetime, timezone, timedelta
 
@@ -12,6 +13,8 @@ from astropy import units as u
 import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
+
+from django.conf import settings
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
@@ -537,6 +540,15 @@ def find_public_phot(
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
+
+    skip_atlas = getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False) or os.environ.get(
+        "TROVE_SKIP_ATLAS_FORCED_PHOT"
+    )
+    if query_atlas and skip_atlas:
+        print(
+            f"TROVE_SKIP_ATLAS_FORCED_PHOT set: not querying ATLAS for {target.name}\n\n"
+        )
+        query_atlas = False
 
     if query_atlas:
         print(

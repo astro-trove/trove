@@ -2,17 +2,12 @@
 Some common functions used in multiple places throughout the app
 """
 
-from collections import OrderedDict
 import math
 import logging
 from astropy.units import Quantity
 from django.db.models import FloatField
 from django.db.models.functions import Cast
-from tom_nonlocalizedevents.models import (
-    EventCandidate,
-    EventLocalization,
-    NonLocalizedEvent,
-)
+from tom_nonlocalizedevents.models import NonLocalizedEvent
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
@@ -28,6 +23,7 @@ from .models import ScoreFactor
 from .phot_method import (
     KILONOVA,
     KILONOVA_SCORE_KEY,
+    KILONOVA_SKIP_KEY,
     KILONOVA_TRANSIENT,
     get_phot_method,
 )
@@ -177,14 +173,20 @@ def get_event_candidate_scores(
             score_factors_by_ec[ec_id] = {}
         score_factors_by_ec[ec_id][sf.key] = sf.value_float
 
+    skip_reason_by_ec = {}
+    if phot_method == KILONOVA:
+        skip_reason_by_ec = dict(
+            ScoreFactor.objects.filter(
+                event_candidate__in=event_candidates_list, key=KILONOVA_SKIP_KEY
+            ).values_list("event_candidate_id", "value")
+        )
+
     ecs_out = []
     for ec in event_candidates_list:
         # set ec.score to be a dictionary mapping transient : score
         ec.score = {}
+        ec.kilonova_skip_reason = skip_reason_by_ec.get(ec.id)
 
-        # get all 'subscores' (sometimes actually calculated values)
-        # for object; need to re-do this per transient because of step
-        # below where we exclude certain scores from the queryset
         sf_dict = score_factors_by_ec.get(ec.id, {})
 
         # Extract values that need special handling
@@ -204,9 +206,6 @@ def get_event_candidate_scores(
         if "mpc_match_name" in te:
             mpc_score = int(te["mpc_match_name"] == str(None))
 
-        # remove keys we don't want and calculate a base subscore
-        # need to add "agn" to exclude keys if button is selected
-        # AGN enabled should be a global state of the website
         subscore_no_phot = (
             math.prod([sf_dict[key] for key in sf_dict if key not in exclude_keys])
             * ps_score
@@ -229,26 +228,6 @@ def get_event_candidate_scores(
             )
 
             if phot_method == KILONOVA and transient == KILONOVA_TRANSIENT:
-                # KilonovaSCORER's cumulative P_tail_KNe, in [0, 1], written by
-                # the background run, used raw: a score of 0 means every epoch
-                # falls outside the simulated kilonova population, and zeroing
-                # the total score is the intended reading of that.
-                #
-                # Only the plain "KN" score may use it. The grids it scores
-                # against are populations of bare kilonovae (see
-                # ``KilonovaScorer/simulation.py``), so P_tail_KNe answers "is
-                # this light curve consistent with a kilonova?" -- not "is it a
-                # kilonova sitting on a supernova?" (KN-in-SN) or "is it a
-                # kilonova far brighter than the simulated population?"
-                # (super-KN). Applying it to those would penalise exactly the
-                # excess flux that defines them, so they keep the TROVE
-                # parameter-range check with their own PARAM_RANGES.
-                #
-                # A candidate with no score at all is a different thing -- not
-                # yet run, too sparse, no usable distance, no band in common
-                # with the grid -- so it falls back to the TROVE photometry
-                # check rather than being penalised for missing data. Its
-                # skip reason is on the candidate's score-details page.
                 kilonova_score = sf_dict.get(KILONOVA_SCORE_KEY)
                 if kilonova_score is not None and math.isfinite(kilonova_score):
                     phot_score = kilonova_score

@@ -4,7 +4,7 @@ Asynchronous tasks for (1) querying public services that takes a long time,
 """
 
 import logging
-import os
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 import numpy as np
@@ -159,120 +159,6 @@ def async_associate_targets_nle(
                 logger.info("Eventcandidate already exists")
     
     
-def _grid_offset_report(event_id: str, target_ids: dict, max_frac_offset: float):
-    """Which candidates sit too far from every rung of the grid ladder.
-
-    Returns ``(offenders, wanted_distances)``: a ``{target_name: (dist_mpc,
-    offset)}`` mapping, and the distinct distances (rounded, so nearby
-    candidates share one rung) a new grid would be needed at.
-
-    A grid is generated at one luminosity distance, and the k-correction and
-    time dilation at that redshift change the *shape* of the simulated
-    magnitude distribution per band and epoch -- see the derivation in
-    ``KilonovaScorer/generate_ladder.py``. Scoring a 3 Gpc candidate against an
-    800 Mpc rung is therefore not a small error that washes out; it is the
-    wrong distribution.
-    """
-    from .KilonovaScorer.grids import available_grids
-    from .candidate_photometry import get_candidate_distance
-
-    grids = available_grids()
-    rungs = (
-        [d for d in grids["distance_mpc"].tolist() if d == d] if len(grids) else []
-    )
-    if not rungs:
-        return {}, []
-
-    offenders = {}
-    for name, target_id in target_ids.items():
-        try:
-            dist_mpc, _ = get_candidate_distance(target_id, event_id)
-        except Exception:  # noqa: BLE001 - a distance failure is score_candidate's to report
-            continue
-        if not np.isfinite(dist_mpc) or dist_mpc <= 0:
-            continue
-        offset = min(abs(rung - dist_mpc) for rung in rungs) / dist_mpc
-        if offset > max_frac_offset:
-            offenders[name] = (float(dist_mpc), float(offset))
-
-    # one rung per 100 Mpc bucket: candidates 20 Mpc apart do not each deserve
-    # their own 30-minute, 4 GB grid
-    wanted = sorted({round(d / 100.0) * 100.0 for d, _ in offenders.values()})
-    return offenders, [d for d in wanted if d > 0]
-
-
-@task(queue_name="kilonova_grids", priority=settings.PRIORITY_LOW)
-def async_generate_grid_rung(distance_mpc: float, nle_id: int | None = None) -> None:
-    """Generate one simulation-grid rung, then re-score the event if given one.
-
-    Shells out to the ``kn-sim`` interpreter: grid generation needs redback /
-    bilby / lalsuite, which are deliberately absent from the environment this
-    worker runs in. ~30 minutes and ~4 GB of disk per rung.
-    """
-    import subprocess
-
-    from .phot_method import get_kilonova_params, set_kilonova_status
-
-    interpreter = getattr(settings, "KN_SIM_PYTHON", "")
-    if not interpreter or not os.path.exists(interpreter):
-        logger.error(
-            "Cannot generate a grid rung: KN_SIM_PYTHON is unset or missing (%r). "
-            "Set it in settings_local.py to the kn-sim environment's python.",
-            interpreter,
-        )
-        set_kilonova_status(
-            state="error",
-            nle_id=nle_id,
-            message=(
-                "Cannot generate a simulation grid: KN_SIM_PYTHON is not "
-                "configured. Set it in settings_local.py."
-            ),
-        )
-        return
-
-    script = os.path.join(os.path.dirname(__file__), "KilonovaScorer", "generate_rung.py")
-    logger.info("Generating a %.0f Mpc grid rung via %s", distance_mpc, interpreter)
-    set_kilonova_status(
-        state="running",
-        nle_id=nle_id,
-        message=(
-            f"Generating a {distance_mpc:.0f} Mpc simulation grid "
-            "(~30 min, ~4 GB) before scoring."
-        ),
-    )
-
-    # generation is memory-hungry in its own right, so it queues behind any
-    # scoring run rather than adding to it
-    with _heavy_job_lock(f"grid rung {distance_mpc:.0f} Mpc"):
-        proc = subprocess.run(
-            [interpreter, "-u", script, "--distance", str(float(distance_mpc))],
-            capture_output=True,
-            text=True,
-        )
-    if proc.returncode != 0:
-        logger.error(
-            "Grid rung at %.0f Mpc failed (exit %d):\n%s",
-            distance_mpc, proc.returncode, proc.stderr[-2000:],
-        )
-        set_kilonova_status(
-            state="error",
-            nle_id=nle_id,
-            message=f"Generating the {distance_mpc:.0f} Mpc grid failed: {proc.stderr.strip()[-300:]}",
-        )
-        return
-
-    logger.info("Grid rung at %.0f Mpc done:\n%s", distance_mpc, proc.stdout[-1000:])
-
-    # the ladder changed, so cached grid inventories are stale
-    from .KilonovaScorer.grids import clear_cache
-
-    clear_cache()
-
-    if nle_id is not None:
-        # now that the rung exists, score the event against it
-        async_kilonova_score.enqueue(nle_id=nle_id, params=get_kilonova_params())
-
-
 @task(queue_name="kilonova_scoring", priority=settings.PRIORITY_HIGH)
 def async_kilonova_score(nle_id: int, params: dict) -> None:
     """Re-score every candidate of an NLE with KilonovaSCORER.
@@ -289,9 +175,9 @@ def async_kilonova_score(nle_id: int, params: dict) -> None:
     """
     # imported here, not at module level: this pulls in pandas, pyarrow and the
     # vendored scorer, which nothing else in the task module needs
-    # score_event_by_distance, not score_event: it groups candidates by the grid
-    # rung their distance selects, so each multi-GB grid is read once for the
-    # whole event instead of once per distinct band set (101 loads on S251112cm)
+    # score_event_by_distance, not score_event: it groups candidates by the bands
+    # they were observed in, so the multi-GB grid is read once per band group for
+    # the whole event instead of once per candidate (101 loads on S251112cm)
     from .kilonova_scoring import score_event_by_distance as score_event
     from .models import ScoreFactor
     from .phot_method import (
@@ -316,56 +202,6 @@ def async_kilonova_score(nle_id: int, params: dict) -> None:
             nonlocalizedevent_id=nle.id
         ).select_related("target")
     }
-
-    # --- grid ladder coverage ---------------------------------------------
-    # Only meaningful when the grid is chosen per candidate; an explicitly
-    # chosen grid is the user overriding this decision on purpose.
-    skip_names = {}
-    if not grid_path:
-        action = params.get("grid_offset_action", "score")
-        max_offset = params.get("max_grid_offset")
-        if action != "score" and max_offset is not None:
-            offenders, wanted = _grid_offset_report(
-                nle.event_id,
-                {name: ec.target_id for name, ec in candidates.items()},
-                float(max_offset),
-            )
-            if offenders:
-                logger.info(
-                    "KilonovaSCORER: %d candidate(s) further than %.0f%% from every "
-                    "rung; nearest-rung distances wanted: %s",
-                    len(offenders), float(max_offset) * 100, wanted,
-                )
-            if offenders and action == "generate":
-                # generate the missing rungs, then re-enter scoring; stop here
-                # rather than scoring half the event against the wrong grid
-                for distance in wanted:
-                    async_generate_grid_rung.enqueue(
-                        distance_mpc=distance,
-                        # only the last one needs to re-trigger scoring, but
-                        # enqueueing per rung keeps this restartable
-                        nle_id=nle.id if distance == wanted[-1] else None,
-                    )
-                set_kilonova_status(
-                    state="running",
-                    nle_id=nle.id,
-                    event_id=nle.event_id,
-                    message=(
-                        f"{len(offenders)} candidate(s) of {nle.event_id} are further "
-                        f"than {float(max_offset):.0%} from every simulation grid. "
-                        f"Generating {len(wanted)} new rung(s) at "
-                        f"{', '.join(f'{d:.0f}' for d in wanted)} Mpc "
-                        "(~30 min each) before scoring."
-                    ),
-                )
-                return
-            skip_names = {
-                name: (
-                    f"no simulation grid within {float(max_offset):.0%} of "
-                    f"{dist:.0f} Mpc (nearest is {offset:.0%} off)"
-                )
-                for name, (dist, offset) in offenders.items()
-            }
 
     set_kilonova_status(
         state="running",
@@ -396,7 +232,8 @@ def async_kilonova_score(nle_id: int, params: dict) -> None:
         )
         return
 
-    n_scored = 0
+    t_persist = time.perf_counter()
+    scored_rows, skipped_rows = [], []
     for row in table.itertuples():
         ec = candidates.get(row.target_name)
         if ec is None:
@@ -407,33 +244,52 @@ def async_kilonova_score(nle_id: int, params: dict) -> None:
             score = float(getattr(row, "score", None))
         except (TypeError, ValueError):
             score = None
-        if row.target_name in skip_names:
-            # too far from every rung to be scored honestly, and the user asked
-            # for those to be left alone rather than scored anyway
-            score = None
         if score is not None and np.isfinite(score):
-            ScoreFactor.objects.update_or_create(
-                event_candidate=ec,
-                key=KILONOVA_SCORE_KEY,
-                defaults=dict(value=f"{float(score):.6g}"),
+            scored_rows.append(
+                ScoreFactor(
+                    event_candidate=ec,
+                    key=KILONOVA_SCORE_KEY,
+                    value=f"{float(score):.6g}",
+                )
             )
-            ScoreFactor.objects.filter(
-                event_candidate=ec, key=KILONOVA_SKIP_KEY
-            ).delete()
-            n_scored += 1
         else:
-            # a stale score from a previous run with different parameters would
-            # be worse than none at all
-            ScoreFactor.objects.filter(
-                event_candidate=ec, key=KILONOVA_SCORE_KEY
-            ).delete()
-            reason = skip_names.get(row.target_name) or getattr(row, "skip_reason", None)
-            ScoreFactor.objects.update_or_create(
-                event_candidate=ec,
-                key=KILONOVA_SKIP_KEY,
-                # ScoreFactor.value is a CharField(max_length=200)
-                defaults=dict(value=str(reason)[:200]),
+            reason = getattr(row, "skip_reason", None)
+            skipped_rows.append(
+                ScoreFactor(
+                    event_candidate=ec,
+                    key=KILONOVA_SKIP_KEY,
+                    # ScoreFactor.value is a CharField(max_length=200)
+                    value=str(reason)[:200],
+                )
             )
+    n_scored = len(scored_rows)
+
+    # Same invariant the per-row version enforced: a candidate holds a score or
+    # a skip reason, never both. A stale score from a previous run with
+    # different parameters is worse than none at all.
+    ScoreFactor.objects.filter(
+        event_candidate_id__in=[f.event_candidate_id for f in scored_rows],
+        key=KILONOVA_SKIP_KEY,
+    ).delete()
+    ScoreFactor.objects.filter(
+        event_candidate_id__in=[f.event_candidate_id for f in skipped_rows],
+        key=KILONOVA_SCORE_KEY,
+    ).delete()
+    # ON CONFLICT against the (event_candidate, key) unique_together, so this is
+    # an upsert: existing rows have their value replaced, new ones are inserted.
+    for batch in (scored_rows, skipped_rows):
+        if batch:
+            ScoreFactor.objects.bulk_create(
+                batch,
+                update_conflicts=True,
+                unique_fields=["event_candidate", "key"],
+                update_fields=["value"],
+                batch_size=500,
+            )
+    logger.info(
+        "KilonovaSCORER: persisted %d score(s) and %d skip(s) in %.1f s",
+        len(scored_rows), len(skipped_rows), time.perf_counter() - t_persist,
+    )
 
     logger.info(
         "KilonovaSCORER: scored %d of %d candidates of %s",

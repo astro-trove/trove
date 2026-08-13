@@ -1378,13 +1378,76 @@ suggests — see the sizing analysis below.
 
 ### Proposed fix
 
-Tag grids with their distance (now done: `KilonovaScorer/grids.py` reads it from the grid's own
-`redshift` column and selects the nearest rung, with an optional `max_frac_offset` guard), and
-generate a small ladder covering the range where a kilonova is detectable at all. Before
-building it, measure whether the distribution actually moves: generate two ~200-sample grids at
-the ends of the intended range and compare per-(band, time-bin) medians against the per-bin
-sigma. If the shift is well below the sigma, one grid covers the range and the ladder is
-unnecessary.
+Generate a small ladder of grids covering the range where a kilonova is detectable at all, and
+select the nearest rung per candidate.
+
+**Status, 2026-08-12: not in the code.** A ladder was built and then removed — there is one
+259 Mpc rung, pinned by name in `DEFAULT_KILONOVA_PARAMS["grid_path"]`, and every candidate is
+scored against it whatever its own distance. So this section describes a known, live defect,
+not a fixed one. The sizing below is retained because it is measured, and because it is what
+the rung spacing should be if the ladder returns.
+
+### Sizing: why a grid is distance-specific, and how many rungs it takes
+
+The natural objection is that the scorer works in *absolute* magnitude, so distance should
+factor out: subtract the distance modulus `mu` and be done. That is true of `mu` itself. It is
+not true of the other two things redshift does to a light curve:
+
+* *K-correction.* A filter has a fixed observer-frame bandpass, so at redshift z it samples
+  rest-frame wavelength `lambda/(1+z)`. Between 150 Mpc (z = 0.033) and 800 Mpc (z = 0.17) the
+  rest-frame wavelength a fixed filter samples shifts by ~12%. Mild for most transients; not for
+  a kilonova, whose lanthanide-rich component produces a steep red continuum that moves across a
+  filter edge as z grows.
+* *Time dilation.* An observation at t days post-merger samples the model at `t/(1+z)` in the
+  rest frame. At 3 days observed that is 2.90 d at 150 Mpc but 2.56 d at 800 Mpc. Kilonovae fade
+  ~4 mag over 10 days, so a 10% shift in epoch is a real magnitude shift, and it is largest
+  where the light curve is steepest.
+
+Both are band- and epoch-dependent, so they change the **shape** of the absolute-magnitude
+distribution in each (band, time-bin) cell, not just its location. A shape change cannot be
+undone afterwards by subtracting a constant — which is exactly what reusing a single-distance
+grid implicitly assumes.
+
+**The error is bounded exactly.** The score consumes `P_tail = 2*min(F, 1-F)` where F is the CDF
+of simulated absolute magnitudes in a (band, time-bin), so with no distributional assumption:
+
+    |dP_tail| <= 2 * sup_x |F_1(x) - F_2(x)| = 2 * KS(D_1, D_2)
+
+Measured on *paired* grids — same prior draws at every distance, see the `RANDOM_SEED` note in
+`simulation.py`; without pairing the measurement is swamped by a sampling-noise floor of
+~sqrt(2/N):
+
+    dP_tail ~ 1.94 * |z - z_grid|
+
+and with identical parameters, 100 -> 200 Mpc shifts magnitudes by 0.040 mag median.
+
+**Observability caps the range.** A kilonova peaks near `M_AB ~ -16`, so it is detectable to
+~200 Mpc at ZTF/ATLAS depth, ~316 Mpc deep, ~501 Mpc for targeted follow-up and ~1000 Mpc for
+DECam-class. Beyond that a detected candidate is necessarily too luminous to be a kilonova and
+is rejected on absolute magnitude whichever grid is used.
+
+**Real data.** 1395 of TROVE's 3369 candidates (41%) lie inside 1000 Mpc, across 26 events;
+candidate-weighted median 197 Mpc, p95 866 Mpc.
+
+The deciding comparison is against the uncertainty already in every candidate's absolute
+magnitude, `sigma_mu = (5/ln10) * sigma_D/D`. Over 788 real candidates that is 0.26 mag median —
+but p25 is 0.057 mag, so a quarter have host redshifts good enough that a mis-distanced grid
+would be their dominant error. Hence:
+
+| rungs | worst dP_tail | median dP_tail |
+| ----: | ------------: | -------------: |
+|     1 |         0.186 |          0.120 |
+|     2 |         0.149 |          0.029 |
+|     3 |         0.140 |          0.008 |
+
+One rung's median error equals the whole RNG scatter and exceeds `sigma_mu` for a quarter of
+candidates; three rungs cut it 15x. Beyond three the worst case stops improving — it is set by
+the ends of the range, not the spacing. The intended rungs were **150 / 400 / 800 Mpc**.
+
+This is the sizing that lived in `generate_ladder.py`, which was deleted on 2026-08-12 along
+with the rest of the ladder machinery. `generate_rung.py --distance <Mpc>` still builds a single
+rung at any distance, so rebuilding the ladder is three invocations plus restoring per-candidate
+selection.
 
 ---
 
@@ -1676,6 +1739,101 @@ parameter is set deliberately.
 Appendix A also validates the grid size: `N = 1e4` reproduces the `N = 1e5` gold standard to
 within the `P_tail` uncertainty (|delta| <~ 0.1), and `N = 1e3` is ~100x faster with no
 significant loss. That is useful headroom for the far-rung survivor-count problem in #19.
+
+---
+
+## 21. The 10-day window discards 45% of the photometry, and most of the discriminating power
+
+**Impact: HIGH | Effort: LOW (a parameter and a grid) | Status: measured, not adopted**
+
+`DEFAULT_KILONOVA_PARAMS["dt_max"] = 10.0`, because the grids span 0-10 d
+(`simulation.TIME = linspace(0, 10, 1000)`). Everything later is cut before
+scoring. On `S251112cm`, in modelled bands:
+
+```
+0-10 d     3,867 points  (36.1%)   1,744 detections
+10-30 d    4,811 points  (44.9%)     805 detections
+>30 d      2,037 points
+
+candidates with any 10-30 d photometry     457 of 457
+candidates with ONLY 10-30 d photometry     12   (unscoreable today)
+candidates whose only detections are >10 d   4
+```
+
+**More photometry sits outside the scored window than inside it.**
+
+### It is not just coverage -- it is where the discrimination lives
+
+A 30-day rung (same 10,000 x 38 x 1,000 shape, 0.03 d per epoch) scored at
+`dt_max=30` against the 10-day rung at `dt_max=10`:
+
+| | 10-day / dt_max=10 | 30-day / dt_max=30 |
+|---|---|---|
+| observations scored | 3,867 | **8,653 (2.24x)** |
+| candidates scored | 425 | 429 |
+| zeroed by the ABC filter | 363 (85.4%) | **382 (89.0%)** |
+| survivors | 62 | **47** |
+| top-10 / top-20 / top-50 overlap | -- | 10/10, 16/20, 37/50 |
+
+The largest score changes are all **rejections**, and they are exactly the
+candidates that gained epochs:
+
+```
+AT2025aebp   0.5567 -> 0.0000     4 -> 14 epochs
+AT2025aebj   0.5185 -> 0.0000     2 ->  9
+AT2025adib   0.4543 -> 0.0000     2 ->  9
+AT2025adpj   0.3604 -> 0.0000     8 -> 20
+AT2025adhh   0.3200 -> 0.0000    10 -> 24
+```
+
+Fifteen candidates that looked kilonova-like on a handful of early points do
+not survive once late-time epochs are included. That is the sequential ABC
+filter doing what it is for: a kilonova fades fast, a supernova at 20 days is
+still bright, and the evidence separating them is entirely outside the current
+window. Four previously unscoreable candidates also gain scores, three of them
+formerly "only non-detections in the grid's time window".
+
+Runtime is not the obstacle: 430.4 s against 396.8 s, measured back to back.
+
+### The catch: the model degrades before the window does
+
+Fraction of simulated lightcurves still usable (finite, `M < 0`) after the
+`MAX_ABS_MAG` artifact cut, by epoch:
+
+| window | atlaso | atlasc | ztfr |
+|---|---|---|---|
+| 0-5 d | 99.6% | 98.1% | 99.2% |
+| 5-10 d | 88.8% | 79.4% | 84.8% |
+| 10-20 d | 72.6% | 63.1% | 68.4% |
+| 20-30 d | **57.2%** | **49.5%** | **54.0%** |
+
+By 20-30 days roughly half the population has been dropped as flux-underflow
+artifacts -- and **not at random**: underflow takes the intrinsically faint
+models first, so what remains is the surviving bright half. A rejection driven
+by 20-30 d epochs is measured against a biased, thinned distribution.
+
+This is a numerical floor in the two-component model, not physics. A faint
+kilonova at 25 days is a real object the grid ought to represent.
+
+Note the current production config already tolerates 11-21% loss in 5-10 d, so
+this is a matter of degree rather than a new class of problem.
+
+### Recommendation
+
+1. **Extend the window to `dt_max=20`, not 30.** Keeps population completeness
+   at 63-73% rather than ~50%, captures most of the extra photometry, and
+   preserves the contaminant rejection.
+2. **Couple `dt_max` to the grid.** The two are not independent: raising
+   `dt_max` against a 10-day grid wastes fetches on epochs no bin can score,
+   and a 30-day grid at `dt_max=10` is strictly worse than the 10-day one
+   (same data, a third of the resolution). Grid selection should require a rung
+   whose span covers the requested window -- see DB.md.
+3. **Fix the underflow in `simulation.py`.** That is the real answer, and it is
+   what would make a genuine 30-day baseline trustworthy.
+
+Not yet split: how the 4,811 late points divide at 20 d, and how many of the 15
+new rejections depend on epochs beyond 20 d. Both are worth knowing before
+choosing the cut.
 
 ---
 

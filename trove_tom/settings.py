@@ -137,9 +137,6 @@ TASKS = {
             # KilonovaSCORER runs on its own queue: holds a multi-GB simulation grid in memory, 
             # so it must not be in front of the short vetting jobs
             "kilonova_scoring",
-            # grid generation is ~30 min and ~4 GB of disk per rung, and runs a
-            # separate interpreter, so it gets its own queue again
-            "kilonova_grids",
         ],
     }
 }

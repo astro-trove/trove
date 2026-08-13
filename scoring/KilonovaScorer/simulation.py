@@ -1,8 +1,8 @@
+import logging
 import time
 import multiprocessing
 from multiprocessing import Pool, cpu_count
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 from astropy.cosmology import Planck18 as cosmo
 from astropy.cosmology import z_at_value
@@ -14,6 +14,69 @@ from bilby.core.prior import Uniform
 import warnings
 warnings.filterwarnings("ignore", "Wswiglal-redir-stdio")
 import lal
+
+logger = logging.getLogger(__name__)
+
+#: redback's own t_max for kilonova SED grids, in source-frame seconds (81 d).
+#: Seven of redback 1.18's ten kilonova models pass this; `get_optimal_time_array`
+#: documents it as the kilonova example.
+_REDBACK_KN_TMAX_S = 7e6
+
+#: The tighter cap that `two_component_kilonova_model` and
+#: `one_component_kilonova_model` pass instead: 6 days, source frame.
+_REDBACK_SHORT_TMAX_S = 86400 * 6
+
+
+def patch_redback_time_cap():
+    """Raise redback's 6-day SED cap on the two-component kilonova models.
+
+    WHY. ``two_component_kilonova_model`` builds its spectral time series on
+
+        get_optimal_time_array(1e-2, 86400*6, ...)
+
+    so the SED grid stops at 6 days in the SOURCE frame however far out you
+    ask for times. ``get_optimal_time_array`` clamps to that maximum --
+    ``eval_max = min(t_max, user_max * 2.0)``, and the array ends at
+    ``t_max`` -- and the resulting ``RedbackTimeSeriesSource`` returns its
+    edge value for any phase past the end of its domain. The magnitude is
+    therefore EXACTLY constant beyond ``6 * (1 + z)`` days observer frame:
+    at z = 0.056 every light curve in a 0-10 d grid freezes at 6.34 d and
+    36% of the time axis is a flat line.
+
+    That is not physics -- kilonovae keep fading -- and it is not consistent
+    within redback either: seven of its ten kilonova models pass 7e6 s (81 d)
+    for the same argument, and the utility's docstring gives 7e6 as the
+    kilonova example. Two models were left on a much tighter cap.
+
+    Measured cost of leaving it in place, paired on identical parameters:
+    zero difference through 6 d (so this changes nothing that was already
+    right), then the capped population runs too BRIGHT by a median 1.16 mag
+    at 10 d, up to 7.16 mag. A frozen, over-bright reference pushes a
+    genuinely fading kilonova into the faint tail and depresses P_tail --
+    a late-time bias on top of the selection effect in IMPROVEMENTS #19.
+
+    Narrow by construction: it rewrites one argument of one function, only
+    when that argument is the 6-day value, and leaves every other caller of
+    ``get_optimal_time_array`` untouched. Idempotent, so workers may call it
+    freely. Remove once redback ships the wider cap upstream.
+    """
+    from redback.transient_models import kilonova_models as _km
+
+    if getattr(_km.get_optimal_time_array, "_trove_tmax_patched", False):
+        return
+
+    _original = _km.get_optimal_time_array
+
+    def _widened(t_min, t_max, resolution, user_times=None, time_units="seconds"):
+        if abs(t_max - _REDBACK_SHORT_TMAX_S) < 1.0:
+            t_max = _REDBACK_KN_TMAX_S
+        return _original(t_min, t_max, resolution,
+                         user_times=user_times, time_units=time_units)
+
+    _widened._trove_tmax_patched = True
+    _widened._trove_original = _original
+    _km.get_optimal_time_array = _widened
+
 
 def _prewarm_bandpasses(bands):
     """Download and cache every bandpass once, serially, in this process.
@@ -44,10 +107,14 @@ def _prewarm_bandpasses(bands):
 # Worker function must be top-level for multiprocessing
 def simulate_single_sample(sample_id, MODEL_NAME, TIME, FILTER_BANDS, z, mu, RANDOM_SEED=42):
     import numpy as np
-    import pandas as pd
     import redback
     from bilby.core.prior import Uniform
     from redback.model_library import all_models_dict
+
+    # Applied in the parent too, but repeated here so the grid is correct under
+    # every multiprocessing start method: 'fork' inherits the parent's patched
+    # module, 'spawn' and 'forkserver' import redback fresh and would not.
+    patch_redback_time_cap()
 
     # Seed per sample, deterministically. Two consequences:
     #  * grids become reproducible (IMPROVEMENTS #11 -- previously each worker
@@ -83,17 +150,18 @@ def simulate_single_sample(sample_id, MODEL_NAME, TIME, FILTER_BANDS, z, mu, RAN
     params = prior.sample()
     params['redshift'] = z
 
-    rows = []
+    # Arrays, not a DataFrame. The grid store holds one lightcurve per row with
+    # the epoch encoded by position, so the (sample, band, time, magnitude,
+    # parameters...) long form the Parquet writer needed is pure overhead here:
+    # it inflated every sample to len(TIME) * len(bands) rows carrying the same
+    # 10 parameter values over and over, and was the reason a rung measured
+    # 25 GB in a naive table. float32 because that is the store's dtype -- doing
+    # it here means one narrowing rather than one per chunk.
+    curves = {}
     for band in FILTER_BANDS:
         mag = all_models_dict[MODEL_NAME](TIME, **params, output_format='magnitude', bands=[band])
-        abs_mag = mag - mu
-        row_dict = {'sample_id': sample_id, 'band': band, 'time': TIME, 
-                    'magnitude': mag, 'absolute_magnitude': abs_mag}
-        for k, v in params.items():
-            row_dict[k] = v
-        rows.append(pd.DataFrame(row_dict))
-    return pd.concat(rows, ignore_index=True)
-
+        curves[band] = np.asarray(mag - mu, dtype=np.float32)
+    return sample_id, params, curves
 # Main simulation function
 def simulate_kilonova(
     N_SIM=100,
@@ -102,24 +170,31 @@ def simulate_kilonova(
     FILTER_BANDS=('lsstg', 'lsstr', 'lssti', 'lsstz'),
     TIME=None,
     save=True,
-    outdir=None,
-    filename=None,
-    compression='zstd',
+    grid_name=None,
+    replace=True,
+    dsn=None,
     chunk_size=250,
-    SAVE_CSV=None,
 ):
-    """Generate a simulation grid and save it as Parquet.
+    """Generate a simulation grid, writing it straight into the grid store.
 
-    Grids are written to ``KilonovaScorer/grids/`` as Parquet, with the
-    luminosity distance in the filename so
-    :func:`KilonovaScorer.grids.grid_for_distance` can build a distance ladder
-    from the directory:
+    There is no intermediate file. The simulator opens a connection, registers
+    the grid, and COPYs each chunk of finished lightcurves into
+    ``kn_grid_lightcurve`` as it is produced; when the last chunk lands the grid
+    is complete and queryable. The Parquet stage this replaces existed only to
+    hand the numbers to a separate ingest pass, and cost a 6 GB file per rung
+    plus a second full read of it.
 
-        grids/simulations_two_component_kilonova_model_259Mpc.parquet
+    Grids are keyed by name, not by path::
 
-    Parquet rather than CSV because these are large and purely numeric -- a
-    10k-sample grid is ~90M rows, which is ~1.4 GB as Parquet against ~20 GB as
-    CSV, and loads in a fraction of a second with column pruning.
+        simulations_two_component_kilonova_model_259Mpc
+
+    with the luminosity distance carried in ``kn_grid_axis.distance_mpc`` --
+    read from a column now rather than parsed back out of a filename, so
+    ``KilonovaScorer/generate_rung.py`` can build a grid at any distance and
+    have it identified correctly with a single query.
+
+    Requires ``TROVE_GRID_DSN`` (or an explicit ``dsn``) and a schema created by
+    :func:`grid_db.ensure_schema`, which this calls.
 
     Parameters
     ----------
@@ -138,38 +213,40 @@ def simulate_kilonova(
         Time samples in days. Defaults to 1000 points over 0-10 d. Note t=0 is
         undefined for these models and is dropped at load time.
     save : bool
-        Write the grid to disk. Results are streamed out in chunks, so peak
-        memory stays bounded no matter how large the grid is.
-    outdir, filename : path-like or None
-        Override the destination. Defaults to the package ``grids/`` directory
-        and the distance-tagged name above.
+        Write to the store. When False nothing is persisted and the finished
+        lightcurves are returned in memory instead -- small test runs only.
+    grid_name : str or None
+        Name to store under. Defaults to
+        ``simulations_{model}_{distance:.0f}Mpc``.
+    replace : bool
+        Delete any existing lightcurves for this grid name first. On by
+        default: a shorter re-run would otherwise leave the tail of the
+        previous one in place, indistinguishable from its own output.
+    dsn : str or None
+        Grid database connection string. Defaults to ``$TROVE_GRID_DSN``.
     chunk_size : int
         Samples simulated and written per batch. Peak memory is roughly
-        ``chunk_size * len(FILTER_BANDS) * len(TIME)`` rows. The default keeps a
-        38-band, 1000-epoch grid near 1 GB.
-    SAVE_CSV : bool or None
-        Deprecated. Ignored -- a full grid is ~20x larger as CSV and does not
-        fit in memory as a single frame.
+        ``chunk_size * len(FILTER_BANDS) * len(TIME) * 4`` bytes -- 76 MB at the
+        default 250 across 38 bands and 1,000 epochs.
 
     Returns
     -------
-    (final_df, path) : (pd.DataFrame or None, pathlib.Path or None)
-        ``final_df`` is returned only when ``save`` is False (small test runs);
-        when saving, results go straight to disk and ``None`` is returned so a
-        multi-hundred-million-row grid is never held in RAM.
+    (result, grid_name) : (dict or None, str or None)
+        When saving, ``result`` is a summary dict and ``grid_name`` is the key
+        the grid was stored under. With ``save=False`` the summary carries the
+        lightcurves themselves and the name is None.
     """
-    from pathlib import Path
-
+    FILTER_BANDS = list(FILTER_BANDS)
     if TIME is None:
         TIME = np.linspace(0, 10, 1000)
-    FILTER_BANDS = list(FILTER_BANDS)
+    TIME = np.asarray(TIME, dtype=float)
     z = z_at_value(cosmo.luminosity_distance, DL_Mpc*u.Mpc).value
     mu = 5 * np.log10(DL_Mpc*1e6) - 5
 
-    est_rows = N_SIM * len(FILTER_BANDS) * len(TIME)
     ncores = min(6, multiprocessing.cpu_count() - 1)
     print(f"🕹 {N_SIM} samples x {len(FILTER_BANDS)} bands x {len(TIME)} epochs "
-          f"= {est_rows:,} rows, on {ncores} cores", flush=True)
+          f"= {N_SIM * len(FILTER_BANDS) * len(TIME):,} magnitudes, on {ncores} cores",
+          flush=True)
 
     # Must happen BEFORE the Pool starts. sncosmo fetches a bandpass the first
     # time it is used and caches it under ~/.astropy/cache/sncosmo. With a cold
@@ -184,66 +261,78 @@ def simulate_kilonova(
     # which names neither the band nor the cache. Touching every bandpass once,
     # serially, in the parent makes the workers' lookups pure cache hits.
     _prewarm_bandpasses(FILTER_BANDS)
+    patch_redback_time_cap()
 
     if not save:
         # Small test runs only -- everything is held in memory.
         with multiprocessing.Pool(ncores) as pool:
-            dfs = pool.starmap(
+            out = pool.starmap(
                 simulate_single_sample,
                 [(i, MODEL_NAME, TIME, FILTER_BANDS, z, mu) for i in range(N_SIM)],
             )
         print("✅ Simulation complete!", flush=True)
-        return pd.concat(dfs, ignore_index=True), None
+        return {
+            "time": TIME,
+            "distance_mpc": float(DL_Mpc),
+            "samples": {sid: curves for sid, _params, curves in out},
+            "params": {sid: params for sid, params, _curves in out},
+        }, None
 
-    # ------------------------------------------------------------------
-    # Streamed write. The previous implementation collected every sample in a
-    # list and concatenated once, which needs ~40 GB for a 38-band 10k-sample
-    # grid -- more RAM than the machine has. Simulating in chunks and appending
-    # each as a Parquet row group bounds memory to one chunk.
-    # ------------------------------------------------------------------
-    import pyarrow as pa
-    import pyarrow.parquet as pq
+    from . import grid_db
 
-    from .grids import GRID_DIR
+    grid_name = grid_name or f"simulations_{MODEL_NAME}_{DL_Mpc:.0f}Mpc"
+    grid_db.ensure_schema(dsn)
+    grid_db.begin_grid(
+        grid_name, TIME, float(DL_Mpc), int(N_SIM), replace=replace, dsn=dsn
+    )
+    print(f"📇 writing to grid store as '{grid_name}'", flush=True)
 
-    outdir = Path(outdir) if outdir else GRID_DIR
-    outdir.mkdir(parents=True, exist_ok=True)
-    name = filename or f"simulations_{MODEL_NAME}_{DL_Mpc:.0f}Mpc.parquet"
-    path = outdir / name
-    tmp = path.with_suffix(".parquet.partial")
-
-    writer = None
-    n_rows = 0
+    n_written = 0
     t0 = time.time()
     try:
         with multiprocessing.Pool(ncores) as pool:
             for start in range(0, N_SIM, chunk_size):
                 stop = min(start + chunk_size, N_SIM)
-                dfs = pool.starmap(
+                out = pool.starmap(
                     simulate_single_sample,
                     [(i, MODEL_NAME, TIME, FILTER_BANDS, z, mu) for i in range(start, stop)],
                 )
-                chunk = pd.concat(dfs, ignore_index=True)
-                del dfs
-                table = pa.Table.from_pandas(chunk, preserve_index=False)
-                if writer is None:
-                    writer = pq.ParquetWriter(tmp, table.schema, compression=compression)
-                writer.write_table(table)
-                n_rows += len(chunk)
-                del chunk, table
+                # Sorted so a chunk's rows go in by sample_id. Not required by
+                # the schema, but it keeps the physical order of the table
+                # aligned with sample_id, which is what the read path scans.
+                out.sort(key=lambda r: r[0])
+                sample_ids = [sid for sid, _p, _c in out]
+                for band in FILTER_BANDS:
+                    block = np.stack([curves[band] for _s, _p, curves in out])
+                    grid_db.write_lightcurves(
+                        grid_name, band, sample_ids, block, dsn=dsn
+                    )
+                n_written += len(sample_ids)
+                del out
+
                 elapsed = time.time() - t0
                 rate = stop / elapsed
-                print(f"   {stop}/{N_SIM} samples  {n_rows:,} rows  "
-                      f"{elapsed/60:.1f} min elapsed, ~{(N_SIM-stop)/rate/60:.1f} min left",
-                      flush=True)
-    finally:
-        if writer is not None:
-            writer.close()
+                print(f"   {stop}/{N_SIM} samples  {n_written * len(FILTER_BANDS):,} "
+                      f"lightcurves  {elapsed/60:.1f} min elapsed, "
+                      f"~{(N_SIM-stop)/rate/60:.1f} min left", flush=True)
+    except BaseException:
+        # A half-written grid that still answers queries is worse than none:
+        # scoring would silently use whatever fraction landed. Drop it.
+        try:
+            grid_db.drop_grid(grid_name, dsn=dsn)
+            print(f"⚠ removed the partial grid '{grid_name}'", flush=True)
+        except Exception:  # noqa: BLE001 - never mask the original failure
+            logger.exception("could not clean up partial grid %s", grid_name)
+        raise
 
-    # Only publish under the real name once the whole grid is written, so an
-    # interrupted run never leaves a truncated grid that looks complete.
-    tmp.replace(path)
-    print(f"💾 Saved {path} ({path.stat().st_size / 1e6:.0f} MB, {n_rows:,} rows) "
+    summary = {
+        "grid": grid_name,
+        "distance_mpc": float(DL_Mpc),
+        "n_samples": n_written,
+        "n_time": int(TIME.size),
+        "bands": {b: n_written for b in FILTER_BANDS},
+    }
+    print(f"💾 Stored {grid_name}: {n_written:,} samples x {len(FILTER_BANDS)} bands "
           f"in {(time.time()-t0)/60:.1f} min", flush=True)
     print("✅ Simulation complete!", flush=True)
-    return None, path
+    return summary, grid_name

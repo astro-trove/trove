@@ -162,14 +162,14 @@ def load_observations(
     """
     Load and standardise photometric observations, then compute absolute magnitudes.
 
-    Supports .csv, .parquet and .json input files.  Absolute magnitudes are
+    Supports .csv and .json input files.  Absolute magnitudes are
     derived via ``compute_abs_mag_samples`` (from utils), which is expected to
     accept array inputs for vectorised computation.
 
     Parameters
     ----------
     file_path : str or Path
-        Path to the photometry file (.csv, .parquet or .json).
+        Path to the photometry file (.csv or .json).
     merger_mjd : float
         MJD of the GW merger event.
     dist_mpc : float
@@ -190,14 +190,12 @@ def load_observations(
     if suffix == ".csv":
         df = pd.read_csv(path)
         df["time_after_gw"] = df["time"] - merger_mjd
-    elif suffix in (".parquet", ".pq"):
-        df = pd.read_parquet(path)
         df["time_after_gw"] = df["time"] - merger_mjd
     elif suffix == ".json":
         df = parse_json_photometry(path, merger_mjd)
     else:
         raise ValueError(
-            f"Unsupported file format: {path.suffix} (expected .csv, .parquet or .json)"
+            f"Unsupported file format: {path.suffix} (expected .csv or .json)"
         )
 
     if df.empty:
@@ -623,6 +621,41 @@ def _band_time_index(data_sim: pd.DataFrame, band: str):
         hit = (sb, sb["time"].to_numpy())
         _BAND_INDEX_CACHE["bands"][band] = hit
     return hit
+
+
+def clear_band_indexes() -> None:
+    """Drop the cached band views.
+
+    The cache holds *sorted copies* of each band's rows -- ~1 GB for a 10-band
+    rung -- and only evicts them when :func:`_band_time_index` is next called
+    with a different grid. That is too late when the caller is about to load
+    the next grid: for the duration of that load the process holds the new
+    grid **and** the previous one's index, which is what pushed a 4-worker run
+    to within 600 MB of the OOM killer. Call this whenever a grid is dropped.
+    """
+    _BAND_INDEX_CACHE["ref"] = None
+    _BAND_INDEX_CACHE["bands"] = {}
+
+
+def prewarm_band_indexes(data_sim: pd.DataFrame, bands=None) -> int:
+    """Build every band's index up front instead of lazily per candidate.
+
+    Serially this only moves work around -- the same slices get built either
+    way, just sooner. It exists for the **process pool**: children forked from
+    the parent share its memory copy-on-write, so an index built before the
+    fork is shared by every worker, while one built lazily afterwards is
+    duplicated in each. On a 10-band grid the cache is ~1.1 GB, which is the
+    difference between four workers costing ~0.3 GB each and ~1.4 GB each.
+
+    Returns the number of bands warmed.
+    """
+    if "filter_mapped" not in data_sim.columns:
+        return 0
+    if bands is None:
+        bands = [b for b in pd.unique(data_sim["filter_mapped"]) if b is not None and b == b]
+    for band in bands:
+        _band_time_index(data_sim, band)
+    return len(bands)
 
 
 def _bin_slice(times: np.ndarray, bins: np.ndarray, bin_idx: int):

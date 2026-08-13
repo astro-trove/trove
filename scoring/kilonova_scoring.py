@@ -9,9 +9,9 @@ grid, and returns a single cumulative score with its diagnostics.
 Typical use::
 
     from scoring.kilonova_scoring import score_event, load_simulation_grid
-    from scoring.KilonovaScorer.grids import grid_for_distance
+    from scoring.KilonovaScorer.grids import resolve_grid
 
-    grid = load_simulation_grid(grid_for_distance(300))   # nearest grid to 300 Mpc
+    grid = load_simulation_grid(resolve_grid(GRID_NAME))
     scores = score_event("S251112cm", grid=grid)          # DataFrame, one row per candidate
     scores.sort_values("score", ascending=False).head(10)
 
@@ -36,17 +36,18 @@ Distance handling
 Absolute magnitudes are derived from the candidate's own distance
 (:func:`scoring.candidate_photometry.get_candidate_distance`), which falls back
 through target redshift -> best host-galaxy redshift -> the GW skymap posterior
-at the candidate's healpix. Because the simulated grid is generated at a
-particular luminosity distance (the redshift enters the model), grids are
-selected per distance bin -- see :func:`select_grid_for_distance`.
+at the candidate's healpix. The distance sets the candidate's absolute
+magnitudes; it no longer selects a grid. There is one grid, named in
+``DEFAULT_KILONOVA_PARAMS["grid_path"]``, and every candidate is scored against
+it -- see IMPROVEMENTS.md section 18 for the error that introduces.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import numpy as np
@@ -57,6 +58,7 @@ from .KilonovaScorer.utils import compute_abs_mag_samples
 from .candidate_photometry import (
     DEFAULT_MAGERR,
     get_candidate_distance,
+    get_candidate_distances,
     get_candidates,
     get_event,
     get_event_photometry,
@@ -89,14 +91,29 @@ DATA_SIM_COLUMNS = ("filter_mapped", "time", "absolute_magnitude", "sample_id")
 # KilonovaScorer.grids, next to the data. These are thin aliases so callers of
 # this module do not need to reach into the package.
 # ---------------------------------------------------------------------------
-from .KilonovaScorer.grids import GRID_DIR  # noqa: E402
 from .KilonovaScorer.grids import available_grids as simulation_grids  # noqa: E402
-from .KilonovaScorer.grids import clear_cache as clear_grid_cache  # noqa: E402
 from .KilonovaScorer.grids import grid_distance_mpc  # noqa: E402
-from .KilonovaScorer.grids import grid_for_distance as select_grid_for_distance  # noqa: E402
 from .KilonovaScorer.grids import grid_name  # noqa: E402
 from .KilonovaScorer.grids import load_grid as load_simulation_grid  # noqa: E402
 from .KilonovaScorer.grids import resolve_grid  # noqa: E402
+
+
+def require_grid_path(grid_path):
+    """The grid to score against, or a clear error saying none was configured.
+
+    ``grid_path`` used to be optional: empty meant "pick the rung nearest this
+    candidate's distance". Rungs are gone, so empty now means nothing is
+    configured, and that has to fail loudly -- there is no sensible grid to
+    guess at, and silently picking one from the store would reintroduce exactly
+    the distance mismatch the ladder existed to avoid.
+    """
+    if grid_path:
+        return grid_path
+    raise ValueError(
+        "No simulation grid configured. Set grid_path (see "
+        "DEFAULT_KILONOVA_PARAMS in scoring/phot_method.py) to the name of a "
+        "grid in the store; `KilonovaScorer.grids.available_grids()` lists them."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -453,7 +470,7 @@ def score_candidate(
 
     # --- grid --------------------------------------------------------------
     if grid is None:
-        path = resolve_grid(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
+        path = resolve_grid(require_grid_path(grid_path))
         # The filter applies to the grid's own `band` column. In survey mode the
         # observation's filter_mapped IS that band id; in canonical mode it is
         # 'g-band'/'r-band'/..., so it has to be inverted through FILTER_LOOKUP
@@ -714,6 +731,7 @@ def score_event_by_distance(
     random_state=42,
     keep_frames: bool = False,
     progress: bool = False,
+    n_workers=None,
     **kwargs,
 ) -> pd.DataFrame:
     """Score every candidate of a GW event, grouped by simulation grid.
@@ -746,6 +764,15 @@ def score_event_by_distance(
     dictionary lookup each. That floor defaults to a single point in a single
     band, so in practice only candidates with no usable photometry at all are
     dropped here.
+
+    ``n_workers``
+        Processes to score each load's candidates across. ``None``/``'auto'``
+        (the default) leaves two cores free and caps at 6; ``1`` scores
+        serially. Once the grid is loaded the candidates are independent and no
+        longer touch the database, and scoring is where essentially all the
+        time goes -- ~950 s of a 983 s event. Workers are ``fork``ed so they
+        share the grid copy-on-write rather than receiving a copy each; see
+        :func:`_score_chunk`. Results are identical either way.
     """
     from .KilonovaScorer.grids import clear_cache
 
@@ -802,11 +829,45 @@ def score_event_by_distance(
         return _results_table(results, keep_frames)
 
     # --- distances, once ---------------------------------------------------
+    # Timed because it is not a small share of a run and it is invisible in the
+    # log otherwise: on S251112cm this pass was ~570 s of a 1,216 s run, more
+    # than all the scoring, because each candidate costs several round trips to
+    # a database that may be at the far end of an SSH tunnel (~79 ms each).
+    # Batching these lookups is the largest remaining win -- see TIMINGS.md.
+    import time as _time
+
+    t_dist = _time.perf_counter()
+    # Resolved in bulk rather than one candidate at a time: same resolver, same
+    # fallback order, same answers, but the Target rows, the host-galaxy JSON
+    # and the event's localization are fetched once for the whole event instead
+    # of per candidate.
+    try:
+        distances = get_candidate_distances([c.target_id for c, _ in scoreable], event_id)
+    except Exception as exc:  # noqa: BLE001 - fall back to the per-candidate path
+        logger.warning("Batched distance lookup failed (%r); falling back per candidate", exc)
+        distances = {}
+
+    # Resolved once, not per candidate. Every candidate scores against the same
+    # grid now that rungs are gone, and resolving a name to a GridRef is a query
+    # against the grid store -- 445 of them cost 34 s against `catalogs`.
+    # A failure here is a configuration error, but it is reported per candidate
+    # so the event still returns a full table saying why nothing scored.
+    path = None
+    grid_error = None
+    try:
+        path = resolve_grid(require_grid_path(grid_path))
+    except Exception as exc:  # noqa: BLE001 - no such grid, or none configured
+        grid_error = exc
+        logger.error("%s: cannot resolve the configured grid: %s", event_id, exc)
+
     buckets: Dict[Any, List[Tuple[Any, pd.DataFrame, float, float]]] = {}
     for cand, lc in scoreable:
         name = cand.target.name
         try:
-            dist_mpc, dist_err_mpc = get_candidate_distance(cand.target_id, event_id)
+            if cand.target_id in distances:
+                dist_mpc, dist_err_mpc = distances[cand.target_id]
+            else:
+                dist_mpc, dist_err_mpc = get_candidate_distance(cand.target_id, event_id)
         except Exception as exc:  # noqa: BLE001
             results.append(
                 KilonovaScore(event_id, name, target_id=cand.target_id,
@@ -827,18 +888,24 @@ def score_event_by_distance(
             )
             continue
 
-        try:
-            path = resolve_grid(grid_path) if grid_path else select_grid_for_distance(dist_mpc)
-        except Exception as exc:  # noqa: BLE001 - no grid at all, or none close enough
+        if grid_error is not None:
             results.append(
                 KilonovaScore(event_id, name, target_id=cand.target_id, dist_mpc=dist_mpc,
                               dist_err_mpc=dist_err_mpc, n_obs_supplied=len(lc),
-                              skip_reason=f"no usable grid: {exc}")
+                              skip_reason=f"no usable grid: {grid_error}")
             )
             continue
         buckets.setdefault(path, []).append((cand, lc, dist_mpc, dist_err_mpc))
 
+    logger.info(
+        "%s: distance pass took %.1f s for %d candidate(s), %d grid bucket(s)",
+        event_id, _time.perf_counter() - t_dist, len(scoreable), len(buckets),
+    )
+
     # --- grid loads, nearest rung first ------------------------------------
+    t_score = _time.perf_counter()
+    load_seconds = 0.0
+    n_loads = 0
     ordered = sorted(buckets, key=lambda p: grid_distance_mpc(p))
     for rung_i, path in enumerate(ordered, start=1):
         members = buckets[path]
@@ -897,10 +964,13 @@ def score_event_by_distance(
                 rung_i, len(ordered), chunk_i, grid_name(path), len(chunk), len(grid_bands),
                 f"{load_max_time:.2f} d" if load_max_time is not None else "all",
             )
+            t_load = _time.perf_counter()
             try:
                 grid = load_simulation_grid(
                     path, bands=grid_bands, mode=mode, max_time=load_max_time
                 )
+                load_seconds += _time.perf_counter() - t_load
+                n_loads += 1
             except Exception as exc:  # noqa: BLE001 - one bad load must not stop the event
                 logger.exception("Loading %s failed", grid_name(path))
                 for cand, lc, d, derr in chunk:
@@ -911,34 +981,197 @@ def score_event_by_distance(
                     )
                 continue
 
-            for i, (cand, lc, dist_mpc, dist_err_mpc) in enumerate(chunk, start=1):
-                name = cand.target.name
-                if progress:
-                    logger.info("  [%d/%d] %s", i, len(chunk), name)
-                try:
-                    results.append(
-                        score_candidate(
-                            event_id, name, grid=grid, phot=lc,
-                            dist=(dist_mpc, dist_err_mpc),
-                            dt_min=dt_min, dt_max=dt_max, snr_min=snr_min,
-                            map_wide_bands=map_wide_bands, mode=mode,
-                            time_bin_width=time_bin_width,
-                            random_state=random_state,
-                            keep_frames=keep_frames, **kwargs,
-                        )
-                    )
-                except Exception as exc:  # noqa: BLE001 - one bad candidate must not stop the run
-                    logger.exception("Scoring failed for %s", name)
-                    results.append(
-                        KilonovaScore(event_id, name, target_id=cand.target_id,
-                                      skip_reason=f"error: {type(exc).__name__}: {exc}")
-                    )
+            score_kwargs = dict(
+                dt_min=dt_min, dt_max=dt_max, snr_min=snr_min,
+                map_wide_bands=map_wide_bands, mode=mode,
+                time_bin_width=time_bin_width, random_state=random_state,
+                keep_frames=keep_frames, **kwargs,
+            )
+            results.extend(
+                _score_chunk(event_id, chunk, grid, score_kwargs, n_workers, progress)
+            )
 
-            # drop this grid before reading the next, so peak memory is one load
+            # Drop this grid before reading the next, so peak memory is one
+            # load. The band index has to go with it: it holds sorted copies of
+            # the grid's rows, and keeping them alive across the next load
+            # means holding two grids' worth at once.
+            from .KilonovaScorer.core import clear_band_indexes
+
             del grid
+            clear_band_indexes()
             clear_cache()
 
+    total = _time.perf_counter() - t_score
+    logger.info(
+        "%s: scoring pass took %.1f s (%.1f s in %d grid load(s), %.1f s scoring)",
+        event_id, total, load_seconds, n_loads, total - load_seconds,
+    )
     return _results_table(results, keep_frames)
+
+
+#: The loaded grid, published to forked workers.
+#:
+#: Set in the parent immediately before the pool is created and read by the
+#: children through the fork, never pickled. A rung is 1-2 GB and its band
+#: index another ~1 GB; sending that down a pipe per task -- which is what
+#: passing it as an argument would do -- costs more than the scoring it enables.
+#: ``fork`` gives every child the parent's address space copy-on-write, and the
+#: scorer only ever reads the grid, so one physical copy serves all workers.
+_WORKER_GRID: Optional[pd.DataFrame] = None
+
+
+def _pool_worker_init():
+    """Restore default signal handling in a forked pool worker.
+
+    ``fork`` copies the parent's signal handlers, and when the parent is a
+    django-tasks ``db_worker`` those handlers are the graceful-shutdown ones:
+    the first SIGTERM sets a "stop after the current task" flag and returns
+    rather than exiting, and only a second one forces the issue. A pool child
+    has no task loop to notice that flag, so it inherits a SIGTERM handler that
+    simply refuses to die.
+
+    ``Pool`` teardown sends exactly one SIGTERM per child and then reaps them.
+    With the inherited handler, no child exits, and the parent blocks in
+    ``do_wait`` **forever** -- after all the scoring is finished but before the
+    results are persisted. Observed twice on S251112cm: all 11 grid loads
+    complete, every candidate scored, and then the worker hangs with zero rows
+    written. It does not reproduce when the scorer runs from a plain script,
+    because there is no django-tasks handler to inherit -- which is exactly why
+    it survived every standalone benchmark and only appears on the queue.
+
+    Registering this as the pool ``initializer`` runs it in each child after
+    the fork, before any task.
+    """
+    import signal
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        try:
+            signal.signal(sig, signal.SIG_DFL)
+        except (ValueError, OSError):  # not the main thread, or not supported
+            pass
+
+
+def _score_one_pooled(args):
+    """Score one candidate in a pool worker. Runs in a forked child."""
+    event_id, name, target_id, lc, dist, score_kwargs = args
+    try:
+        return score_candidate(
+            event_id, name, grid=_WORKER_GRID, phot=lc, dist=dist, **score_kwargs
+        )
+    except Exception as exc:  # noqa: BLE001 - a bad candidate must not kill the pool
+        logger.exception("Scoring failed for %s", name)
+        return KilonovaScore(
+            event_id, name, target_id=target_id,
+            skip_reason=f"error: {type(exc).__name__}: {exc}",
+        )
+
+
+def _score_chunk(event_id, chunk, grid, score_kwargs, n_workers, progress):
+    """Score every candidate of one grid load, serially or across processes.
+
+    Candidates are independent once the grid is loaded -- ``score_candidate``
+    reads the grid, takes its photometry and distance as arguments, and touches
+    no database -- so the loop is embarrassingly parallel. It is also where
+    essentially all the time goes: on ``S251112cm`` the scoring is ~950 s of a
+    983 s run, against ~30 s of grid loads.
+
+    Determinism is preserved. Every candidate is seeded by ``random_state``
+    independently of what was scored before it, and ``imap`` yields in
+    submission order, so the results table is identical to the serial one --
+    verified across a full event, not assumed.
+    """
+    tasks = [
+        (event_id, cand.target.name, cand.target_id, lc, (dist_mpc, dist_err_mpc), score_kwargs)
+        for cand, lc, dist_mpc, dist_err_mpc in chunk
+    ]
+
+    workers = _resolve_workers(n_workers, len(tasks), score_kwargs.get("keep_frames"))
+    if workers <= 1:
+        out = []
+        for i, task in enumerate(tasks, start=1):
+            if progress:
+                logger.info("  [%d/%d] %s", i, len(tasks), task[1])
+            out.append(_score_one_pooled(task))
+        return out
+
+    import multiprocessing
+
+    # Build every band's view before forking. Done lazily inside the workers
+    # instead, each child would build and privately hold its own ~1 GB copy.
+    from .KilonovaScorer.core import prewarm_band_indexes
+
+    n_bands = prewarm_band_indexes(grid)
+
+    # Children inherit these through the fork; they are never pickled.
+    global _WORKER_GRID
+    _WORKER_GRID = grid
+
+    # A forked child inherits the parent's open sockets. Django's connections
+    # are not safe to share across a fork, and while the scorer does not use
+    # them, the child would still close them on exit and break the parent's.
+    from django.db import connections
+
+    connections.close_all()
+
+    logger.info(
+        "  scoring %d candidate(s) across %d worker(s), %d band index(es) shared",
+        len(tasks), workers, n_bands,
+    )
+    ctx = multiprocessing.get_context("fork")
+    out = []
+    try:
+        # maxtasksperchild recycles a worker after N candidates. The scorer
+        # allocates and frees large transient arrays per candidate
+        # (n_kde_sim x n_obs), and glibc does not reliably return freed memory
+        # to the OS, so a long-lived worker's private set creeps upward all
+        # run. Measured: four workers drifted ~2.5 GB over 149 candidates and
+        # tripped the memory guard on the next grid load. Re-forking is cheap
+        # and re-shares the parent's grid copy-on-write, so the creep resets.
+        with ctx.Pool(
+            processes=workers, maxtasksperchild=25, initializer=_pool_worker_init
+        ) as pool:
+            # chunksize=1 because per-candidate cost varies by an order of
+            # magnitude with observation count; batching would leave workers
+            # idle behind one slow candidate.
+            for i, res in enumerate(pool.imap(_score_one_pooled, tasks, chunksize=1), start=1):
+                if progress:
+                    logger.info("  [%d/%d] %s", i, len(tasks), res.target_name)
+                out.append(res)
+    finally:
+        _WORKER_GRID = None
+    return out
+
+
+def _resolve_workers(n_workers, n_tasks: int, keep_frames) -> int:
+    """How many processes to actually use, and why it might be one.
+
+    ``n_workers=None`` or ``'auto'`` leaves two cores for the rest of the
+    machine -- the Django server and Postgres are usually on it -- and caps at
+    4.
+
+    The cap is about **memory, not cores**. Forked workers share the grid and
+    its band index copy-on-write, so what each one adds is its private
+    per-candidate working set, and that is what runs out first: on the 8-core /
+    8.9 GB development machine, 4 workers over a 10-band grid left ~2.0 GB
+    free. Raise it on a bigger box; do not raise it on this one without
+    watching ``MemAvailable``, because per-process RSS *looks* like 2 GB per
+    worker and is mostly the shared grid counted repeatedly.
+    """
+    if keep_frames:
+        # Every result would carry three DataFrames back through a pipe.
+        return 1
+    if n_workers in (None, "auto"):
+        n_workers = max(1, min(4, (os.cpu_count() or 2) - 2))
+    try:
+        n_workers = int(n_workers)
+    except (TypeError, ValueError):
+        logger.warning("Ignoring unusable n_workers=%r; scoring serially", n_workers)
+        return 1
+    if not hasattr(os, "fork"):
+        # Spawn would re-import and re-load the grid per worker.
+        logger.info("No fork() on this platform; scoring serially")
+        return 1
+    return max(1, min(n_workers, n_tasks))
 
 
 def _chunk_by_bands(with_band, max_bands: int):
@@ -947,7 +1180,7 @@ def _chunk_by_bands(with_band, max_bands: int):
     The union of bands over a whole rung is what a single load would have to
     read, and it does not stay small: on ``S251112cm`` every rung's union is
     12-13 bands, which measured **12.9 GB of peak RSS** on a 15 GB machine --
-    pyarrow's transient peak during the read is well above the final frame, so
+    the store's transient peak during the read is above the final frame, so
     the union is not something to hand to the reader unbounded.
 
     Candidates are sorted by band set so ones needing the same bands land in the

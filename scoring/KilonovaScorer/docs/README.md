@@ -66,10 +66,11 @@ sim.simulate_kilonova(N_SIM=1000, MODEL_NAME="two_component_kilonova_model")
 ### The `kn-sim` environment
 
 redback pins numpy / pandas / astropy tightly enough to disturb the Django
-stack, so grid generation lives in its **own conda environment** and the worker
-shells out to it rather than importing anything. `async_generate_grid_rung`
-reads that interpreter's path from the `KN_SIM_PYTHON` setting — declare it in
-`settings_local.py`; leave it blank to disable on-demand rung generation.
+stack, so grid generation lives in its **own conda environment**. Nothing in the
+app imports it: run `generate_rung.py` by hand with that interpreter, whose path
+is conventionally recorded as `KN_SIM_PYTHON` in `settings_local.py`. Grid
+generation used to be an on-demand task (`async_generate_grid_rung`); it was
+removed with the rest of the distance ladder on 2026-08-12.
 
 ```bash
 conda create -n kn-sim python=3.11
@@ -118,11 +119,13 @@ already because seeding was not reaching bilby's own RNG):
 - records the grid's own luminosity distance from its `redshift` column in
   `grid.attrs["distance_mpc"]`.
 
-Because the grid is generated at one luminosity distance, use one grid per
-distance bin. `select_grid_for_distance(dist_mpc)` picks the nearest from
-`KILONOVA_GRID_DIR` (default `data/kilonova_grids/`, gitignored), reading the
-distance from either a `..._259Mpc.csv` filename or the file's own `redshift`
-column.
+Because the grid is generated at one luminosity distance, it is only strictly
+valid near that distance. There is currently **one** grid — the 259 Mpc, 30-day
+rung named in `DEFAULT_KILONOVA_PARAMS["grid_path"]` — and every candidate is
+scored against it whatever its own distance. Per-candidate selection from a
+ladder of rungs existed and was removed on 2026-08-12; IMPROVEMENTS.md section
+18 measures the error that leaves behind and sizes the ladder that would fix it.
+`resolve_grid(name)` turns the configured name into a `GridRef`.
 
 ## Scoring API
 

@@ -119,8 +119,7 @@ def vet_kn_in_sn(
 
     ## AGN scoring
     if len(agn_df) != 0:
-        # Changed from 0 to 0.1
-        agn_assoc_score = 0.1  # association with an AGN is bad
+        agn_assoc_score = 0  # association with an AGN is bad
     else:
         agn_assoc_score = 1
     agn_score = agn_assoc_score  # don't bother with 3D AGN scoring, for now

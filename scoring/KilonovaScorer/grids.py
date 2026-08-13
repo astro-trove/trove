@@ -17,14 +17,21 @@ modulus but *not* the k-correction (a fixed filter samples rest-frame
 lambda/(1+z)) or time dilation (an epoch t maps to t/(1+z)). Both are band- and
 epoch-dependent, so they change the shape of the magnitude distribution in each
 (band, time-bin) cell rather than shifting it -- and a shape change cannot be
-corrected after the fact. Grids therefore come in a distance ladder, and
-:func:`grid_for_distance` picks the closest rung to a candidate's distance. See
-``generate_ladder.py`` for the derivation of the rung spacing.
+corrected after the fact.
 
-    from KilonovaScorer.grids import load_grid, grid_for_distance, available_grids
+That argued for a distance ladder -- a rung every few hundred Mpc, the nearest
+one picked per candidate. It was built and then removed on 2026-08-12: there is
+one 259 Mpc grid, named in ``DEFAULT_KILONOVA_PARAMS["grid_path"]``, and every
+candidate is scored against it whatever its own distance. **This is a known
+defect, not a resolved question** -- IMPROVEMENTS.md section 18 has the measured
+size of the error and the rung spacing it would take to fix. Grids are still
+tagged with their distance in ``kn_grid_axis``, so selection can come back
+without regenerating anything.
 
-    available_grids()                       # what's on disk
-    grid = load_grid(grid_for_distance(310))  # nearest grid to 310 Mpc
+    from KilonovaScorer.grids import load_grid, resolve_grid, available_grids
+
+    available_grids()                              # what's in the store
+    grid = load_grid(resolve_grid("simulations_..._259Mpc_30d"))
 
 Two backends
 ------------
@@ -41,7 +48,7 @@ Postgres, both of which have a ``.name`` and hash. Parquet stays the default,
 so nothing changes until the environment says so:
 
     export TROVE_GRID_BACKEND=postgres
-    export TROVE_GRID_DSN='postgresql://bench@127.0.0.1:55432/gridbench'
+    export TROVE_GRID_DSN='postgresql://trove@127.0.0.1:5433/kn_grids'
 """
 
 from __future__ import annotations
@@ -61,10 +68,22 @@ from .core import FILTER_LOOKUP
 
 logger = logging.getLogger(__name__)
 
-#: ``'parquet'`` (default) or ``'postgres'``. The default matters: a grid store
-#: has to be populated by ``manage.py ingest_kn_grid`` before it holds anything,
-#: so flipping this on an unprepared deployment would break scoring outright.
-GRID_BACKEND = (os.environ.get("TROVE_GRID_BACKEND") or "parquet").strip().lower()
+#: Retained as a constant because callers still branch on it, but there is only
+#: one backend now: grids are written straight into Postgres by the simulator
+#: and read back by :mod:`.grid_db`. ``TROVE_GRID_BACKEND`` is honoured only to
+#: reject a stale ``=parquet`` loudly rather than silently ignoring it -- that
+#: setting used to select a real code path, and a deployment still exporting it
+#: is configured for a backend that no longer exists.
+GRID_BACKEND = "postgres"
+
+_requested_backend = (os.environ.get("TROVE_GRID_BACKEND") or "").strip().lower()
+if _requested_backend and _requested_backend != "postgres":
+    raise RuntimeError(
+        f"TROVE_GRID_BACKEND={_requested_backend!r} is no longer supported. The "
+        "Parquet backend has been removed; grids live in the Postgres store "
+        "addressed by TROVE_GRID_DSN. Unset TROVE_GRID_BACKEND or set it to "
+        "'postgres'."
+    )
 
 
 @dataclass(frozen=True)
@@ -80,6 +99,11 @@ class GridRef:
     name: str
     distance_mpc: float
     backend: str = "postgres"
+    #: Last epoch the grid covers, in days. NaN when unknown (the Parquet
+    #: backend does not read it). Selection uses it to reject a rung that does
+    #: not reach the epochs being scored -- a 10-day rung and a 30-day rung at
+    #: the same distance are *not* interchangeable.
+    t_max: float = float("nan")
 
     def __str__(self) -> str:
         return self.name
@@ -138,7 +162,8 @@ MODELLED_SIM_BANDS = tuple(sorted(FILTER_LOOKUP))
 #: the KDE the entire score is built on.
 MAX_ABS_MAG = 0.0
 
-#: ``..._259Mpc.parquet`` / ``grid_400mpc.parquet`` -- distance in the filename.
+#: Distance parsed out of a grid NAME (``..._259Mpc``) as a fallback; the
+#: authoritative value is ``kn_grid_axis.distance_mpc``.
 _DISTANCE_RE = re.compile(r"(\d+(?:\.\d+)?)\s*mpc", re.IGNORECASE)
 
 #: Rows of ``redshift`` sampled to identify a loaded grid's distance. A grid is
@@ -214,18 +239,12 @@ def _distance_from_redshift(z: float) -> float:
 def grid_distance_mpc(source) -> float:
     """Luminosity distance a grid was generated at, in Mpc.
 
-    Accepts a loaded DataFrame or a path. A grid is generated at a single
-    redshift, so one row answers the question and only one row group is ever
-    read -- ``pd.read_parquet(path, columns=["redshift"]).head(1)`` would
-    decompress the whole 380M-row column (~3 GB) to look at its first element,
-    which is enough to OOM the machine when it happens inside a loop.
-
-    Falls back to the filename when there is no ``redshift`` column, and returns
-    NaN if neither is available.
+    Accepts a :class:`GridRef` or a loaded DataFrame. The store keeps the
+    distance in ``kn_grid_axis`` alongside the time axis, so this is a column
+    read -- no redshift sampling, no filename parsing, and no risk of the
+    3 GB decompression the Parquet path had to work around.
     """
     if isinstance(source, GridRef):
-        # The database stores the distance alongside the axis, so there is
-        # nothing to parse or sample.
         return float(source.distance_mpc)
 
     if isinstance(source, pd.DataFrame):
@@ -237,100 +256,53 @@ def grid_distance_mpc(source) -> float:
                 return _distance_from_redshift(np.median(z))
         return float(source.attrs.get("distance_mpc", np.nan))
 
-    path = Path(source)
+    # A bare name: ask the store.
     try:
-        if _is_parquet(path):
-            import pyarrow.parquet as pq
-
-            pf = pq.ParquetFile(path)
-            if "redshift" not in pf.schema_arrow.names or pf.num_row_groups == 0:
-                raise KeyError("redshift")
-            head = pf.read_row_group(0, columns=["redshift"]).slice(0, 1).to_pandas()
-        else:
-            head = pd.read_csv(path, usecols=["redshift"], nrows=1)
-        if len(head):
-            return _distance_from_redshift(head["redshift"].iloc[0])
-    except Exception:  # noqa: BLE001 - fall through to the filename
-        pass
-
-    match = _DISTANCE_RE.search(path.stem)
-    return float(match.group(1)) if match else np.nan
-
-
-def _is_parquet(path: Path) -> bool:
-    return path.suffix.lower() in (".parquet", ".pq")
-
-
-def available_grids(directory=None) -> pd.DataFrame:
-    """Inventory of available grids: ``path``, ``distance_mpc``, ``size_mb``.
-
-    Sorted by distance so the ladder is obvious at a glance. Under the Postgres
-    backend ``path`` holds a :class:`GridRef` rather than a filesystem path, and
-    ``size_mb`` is the stored size of the magnitude column; callers that read
-    only ``distance_mpc`` are unaffected either way.
-
-    An explicit ``directory`` always means the filesystem -- it is how a caller
-    asks about Parquet files specifically.
-    """
-    if GRID_BACKEND == "postgres" and directory is None:
         from . import grid_db
 
-        return grid_db.available_grids_db()
-
-    directory = Path(directory) if directory else GRID_DIR
-    if not directory.exists():
-        return pd.DataFrame(columns=["path", "distance_mpc", "size_mb"])
-
-    rows = []
-    for path in sorted(list(directory.glob("*.parquet")) + list(directory.glob("*.csv"))):
-        rows.append(
-            {
-                "path": path,
-                "distance_mpc": grid_distance_mpc(path),
-                "size_mb": path.stat().st_size / 1e6,
-            }
-        )
-    out = pd.DataFrame(rows)
-    return out.sort_values("distance_mpc").reset_index(drop=True) if len(out) else out
+        return float(grid_db.grid_axis(str(source))[1])
+    except Exception:  # noqa: BLE001 - unknown grid, or no store configured
+        return float("nan")
 
 
-def grid_for_distance(dist_mpc: float, directory=None, max_frac_offset: Optional[float] = None) -> Path:
-    """Path of the grid closest in luminosity distance to ``dist_mpc``.
+#: Memoised inventory. Deliberately not dropped by :func:`clear_cache`, which
+#: runs between chunks to release grid frames -- this is a handful of rows, and
+#: the set of grids cannot change while a score is running.
+_INVENTORY: "Optional[pd.DataFrame]" = None
 
-    ``max_frac_offset`` optionally rejects a match that is too far away in
-    fractional terms -- e.g. ``0.5`` refuses to score a 1500 Mpc candidate
-    against a 400 Mpc grid, which is the case where you want to generate a new
-    grid rather than silently use a bad one.
+
+def available_grids(directory=None, refresh: bool = False) -> pd.DataFrame:
+    """Inventory of the grids in the store: ``path``, ``distance_mpc``, ``size_mb``.
+
+    Sorted by distance. ``path`` holds a :class:`GridRef` -- a name, not a
+    filesystem path -- and ``size_mb`` is the size of the magnitude column.
+
+    Cached for the life of the process. Grids are written by an ingest, never by
+    scoring, so the set cannot change under a running score, and re-reading it
+    was costing one round trip and one aggregate *per candidate* back when
+    selection called this before choosing a rung. Against the grid in
+    ``catalogs`` that was 3.15 s x 457 candidates -- roughly 24 minutes to
+    re-answer a question with one possible answer. Pass ``refresh=True`` after
+    an ingest.
+
+    ``directory`` is accepted and ignored. It selected a folder of Parquet
+    rungs, which no longer exist; kept in the signature so the handful of
+    callers that pass it keep working rather than raising a TypeError far from
+    the cause.
     """
-    grids = available_grids(directory)
-    grids = grids[grids["distance_mpc"].notna()] if len(grids) else grids
-    if grids.empty:
-        where = (
-            "the grid database (TROVE_GRID_DSN)"
-            if GRID_BACKEND == "postgres" and directory is None
-            else str(Path(directory) if directory else GRID_DIR)
-        )
-        raise FileNotFoundError(
-            f"No grids found in {where}. Generate one with "
-            "KilonovaScorer.simulation.simulate_kilonova(), and under the postgres "
-            "backend load it with `manage.py ingest_kn_grid <parquet>`."
-        )
-    if not np.isfinite(dist_mpc) or dist_mpc <= 0:
-        raise ValueError(f"Cannot select a grid for distance {dist_mpc}")
+    global _INVENTORY
 
-    best = grids.iloc[(grids["distance_mpc"] - dist_mpc).abs().argmin()]
-    offset = abs(best["distance_mpc"] - dist_mpc) / dist_mpc
-    if max_frac_offset is not None and offset > max_frac_offset:
-        raise ValueError(
-            f"Nearest grid is {best['distance_mpc']:.0f} Mpc for a candidate at "
-            f"{dist_mpc:.0f} Mpc ({offset:.0%} off, limit {max_frac_offset:.0%}). "
-            "Generate a grid at this distance."
+    if directory is not None:
+        logger.warning(
+            "available_grids(directory=%r) ignored: grids are in the Postgres "
+            "store, not on disk.", directory,
         )
-    logger.info(
-        "Candidate at %.0f Mpc -> %s (%.0f Mpc, %.0f%% off)",
-        dist_mpc, best["path"].name, best["distance_mpc"], offset * 100,
-    )
-    return best["path"]
+    if _INVENTORY is None or refresh:
+        from . import grid_db
+
+        _INVENTORY = grid_db.available_grids_db()
+    # a copy: callers index and sort this, and a mutation would poison the cache
+    return _INVENTORY.copy()
 
 
 def load_grid(
@@ -350,8 +322,8 @@ def load_grid(
     Parameters
     ----------
     path
-        Grid file. ``.parquet`` is the expected format; ``.csv`` still works for
-        grids produced before the switch.
+        Grid identifier: a :class:`GridRef`, or a name resolvable in the
+        store. Anything else raises -- there is no file to load.
     columns
         Columns to read. Defaults to the four the scorer needs -- pass ``None``
         for everything (model parameters included, for posterior plots).
@@ -379,7 +351,7 @@ def load_grid(
 
         Note the ceiling: :func:`.simulation.simulate_kilonova` defaults to
         ``TIME = np.linspace(0, 10, 1000)``, so a grid covers **0-10 days** at
-        0.01 d resolution -- verified against the 400 Mpc rung, whose parquet
+        0.01 d resolution -- verified against the 400 Mpc rung, whose stored
         row-group statistics give a time range of 0.0 to 10.0. ``max_time``
         above 10 is therefore a no-op, and *observations* past 10 days cannot be
         scored at all: they fall outside every time bin the grid provides and
@@ -424,201 +396,12 @@ def load_grid(
             _cache_put(key, df)
         return df
 
-    if not path.exists():
-        raise FileNotFoundError(
-            f"Simulation grid not found: {path}\n"
-            f"Available grids in {GRID_DIR}:\n{available_grids()}"
-        )
-
-    key = (
-        str(path.resolve()), path.stat().st_mtime,
-        tuple(columns or ()), tuple(bands or ()), min_time, max_time, max_abs_mag, mode,
+    raise TypeError(
+        f"load_grid received {path!r}. Grids live in the Postgres store and are "
+        "identified by name, not by path -- there is no file to load. List what "
+        "is available with `available_grids()`, or build a rung with "
+        "`KilonovaScorer/generate_rung.py --distance <Mpc>`."
     )
-    if use_cache:
-        cached = _cache_get(key)
-        if cached is not None:
-            return cached
-
-    cols = list(columns) if columns else None
-    cols_read = cols
-    if cols and "redshift" not in cols and not _is_parquet(path):
-        # A grid is generated at one redshift, so this column is tens of
-        # millions of copies of a single value -- 376 MB on a 47M-row selection,
-        # read and then immediately dropped. For Parquet the distance comes from
-        # the file instead (one row group), so it is never read. CSV has no
-        # cheap way to sample one value, so there it still rides along.
-        cols_read = cols + ["redshift"]
-
-    if _is_parquet(path):
-        import pyarrow.parquet as pq
-
-        pf = pq.ParquetFile(path)
-        # A full ladder rung is 380M rows, ~15 GB once materialised as a
-        # DataFrame -- more than the machine has, and an OOM kill takes the
-        # whole WSL VM (and the editor attached to it) with it. Nothing in the
-        # scorer needs every band at once: pass the bands the candidate was
-        # observed in. Raise rather than warn, because by the time a warning is
-        # visible the allocation is already under way.
-        if max_rows and not bands and pf.metadata.num_rows > max_rows:
-            raise MemoryError(
-                f"{path.name} has {pf.metadata.num_rows:,} rows; loading every band at "
-                f"once needs roughly {pf.metadata.num_rows * 40 / 1e9:.0f} GB of RAM.\n"
-                f"Pass bands=[...] to read only what you need (one band is "
-                f"~{pf.metadata.num_rows // max(1, len(MODELLED_SIM_BANDS)):,} rows), or "
-                f"raise max_rows if you really do have the memory."
-            )
-        available = set(pf.schema_arrow.names)
-        if cols_read:
-            cols_read = [c for c in cols_read if c in available]
-        # Both predicates are pushed down so the rows are dropped by the parquet
-        # reader rather than after a full materialisation -- the point of the
-        # exercise is never holding the unwanted rows in memory at all.
-        filters = []
-        if bands and "band" in available:
-            filters.append(("band", "in", list(bands)))
-        if max_time is not None and "time" in available:
-            filters.append(("time", "<=", float(max_time)))
-        # Stream the read in batches rather than materialising one table.
-        #
-        # `pq.read_table(...).to_pandas(self_destruct=True)` builds the entire
-        # filtered result as Arrow first -- at float64, and with `band` as
-        # strings -- and only then hands it to pandas for the float32/categorical
-        # narrowing below. The peak is therefore the *wide* representation of the
-        # whole selection, several times the frame that comes back: measured on
-        # this 380M-row rung, a 5-band selection (47M rows, an 865 MB frame)
-        # peaked over 4.5 GB and tripped the OOM guard, even though it fits in
-        # memory comfortably once narrowed.
-        #
-        # Scanning batch by batch and narrowing each one before it is retained
-        # bounds the peak to (final frame + one batch + the concat copy). Same
-        # rows, same dtypes, same order -- the scanner reads row groups in file
-        # order and the filters are the identical pushdown expression.
-        #
-        # This is what makes a load that cannot be split by band survivable: a
-        # single candidate observed in more bands than `max_bands_per_load`
-        # forces all of them into one load, so the reader has to be the thing
-        # that stays bounded.
-        import pyarrow.dataset as pds
-
-        try:
-            expr = pq.filters_to_expression(filters) if filters else None
-        except AttributeError:  # pyarrow < 13
-            expr = pq._filters_to_expression(filters) if filters else None
-
-        # Fixing the category list up front keeps `band` categorical in every
-        # batch, so concat can stay categorical. As plain strings this column is
-        # ~2 GB on a 47M-row selection -- more than everything else combined.
-        cats = sorted(bands) if bands else None
-
-        # Readahead has to be pinned down or streaming loses to read_table. The
-        # scanner defaults to 16 batches x 4 fragments in flight, and since every
-        # row group here contains every band, the band filter prunes nothing --
-        # each prefetched batch is a fully decompressed row group. Measured on a
-        # 1-band selection (a 131 MB frame): 3.29 GB peak at the defaults against
-        # 14.7 s / 1.26 GB for the old read_table path. One batch at a time, one
-        # fragment at a time, is what actually bounds the read.
-        scanner = pds.dataset(path, format="parquet").scanner(
-            columns=cols_read,
-            filter=expr,
-            batch_size=250_000,
-            batch_readahead=1,
-            fragment_readahead=1,
-            use_threads=False,
-        )
-        parts = []
-        for batch in scanner.to_batches():
-            if batch.num_rows == 0:
-                continue
-            part = batch.to_pandas(self_destruct=True, split_blocks=True)
-            del batch
-            for col in ("time", "absolute_magnitude"):
-                if col in part.columns:
-                    part[col] = part[col].astype("float32")
-            if "sample_id" in part.columns:
-                part["sample_id"] = part["sample_id"].astype("int32")
-            if cats is not None and "band" in part.columns:
-                part["band"] = pd.Categorical(part["band"], categories=cats)
-            parts.append(part)
-
-        if not parts:
-            raise ValueError(
-                f"Grid {path.name} returned no rows for bands={list(bands or [])}, "
-                f"max_time={max_time}"
-            )
-        df = pd.concat(parts, ignore_index=True, copy=False) if len(parts) > 1 else parts[0]
-        del parts  # drop the per-batch references so concat's inputs can be freed
-    else:
-        available = set(pd.read_csv(path, nrows=0).columns)
-        if cols_read:
-            cols_read = [c for c in cols_read if c in available]
-        df = pd.read_csv(path, usecols=cols_read)
-        if bands and "band" in df.columns:
-            df = df[df["band"].isin(bands)]
-        if max_time is not None and "time" in df.columns:
-            df = df[df["time"] <= max_time]
-
-    n_read = len(df)
-    missing = {"sample_id", "time", "absolute_magnitude"} - set(df.columns)
-    if missing:
-        raise ValueError(f"Grid {path.name} is missing required column(s): {sorted(missing)}")
-
-    distance = grid_distance_mpc(df if "redshift" in df.columns else path)
-    df = df.drop(columns=[c for c in ("redshift",) if cols and c not in cols and c in df.columns])
-
-    # Narrow the two big float columns; float32 is ~7 significant digits, far
-    # beyond the precision of a simulated magnitude, and halves memory.
-    for col in ("time", "absolute_magnitude"):
-        if col in df.columns:
-            df[col] = df[col].astype("float32")
-    if "band" in df.columns:
-        df["band"] = df["band"].astype("category")
-
-    if add_filter_mapped and "band" in df.columns:
-        if mode == "survey":
-            # The grid's own bandpass ids ARE the matching key: an observation
-            # through atlaso is scored against simulations through atlaso.
-            df["filter_mapped"] = df["band"]
-        else:
-            # Legacy: collapse onto canonical g/r/i/z. Map on the (few) distinct
-            # band names, not row-by-row, and keep the result categorical -- as
-            # plain strings this column alone is ~2 GB on a 37M-row grid.
-            cats = df["band"].cat.categories if hasattr(df["band"], "cat") else pd.unique(df["band"])
-            mapping = {c: FILTER_LOOKUP.get(str(c).lower().strip()) for c in cats}
-            df["filter_mapped"] = df["band"].map(mapping).astype("category")
-            unmapped = df["filter_mapped"].isna()
-            if unmapped.any():
-                logger.info("Grid %s: dropping %d row(s) in unmapped bands", path.name, int(unmapped.sum()))
-                df = df[~unmapped]
-                df["filter_mapped"] = df["filter_mapped"].cat.remove_unused_categories()
-
-    bad_time = df["time"] <= min_time
-    bad_mag = ~np.isfinite(df["absolute_magnitude"]) | (df["absolute_magnitude"] > max_abs_mag)
-    if bad_time.any() or bad_mag.any():
-        logger.info(
-            "Grid %s: dropping %d row(s) at t<=%g and %d artifact row(s) with M>%g",
-            path.name, int(bad_time.sum()), min_time, int((bad_mag & ~bad_time).sum()), max_abs_mag,
-        )
-        df = df[~(bad_time | bad_mag)]
-
-    if df.empty:
-        raise ValueError(f"Grid {path.name} has no usable rows after filtering")
-
-    df = df.reset_index(drop=True)
-    df.attrs["name"] = path.name
-    df.attrs["distance_mpc"] = distance
-
-    if use_cache:
-        _cache_put(key, df)
-    logger.info(
-        "Loaded %s: %d/%d rows, %d simulations, t=[%.3f, %.2f] d, "
-        "M=[%.2f, %.2f], D_L=%s Mpc, %.0f MB in memory",
-        path.name, len(df), n_read, df["sample_id"].nunique(),
-        df["time"].min(), df["time"].max(),
-        df["absolute_magnitude"].min(), df["absolute_magnitude"].max(),
-        f"{distance:.0f}" if np.isfinite(distance) else "unknown",
-        df.memory_usage(deep=True).sum() / 1e6,
-    )
-    return df
 
 
 def clear_cache() -> None:

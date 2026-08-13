@@ -307,32 +307,65 @@ def skymap_association(
     return 1 - cumprob[0][0]
 
 
-def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name: str):
+def get_eventcandidate_default_distance(
+    target_id: int,
+    nonlocalized_event_name: str,
+    *,
+    target=None,
+    host_json=None,
+    localization=None,
+):
+    """Luminosity distance and its error for one candidate, in Mpc.
 
+    The three keyword arguments exist only so that a caller resolving *many*
+    candidates can hand in data it already fetched in bulk. Omit them and this
+    queries for each itself, exactly as before -- the behaviour is identical
+    either way, they only remove round trips.
+
+    That matters because resolving an event candidate-by-candidate costs ~16
+    round trips each, measured at 117 s for 40 candidates over the SSH tunnel
+    to the database host. See
+    :func:`scoring.candidate_photometry.get_candidate_distances`.
+
+    ``host_json`` is the raw "Host Galaxies" JSON string. "No host row" and
+    "not prefetched" have to stay distinguishable, so a caller supplying it
+    must pass ``""`` for a candidate known to have no hosts, never ``None``.
+    """
     # first check if this target has a redshift associated with it
-    targ = Target.objects.get(id=target_id)
+    targ = target if target is not None else Target.objects.get(id=target_id)
     if targ.redshift is not None and not np.isnan(targ.redshift):
         targ_dist = cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
         targ_dist_err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
         return targ_dist, targ_dist_err
 
     # then try to get out the host galaxy json file from target extra
-    hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
-    if not hosts.count():
-        return _distance_at_healpix(nonlocalized_event_name, target_id)
+    if host_json is None:
+        hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
+        if not hosts.count():
+            return _distance_at_healpix(
+                nonlocalized_event_name, target_id, localization=localization
+            )
+        host_json = hosts[0].value
+    elif not host_json:
+        return _distance_at_healpix(
+            nonlocalized_event_name, target_id, localization=localization
+        )
     host_df = pd.read_json(
-        io.StringIO(hosts[0].value)
+        io.StringIO(host_json)
     )  # since we store the host info as a json str in the db
 
     # clean up dataframe
     if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
+        host_df = host_df[host_df.z > 0]
         host_df = host_df[host_df.z != -99.0] # LS DR9 North
         host_df = host_df[host_df.z != -999.0] # PS1-STRM
         host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
         host_df = host_df[~np.isnan(host_df.z)]
 
     if not len(host_df):
-        return _distance_at_healpix(nonlocalized_event_name, target_id)
+        return _distance_at_healpix(
+            nonlocalized_event_name, target_id, localization=localization
+        )
 
     # if we've gotten to this point then the target has host galaxies associated with it!
     # first thing we need to do is assign a rank ordering to the various catalogs,
@@ -364,10 +397,18 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     return to_ret.Dist, to_ret.DistErr
 
 
-def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()):
-    """Computes the GW distance at the target_id healpix location"""
+def _distance_at_healpix(
+    nonlocalized_event_name, target_id, max_time=Time.now(), localization=None
+):
+    """Computes the GW distance at the target_id healpix location
 
-    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
+    ``localization`` short-circuits the lookup. It is the same object for every
+    candidate of an event, but resolving it queries NonLocalizedEvent, queries
+    every EventLocalization and sorts them -- so left to itself this repeats
+    identical work once per candidate.
+    """
+    if localization is None:
+        localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
     # find the distance at the healpix
     query = sa.select(SaSkymapTile.distance_mean, SaSkymapTile.distance_std).filter(
         SaTarget.basetarget_ptr_id == target_id,

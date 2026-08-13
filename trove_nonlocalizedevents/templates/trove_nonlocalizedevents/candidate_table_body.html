@@ -28,7 +28,7 @@
       </thead>
       <tbody>
 	{% for candidate in page_obj.object_list %}
-        <tr>
+        <tr {% if candidate.kilonova_skip_reason %}class="table-warning" title="Not scored by KilonovaSCORER: {{ candidate.kilonova_skip_reason }}. Showing the TROVE photometry score instead."{% endif %}>
 	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
 	  <td>
             {% if candidate.target is not None %}
@@ -42,6 +42,9 @@
 	    {% for transient, score in candidate.score.items %}
             {{ transient }} {{score|floatformat:2}}<br>
             {% endfor %}
+            {% if candidate.kilonova_skip_reason %}
+            <small class="text-muted">not scored by KilonovaSCORER &mdash; {{ candidate.kilonova_skip_reason }}</small>
+            {% endif %}
           </td>
         </tr>
         {% empty %}
@@ -57,6 +60,15 @@
         {% endfor %}
       </tbody>
     </table>
+    {% if phot_method == 'kilonova' %}
+    <p class="text-muted small">
+      <span class="table-warning" style="padding:0 .6em; border:1px solid rgba(0,0,0,.1)">&nbsp;</span>
+      Shaded rows were <strong>not scored by KilonovaSCORER</strong> &mdash; too few
+      observations, no usable distance, or no band the grid simulates. Their score is
+      the TROVE photometry check instead, which does not penalise missing photometry,
+      so a shaded row can rank above candidates that were scored.
+    </p>
+    {% endif %}
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
 
   {# What produced the scores in the table above. Rendered after the list so it #}

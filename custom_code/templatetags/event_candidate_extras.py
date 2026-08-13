@@ -55,9 +55,7 @@ def display_score_details(target_id):
         skymap_score=("2D Localization Score", _float_format),
         host_distance_score=("3D Association Score", _float_format),
         host_name=("Host Galaxy Name", _str_int_format),
-        # not _bool_format: that is int(), which renders the 0.1 AGN penalty
-        # as a flat 0 and makes the label a lie
-        agn_score=("AGN Score (1 or 0.1)", _float_format),
+        agn_score=("AGN Score (1 or 0)", _bool_format),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",
@@ -92,8 +90,11 @@ def display_score_details(target_id):
             key__in=TARGETEXTRA_KEYS
             + ["mpc_score", "predetection_score"]  # exclude keys in TargetExtra + exclude mpc_score, predetection_score
         ).all()
-        # reorder them for user-friendly printing later
-        sf_set = sorted(sf_set, key=lambda sf: order.index(sf.key))
+
+        sf_set = sorted(
+            sf_set,
+            key=lambda sf: (order.index(sf.key) if sf.key in keymap else len(order), sf.key),
+        )
         score_details.append(sf_set)
 
     # for printing
@@ -103,15 +104,7 @@ def display_score_details(target_id):
         for te in queryset:
             if basic_score_key not in res:
                 res[basic_score_key] = ""
-            if te.key in keymap:
-                label, fmter = keymap[te.key]
-            else:
-                label = te.key
-                fmter = _float_format
-            if te.value is None or isinstance(te.value, str):
-                s = te.value
-            else:
-                s = fmter(float(te.value))
+            label, s = _render_factor(te.key, te.value, keymap)
             res[basic_score_key] += f"&emsp;{label}: {s}\n"
 
     for queryset in score_details:
@@ -119,21 +112,8 @@ def display_score_details(target_id):
             nle = score_factor.event_candidate.nonlocalizedevent
             if nle not in res:
                 res[nle] = ""
-            if score_factor.key in keymap:
-                label, fmter = keymap[score_factor.key]
-            else:
-                label = score_factor.key
-                fmter = _float_format
-            if score_factor.value in (None, np.nan, "nan"):
-                res[nle] += f"&emsp;{label}: {score_factor.value}\n"
-            else:
-                # string-valued factors (a host name, a KilonovaSCORER skip
-                # reason) must not be run through float() first
-                res[nle] += (
-                    f"&emsp;{label}: {fmter(score_factor.value)}\n"
-                    if fmter in (_str_format, _str_int_format)
-                    else f"&emsp;{label}: {fmter(float(score_factor.value))}\n"
-                )
+            label, s = _render_factor(score_factor.key, score_factor.value, keymap)
+            res[nle] += f"&emsp;{label}: {s}\n"
 
     out = ""
     for key, s in res.items():
@@ -142,6 +122,28 @@ def display_score_details(target_id):
         out += "\n\n"
 
     return mark_safe(linebreaks(out))
+
+
+_EMPTY_VALUES = (None, np.nan, "", "nan", "None")
+
+def _render_factor(key, value, keymap):
+    label, fmter = keymap.get(key, (key, None))
+
+    if value in _EMPTY_VALUES:
+        return label, value
+
+    if fmter is None:
+        try:
+            return label, _float_format(float(value))
+        except (TypeError, ValueError):
+            return label, str(value)
+
+    try:
+        if fmter in (_str_format, _str_int_format):
+            return label, fmter(value)
+        return label, fmter(float(value))
+    except (TypeError, ValueError):
+        return label, str(value)
 
 
 def _float_format(flt, unit=""):

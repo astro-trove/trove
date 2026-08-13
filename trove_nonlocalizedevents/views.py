@@ -128,9 +128,7 @@ class EventCandidateListView(FilterView):
         return context
 
     def get(self, request, *args, **kwargs):
-        print(f"DEBUG: request.GET={request.GET}")
         candidate_id = request.GET.get("target_name")
-        print(f"DEBUG: candidate_id={candidate_id}")
         if candidate_id:
             try:
                 candidate = EventCandidate.objects.select_related(

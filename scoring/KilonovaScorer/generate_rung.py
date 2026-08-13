@@ -1,16 +1,15 @@
 """
-Generate ONE simulation-grid rung at an arbitrary luminosity distance.
+Generate ONE simulation-grid rung at a given luminosity distance.
 
-``generate_ladder.py`` builds the fixed 150 / 400 / 800 Mpc ladder. This builds
-a single rung wherever you ask for one, for the case the ladder does not cover:
-a candidate far enough from every existing rung that scoring it against the
-nearest one is not defensible (see the k-correction / time-dilation argument in
-``generate_ladder.py`` -- both change the *shape* of the magnitude distribution
-per band and epoch, which no after-the-fact correction can undo).
-
-Everything except the distance is imported from ``generate_ladder``, so a rung
-made here is constructed identically to the ladder's own and the two are
-directly comparable. Do not duplicate N_SIM / MODEL / BANDS here.
+This is the only grid generator. It used to be the exception to
+``generate_ladder.py``, which built a fixed 150 / 400 / 800 Mpc ladder that the
+scorer then selected from per candidate; the ladder was removed on 2026-08-12
+and there is now a single 259 Mpc grid, pinned by name in
+``DEFAULT_KILONOVA_PARAMS``. The sizing argument for why a grid is
+distance-specific at all -- k-correction and time dilation change the *shape* of
+the magnitude distribution per band and epoch, so no after-the-fact correction
+undoes a distance mismatch -- is preserved in IMPROVEMENTS.md section 18, along
+with the measurement of how many rungs it would take.
 
 Run with the grid-generation environment (`KN_SIM_PYTHON` in
 settings_local.py; see KilonovaScorer/README.md) (redback + bilby + lalsuite), which is kept
@@ -19,12 +18,8 @@ separate from `t-env` so redback's pins cannot disturb the TROVE Django stack::
     "$KN_SIM_PYTHON" \
         scoring/KilonovaScorer/generate_rung.py --distance 1200
 
-This is why :func:`scoring.tasks.async_generate_grid_rung` shells out to a
-separate interpreter instead of importing anything here: the Django worker runs
-in `t-env`, where ``import redback`` does not resolve.
-
-Costs, measured from ``grids/ladder.log``: ~30 min and ~4 GB of disk per rung,
-380M rows at N_SIM=10000 across 38 bands.
+Costs, measured from ``grids/ladder.log``: ~55 min and ~1.5 GB in the store per
+rung, 380,000 lightcurves at N_SIM=10000 across 38 bands.
 
 Exits 0 on success (including "already exists"), non-zero on failure. The last
 line of stdout on success is ``RUNG_OK <path>`` so a caller can parse it.
@@ -39,59 +34,95 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from scoring.KilonovaScorer.generate_ladder import BANDS, MODEL, N_SIM  # noqa: E402
-from scoring.KilonovaScorer.grids import GRID_DIR  # noqa: E402
+#: Samples per rung. The CDF convergence test showed 5000 already puts grid
+#: sampling error (dP_tail ~ 0.03) well below the scorer's own RNG scatter
+#: (~0.12), so this can be halved if storage becomes a concern. Referenced by
+#: phot_method's k_ABC note, which is calibrated against this value.
+N_SIM = 10000
+
+MODEL = "two_component_kilonova_model"
+
+#: Every bandpass TROVE has photometry in, plus IR headroom. Names are sncosmo
+#: bandpass ids (redback resolves them through sncosmo).
+#:
+#: Simulated in the REAL survey bandpasses TROVE observes in, not a canonical
+#: g/r/i/z that everything gets approximated onto. 87% of TROVE's candidate
+#: photometry is ATLAS cyan/orange, whose wide filters straddle SDSS bands --
+#: mapping them onto g/r was a real systematic. Simulating ``atlasc``/``atlaso``
+#: directly removes it, and likewise for GOTO L, Pan-STARRS w and Gaia G.
+#:
+#: The infrared bands are deliberate: the lanthanide-rich ejecta component
+#: dominates from ~2 days onward, which is where a kilonova separates from a
+#: supernova. AT2017gfo -- the event this method is calibrated against -- was
+#: tracked in JHK for exactly that reason. A kilonova grid without IR discards
+#: the most discriminating part of the spectrum.
+BANDS = (
+    # ATLAS -- 87% of TROVE's candidate photometry
+    "atlasc", "atlaso",
+    # ZTF
+    "ztfg", "ztfr", "ztfi",
+    # SDSS-like (generic g/r/i/z from assorted telescopes)
+    "sdssu", "sdssg", "sdssr", "sdssi", "sdssz",
+    # Rubin / LSST
+    "lsstu", "lsstg", "lsstr", "lssti", "lsstz", "lssty",
+    # Pan-STARRS, including the wide w filter
+    "ps1::g", "ps1::r", "ps1::i", "ps1::z", "ps1::y", "ps1::w",
+    # Gaia
+    "gaia::g",
+    # GOTO, including the wide L filter
+    "gotob", "gotog", "gotol", "gotor",
+    # Johnson / Cousins
+    "bessellux", "bessellb", "bessellv", "bessellr", "besselli",
+    # Near-infrared -- where a kilonova separates from a supernova
+    "2massj", "2massh", "2massks",
+    "f110w", "f125w", "f160w",
+)
 
 
-def rung_path(distance_mpc: float, outdir=None) -> Path:
-    """Where a rung at this distance lives.
+def rung_name(distance_mpc: float) -> str:
+    """Key a rung at this distance is stored under.
 
-    Same ``simulations_{model}_{distance:.0f}Mpc.parquet`` naming the ladder
-    uses, which is what lets :func:`KilonovaScorer.grids.grid_for_distance`
-    read the distance back off the filename.
+    The distance is also a column in ``kn_grid_axis``, which is where anything
+    needing it should read it -- this name is for humans.
     """
-    outdir = Path(outdir) if outdir else Path(GRID_DIR)
-    return outdir / f"simulations_{MODEL}_{float(distance_mpc):.0f}Mpc.parquet"
+    return f"simulations_{MODEL}_{float(distance_mpc):.0f}Mpc"
 
 
-def generate_rung(distance_mpc: float, outdir=None, overwrite: bool = False) -> Path:
-    """Simulate one rung and return its path, skipping an existing one."""
-    outdir = Path(outdir) if outdir else Path(GRID_DIR)
-    outdir.mkdir(parents=True, exist_ok=True)
-    target = rung_path(distance_mpc, outdir)
+def generate_rung(distance_mpc: float, overwrite: bool = False, dsn=None) -> str:
+    """Simulate one rung into the grid store and return its name."""
+    grid = rung_name(distance_mpc)
 
-    if target.exists() and not overwrite:
-        print(f"{distance_mpc:.0f} Mpc: exists, skipping", flush=True)
-        return target
+    from scoring.KilonovaScorer import grid_db
+
+    if grid_db.grid_exists(grid, dsn=dsn) and not overwrite:
+        print(f"{distance_mpc:.0f} Mpc: '{grid}' already in the store, skipping",
+              flush=True)
+        return grid
 
     import scoring.KilonovaScorer.simulation as sim  # heavy: redback/bilby/lalsuite
 
-    print(
-        f"rung: {distance_mpc:.0f} Mpc, N={N_SIM}, {len(BANDS)} bands -> {outdir}",
-        flush=True,
-    )
+    print(f"rung: {distance_mpc:.0f} Mpc, N={N_SIM}, {len(BANDS)} bands -> {grid}",
+          flush=True)
     t0 = time.time()
-    # simulate_kilonova streams to disk and returns df=None when saving
-    _, path = sim.simulate_kilonova(
+    summary, name = sim.simulate_kilonova(
         N_SIM=N_SIM,
         DL_Mpc=float(distance_mpc),
         MODEL_NAME=MODEL,
         FILTER_BANDS=BANDS,
-        outdir=str(outdir),
+        grid_name=grid,
+        replace=True,
+        dsn=dsn,
     )
-    path = Path(path)
-    print(
-        f"OK {distance_mpc:.0f} Mpc: {path.stat().st_size / 1e6:.0f} MB, "
-        f"{time.time() - t0:.0f}s",
-        flush=True,
-    )
-    return path
+    print(f"OK {distance_mpc:.0f} Mpc: {summary['n_samples']:,} samples x "
+          f"{len(summary['bands'])} bands, {time.time() - t0:.0f}s", flush=True)
+    return name
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--distance", type=float, required=True, help="luminosity distance, Mpc")
-    parser.add_argument("--outdir", default=None, help="defaults to GRID_DIR")
+    parser.add_argument("--dsn", default=None,
+                        help="grid database (default: $TROVE_GRID_DSN)")
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
 
@@ -100,7 +131,7 @@ def main(argv=None) -> int:
         return 2
 
     try:
-        path = generate_rung(args.distance, outdir=args.outdir, overwrite=args.overwrite)
+        path = generate_rung(args.distance, overwrite=args.overwrite, dsn=args.dsn)
     except Exception as exc:  # noqa: BLE001 - the caller only sees the exit code and stderr
         print(f"FAILED {args.distance:.0f} Mpc: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1

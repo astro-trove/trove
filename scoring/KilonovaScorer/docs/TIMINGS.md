@@ -352,6 +352,290 @@ adds ~1.7 GB on top of the load peak, and 3.84 + 1.7 GB exceeds what was free.
 machine. Candidates within a load are independent, so a process pool over the
 candidate loop is the next real win — bigger than anything left in storage.
 
+### The process pool
+
+`_score_chunk` in `kilonova_scoring.py` spreads each load's candidates over
+forked workers. `fork`, not `spawn`: the grid is 1-2 GB and its band index
+another ~1 GB, so children inherit it copy-on-write through a module global
+(`_WORKER_GRID`) rather than receiving a pickled copy each. `prewarm_band_indexes`
+builds every band's sorted view *before* the fork for the same reason — built
+lazily afterwards, each child holds its own private copy.
+
+Watch out for a measurement trap here. Per-process RSS shows ~2.1 GB **per
+worker** and sums to more than the machine has; that is shared pages counted
+repeatedly. `MemAvailable` is the only number that means anything, and any
+memory guard has to read it rather than per-process RSS.
+
+**Results are identical to serial** — 14 of 14 candidates, exact. Every
+candidate is seeded by `random_state` independently of what was scored before
+it, and `imap` yields in submission order, so the results table is unchanged.
+
+Full event, corrected grid, Postgres backend, 4 workers, `max_bands_per_load=6`:
+
+| | |
+|---|---|
+| Wall clock | **1,216 s (20 min 16 s)** |
+| Scored | 425 / 457 |
+| Grid loads | 11 |
+| Memory floor | 1.94 GB available |
+| Errors | 0 |
+
+Phase split, and the reason this is **not** a clean speedup number:
+
+| phase | time |
+|---|---|
+| serial distance pass (445 lookups over the SSH tunnel) | ~570 s |
+| pooled scoring, 445 candidates | ~350 s |
+| grid loads + persistence | ~300 s |
+
+Scoring ran at ~0.8 s/candidate against ~2.2 s serial, i.e. **~2.5-3x on the
+work the pool actually covers**. But the run came in *slower* than the 983 s
+serial baseline, because the distance pass took ~9.5 min against a much faster
+tunnel earlier in the day. The tunnel was restarted mid-session; end-to-end
+totals from before and after it are not comparable. Do not quote a
+pool-vs-serial ratio from these two runs.
+
+### Two memory bugs the pool exposed
+
+Both pre-dated the pool and both bit harder with it.
+
+* **The band index cache outlived its grid.** `_BAND_INDEX_CACHE` only evicted
+  when `_band_time_index` was next called with a *different* grid, so for the
+  whole of the next `load_grid` the process held the new grid **and** the
+  previous one's ~1 GB of sorted copies. Fixed with `clear_band_indexes()`,
+  called next to `clear_cache()` when a grid is dropped.
+* **Worker private memory crept ~2.5 GB over 149 candidates.** The scorer
+  allocates and frees large transient arrays per candidate and glibc does not
+  return them to the OS. Fixed with `maxtasksperchild=25`; re-forking is cheap
+  and re-shares the parent's grid, so the creep resets.
+
+### The band/worker trade-off inverted
+
+Under Parquet, memory was spent on few large loads because a load cost ~60 s
+regardless. Under Postgres a 6-band load costs 4.8 s, so loads are cheap and
+memory is the scarce resource — spend it on **workers**, not bands.
+`max_bands_per_load=6` with 4 workers holds a 1.94 GB floor; `10` with 4
+workers tripped the guard twice.
+
+### The tunnel, not the CPU
+
+The round trip to the database host through the SSH tunnel measures **78.7 ms**
+(50 × `SELECT 1`). Against the 1,216 s run that reframes everything:
+
+| phase | time | what it was |
+|---|---|---|
+| distance pass | ~570 s | 445 lookups x ~16 round trips |
+| persistence | ~300 s | 457 candidates x ~8 statements |
+| pooled scoring | ~350 s | actual computation |
+
+**~71% of the run was waiting on the network**, and the part that had just been
+parallelised was the smallest of the three. Both latency phases have since been
+fixed.
+
+### Persistence: ~300 s -> 0.44 s
+
+`ScoreFactor.objects.update_or_create` per candidate is a SELECT plus an
+INSERT/UPDATE inside savepoints, and the loop also issued a `.delete()` --
+about 3,800 statements for 457 candidates. Replaced with two bulk deletes and
+two `bulk_create(update_conflicts=True)` upserts against the
+`(event_candidate, key)` unique constraint.
+
+Measured on the real 457 rows: **0.44 s, values byte-identical, no duplicate
+rows**, and the same invariant holds (a candidate carries a score or a skip
+reason, never both).
+
+### Distance pass: ~570 s -> 19.4 s
+
+`get_candidate_distances` (in `candidate_photometry.py`) resolves a whole
+event at once. The win is not a cleverer algorithm, it is not repeating work:
+
+* every `Target` in one query instead of one each,
+* every "Host Galaxies" `TargetExtra` in one query,
+* **the event's localization once**, where `_distance_at_healpix` previously
+  re-queried `NonLocalizedEvent`, re-queried *every* `EventLocalization` of the
+  event and re-sorted them, once per candidate.
+
+Crucially this is a **refactor, not a reimplementation**:
+`get_eventcandidate_default_distance` gained optional `target` / `host_json` /
+`localization` keywords, so there is still exactly one copy of the fallback
+logic. Omit them and it queries as before.
+
+Validated on all 457 candidates of `S251112cm`: **457/457 identical**,
+including NaN-for-NaN. 19.4 s batched against 109.0 s looped in the same
+process -- and 109 s is itself a warm-cache figure, since the batched pass ran
+first; the same work took ~570 s cold in the full run.
+
+> `host_json=None` means "not prefetched" and `""` means "this candidate has no
+> host row". Collapsing the two would send prefetched-but-empty candidates back
+> to the database and quietly undo the saving.
+
+### Diagnostic: n_kde_sim 10,000 vs 5,000 -- not recommended
+
+Fixed 40-candidate subset, 4 workers, everything else equal:
+
+| | 10,000 | 5,000 |
+|---|---|---|
+| scoring | 90.6 s | 73.4 s (-19%) |
+| wall | 259.8 s | 234.6 s (-9.7%) |
+
+**-19%, not the ~50% predicted.** That prediction came from the old profile
+where `kde.resample` dominated; the searchsorted rewrite already removed most
+of it, so halving the draws now buys proportionally less.
+
+The cost is real: of 37 scored, 33 were unchanged (almost all ABC-penalised
+zeros), and **every candidate with a non-trivial score moved by 15-37% in
+relative terms** -- `AT2025adhh` 0.3200 -> 0.2716, which is ~3.7x the ±0.013
+run-to-run MC spread at 10,000. Top-10 set and order survived on this subset.
+
+6.6% of wall clock for that much movement on exactly the candidates a vetter
+reads is a bad trade. Keep 10,000.
+
+### Diagnostic: BLAS thread pinning -- no effect
+
+`OMP_NUM_THREADS=1` / `OPENBLAS_NUM_THREADS=1` / `MKL_NUM_THREADS=1`, on the
+theory that 4 workers x 8 BLAS threads were oversubscribing 8 cores.
+
+Microbenchmark of the hot call, `gaussian_kde.resample(10000)`, minimum of 40
+reps, two independent trials:
+
+```
+default   min 1.73 ms / 1.70 ms
+pinned    min 1.71 ms / 1.70 ms
+```
+
+**No difference.** The premise was wrong: a 1-D `gaussian_kde` does no
+meaningful BLAS work -- a 1x1 Cholesky and RNG -- so there was never any thread
+contention to remove. Scores are identical either way (40/40), so it is safe,
+just pointless.
+
+### Measured: the optimised full run
+
+`S251112cm`, all of the above, 6 workers, `max_bands_per_load=6`, corrected
+10-day grid pinned via `grid_path`, warmed tunnel:
+
+| phase | first run of the day | optimised |
+|---|---|---|
+| distance pass | ~570 s | **10.1 s** |
+| grid loads (11) | ~660 s | **45.4 s** |
+| scoring, 445 candidates | ~1,100 s | **206.2 s** |
+| persistence | ~300 s | **1.2 s** |
+| **total** | **1,746 s** | **272.9 s** |
+
+**6.4x, and all 457 rows byte-identical** to the previous run -- verified
+against a snapshot, values and keys both.
+
+Two things about the headline. The often-quoted "~2 hours" was never a fair
+baseline: it was a stopped run at `max_bands_per_load=3`, a configuration that
+re-read the parquet 125 times instead of 11. And the 272.9 s run used 6 workers
+rather than the default 4, plus a pinned `grid_path` that skips per-candidate
+grid selection.
+
+The striking part is how little of the original time was ever computation. The
+Monte-Carlo scoring is ~206 s and always was; the rest was re-reading a file
+that could not be filtered, ~7,000 network round trips, and seven idle cores.
+
+> Wall-clock on this machine drifts by ±40% between identical runs -- the same
+> configuration measured 272.9 s and later 396.8 s, the difference being the
+> grid database's page cache. Compare phases within a run, or paired runs
+> back to back; never two totals from different hours.
+
+### The 30-day rung: two different questions
+
+A second rung was generated spanning 0-30 d at the same 259 Mpc and the same
+10,000 x 38 x 1,000 shape -- so 0.03 d per epoch instead of 0.01 d.
+
+**As a drop-in speed change (`dt_max=10` on both), it is not worth it.**
+136.0 s against 272.9 s, but the entire saving is in scoring (67.6 s vs
+206.2 s) because the 0-10 d window holds ~333 epochs instead of 1,000. Grid
+loads are unchanged, since the `substring` pushdown already trims to the
+observed window either way. Scores move: 363 of 425 identical, but
+`AT2025aebp` shifted 0.5567 -> 0.3535 and the top-20 lost a member. Coarser,
+not better.
+
+**As an extended window (`dt_max=30`), it is a different proposition
+entirely** -- see IMPROVEMENTS.md section 21. Runtime is essentially free:
+
+| | 10-day grid, dt_max=10 | 30-day grid, dt_max=30 |
+|---|---|---|
+| wall clock | 396.8 s | 430.4 s |
+| grid loads | 11 | 15 |
+| observations scored | 3,867 | **8,653 (2.24x)** |
+| candidates scored | 425 | **429** |
+
+Both measured back to back, so the totals are comparable to each other but not
+to the 272.9 s above (cold page cache after switching grids).
+
+### How not to measure this
+
+Three end-to-end attempts at the pinning question were all confounded, and the
+methodology is worth recording because the same trap is waiting for the next
+person.
+
+The distance pass was used as a control -- it should be unaffected by BLAS
+threads, so a change in it flags bad conditions. It flagged every time
+(117.3 / 117.4 s clean, then 141.8 / 154.1 / 141.2 s), including once because
+*this session* started a 457-candidate validation alongside the benchmark.
+
+But the control was also **the wrong resource**: it measures database and
+network contention, while the thing under test is CPU-bound. One run had a 20%
+worse control and 9% *better* scoring. A 4-minute end-to-end run on a loaded
+8-core laptop cannot resolve a ~5% CPU effect. Use a microbenchmark of the hot
+call and take the **minimum** of many reps -- minima are robust to contention
+in a way means and single runs are not.
+
+### Reading the grid from `catalogs` on the production host
+
+The 30-day rung was cloned into `catalogs` on datatrove, and the same event was
+scored twice with everything but the grid store held fixed (457 candidates,
+`dt_max=10`, 6 workers, 6 bands per load, the grid pinned by name). Scores were
+compared afterwards: **457/457 identical**, so the clone is faithful and the
+remote store is a drop-in.
+
+| phase              | local store | `catalogs` (tunnelled) | delta  |
+| ------------------ | ----------: | ---------------------: | -----: |
+| distance pass      |      14.0 s |                 12.7 s |   ~0   |
+| 11 grid loads      |      26.7 s |             **150.7 s** | **+124** |
+| scoring (CPU)      |      68.5 s |                 77.1 s |   +8.6 |
+| persistence        |       1.2 s |                  1.2 s |   ~0   |
+| **wall**           | **123.3 s** |            **261.3 s** | **2.1x** |
+
+Scoring is the control: it is pure CPU and lands within a few percent either
+way, so the gap is entirely transfer. The tunnel moves grid bytes at ~16 MB/s
+against ~100 MB/s from the local store once its page cache is warm.
+
+**Do not size this from a single cold band read.** Doing exactly that gave
+7.4 MB/s tunnelled against 9.7 MB/s local -- a 1.3x penalty -- and produced an
+estimate of "co-location saves ~15 s". The real figure is 124 s. A cold read is
+dominated by detoasting 4 KB float blocks, which happens on the server and hides
+the network; the second read of the same band does not.
+
+So co-location on the database host is worth roughly half of this run, not a
+rounding error. What it cannot help is the CPU: 77 s of scoring stays 77 s.
+
+### Two per-candidate round trips that hid behind a pinned grid
+
+Both were invisible until the store moved off the local socket, and both were
+the same shape -- a query re-answered once per candidate whose answer cannot
+change during a run.
+
+* `grid_for_distance` opens by calling `available_grids`, which was uncached.
+  Against `catalogs` the inventory query took 3.15 s, so selecting a grid for
+  457 candidates cost ~24 minutes -- to pick the only grid in the store. Most of
+  that 3.15 s was `SUM(pg_column_size(absmag))` walking 380,000 TOAST pointers
+  to fill a `size_mb` column nothing but display reads; it is now computed as
+  `n_lightcurves * n_time * 4`, which for this layout is the same number.
+* `resolve_grid` turns a pinned grid name into a `GridRef` by fetching the axis
+  row, once per candidate: 445 round trips at 78.8 ms = 34 s, a quarter of the
+  run. `grid_db.grid_axis` is now memoised, and the distance pass fell from
+  48.1 s to 12.7 s -- level with the local store, which is what it should have
+  been all along, since both configurations query the same `trove_test` through
+  the same tunnel.
+
+The second one is the useful lesson: **the distance pass was 3.4x slower with no
+plausible mechanism**, because the grid store is not supposed to be involved in
+it at all. An unexplained gap in a phase that should not have moved is a bug,
+not noise.
+
 ---
 
 ## 8. How to measure
