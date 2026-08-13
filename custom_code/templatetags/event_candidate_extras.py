@@ -44,7 +44,10 @@ def display_score_details(target_id):
     if target_id is None:
         return "Target ID is None!"
 
-    target = Target.objects.get(id=target_id)
+    try:
+        target = Target.objects.get(id=target_id)
+    except Target.DoesNotExist:
+        return f"No target with id {target_id}"
 
     keymap = OrderedDict(
         ps_score=("Point Source Score (1 or 0)", _bool_format),
@@ -92,8 +95,14 @@ def display_score_details(target_id):
             # exclude keys in TargetExtra + exclude mpc_score, predetection_score
             + ["mpc_score", "predetection_score", "localization_id"]
         ).all()
-        # reorder them for user-friendly printing later
-        sf_set = sorted(sf_set, key=lambda sf: order.index(sf.key))
+        # Reorder them for user-friendly printing later. A ScoreFactor key that
+        # is not in keymap sorts to the end rather than raising -- a new scorer
+        # writing an unregistered key must not take the target page down.
+        sf_set = sorted(
+            sf_set,
+            key=lambda sf: (order.index(sf.key) if sf.key in order else len(order),
+                            sf.key),
+        )
         score_details.append(sf_set)
 
     # for printing
@@ -103,15 +112,11 @@ def display_score_details(target_id):
         for te in queryset:
             if basic_score_key not in res:
                 res[basic_score_key] = ""
-            if te.key in keymap:
-                label, fmter = keymap[te.key]
-            else:
-                label = te.key
-                fmter = _float_format
+            label, fmter = keymap.get(te.key, (te.key, _float_format))
             if te.value is None or isinstance(te.value, str):
                 s = te.value
             else:
-                s = fmter(float(te.value))
+                s = _safe_format(te.value, fmter)
             res[basic_score_key] += f"&emsp;{label}: {s}\n"
 
     for queryset in score_details:
@@ -119,19 +124,12 @@ def display_score_details(target_id):
             nle = score_factor.event_candidate.nonlocalizedevent
             if nle not in res:
                 res[nle] = ""
-            if score_factor.key in keymap:
-                label, fmter = keymap[score_factor.key]
-            else:
-                label = score_factor.key
-                fmter = _float_format
+            label, fmter = keymap.get(score_factor.key,
+                                      (score_factor.key, _float_format))
             if score_factor.value in (None, np.nan, "nan"):
                 res[nle] += f"&emsp;{label}: {score_factor.value}\n"
             else:
-                res[nle] += (
-                    f"&emsp;{label}: {fmter(score_factor.value)}\n"
-                    if label == "Host Galaxy Name"
-                    else f"&emsp;{label}: {fmter(float(score_factor.value))}\n"
-                )
+                res[nle] += f"&emsp;{label}: {_safe_format(score_factor.value, fmter)}\n"
 
     out = ""
     for key, s in res.items():
@@ -140,6 +138,23 @@ def display_score_details(target_id):
         out += "\n\n"
 
     return mark_safe(linebreaks(out))
+
+
+def _safe_format(value, fmter):
+    """Apply `fmter` to a ScoreFactor/TargetExtra value without ever raising.
+
+    Values arrive as strings and may be numeric ("0.97") or free text (e.g.
+    kilonova_skip_reason). The previous code decided whether to call float()
+    by comparing the display label to "Host Galaxy Name", so any other
+    non-numeric key crashed the whole target page. Try numeric, then raw, then
+    fall back to str().
+    """
+    for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
+        try:
+            return candidate()
+        except (TypeError, ValueError):
+            continue
+    return str(value)
 
 
 def _float_format(flt, unit=""):
