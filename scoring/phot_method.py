@@ -119,24 +119,29 @@ DEFAULT_KILONOVA_PARAMS = {
     "dt_min": 0.0,
     # Must not exceed the span of the grid being scored against: an epoch past
     # the grid's last time bin is dropped after being fetched and converted, so
-    # cutting here saves the fetch. The default 10-day rung is
-    # simulation.TIME = linspace(0, 10, 1000).
+    # cutting here saves the fetch. The configured grid above spans 0-30 d, so
+    # 30.0 uses all of it.
     #
-    # THIS IS NOT A FREE PARAMETER -- it is coupled to the grid, and at 10.0 it
-    # is discarding most of the discriminating data. On S251112cm, 45% of the
+    # THIS IS NOT A FREE PARAMETER -- it is coupled to the grid. At the previous
+    # 10.0 it discarded most of the discriminating data: on S251112cm, 45% of the
     # photometry in modelled bands falls in 10-30 d, every candidate has some,
-    # and 12 are unscoreable solely because their data starts after day 10.
-    # Scored against a 30-day rung at dt_max=30, the ABC filter rejects 15 more
-    # contaminants -- candidates that look kilonova-like on a few early points
-    # and clearly do not once late epochs are included.
+    # and 12 were unscoreable solely because their data starts after day 10.
+    # Widening to 30 scores 2.24x more observations, raises ABC zeroing from
+    # 85.4% to 89.0%, rejects 15 more contaminants -- candidates that look
+    # kilonova-like on a few early points and clearly do not once late epochs are
+    # included -- and unlocks 4 candidates that could not be scored at all.
     #
-    # Raising it requires a grid that spans the wider window; a 30-day rung at
-    # dt_max=10 is strictly worse than this one (same data, a third of the time
-    # resolution). Note also that the model's late-time reliability degrades:
-    # ~43-50% of simulated lightcurves are flux-underflow artifacts by 20-30 d,
-    # against 27-37% at 10-20 d. IMPROVEMENTS.md section 21 has the measurements
-    # and recommends dt_max=20 with a 30-day grid.
-    "dt_max": 10.0,
+    # The counterweight, and it is real: the model's late-time reliability
+    # degrades. ~43-50% of simulated lightcurves are flux-underflow artifacts by
+    # 20-30 d, against 27-37% at 10-20 d, and the artifacts are biased toward the
+    # faint end -- so the reference population a candidate is compared against is
+    # least trustworthy exactly where this setting now reaches. IMPROVEMENTS.md
+    # section 21 has the measurements and recommends 20.0 as the compromise;
+    # 30.0 is the deliberate choice to use the whole grid and accept that, on the
+    # grounds that a longer baseline tests whether a light curve stays consistent
+    # with a kilonova rather than only resembling one early on. Fixing the
+    # underflow in simulation.py would remove the trade-off.
+    "dt_max": 30.0,
     "snr_min": None,
     # One detection in one band is enough. P_tail_KNe is evaluated per
     # observation against the simulated population, so a single point already
