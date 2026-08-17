@@ -1,3 +1,8 @@
+{% extends 'tom_common/base.html' %}
+{% load static targets_extras observation_extras dataproduct_extras tom_common_extras custom_code_extras nonlocalizedevent_extras skymap_extras %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
 <style>
   .select2-container {
     width: 100% !important;
@@ -22,10 +27,7 @@
   to { transform: rotate(360deg); }
 }
 </style>
-{% extends 'tom_common/base.html' %}
-{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras nonlocalizedevent_extras skymap_extras %}
-{% block title %}Home{% endblock %}
-{% block content %}
+
 <div class="row">
   <!-- LEFT SIDE OF PAGE -->
   <div class="col-md-6">
@@ -124,14 +126,14 @@
       <div class="card-header">
         <b>Latest Targets</b>
       </div>
-      {% recent_targets 5 %}
+      {% recent_targets 5 %}arg
     </div>
     {% endcomment %}
 
     <!-- Latest comments on targets -->
     <div class="card">
       <div class="card-header">
-        <b>Latest Target Comments</b>
+        <b>Latest Candidate Comments</b>
       </div>
       {% recent_comments %}
     </div>

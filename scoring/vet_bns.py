@@ -35,6 +35,9 @@ from tom_nonlocalizedevents.models import (
     EventSequence,
 )
 
+from candidate_vetting.vet import localization_sequence_from_name
+from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+
 logger = logging.getLogger(__name__)
 
 PARAM_RANGES = dict(
@@ -62,7 +65,9 @@ def vet_bns(
         nonlocalizedevent_id=nonlocalized_event.id, target_id=target_id
     )
     target = Target.objects.get(id=target_id)
-
+    nle_eventseq = localization_sequence_from_name(nonlocalized_event.event_id)
+    nle_type = get_most_likely_class(nle_eventseq.details)
+    
     ## check skymap association
     if np.isfinite(param_ranges["t_post"]):
         gw_disc_date = (
@@ -112,13 +117,15 @@ def vet_bns(
     elif len(host_df) != 0:
         # then run the distance comparison for each of these hosts
         host_df = host_distance_match(host_df, target_id, nonlocalized_event_name)
-
+        
         # choose the maximum score
-        host_score, host_name = get_distance_score(
-            host_df, target_id, nonlocalized_event_name
-        )
-        update_score_factor(event_candidate, "host_distance_score", host_score)
-        update_score_factor(event_candidate, "host_name", host_name)
+        if nle_type not in {"FXT", "LGRB", "SGRB"}: # These don't have distances
+            host_score, host_name, host_catalog = get_distance_score(
+                host_df, target_id, nonlocalized_event_name
+            )
+            update_score_factor(event_candidate, "host_distance_score", host_score)
+            update_score_factor(event_candidate, "host_name", host_name)
+            update_score_factor(event_candidate, "host_catalog", host_catalog)
 
     else:
         # if no target redshift is known and no hosts are found, we don't want
@@ -128,10 +135,11 @@ def vet_bns(
         # and we should also clear out any existing scores / host names for it
         delete_score_factor(event_candidate, "host_distance_score")
         delete_score_factor(event_candidate, "host_name")
+        delete_score_factor(event_candidate, "host_catalog")
 
     ## AGN scoring
     if len(agn_df) != 0:
-        agn_assoc_score = 0  # association with an AGN is bad
+        agn_assoc_score = 0.1  # association with an AGN is bad
     else:
         agn_assoc_score = 1
     agn_score = agn_assoc_score  # don't bother with 3D AGN scoring, for now

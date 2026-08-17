@@ -195,7 +195,10 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         max_score_host_name = userz_distance_hosts.iloc[
             userz_distance_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
-        return max_score, max_score_host_name
+        max_score_host_catalog = userz_distance_hosts.iloc[
+            userz_distance_hosts["dist_norm_joint_prob"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
 
     # then use the redshift independent measurements of distances
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
@@ -205,7 +208,10 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         max_score_host_name = ind_distance_hosts.iloc[
             ind_distance_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
-        return max_score, max_score_host_name
+        max_score_host_catalog = ind_distance_hosts.iloc[
+            ind_distance_hosts["dist_norm_joint_prob"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
 
     # then use the specz hosts
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
@@ -215,7 +221,10 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         max_score_host_name = specz_hosts.iloc[
             specz_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
-        return max_score, max_score_host_name
+        max_score_host_catalog = specz_hosts.iloc[
+            specz_hosts["dist_norm_joint_prob"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
 
     # then if we don't know the spec-z or have an independent distance measure use the photo-z's
     photoz_hosts = host_df[host_df.z_type == "photo-z"]
@@ -225,10 +234,13 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         max_score_host_name = photoz_hosts.iloc[
             photoz_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
-        return max_score, max_score_host_name
+        max_score_host_catalog = photoz_hosts.iloc[
+            photoz_hosts["dist_norm_joint_prob"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
 
     # no potential host
-    return 1.0, None # None because there is no host name
+    return 1.0, None, None # Nones because there are no host names or host catalogs
 
 
 def skymap_association(

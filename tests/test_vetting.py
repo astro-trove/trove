@@ -76,7 +76,7 @@ class TestStaticCatalogStandardization:
         cat = DesiDr1()
         df = pd.DataFrame(
             {
-                "desiname": "DESI123",
+                "name": "DESI123",
                 "target_ra": [150.0],
                 "target_dec": [30.0],
                 "z": [0.1],

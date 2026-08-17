@@ -1,19 +1,25 @@
 import logging
+from datetime import datetime
 
 from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView
 from django.conf import settings
+from django.db.models import Value, CharField, Min, Q
+from django.db.models.functions import Cast, Replace, Round
+from django.contrib.postgres.aggregates import StringAgg
 from dal import autocomplete
 
 from tom_common.hooks import run_hook
 
-from tom_targets.views import TargetCreateView
+from tom_targets.views import TargetCreateView, TargetListView
 from tom_targets.models import BaseTarget, Target
 from tom_targets.forms import TargetForm, SiderealTargetCreateForm
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 
 from .forms import TargetNLEForm, CustomSiderealTargetCreateForm
+from .tables import TroveTargetTable
+from .filters import TroveTargetListFilterSet
 
 logger = logging.getLogger(__name__)
 
@@ -122,3 +128,54 @@ class CustomTargetCreateView(TargetCreateView):
 
         print("Returning", form_class, form_class._meta.fields)
         return form_class
+
+class TroveTargetListView(TargetListView):
+    table_class = TroveTargetTable
+    filterset_class = TroveTargetListFilterSet
+    
+    ordering = ['-created']
+    
+    def get_queryset(self, *args, **kwargs):
+        qs = super().get_queryset(*args, **kwargs)
+
+        # add the redshift to the queryset in a nice format for the table
+        qs = qs.annotate(
+            _z = Replace(
+                Cast("redshift", output_field=CharField()),
+                Value("NaN"),
+                Value("—"),
+                output_field=CharField()
+            )
+        )
+
+        # add the date of first detection
+        qs = qs.annotate(
+            first_detection=Min(
+                "reduceddatum__timestamp",
+                filter=Q(
+                    ~Q(reduceddatum__source_name="ATLAS"), # exclude ATLAS FP which can have spurious detections
+                    reduceddatum__data_type="photometry", # only include phot, not spec
+                    reduceddatum__value__has_key="magnitude", # make sure it is a detection, not a limit
+                )
+            )
+        )
+
+        # associated NLEs
+        qs = qs.annotate(
+            associated_events = StringAgg(
+                "eventcandidate__nonlocalizedevent__event_id",
+                delimiter="\n",
+                distinct=True,
+                order_by="eventcandidate__nonlocalizedevent__event_id"
+            )
+        )
+
+        # round the RA/Dec columns to consistent decimal places
+        radec_precision = 6
+        qs = qs.annotate(
+            _ra=Round("ra", precision=radec_precision),
+            _dec=Round("dec", precision=radec_precision),
+        )
+        
+        return qs
+    

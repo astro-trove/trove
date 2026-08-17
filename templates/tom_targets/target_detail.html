@@ -1,7 +1,12 @@
 {% extends 'tom_targets/partials/base.html' %}
-{% load comments bootstrap4 tom_common_extras targets_extras observation_extras dataproduct_extras target_list_extras photometry_extras cache target_extras spectroscopy_extras event_candidate_extras %}
+{% load comments bootstrap4 tom_common_extras targets_extras observation_extras dataproduct_extras target_list_extras photometry_extras cache target_extras spectroscopy_extras event_candidate_extras static %}
 {% block title %}Target {{ object.name }}{% endblock %}
 {% block content %}
+
+{# Save the number of photometry points and spectra for later #}
+{% count_phot object as nphot %}
+{% count_spec object as nspec %}
+
 <div class="row">
   <div class="col-md-4">
     <div id="target-info">
@@ -14,7 +19,7 @@
       {% target_unknown_statuses object %}
       {% target_buttons object %}
       {% target_data object %}
-      {% recent_photometry object limit=3 %}
+      {# recent_photometry object limit=3 #}
       {% if object.type == 'SIDEREAL' %}
       {% aladin_custom object %}
       {% endif %}
@@ -22,35 +27,57 @@
     </div>
   </div>
   <div class="col-md-8">
-    <div class="tab-pane" id="score-detail">
-      <h4>Score Details</h4>
-      {% display_score_details target.id %}
+    <ul class="nav nav-tabs" role="tablist" id="tabs">
+      <li class="nav-item">
+        <a class="nav-link active" id="score-details-tab" href="#score-details" role="tab" data-toggle="tab"><h5>Score Details</h5></a>
+      </li>
+      {% if nphot %}
+      <li class="nav-item">
+        <a class="nav-link" id="photometry-tab" href="#photometry" role="tab" data-toggle="tab"><h5>Photometry</h5></a>
+      </li>
+      {% endif %}
+      {% if nspec %}
+      <li class="nav-item">
+        <a class="nav-link" id="spectroscopy-tab" href="#spectroscopy" role="tab" data-toggle="tab"><h5>Spectroscopy</h5></a>
+      </li>
+      {% endif %}
+      <li class="nav-item">
+        <a class="nav-link" id="comments-tab" href="#comments" role="tab" data-toggle="tab"><h5>Comments</h5></a>
+      </li>
+    </ul>
+    <div class="tab-content">
+      <div class="tab-pane active" id="score-details">
+	{% display_score_details target.id %}
+	<details open>
+	  <summary><h5 style="display:inline-block">Host Galaxies</h5></summary>
+	  {% galaxy_table object %}
+	</details>
+      </div>
+      <div class="tab-pane" id="photometry">
+	{% photometry_for_target target %}
+	<details>
+	  <summary><h5 style="display:inline-block">Photometry Table</h5></summary>
+	  {% get_photometry_data object %}
+	</details>
+      </div>
+      <div class="tab-pane" id="spectroscopy">
+	{% spectroscopy_for_target target %}
+	<details>
+	  <summary><h5 style="display:inline-block">Spectroscopy Table</h5></summary>
+	  {% get_spectroscopy_data object %}
+	</details>
+      </div>
+      <div class="tab-pane text-break" id="comments">
+	{% render_comment_list for object %}
+	{% url 'targets:detail' object.id as next %}
+	{% if user.is_authenticated %}
+	  {% render_comment_form for object %}
+	{% endif %}
+    </div>    
     </div>
-    <details>
-      <summary><h4 style="display:inline-block">Host Galaxies</h4></summary>
-      {% galaxy_table object %}
-    </details>
-    <details>
-      <summary><h4 style="display:inline-block">Photometry</h4></summary>
-        {% photometry_for_target target %}
-        {% get_photometry_data object %}
-    </details>
-    <!--
-    <details>
-      <summary><h4 style="display:inline-block">Spectroscopy</h4></summary>
-      {% spectroscopy_for_target target %}
-      {% get_spectroscopy_data object %}
-    </details>
-    -->
-
-    <hr/>
-    <details>
-        <summary><h4 style="display:inline-block">Comments</h4></summary>
-            {% render_comment_list for object %}
-            {% url 'targets:detail' object.id as next %}
-            {% if user.is_authenticated %}
-              {% render_comment_form for object %}
-            {% endif %}
   </div>
 </div>
+
+<script src="{% static 'tom_targets/js/tabs.js' %}"></script>
+  
 {% endblock %}
