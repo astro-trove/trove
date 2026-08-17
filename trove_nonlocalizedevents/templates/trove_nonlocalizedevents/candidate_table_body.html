@@ -4,14 +4,31 @@
   <div class="col-md-10">
   {% if request.user.is_authenticated %}
       <div style="display:flex; justify-content:space-between; width:100%">
-        <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
-          {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
-        </a>
+        <div style="display:flex; gap:0.5rem">
+          <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
+            {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
+          </a>
+          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}"
+             class="btn {% if phot_method == 'kilonova' %}btn-success{% else %}btn-light{% endif %} mb-2"
+             title="Which photometry scorer the next Vet All uses. Switching does not rescore anything.">
+            Photometry: {{ phot_method_label }}
+          </a>
+        </div>
         <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn btn-outline-secondary mb-2">
           <i class="fa fa-refresh"></i> Refresh
         </a>
       </div>
    {% endif %}
+    {% if kilonova_scores_missing %}
+      <div class="alert alert-info mb-2" role="alert">
+        <i class="fa fa-info-circle"></i>
+        <strong>No KilonovaSCORER scores yet.</strong>
+        Switching the photometry method does not rescore anything, and none of
+        these candidates has a stored KilonovaSCORER score — the scores below are
+        still TROVE's photometry factor. Run <strong>Vet All</strong> on this
+        event to compute them.
+      </div>
+    {% endif %}
     </br>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     <table class="table table-sm table-hover">
@@ -25,7 +42,7 @@
       </thead>
       <tbody>
 	{% for candidate in page_obj.object_list %}
-        <tr>
+        <tr {% if candidate.kilonova_skip_reason %}class="table-warning" title="KilonovaSCORER could not score this candidate: {{ candidate.kilonova_skip_reason }}"{% endif %}>
 	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
 	  <td>
             {% if candidate.target is not None %}
@@ -55,6 +72,50 @@
       </tbody>
     </table>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+
+    {% if phot_method == 'kilonova' %}
+    <div class="card mt-3 mb-4">
+      <div class="card-header py-2">
+        <strong>Scoring key</strong>
+      </div>
+      <div class="card-body py-3">
+
+        <h6 class="text-muted text-uppercase small mb-2">Row and badge markers</h6>
+        <dl class="row mb-0 small">
+
+          <dt class="col-sm-4 col-lg-3 font-weight-normal">
+            <span class="d-inline-block px-4 py-1 border rounded" style="background-color:#ffeeba;"></span>
+            <span class="ml-1">Yellow row</span>
+          </dt>
+          <dd class="col-sm-8 col-lg-9">
+            KilonovaSCORER ran on this candidate but could not produce a score.
+            The score shown is TROVE's photometry factor instead, so the
+            candidate stays rankable rather than being dropped or zeroed.
+            Hover the row to see the reason.
+            <span class="text-muted">
+              Common causes: no detections inside the grid's 0&ndash;30 day
+              window, no usable distance, no observation in a bandpass the
+              simulation grid models, or a failure inside the scorer itself.
+            </span>
+          </dd>
+
+          <dt class="col-sm-4 col-lg-3 font-weight-normal">
+            <span class="d-inline-block px-4 py-1 border rounded"></span>
+            <span class="ml-1">Unhighlighted row</span>
+          </dt>
+          <dd class="col-sm-8 col-lg-9 mb-0">
+            Either the candidate has a KilonovaSCORER score, which is the score
+            shown, or it has no stored result yet because it has not been
+            vetted since the scorer was selected. The second case is
+            <em>not</em> the same as being unscoreable, which is why it is not
+            highlighted; run <strong>Vet All</strong> to compute it.
+          </dd>
+
+        </dl>
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 </div>
 

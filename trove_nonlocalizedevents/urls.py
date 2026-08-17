@@ -3,6 +3,7 @@ from .views import (
     EventCandidateCreateFromNLEView,
     generate_report,
     ToggleAgnCacheView,
+    TogglePhotMethodCacheView,
     RefreshCandidateList,
     SkymapPartialView,
     vet_all_cooldown_notice
@@ -21,6 +22,11 @@ urlpatterns = [
         "toggle-agn-cache/",
         ToggleAgnCacheView.as_view(),
         name="toggle-agn-cache",
+    ),
+    path(
+        "toggle-phot-method/",
+        TogglePhotMethodCacheView.as_view(),
+        name="toggle-phot-method",
     ),
     path(
         "refresh-candidate-list",

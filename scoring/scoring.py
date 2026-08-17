@@ -355,9 +355,22 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     # because we already sorted the dataframe by our "preferred" catalogs, we can
     # just always take the distances from the first row and return them
     # start with user-provided host spec z's
-    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
-    ind_distance_hosts = host_df[host_df.z_type == "z ind."]
-    specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
+    # Host tables written before `z_type` was added use an 11-column schema and
+    # were never migrated, so an unguarded read raises AttributeError. The
+    # caller catches it and reports "no usable distance", which is a SILENT
+    # drop -- it took out 7 of 8 S250818k candidates in a KilonovaSCORER run.
+    # Old-schema tables fall to the `else` branch below, which already means
+    # "no typed redshift, use the best-ranked host" -- exactly what an untyped
+    # table is. They still carry Dist/DistErr, so the host is used, not lost.
+    if "z_type" in host_df.columns:
+        userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
+        ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+        # na=False: a NULL z_type would make str.contains yield NA and the
+        # boolean mask raise, reproducing the same silent drop.
+        specz_hosts = host_df[host_df.z_type.str.contains("spec-z", na=False)]
+    else:
+        _none = host_df.iloc[:0]
+        userz_distance_hosts = ind_distance_hosts = specz_hosts = _none
     if len(userz_distance_hosts):
         to_ret = userz_distance_hosts.iloc[0]
 

@@ -14,8 +14,18 @@ from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
+import logging
+
 from scoring.models import ScoreFactor
 from scoring.util import get_event_candidate_scores
+from scoring.phot_method import (
+    PHOT_METHOD_KILONOVA,
+    get_phot_method,
+    phot_method_label,
+    toggle_phot_method,
+)
+
+logger = logging.getLogger(__name__)
 from tom_dataproducts.models import ReducedDatum
 from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
 
@@ -81,7 +91,12 @@ class EventCandidateListView(FilterView):
         query_params = self.request.GET.copy()
         query_params.pop("page", None)
         filter_key = query_params.urlencode()
-        cache_key = f"event_candidates_scored_{filter_key}_{agn_toggle}"
+        # `phot_method` IS part of the key: unlike the toggle's effect on future
+        # vetting, which the page does not render, switching it changes which
+        # stored factor each row displays -- so a cached list scored under the
+        # other method is stale, not merely older.
+        phot_method = get_phot_method()
+        cache_key = f"event_candidates_scored_{filter_key}_{agn_toggle}_{phot_method}"
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
         # current NLE when the AGN toggle is flipped)
@@ -89,7 +104,9 @@ class EventCandidateListView(FilterView):
         if scored_candidates is None:
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
-            scored_candidates = get_event_candidate_scores(all_candidates, agn_toggle=agn_toggle)
+            scored_candidates = get_event_candidate_scores(
+                all_candidates, agn_toggle=agn_toggle, phot_method=phot_method
+            )
             # Cache for 5 minutes
             cache.set(cache_key, scored_candidates, 60 * 5)
 
@@ -101,6 +118,22 @@ class EventCandidateListView(FilterView):
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
+        # Not part of `cache_key` above: the photometry method changes what a
+        # FUTURE Vet All computes, not the already-stored factors this page
+        # renders, so it must not invalidate the scored-candidate cache.
+        context["phot_method"] = phot_method
+        context["phot_method_label"] = phot_method_label()
+        # True when KilonovaSCORER is selected but NOTHING in the current list
+        # has a stored score, i.e. no Vet All has run under it yet. The page
+        # then says so instead of silently showing TROVE numbers under a
+        # KilonovaSCORER heading. Partial coverage is not a warning: a Vet All
+        # in progress legitimately has some scored and some not.
+        context["kilonova_scores_missing"] = (
+            phot_method == PHOT_METHOD_KILONOVA
+            and bool(scored_candidates)
+            and not any(getattr(ec, "phot_source", "trove") == "kilonova"
+                        for ec in scored_candidates)
+        )
 
         nle_id = self.request.GET.get("nonlocalizedevent")
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
@@ -300,13 +333,51 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             candidates = EventCandidate.objects.filter(
                 nonlocalizedevent_id=nle_id
             ).select_related("target", "nonlocalizedevent")
-            scored_candidates = get_event_candidate_scores(candidates, agn_toggle=new_val)
+            phot_method = get_phot_method()
+            scored_candidates = get_event_candidate_scores(
+                candidates, agn_toggle=new_val, phot_method=phot_method
+            )
 
-            # Re-sores all candidates after AGN-toggle change and saves to cache
-            cache_key = f"event_candidates_scored_nonlocalizedevent={nle_id}_{new_val}"
+            # Re-scores all candidates after AGN-toggle change and saves to
+            # cache. The key must match the one the list view builds, photometry
+            # method included -- otherwise this pre-warm writes a key nothing
+            # reads and the list re-scores anyway.
+            cache_key = (f"event_candidates_scored_nonlocalizedevent={nle_id}"
+                         f"_{new_val}_{phot_method}")
             cache.set(cache_key, scored_candidates, 60 * 5)
             return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
         return redirect(reverse("custom_code:event-candidates"))
+
+
+class TogglePhotMethodCacheView(LoginRequiredMixin, View):
+    """Flip the photometry scorer between TROVE and KilonovaSCORER.
+
+    Deliberately lighter than :class:`ToggleAgnCacheView`, which rescores the
+    whole candidate list on every press. This one only writes the cache key --
+    no rescoring, no vetting queued, no stored ``ScoreFactor`` row touched.
+    The next Vet All reads the value and uses it.
+
+    That difference is the point. The AGN flag changes an arithmetic factor
+    already held in memory, so recomputing is cheap. Switching photometry
+    scorer would mean re-running KilonovaSCORER against the simulation grid for
+    every candidate -- minutes of compute, triggered by a single click, on a
+    page a user may only be browsing.
+    """
+
+    def get(self, request, *args, **kwargs):
+        new_val = toggle_phot_method()
+        logger.info("Photometry scoring method switched to %r", new_val)
+
+        nle_id = request.GET.get("nonlocalizedevent")
+        # No rescoring -- but the cached scored list was built displaying the
+        # OTHER method's factor, so it has to go or the page keeps showing the
+        # old numbers under the new label. The method is part of the cache key,
+        # so the entry for the new method is simply absent and gets rebuilt from
+        # stored ScoreFactor rows: a read, not a re-vet.
+        url = reverse("custom_code:event-candidates")
+        if nle_id:
+            url += f"?nonlocalizedevent={nle_id}"
+        return redirect(url)
 
 
 class SkymapPartialView(View):

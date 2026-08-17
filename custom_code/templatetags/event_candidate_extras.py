@@ -17,6 +17,10 @@ from scoring.util import (
     get_target_score as _get_target_score,
     TARGETEXTRA_KEYS,
 )
+from scoring.phot_method import (
+    get_phot_method as _get_phot_method,
+    phot_method_label as _phot_method_label,
+)
 
 register = template.Library()
 
@@ -25,6 +29,25 @@ register = template.Library()
 def get_agn_toggle():
     """Current value of the site-wide, cache-backed agn_toggle flag."""
     return cache.get("agn_toggle", True)
+
+
+@register.simple_tag
+def get_phot_method():
+    """Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
+
+    Site-wide and cache-backed, exactly like ``agn_toggle``. Unlike the AGN
+    flag, flipping this does NOT rescore anything -- the stored factors are not
+    recomputed and no vetting is triggered. It only changes which scorer the
+    NEXT Vet All run uses, so the button is cheap to press and cannot cost a
+    user a long re-vet by accident.
+    """
+    return _get_phot_method()
+
+
+@register.simple_tag
+def get_phot_method_label():
+    """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
+    return _phot_method_label()
 
 @register.simple_tag
 def get_event_candidate_scores(*args, **kwargs):
@@ -38,9 +61,26 @@ def get_target_score(*args, **kwargs):
 
 @register.simple_tag(takes_context=True)
 def vet_all_is_allowed(context):
+    """Is the Vet All button enabled, or is this event within its cooldown?
+
+    True when nothing has run recently. ``VetAllView.form_valid`` sets
+    ``VETTING_COOLDOWN_KEY_<nle_id>`` for ``VETTING_COOLDOWN_PERIOD`` (1 hour)
+    when the button is used, so the presence of that key IS the cooldown.
+
+    This used to compute the key and then fall off the end of the function,
+    returning None. None is falsy, so the template took every event to be on
+    cooldown permanently and the button was greyed out for good -- with no
+    cooldown actually set anywhere.
+    """
     request = context['request']
     nle_id = request.GET.get('nonlocalizedevent')
-    cooldown_cache_key = settings.VETTING_COOLDOWN_KEY+"_"+nle_id
+    if not nle_id:
+        # No event in scope, so nothing to rate-limit. Returning True also
+        # avoids `KEY + "_" + None`, which raises TypeError and would take the
+        # whole page down rather than just disabling a button.
+        return True
+    cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
+    return not cache.get(cooldown_cache_key)
 
 @register.simple_tag(takes_context=True)
 def display_score_details(context, target_id):
@@ -81,6 +121,14 @@ def display_score_details(context, target_id):
             "Score from Light Curve Slope",
             partial(_float_format, precision=1),
         ),
+        kilonova_score=(
+            "KilonovaSCORER Photometry Score",
+            partial(_float_format, precision=4),
+        ),
+        kilonova_skip_reason=(
+            "KilonovaSCORER: could not score",
+            _str_format,
+        ),
     )
     order = list(keymap.keys())
 
@@ -101,7 +149,14 @@ def display_score_details(context, target_id):
             key__in=TARGETEXTRA_KEYS
             + ["mpc_score", "predetection_score"]
         ).all()
-        sf_set = sorted(sf_set, key=lambda sf: order.index(sf.key))
+        # `order.index` raises ValueError on a key that is not in `keymap`,
+        # which took the whole target page down whenever a new ScoreFactor key
+        # appeared -- `kilonova_score` did exactly that. Unknown keys sort to
+        # the end and are rendered with their raw key as the label instead.
+        sf_set = sorted(
+            sf_set,
+            key=lambda sf: order.index(sf.key) if sf.key in order else len(order),
+        )
         score_details.append(sf_set)
 
     # Build structured data instead of strings
@@ -120,10 +175,7 @@ def display_score_details(context, target_id):
                 label = te.key
                 fmter = _float_format
             
-            if te.value in (None, np.nan, "nan", "None"):
-                value = te.value
-            else:
-                value = fmter(float(te.value))
+            value = _safe_format(te.value, fmter)
             
             basic_card["details"].append({
                 "label": label,
@@ -160,19 +212,23 @@ def display_score_details(context, target_id):
                 label = score_factor.key
                 fmter = _float_format
             
-            if score_factor.value in (None, np.nan, "nan"):
-                value = score_factor.value
-            else:
-                value = (
-                    fmter(score_factor.value)
-                    if label in ("Host Galaxy used for Distance Scoring", "Host Galaxy Source Catalog")
-                    else fmter(float(score_factor.value))
-                )
+            numeric = label not in (
+                "Host Galaxy used for Distance Scoring",
+                "Host Galaxy Source Catalog",
+            )
+            value = _safe_format(score_factor.value, fmter, numeric=numeric)
             
+            # KilonovaSCORER scores only the KN model, so its score and its
+            # "could not score" reason belong in the KN subtab alone. The detail
+            # loops below run once per transient subtab, so without this tag the
+            # same row is repeated under KN-in-SN and super-KN, where it is not
+            # just redundant but wrong -- it reads as a verdict on models the
+            # scorer never evaluated.
             event_card["details"].append(
                 {
                     "label": label,
-                    "value": value, 
+                    "value": value,
+                    "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
         
         if event_card:
@@ -252,15 +308,20 @@ def display_score_details(context, target_id):
                 # per transient model 
                 html += f'              <div class="score-card-content-filled">\n'
                 for detail in score_details:
-                    if "Score" not in detail["label"]: continue 
+                    if "Score" not in detail["label"]: continue
+                    if detail.get("only") and detail["only"] != em_transient_type:
+                        continue
                     html += f'                <div class="detail-row">\n'
                     html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
                     html += f'                  <span class="detail-value">{detail["value"]}</span>\n'
                     html += f'                </div>\n'
 
-                # then the photometry scores too
-                for key, subscore in ec_subscores[em_transient_type].items():
-                    label, fmter = keymap[key+"_score"]
+                # then the photometry scores too. Both lookups are guarded:
+                # a transient with no subscores, or a subscore whose "<key>_score"
+                # has no keymap entry, is a missing label -- not a reason to 500
+                # the page and lose every other score on it.
+                for key, subscore in ec_subscores.get(em_transient_type, {}).items():
+                    label, fmter = keymap.get(key + "_score", (key, _float_format))
                     html += f'                <div class="detail-row">\n'
                     html += f'                  <span class="detail-label">{label}</span>\n'
                     html += f'                  <span class="detail-value">{fmter(subscore)}</span>\n'
@@ -270,7 +331,9 @@ def display_score_details(context, target_id):
                 # then the score details (max lum., etc.)
                 html += f'              <div class="score-card-content">\n'
                 for detail in score_details:
-                    if "Score" in detail["label"]: continue 
+                    if "Score" in detail["label"]: continue
+                    if detail.get("only") and detail["only"] != em_transient_type:
+                        continue
                     html += f'                <div class="detail-row">\n'
                     html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
                     html += f'                  <span class="detail-value">{detail["value"]}</span>\n'
@@ -284,6 +347,26 @@ def display_score_details(context, target_id):
         html += '  </div>\n'
     html += '</div>\n'
     return mark_safe(html)
+
+
+def _safe_format(raw, fmter, numeric=True):
+    """Render a ScoreFactor value, never raising.
+
+    Two things reach here that the old inline formatting could not survive: a
+    value that is text rather than a number (``kilonova_skip_reason`` is a
+    sentence), and a key with no entry in ``keymap``, whose fallback formatter
+    is numeric. Either one raised ValueError and returned a 500 for the whole
+    target page -- losing every other score on it to make one cell unrenderable.
+    Falling back to the raw string keeps the page up and still shows the value.
+    """
+    if raw is None or (isinstance(raw, str) and raw.strip() in ("", "nan", "None")):
+        return raw
+    try:
+        if numeric:
+            return fmter(float(raw))
+        return fmter(raw)
+    except (TypeError, ValueError):
+        return str(raw)
 
 
 def _float_format(flt, unit="", precision=2):

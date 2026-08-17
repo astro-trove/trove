@@ -38,6 +38,12 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 logger = logging.getLogger(__name__)
 
+from scoring.kilonova_scoring import (
+    KilonovaScoreUnavailable,
+    score_candidate as kilonova_score_candidate,
+)
+from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+
 PARAM_RANGES = dict(
     lum_max=[0 * u.erg / u.s, 1e43 * u.erg / u.s],
     peak_time=[0, 4],
@@ -153,6 +159,27 @@ def vet_bns(
             "c",
         ],  # common optical filters + some Roman filters + ATLAS o,c
     )
+    # The photometry factor can come from either scorer -- the site-wide
+    # `phot_method` toggle picks. The TROVE fit above always runs regardless,
+    # because its `lum` / `max_time` / `decay_rate` are displayed on the
+    # candidate page in their own right, not only as inputs to the factor.
+    if get_phot_method() == PHOT_METHOD_KILONOVA:
+        try:
+            phot_score = kilonova_score_candidate(
+                target_id=target_id,
+                nonlocalized_event=nonlocalized_event,
+                candidate_name=target.name,
+            )
+            update_score_factor(event_candidate, "kilonova_score", phot_score)
+            delete_score_factor(event_candidate, "kilonova_skip_reason")
+        except KilonovaScoreUnavailable as exc:
+            # Unscoreable is not the same as rejected. Falling through to the
+            # TROVE factor keeps the candidate rankable instead of zeroing it
+            # for missing a distance or a grid band.
+            logger.warning("KilonovaSCORER unavailable for %s: %s", target.name, exc)
+            update_score_factor(event_candidate, "kilonova_skip_reason", str(exc))
+            delete_score_factor(event_candidate, "kilonova_score")
+
     if lum is not None:
         update_score_factor(event_candidate, "phot_peak_lum", lum.value)
     else:

@@ -40,7 +40,21 @@ DICT_TRANSIENTS_PARAM_RANGES = {
 
 
 # default subscore names
+#: ScoreFactor key holding KilonovaSCORER's photometry factor, written by
+#: `vet_bns` when the site-wide `phot_method` toggle is on KilonovaSCORER.
+#: Listed in SUBSCORE_NAMES so it is fetched, and excluded from the generic
+#: product below so it is never multiplied in as just another subscore -- it
+#: REPLACES the TROVE photometry factor rather than joining it.
+KILONOVA_SCORE_KEY = "kilonova_score"
+
+#: Why KilonovaSCORER could not score a candidate, written by `vet_bns` in place
+#: of a score. Its PRESENCE is what distinguishes "the scorer ran and failed"
+#: from "this candidate has not been vetted yet" -- the two look identical if
+#: you only check for a missing score, and only the first is worth flagging.
+KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
+
 SUBSCORE_NAMES = [
+    "kilonova_score",
     "skymap_score",
     "host_distance_score",
     "ps_score",
@@ -94,15 +108,31 @@ def get_event_candidate_scores(
         dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
         subscore_names=SUBSCORE_NAMES,
         agn_toggle=True,
-        include_subscores=False
+        include_subscores=False,
+        phot_method=None,
 ):
     """Get the event candidate scores for everything in subscore_names
 
     event_candidates should be a django queryset of EventCandidate objects
+
+    ``phot_method`` selects which photometry factor the score uses. ``None``
+    reads the site-wide toggle. On ``kilonova`` a candidate with a stored
+    ``kilonova_score`` uses it INSTEAD of the product of TROVE's peak-luminosity
+    / peak-time / decay-rate checks; a candidate without one falls back to the
+    TROVE factor, because the toggle deliberately does not rescore and a
+    candidate that has never been vetted under KilonovaSCORER has nothing else
+    to show. Each candidate is marked with ``ec.phot_source`` so the page can
+    say which it is displaying rather than leaving the two indistinguishable.
     """
+    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+
+    if phot_method is None:
+        phot_method = get_phot_method()
+    use_kilonova = phot_method == PHOT_METHOD_KILONOVA
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
-    exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
+    exclude_keys = (set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
+                    | {KILONOVA_SCORE_KEY})
     
     if not agn_toggle:
         exclude_keys.add('agn_score')
@@ -147,6 +177,20 @@ def get_event_candidate_scores(
         event_candidate__in=event_candidates_list, key__in=subscore_names
     ).annotate(value_float=Cast("value", FloatField()))
 
+    # Skip reasons are TEXT, so they cannot ride along in the query above --
+    # that one casts `value` to a float and a reason string would break the
+    # cast for every row. Fetched separately, and only when KilonovaSCORER is
+    # the selected method, since nothing else displays them.
+    skip_reason_by_ec = {}
+    if use_kilonova:
+        skip_reason_by_ec = {
+            sf.event_candidate_id: sf.value
+            for sf in ScoreFactor.objects.filter(
+                event_candidate__in=event_candidates_list,
+                key=KILONOVA_SKIP_REASON_KEY,
+            )
+        }
+
     # Group score factors by event candidate
     score_factors_by_ec = {}
     for sf in score_factors:
@@ -185,6 +229,11 @@ def get_event_candidate_scores(
         if "mpc_match_name" in te:
             mpc_score = int(te["mpc_match_name"] == str(None))
 
+        # Set on every candidate so the template can test it directly. Empty
+        # string rather than None: a candidate that was never vetted under
+        # KilonovaSCORER has no reason to show and must not be flagged.
+        ec.kilonova_skip_reason = skip_reason_by_ec.get(ec.id, "")
+
         # remove keys we don't want and calculate a base subscore
         # need to add "agn" to exclude keys if button is selected
         # AGN enabled should be a global state of the website
@@ -220,8 +269,17 @@ def get_event_candidate_scores(
 
             if include_subscores:
                 ec.subscores[transient] = phot_subscores
-            
-            phot_score = math.prod(list(phot_subscores.values()))
+
+            kn = sf_dict.get(KILONOVA_SCORE_KEY)
+            if use_kilonova and kn is not None and math.isfinite(kn):
+                # KilonovaSCORER's factor stands in for the whole TROVE
+                # photometry product -- not multiplied with it, which would
+                # apply the photometry twice.
+                phot_score = kn
+                ec.phot_source = "kilonova"
+            else:
+                phot_score = math.prod(list(phot_subscores.values()))
+                ec.phot_source = "trove"
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object
