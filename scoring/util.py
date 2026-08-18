@@ -32,6 +32,12 @@ logger = logging.getLogger(__name__)
 
 # map imported parameter ranges to transients
 TRANSIENTS = ["KN", "KN-in-SN", "super-KN"]
+
+#: The one transient type KilonovaSCORER models. Its simulation grid is a
+#: two-component kilonova population, so its factor is only meaningful for
+#: "KN" -- "KN-in-SN" and "super-KN" ask a different question of the same
+#: photometry and keep TROVE's own factor.
+KILONOVA_SCORER_TRANSIENT = "KN"
 DICT_TRANSIENTS_PARAM_RANGES = {
     "KN": KN_PARAM_RANGES,
     "KN-in-SN": KN_IN_SN_PARAM_RANGES,
@@ -219,6 +225,20 @@ def get_event_candidate_scores(
             if subscore_key in sf_dict
         }
 
+        # How many of TROVE's photometry checks actually had a value to test.
+        # The score itself is deliberately left alone: `math.prod` over the
+        # checks that DID run is the design -- a missing measurement leaves the
+        # score unaffected rather than penalising a candidate for data nobody
+        # collected. But "unaffected" and "passed" are indistinguishable in the
+        # rendered number, so the COUNT is carried to the template and the row
+        # is flagged, exactly as an unscoreable KilonovaSCORER row is.
+        ec.trove_phot_checks = len(val_dict)
+        ec.trove_phot_checks_total = len(val_not_score_keys)
+        ec.trove_phot_insufficient = len(val_dict) < len(val_not_score_keys)
+        ec.trove_phot_missing = sorted(
+            k for k in val_not_score_keys if k not in val_dict
+        )
+
         # now get all the scores stored in TargetExtra objects
         te = target_extras_by_id.get(ec.target_id, {})
         ps_score = 1
@@ -270,16 +290,32 @@ def get_event_candidate_scores(
             if include_subscores:
                 ec.subscores[transient] = phot_subscores
 
+            # ONLY "KN" may use KilonovaSCORER. The three transient types differ
+            # solely in the `param_ranges` above -- `subscore_no_phot` is shared
+            # -- so substituting the same `kn` into all of them made all three
+            # scores numerically identical and silently discarded the
+            # "KN-in-SN" / "super-KN" acceptance windows, which is the whole
+            # content of those two columns.
             kn = sf_dict.get(KILONOVA_SCORE_KEY)
-            if use_kilonova and kn is not None and math.isfinite(kn):
+            if (use_kilonova and transient == KILONOVA_SCORER_TRANSIENT
+                    and kn is not None and math.isfinite(kn)):
                 # KilonovaSCORER's factor stands in for the whole TROVE
                 # photometry product -- not multiplied with it, which would
                 # apply the photometry twice.
                 phot_score = kn
-                ec.phot_source = "kilonova"
+                phot_source = "kilonova"
             else:
                 phot_score = math.prod(list(phot_subscores.values()))
-                ec.phot_source = "trove"
+                phot_source = "trove"
+
+            # Recorded from the "KN" pass only. This drives the yellow-row
+            # highlight, the "scored only" filter and the blue "no scores yet"
+            # notice, all of which are about the KilonovaSCORER column; taking
+            # it from whichever transient happened to be last would report
+            # "trove" for every candidate as soon as more than one type is
+            # scored.
+            if transient == KILONOVA_SCORER_TRANSIENT:
+                ec.phot_source = phot_source
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object

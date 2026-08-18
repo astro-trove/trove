@@ -5,13 +5,19 @@
   {% if request.user.is_authenticated %}
       <div style="display:flex; justify-content:space-between; width:100%">
         <div style="display:flex; gap:0.5rem">
-          <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
+          <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}{% if scored_only %}&scored_only=1{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
             {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
           </a>
-          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}"
-             class="btn {% if phot_method == 'kilonova' %}btn-success{% else %}btn-light{% endif %} mb-2"
+          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}{% if scored_only %}&scored_only=1{% endif %}"
+             class="btn {% if is_kilonova %}btn-success{% else %}btn-light{% endif %} mb-2"
              title="Which photometry scorer the next Vet All uses. Switching does not rescore anything.">
             Photometry: {{ phot_method_label }}
+          </a>
+          <a href="{{ scored_only_url }}"
+             class="btn {% if scored_only %}btn-success{% else %}btn-light{% endif %} mb-2"
+             title="{% if is_kilonova %}Show only candidates KilonovaSCORER produced a score for.{% else %}Show only candidates where every TROVE photometry check had data to run on.{% endif %} Hides {{ n_unscored }} highlighted row{{ n_unscored|pluralize }}.">
+            {% if scored_only %}☑{% else %}☐{% endif %} Scored only
+            <span class="badge badge-light ml-1">{{ n_scored }}</span>
           </a>
         </div>
         <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn btn-outline-secondary mb-2">
@@ -29,6 +35,22 @@
         event to compute them.
       </div>
     {% endif %}
+    {% if scored_only %}
+      <div class="alert alert-secondary py-2 mb-2" role="alert">
+        <i class="fa fa-filter"></i>
+        Showing the <strong>{{ n_scored }}</strong> candidate{{ n_scored|pluralize }}
+        {% if is_kilonova %}
+          with a KilonovaSCORER score.
+          <strong>{{ n_unscored }}</strong> hidden — either unscoreable or not yet
+          vetted under this method.
+        {% else %}
+          whose TROVE photometry factor used every check.
+          <strong>{{ n_unscored }}</strong> hidden — one or more checks had no
+          data to run on.
+        {% endif %}
+        <a href="{{ scored_only_url }}" class="alert-link">Show all</a>.
+      </div>
+    {% endif %}
     </br>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     <table class="table table-sm table-hover">
@@ -42,7 +64,7 @@
       </thead>
       <tbody>
 	{% for candidate in page_obj.object_list %}
-        <tr {% if candidate.kilonova_skip_reason %}class="table-warning" title="KilonovaSCORER could not score this candidate: {{ candidate.kilonova_skip_reason }}"{% endif %}>
+        <tr {% if is_kilonova %}{% if candidate.kilonova_skip_reason %}class="table-warning" title="KilonovaSCORER could not score this candidate: {{ candidate.kilonova_skip_reason }}"{% endif %}{% else %}{% if candidate.trove_phot_insufficient %}class="table-warning" title="Only {{ candidate.trove_phot_checks }} of {{ candidate.trove_phot_checks_total }} TROVE photometry checks had data to run on. Missing: {{ candidate.trove_phot_missing|join:', ' }}. The score is the product of the checks that did run, so the missing ones left it unchanged rather than lowering it."{% endif %}{% endif %}>
 	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
 	  <td>
             {% if candidate.target is not None %}
@@ -73,10 +95,10 @@
     </table>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
 
-    {% if phot_method == 'kilonova' %}
     <div class="card mt-3 mb-4">
       <div class="card-header py-2">
         <strong>Scoring key</strong>
+        <span class="text-muted small ml-1">&mdash; photometry: {{ phot_method_label }}</span>
       </div>
       <div class="card-body py-3">
 
@@ -88,15 +110,30 @@
             <span class="ml-1">Yellow row</span>
           </dt>
           <dd class="col-sm-8 col-lg-9">
-            KilonovaSCORER ran on this candidate but could not produce a score.
-            The score shown is TROVE's photometry factor instead, so the
-            candidate stays rankable rather than being dropped or zeroed.
-            Hover the row to see the reason.
-            <span class="text-muted">
-              Common causes: no detections inside the grid's 0&ndash;30 day
-              window, no usable distance, no observation in a bandpass the
-              simulation grid models, or a failure inside the scorer itself.
-            </span>
+            {% if is_kilonova %}
+              KilonovaSCORER ran on this candidate but could not produce a score.
+              The score shown is TROVE's photometry factor instead, so the
+              candidate stays rankable rather than being dropped or zeroed.
+              Hover the row to see the reason.
+              <span class="text-muted">
+                Common causes: no detections inside the grid's 0&ndash;30 day
+                window, no usable distance, no observation in a bandpass the
+                simulation grid models, or a failure inside the scorer itself.
+              </span>
+            {% else %}
+              One or more of TROVE's photometry checks had no data to run on, so
+              the factor shown rests on partial evidence. Hover the row to see
+              which are missing.
+              <span class="text-muted">
+                The score is deliberately <em>not</em> penalised for this: it is
+                the product of the checks that did run, so a missing measurement
+                leaves it unchanged. That is why a candidate with no photometry
+                at all can still show a factor of 1 &mdash; nothing was tested,
+                so nothing lowered it. The highlight marks the difference
+                between &ldquo;passed every check&rdquo; and &ldquo;was never
+                checked&rdquo;, which the number alone cannot show.
+              </span>
+            {% endif %}
           </dd>
 
           <dt class="col-sm-4 col-lg-3 font-weight-normal">
@@ -104,17 +141,38 @@
             <span class="ml-1">Unhighlighted row</span>
           </dt>
           <dd class="col-sm-8 col-lg-9 mb-0">
-            Either the candidate has a KilonovaSCORER score, which is the score
-            shown, or it has no stored result yet because it has not been
-            vetted since the scorer was selected. The second case is
-            <em>not</em> the same as being unscoreable, which is why it is not
-            highlighted; run <strong>Vet All</strong> to compute it.
+            {% if is_kilonova %}
+              Either the candidate has a KilonovaSCORER score, which is the score
+              shown, or it has no stored result yet because it has not been
+              vetted since the scorer was selected. The second case is
+              <em>not</em> the same as being unscoreable, which is why it is not
+              highlighted; run <strong>Vet All</strong> to compute it.
+            {% else %}
+              Every TROVE photometry check had data to run on, so the factor
+              shown reflects the full set of tests.
+            {% endif %}
           </dd>
 
         </dl>
+
+        <h6 class="text-muted text-uppercase small mb-2 mt-3">Filters</h6>
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4 col-lg-3 font-weight-normal">Scored only</dt>
+          <dd class="col-sm-8 col-lg-9 mb-0">
+            {% if is_kilonova %}
+              Restricts the list to candidates KilonovaSCORER produced a score
+              for. This removes both highlighted rows and never-vetted ones.
+            {% else %}
+              Restricts the list to candidates whose photometry factor used
+              every check, i.e. every row that is not highlighted.
+            {% endif %}
+            Ranks are then positions within that subset, not within the full
+            candidate list. The setting is kept when you switch photometry
+            method, so the same candidates can be compared under both.
+          </dd>
+        </dl>
       </div>
     </div>
-    {% endif %}
 
   </div>
 </div>

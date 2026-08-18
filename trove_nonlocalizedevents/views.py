@@ -6,7 +6,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.generic.base import View
 from django.contrib import messages
 
@@ -90,6 +90,10 @@ class EventCandidateListView(FilterView):
         # Create cache key from filters (excluding page number)
         query_params = self.request.GET.copy()
         query_params.pop("page", None)
+        # `scored_only` is a DISPLAY filter applied to the already-scored list
+        # below, so it must not reach the cache key: including it would score
+        # the whole event a second time to render a subset of the same rows.
+        query_params.pop("scored_only", None)
         filter_key = query_params.urlencode()
         # `phot_method` IS part of the key: unlike the toggle's effect on future
         # vetting, which the page does not render, switching it changes which
@@ -110,6 +114,37 @@ class EventCandidateListView(FilterView):
             # Cache for 5 minutes
             cache.set(cache_key, scored_candidates, 60 * 5)
 
+        # "Show scored only": drop every row KilonovaSCORER did not produce a
+        # score for. Applied AFTER scoring and BEFORE pagination, so the page
+        # numbers count the rows actually shown rather than leaving gaps.
+        #
+        # The test is `phot_source == "kilonova"`, i.e. a score exists -- not
+        # "has no skip reason". The two differ for a candidate that has never
+        # been vetted under this method: it is not unscoreable, so it is not
+        # highlighted, but it has no KilonovaSCORER score either and does not
+        # belong in a list the user asked to restrict to scored candidates.
+        #
+        # What counts as "scored" depends on the method, so the filter follows
+        # the toggle rather than being KilonovaSCORER-only:
+        #
+        #   KilonovaSCORER -- a stored kilonova_score exists.
+        #   TROVE          -- all of the photometry checks had data to run on.
+        #                     TROVE's product over the checks that DID run is
+        #                     deliberate and unchanged; this only hides rows
+        #                     whose factor rests on partial evidence.
+        is_kilonova = phot_method == PHOT_METHOD_KILONOVA
+
+        def _is_scored(ec):
+            if is_kilonova:
+                return getattr(ec, "phot_source", "trove") == "kilonova"
+            return not getattr(ec, "trove_phot_insufficient", False)
+
+        scored_only = self.request.GET.get("scored_only") == "1"
+        n_total = len(scored_candidates)
+        n_scored = sum(_is_scored(ec) for ec in scored_candidates)
+        if scored_only:
+            scored_candidates = [ec for ec in scored_candidates if _is_scored(ec)]
+
         # Paginate the cached scored list
         paginator = Paginator(scored_candidates, self.paginate_by)
         page_number = self.request.GET.get("page", 1)
@@ -128,12 +163,26 @@ class EventCandidateListView(FilterView):
         # then says so instead of silently showing TROVE numbers under a
         # KilonovaSCORER heading. Partial coverage is not a warning: a Vet All
         # in progress legitimately has some scored and some not.
+        # Counted on the UNFILTERED list: with "show scored only" on and nothing
+        # scored, the filtered list is empty, and testing that would report "no
+        # scores yet" as a consequence of the filter rather than of the data.
         context["kilonova_scores_missing"] = (
-            phot_method == PHOT_METHOD_KILONOVA
-            and bool(scored_candidates)
-            and not any(getattr(ec, "phot_source", "trove") == "kilonova"
-                        for ec in scored_candidates)
+            is_kilonova and n_total > 0 and n_scored == 0
         )
+        context["scored_only"] = scored_only
+        context["n_scored"] = n_scored
+        context["n_unscored"] = n_total - n_scored
+        context["is_kilonova"] = is_kilonova
+        # Href that flips the filter, preserving the other query parameters and
+        # dropping `page` -- page 3 of the unfiltered list is not page 3 of the
+        # filtered one, and keeping it would land the user on an empty page.
+        toggle_params = self.request.GET.copy()
+        toggle_params.pop("page", None)
+        toggle_params.pop("scored_only", None)
+        if not scored_only:
+            toggle_params["scored_only"] = "1"
+        qs = toggle_params.urlencode()
+        context["scored_only_url"] = f"?{qs}" if qs else "?"
 
         nle_id = self.request.GET.get("nonlocalizedevent")
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
@@ -345,7 +394,13 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             cache_key = (f"event_candidates_scored_nonlocalizedevent={nle_id}"
                          f"_{new_val}_{phot_method}")
             cache.set(cache_key, scored_candidates, 60 * 5)
-            return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
+            params = {"nonlocalizedevent": nle_id}
+            # Carried for the same reason the photometry toggle carries it:
+            # the display filter is the user's, not the button's.
+            if request.GET.get("scored_only") == "1":
+                params["scored_only"] = "1"
+            return redirect(reverse("custom_code:event-candidates")
+                            + "?" + urlencode(params))
         return redirect(reverse("custom_code:event-candidates"))
 
 
@@ -375,8 +430,18 @@ class TogglePhotMethodCacheView(LoginRequiredMixin, View):
         # so the entry for the new method is simply absent and gets rebuilt from
         # stored ScoreFactor rows: a read, not a re-vet.
         url = reverse("custom_code:event-candidates")
+        params = {}
         if nle_id:
-            url += f"?nonlocalizedevent={nle_id}"
+            params["nonlocalizedevent"] = nle_id
+        # "Show scored only" is a property of how the user wants to read the
+        # list, not of the method, and it means something under both. Dropping
+        # it here would silently re-reveal the rows they had filtered out every
+        # time they compared the two scorers -- which is the main reason to
+        # press this button at all.
+        if request.GET.get("scored_only") == "1":
+            params["scored_only"] = "1"
+        if params:
+            url += "?" + urlencode(params)
         return redirect(url)
 
 
