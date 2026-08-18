@@ -53,6 +53,7 @@ packages = [
     "trove_tom",
     "custom_code",
     "scoring",
+    "scoring.KilonovaScorerHelpers",
     "trove_nonlocalizedevents",
     "trove_targets",
     "tests",
