@@ -1,0 +1,2 @@
+- Remove highlight rows
+- Add explanation for what gives the TROVE its score for the items in fig2

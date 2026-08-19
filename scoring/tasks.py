@@ -4,6 +4,7 @@ Asynchronous tasks for (1) querying public services that takes a long time,
 """
 
 import logging
+import time
 from datetime import datetime, timedelta
 import numpy as np
 
@@ -22,6 +23,8 @@ from trove_targets.models import Target
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 
 logger = logging.getLogger(__name__)
+
+from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
 
 ## tasks
@@ -125,8 +128,41 @@ def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
     """
     Asychronously vet according to vetting mode, wraps async_vet for a list of
     eventcandidates
+
+    Under KilonovaSCORER the candidates are enqueued in DISTANCE ORDER, because
+    the scorer now picks the simulation rung nearest each candidate's own
+    distance. The grid cache holds a handful of frames and a rung costs 25-60 s
+    to read out of Postgres, so an arbitrary ordering evicts and re-reads the
+    same rungs over and over -- with 19 rungs and a 4-entry cache that is
+    potentially hundreds of reads across an event. Sorted, each rung is read
+    once and every candidate at that distance is scored behind it.
+
+    The sort costs one distance lookup per candidate here, which the scoring
+    task then repeats. That duplication is deliberate: it is seconds against
+    the tens of minutes of grid reads it removes, and it keeps `async_vet`
+    self-contained rather than having to trust a distance passed in from
+    outside.
     """
-    for ec in eventcandidates:
+    ecs = list(eventcandidates)
+
+    if vetting_mode == "KN" and get_phot_method() == PHOT_METHOD_KILONOVA:
+        from scoring.scoring import get_eventcandidate_default_distance
+
+        def _dist(ec):
+            try:
+                d, _ = get_eventcandidate_default_distance(ec.target_id, nle.event_id)
+                return float(d) if np.isfinite(d) and d > 0 else float("inf")
+            except Exception:  # noqa: BLE001 - unknown distance sorts last
+                # These fail in the task too, so their position is irrelevant to
+                # cache behaviour; last keeps them out of the grouped runs.
+                return float("inf")
+
+        t0 = time.time()
+        ecs.sort(key=_dist)
+        logger.info("ordered %d candidate(s) by distance for grid grouping in %.1fs",
+                    len(ecs), time.time() - t0)
+
+    for ec in ecs:
         async_vet.enqueue(
             target_ids=[ec.target_id],
             nle_event_id=nle.event_id,

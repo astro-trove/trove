@@ -183,20 +183,6 @@ def get_event_candidate_scores(
         event_candidate__in=event_candidates_list, key__in=subscore_names
     ).annotate(value_float=Cast("value", FloatField()))
 
-    # Skip reasons are TEXT, so they cannot ride along in the query above --
-    # that one casts `value` to a float and a reason string would break the
-    # cast for every row. Fetched separately, and only when KilonovaSCORER is
-    # the selected method, since nothing else displays them.
-    skip_reason_by_ec = {}
-    if use_kilonova:
-        skip_reason_by_ec = {
-            sf.event_candidate_id: sf.value
-            for sf in ScoreFactor.objects.filter(
-                event_candidate__in=event_candidates_list,
-                key=KILONOVA_SKIP_REASON_KEY,
-            )
-        }
-
     # Group score factors by event candidate
     score_factors_by_ec = {}
     for sf in score_factors:
@@ -225,20 +211,6 @@ def get_event_candidate_scores(
             if subscore_key in sf_dict
         }
 
-        # How many of TROVE's photometry checks actually had a value to test.
-        # The score itself is deliberately left alone: `math.prod` over the
-        # checks that DID run is the design -- a missing measurement leaves the
-        # score unaffected rather than penalising a candidate for data nobody
-        # collected. But "unaffected" and "passed" are indistinguishable in the
-        # rendered number, so the COUNT is carried to the template and the row
-        # is flagged, exactly as an unscoreable KilonovaSCORER row is.
-        ec.trove_phot_checks = len(val_dict)
-        ec.trove_phot_checks_total = len(val_not_score_keys)
-        ec.trove_phot_insufficient = len(val_dict) < len(val_not_score_keys)
-        ec.trove_phot_missing = sorted(
-            k for k in val_not_score_keys if k not in val_dict
-        )
-
         # now get all the scores stored in TargetExtra objects
         te = target_extras_by_id.get(ec.target_id, {})
         ps_score = 1
@@ -248,11 +220,6 @@ def get_event_candidate_scores(
         mpc_score = 1
         if "mpc_match_name" in te:
             mpc_score = int(te["mpc_match_name"] == str(None))
-
-        # Set on every candidate so the template can test it directly. Empty
-        # string rather than None: a candidate that was never vetted under
-        # KilonovaSCORER has no reason to show and must not be flagged.
-        ec.kilonova_skip_reason = skip_reason_by_ec.get(ec.id, "")
 
         # remove keys we don't want and calculate a base subscore
         # need to add "agn" to exclude keys if button is selected

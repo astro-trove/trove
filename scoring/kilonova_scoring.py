@@ -17,61 +17,227 @@ fetched from a broker.
 from __future__ import annotations
 
 import logging
+import os
 from collections import OrderedDict
 from typing import Optional
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import union_categoricals
 
 logger = logging.getLogger(__name__)
 
-#: Grid to score against. One grid exists today; a candidate at any distance is
-#: compared against it, with distance entering through the distance modulus
-#: rather than through grid choice.
 DEFAULT_GRID = "simulations_two_component_kilonova_model_259Mpc_30d"
 
-#: Epoch window, in days after the trigger. 0 because a kilonova does not exist
-#: before the merger; 30 because that is the grid's span -- an epoch past it
-#: has nothing to be compared against.
+# 202/456 candidates for S251112cm are greater than this
+MAX_DISTANCE_MPC = 1000.0
+
+# Current simulation grids only simulated the KN up to 30 days
+# Useful because there are quite a few TROVE candidates who only have photometry after 10d
 DT_MIN, DT_MAX = 0.0, 30.0
 
-#: A measurement with no usable error. 2.5/(3 ln10) ~ 0.36 mag is the
-#: error a source detected exactly at a 3-sigma limit would have had.
 DEFAULT_MAGERR = 2.5 / (3.0 * np.log(10.0))
 
 
-#: Loaded grid frames, keyed by (grid, bands, min_time, max_time). Bounded LRU.
+#: Loaded grid slices, keyed by (grid, ONE band, min_time, max_time). Bounded
+#: LRU, budgeted in bytes.
 #:
 #: `vet_all_async` enqueues ONE TASK PER CANDIDATE, and `vet_bns` calls
 #: `score_candidate` without a `grid_df`, so without this every candidate reads
-#: the grid out of Postgres again -- 25-60 s each, against ~3 s of actual
+#: the grid out of Postgres again -- 10-20 s each, against ~3 s of actual
 #: scoring. A worker is a long-lived process, so caching at module level means
-#: the first candidate of a band set pays the read and the rest do not.
+#: the first candidate to want a band pays the read and the rest do not.
 #:
-#: Bounded because a band slice is ~100 MB: an unbounded cache would grow to the
-#: whole grid (~1.6 GB) inside one worker. Candidates repeat band sets heavily
-#: (ATLAS c/o covers most of a GW follow-up list), so a small cache still hits
-#: nearly always.
-_GRID_CACHE: "OrderedDict[tuple, pd.DataFrame]" = OrderedDict()
-GRID_CACHE_MAX = 4
+#: KEYED PER BAND, NOT PER BAND SET. The first version keyed on the candidate's
+#: whole band tuple, which is a *combination*: ~12 bands appear across a GW
+#: follow-up list, so the key space was 2**12 while the cache held 4 entries.
+#: Measured on S251112cm, that was 125 Postgres reads for 160 candidates and 121
+#: evictions -- the same rung re-read three times in a row for ('sdssg',), then
+#: ('atlaso','sdssr'), then ('atlasc','atlaso','sdssg'). Keying per band
+#: collapses the space to the bands that actually exist, which is what lets
+#: ordering candidates by distance group the loads the way it was meant to. The
+#: per-candidate frame is then assembled from cached slices: a memory copy
+#: instead of a query.
+#:
+#: Budgeted in bytes rather than entries because a band slice is ~100 MB and the
+#: WSL OOM killer is global -- an entry count cannot bound what actually matters.
+_GRID_CACHE: "OrderedDict[tuple, Optional[pd.DataFrame]]" = OrderedDict()
+GRID_CACHE_MAX_BYTES = int(os.environ.get("TROVE_GRID_CACHE_BYTES") or 1_500_000_000)
+_GRID_CACHE_BYTES = 0
 
 
-def _load_grid_cached(grid: str, bands: tuple, min_time: float, max_time: float):
-    key = (grid, tuple(sorted(bands)), min_time, max_time)
-    hit = _GRID_CACHE.get(key)
-    if hit is not None:
+#: (name, distance_mpc) for every grid that can actually be scored against,
+#: nearest-distance lookup table for `grid_for_distance`. Cached because it is a
+#: two-query inventory of a handful of rows and a worker scores hundreds of
+#: candidates; `refresh=True` re-reads it after a new rung is ingested.
+_GRID_INVENTORY: "list[tuple[str, float]] | None" = None
+
+
+def _grid_inventory(refresh: bool = False):
+    """Grids in the store that span the scored window, sorted by distance.
+
+    Filtered on ``t_max``, not just presence: a 10-day rung is a perfectly valid
+    grid that simply cannot answer for epochs 10-30 d, and routing a candidate
+    to one would silently drop two thirds of the window. `available_grids_db`
+    already inner-joins against the lightcurve table, so a half-ingested rung
+    with only an axis row is excluded before it gets here.
+    """
+    global _GRID_INVENTORY
+    if _GRID_INVENTORY is not None and not refresh:
+        return _GRID_INVENTORY
+
+    from scoring.KilonovaScorerHelpers import available_grids_db
+
+    inv = []
+    try:
+        df = available_grids_db()
+    except Exception as exc:  # noqa: BLE001 - fall back to the single default
+        logger.warning("could not read the grid inventory (%s: %s); "
+                       "falling back to %s", type(exc).__name__, exc, DEFAULT_GRID)
+        _GRID_INVENTORY = []
+        return _GRID_INVENTORY
+
+    for row in df.itertuples():
+        ref = row.path
+        t_max = getattr(ref, "t_max", float("nan"))
+        if not np.isfinite(t_max) or t_max + 1e-6 < DT_MAX:
+            logger.debug("grid %s spans only %.1f d, skipping", ref.name, t_max)
+            continue
+        inv.append((ref.name, float(row.distance_mpc)))
+    inv.sort(key=lambda t: t[1])
+    _GRID_INVENTORY = inv
+    logger.info("grid inventory: %d rung(s) spanning %.0f-%.0f Mpc",
+                len(inv), inv[0][1] if inv else float("nan"),
+                inv[-1][1] if inv else float("nan"))
+    return _GRID_INVENTORY
+
+
+def grid_for_distance(dist_mpc: float, refresh: bool = False) -> str:
+    """Name of the rung whose distance is closest to ``dist_mpc``.
+
+    Nearest in linear distance rather than in distance modulus. The ladder is
+    deliberately denser where it matters -- 25 Mpc steps below 250, 100 Mpc
+    steps above -- so linear nearest already keeps the fractional distance error
+    roughly flat across the range, and it is the rule that is obvious when
+    reading a candidate's grid assignment back off the page.
+    """
+    inv = _grid_inventory(refresh=refresh)
+    if not inv:
+        return DEFAULT_GRID
+    name, _ = min(inv, key=lambda t: abs(t[1] - float(dist_mpc)))
+    return name
+
+
+def _frame_bytes(df: Optional[pd.DataFrame]) -> int:
+    """Resident size of a cached slice.
+
+    ``deep=False`` is accurate here: every column is a numpy array or a
+    categorical, so there are no object pointers hiding a larger payload.
+    """
+    if df is None:
+        return 0
+    try:
+        return int(df.memory_usage(index=True, deep=False).sum())
+    except Exception:  # noqa: BLE001 - a bad size estimate must not fail a score
+        return 0
+
+
+def _load_band_cached(grid: str, band: str, min_time: float, max_time: float):
+    """One band of one rung, or None if the rung carries no simulations in it.
+
+    The None is cached as well: a band the grid does not have is a permanent
+    fact about the store, and re-asking Postgres once per candidate is the same
+    wasted round trip as re-reading a band it does have.
+    """
+    global _GRID_CACHE_BYTES
+
+    key = (grid, band, min_time, max_time)
+    if key in _GRID_CACHE:
         _GRID_CACHE.move_to_end(key)
-        return hit
+        return _GRID_CACHE[key]
 
     from scoring.KilonovaScorerHelpers import load_grid_db
 
-    df = load_grid_db(grid, bands=list(key[1]), min_time=min_time,
-                      max_time=max_time, mode="survey")
+    try:
+        df = load_grid_db(grid, bands=[band], min_time=min_time,
+                          max_time=max_time, mode="survey")
+    except ValueError as exc:
+        # "returned no rows" and "no usable rows after filtering" both mean the
+        # band is simply absent. Every other ValueError from the loader -- an
+        # empty epoch window, a lightcurve width that disagrees with the axis --
+        # means the store is broken, and must not be swallowed into a band that
+        # silently disappears from the score.
+        if "no rows" not in str(exc):
+            raise
+        logger.info("Grid %s has no simulations in band %s", grid, band)
+        _GRID_CACHE[key] = None
+        return None
+
     _GRID_CACHE[key] = df
-    while len(_GRID_CACHE) > GRID_CACHE_MAX:
-        dropped, _ = _GRID_CACHE.popitem(last=False)
-        logger.info("Grid cache full -- evicted %s", dropped[1])
+    _GRID_CACHE_BYTES += _frame_bytes(df)
+    # `> 1` so the slice just loaded is never the one evicted: a budget smaller
+    # than a single band would otherwise thrash forever and never make progress.
+    while len(_GRID_CACHE) > 1 and _GRID_CACHE_BYTES > GRID_CACHE_MAX_BYTES:
+        dropped, victim = _GRID_CACHE.popitem(last=False)
+        _GRID_CACHE_BYTES -= _frame_bytes(victim)
+        logger.info("Grid cache over budget -- evicted %s / %s", dropped[0], dropped[1])
     return df
+
+
+def _load_grid_cached(grid: str, bands: tuple, min_time: float, max_time: float):
+    """The candidate's bands as one frame, assembled from per-band cache slices."""
+    wanted = sorted(set(bands))
+    frames = [df for df in (_load_band_cached(grid, b, min_time, max_time)
+                            for b in wanted) if df is not None]
+    if not frames:
+        # Same failure the single-query loader raised, so callers see no change.
+        raise ValueError(
+            f"Grid {grid} returned no rows for bands={wanted}, max_time={max_time}")
+    if len(frames) == 1:
+        return frames[0]
+
+    # `band` and `filter_mapped` are categoricals whose categories differ from
+    # slice to slice, and a plain concat would collapse them to object dtype --
+    # eight bytes of pointer per row across ~20M rows, and a slower groupby
+    # inside the scorer. union_categoricals remaps the codes instead.
+    columns = list(frames[0].columns)
+    cat_cols = [c for c in ("band", "filter_mapped")
+                if isinstance(frames[0][c].dtype, pd.CategoricalDtype)]
+    merged = {c: union_categoricals([f[c] for f in frames]) for c in cat_cols}
+    out = pd.concat([f.drop(columns=cat_cols) for f in frames],
+                    ignore_index=True, copy=False)
+    for col, values in merged.items():
+        out[col] = values
+    out = out[columns]
+    out.attrs["name"] = grid
+    return out
+
+
+def _scalar_dist_err(dist_err) -> float:
+    """The distance uncertainty as a single non-negative number.
+
+    ``get_eventcandidate_default_distance`` hands back whatever the host-galaxy
+    JSON stored in ``DistErr``, and some catalogs record an ASYMMETRIC error as
+    a two-element ``[minus, plus]`` pair instead of a scalar -- e.g. AT2025aeag,
+    229.9 Mpc with ``[76.3, 94.6]``. ``np.isfinite`` on a pair returns an array
+    and ``not`` on an array raises, which took out 31 of 456 S251112cm
+    candidates with "truth value of an array is ambiguous" before this existed.
+
+    The package propagates the distance error by sampling ONE Gaussian sigma
+    (``compute_abs_mag_samples``), so an asymmetric pair has to be symmetrised
+    before it can be used at all. We take the LARGER side: it is the
+    conservative choice, widening the distance posterior rather than narrowing
+    it, so a candidate is never rejected because we understated how poorly its
+    distance is known.
+
+    Scalar behaviour is unchanged from the check this replaces: non-finite or
+    negative still becomes 0.0, which the caller reads as "no usable error".
+    """
+    arr = np.asarray(dist_err, dtype=float).ravel()
+    arr = arr[np.isfinite(arr)]
+    if arr.size == 0 or (arr < 0).any():
+        return 0.0
+    return float(arr.max())
 
 
 class KilonovaScoreUnavailable(RuntimeError):
@@ -159,11 +325,47 @@ def build_data_obs(phot: pd.DataFrame, dist_mpc: float, dist_err_mpc: float) -> 
     return out
 
 
+def _abc_survivors(results: pd.DataFrame) -> Optional[int]:
+    """Simulations consistent with EVERY epoch, in every band, or None if unknown.
+
+    This is the survival set S_t of Darc & Kilpatrick (2026), section 3.5,
+    carried to its end::
+
+        S_t = S_{t-1} INTERSECT {i : M_rep,i(t) in R(M_obs(t), k_ABC sigma_obs(t))}
+
+    ACROSS BANDS, not per band -- the paper is explicit that the set shrinks
+    "as each subsequent observation is incorporated across all available
+    photometric bands". ``sample_id`` labels the same physical simulation in
+    every band, which is what makes the cross-band intersection meaningful:
+    a model that fits g but not r is not a model that fits the candidate.
+
+    The package computes the chain PER BAND instead (``overlap_chain`` is
+    called once inside each band's loop and the results are keyed by band in
+    ``overlap_summary_by_band``), so nothing it returns implements the paper's
+    S_t. That is why this is computed here from ``consistent_ids`` rather than
+    read off ``running_survivors_n``.
+
+    Monotone by construction, so the first epoch admitting nothing settles the
+    answer and the loop stops there.
+    """
+    if "consistent_ids" not in results.columns:
+        return None
+    survivors = None
+    for ids in results["consistent_ids"]:
+        current = set(ids) if ids is not None else set()
+        survivors = current if survivors is None else (survivors & current)
+        if not survivors:
+            return 0
+    return None if survivors is None else len(survivors)
+
+
 def _cumulative_factor(results: pd.DataFrame) -> float:
     """The package's per-epoch output -> one factor in [0, 1].
 
     ``binned_stats_cumulative_ptail`` returns a running mean whose LAST bin is
-    the cumulative score. Two results need converting rather than passing on:
+    the cumulative score, and the ABC survival chain floors it to 0 when no
+    simulation is consistent with every epoch (see the comment below). Two
+    further results need converting rather than passing on:
 
     * **NaN.** When the ABC chain empties, every ``p_tail_std`` is 0 and the
       package's inverse-variance update divides by zero, so the running mean
@@ -177,6 +379,40 @@ def _cumulative_factor(results: pd.DataFrame) -> float:
 
     if results is None or not len(results):
         raise KilonovaScoreUnavailable("scorer returned no per-epoch rows")
+
+    # THE ABC FLOOR -- Darc & Kilpatrick (2026) section 3.5, "Penalization and
+    # Flagging", checked before the P_tail aggregation:
+    #
+    #   "In cases where |S_t| = 0 at any epoch t, the candidate is flagged as
+    #    temporally inconsistent with the kilonova model grid. Even if a high
+    #    P_near,KNe or P_tail,KNe score is recorded for a subsequent isolated
+    #    observation, the cumulative kilonova score is penalized and set to
+    #    zero."
+    #
+    # So the diagnostic is inert -- it never shades the score up or down --
+    # except for this one hard floor, and the floor has to be applied here
+    # because the aggregation cannot express it. `binned_stats_cumulative_ptail`
+    # combines P_tail in logit space with inverse-variance weights, and the
+    # delta-method variance s/(p(1-p)) diverges as p -> 0, so the epochs that
+    # reject a candidate carry almost no weight. Measured on AT2025adro: five of
+    # eleven epochs admitted ZERO simulations and together held 0.36% of the
+    # weight while three permissive epochs held 95%, producing 0.12 for a
+    # candidate the diagnostic had already excluded outright.
+    #
+    # k_ABC is the package's `overlap_k`, left at its default of 2.0. The
+    # paper's fiducial 1.5 is calibrated to its N=1e5 grid; Appendix A gives
+    # k_ABC,min = 2.0 for an N=1e4 grid and tells users to calibrate to their
+    # own grid size, and our rungs carry 1e4 samples per band.
+    #
+    # Checked FIRST, so a candidate the diagnostic rejects returns 0 even when
+    # the aggregation would have failed -- `ivw_stats_logit` raises on some
+    # degenerate inputs, and "no simulation fits" is an answer, not an error.
+    survivors = _abc_survivors(results)
+    if survivors == 0:
+        logger.info("ABC chain empty -- no simulation is consistent with every "
+                    "epoch; flooring the score to 0")
+        return 0.0
+
     try:
         cum = binned_stats_cumulative_ptail(results)
     except (KeyError, ValueError) as exc:
@@ -207,15 +443,24 @@ def _cumulative_factor(results: pd.DataFrame) -> float:
 def score_candidate(
     target_id: int,
     nonlocalized_event,
-    grid: str = DEFAULT_GRID,
+    grid: Optional[str] = None,
     grid_df: Optional[pd.DataFrame] = None,
     candidate_name: Optional[str] = None,
     n_kde_sim: Optional[int] = None,
 ) -> float:
     """KilonovaSCORER's photometry factor for one candidate, in [0, 1].
 
+    ``grid`` defaults to the rung nearest the candidate's own distance. A grid
+    is distance-specific -- redshift sets both the k-correction and the time
+    dilation, so it changes the SHAPE of the magnitude distribution per band and
+    epoch, and the distance modulus cannot correct for a mismatch. Passing a
+    name pins the choice, which is what the diagnostics do when they need every
+    candidate compared against one population.
+
     ``grid_df`` lets a caller scoring a whole event load the grid once and
-    reuse it -- reading it per candidate would dominate the run.
+    reuse it -- reading it per candidate would dominate the run. It overrides
+    ``grid`` entirely, so a caller supplying a frame is responsible for it being
+    the right rung.
     """
     from scoring.scoring import get_eventcandidate_default_distance
     from scoring.vet_phot import _get_post_disc_phot
@@ -226,8 +471,22 @@ def score_candidate(
     dist_mpc, dist_err_mpc = get_eventcandidate_default_distance(target_id, event_id)
     if not np.isfinite(dist_mpc) or dist_mpc <= 0:
         raise KilonovaScoreUnavailable(f"no usable distance for target {target_id}")
-    if not np.isfinite(dist_err_mpc) or dist_err_mpc < 0:
-        dist_err_mpc = 0.0
+    dist_err_mpc = _scalar_dist_err(dist_err_mpc)
+
+    # Checked before any photometry is read: the read is the expensive part and
+    # the answer cannot change once the distance is known.
+    if dist_mpc > MAX_DISTANCE_MPC:
+        raise KilonovaScoreUnavailable(
+            f"distance {dist_mpc:,.0f} Mpc is beyond the {MAX_DISTANCE_MPC:,.0f} Mpc "
+            f"limit of the simulation ladder"
+        )
+
+    # Nearest rung, unless the caller pinned one or supplied a frame.
+    if grid_df is None and grid is None:
+        grid = grid_for_distance(dist_mpc)
+        logger.debug("target %s at %.0f Mpc -> grid %s", target_id, dist_mpc, grid)
+    elif grid is None:
+        grid = DEFAULT_GRID
 
     phot = _get_post_disc_phot(target_id=target_id,
                                nonlocalized_event=nonlocalized_event,
