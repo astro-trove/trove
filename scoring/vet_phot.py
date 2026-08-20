@@ -220,10 +220,19 @@ def estimate_max_find_decay_rate(
     -------
     max_time: float
         Days since GW discovery for max to occur
-    decay_slope: float
-        The slope of the decay from peak between peak and max_decay_fit_time if the
-        if the data has a maximum in the mag array. Otherwise this is just the slope
-        of the light curve in mag/day.
+    decay_rate: float
+        The late-time logarithmic slope of the light curve, in **magnitudes per
+        dex of time** -- NOT mag/day. For a power law d(mag)/d(log10 t) is
+        constant, which is why it is quoted per dex; the same curve expressed
+        in mag/day varies by a factor ~24 across the 25 d window and would not
+        be a single number.
+
+        SIGN: this is the `a` of `mag = y0 - a*log10(t)`, so it is the NEGATIVE
+        of d(mag)/d(log10 t). A source getting FAINTER has d(mag)/d(log10 t) > 0
+        and therefore `decay_rate < 0`. Hence the kilonova cut is
+        `decay_rate <= -0.1`. Relation to the flux index: for F ~ t^-alpha,
+        decay_rate = -2.5*alpha, so r-process heating (alpha ~ 1.3) corresponds
+        to about -3.25 and the -0.1 cut to alpha ~ 0.04.
     """
 
     # define some useful variables
@@ -355,14 +364,16 @@ def estimate_max_find_decay_rate(
         logger.info("Powerlaw fits better")
         model = _powerlaw
         best_fit_params = pl_popt
-        decay_rate = pl_popt[0]  # this is the slope
+        # mag = y0 - a*log10(t)  =>  d(mag)/d(log10 t) = -a
+        mag_slope_per_dex = -pl_popt[0]
     elif not bpl_failed:
         logger.info("Broken Powerlaw fits better")
         model = _broken_powerlaw
         best_fit_params = bpl_popt
-        # a1 is the late-time ASYMPTOTIC index (see `_broken_powerlaw`). It is
-        # not what we report -- see the secant calculation below.
-        decay_rate = bpl_popt[0]
+        # Late-time limit of `_broken_powerlaw`: the u**-a1 term dominates, so
+        # mag -> y0 - a1*log10(t)  =>  d(mag)/d(log10 t) = -a1.
+        # Same form as the single powerlaw above, hence the same expression.
+        mag_slope_per_dex = -bpl_popt[0]
     else:
         raise RuntimeError(
             "Both a powerlaw and broken powerlaw failed to fit the data!"
@@ -378,33 +389,35 @@ def estimate_max_find_decay_rate(
         np.argmin(ytest)
     ]  # need to use min here b/s magnitudes are backwards
 
-    # Report the slope ACTUALLY TRAVERSED from the peak to the end of the fit
-    # window, which is what this function documents ("the slope of the decay
-    # from peak to max_decay_fit_time") and what the `decay_rate` check means.
+    # ------------------------------------------------------------------
+    # SIGN CONVENTION. Two quantities, differing by a minus sign; conflating
+    # them is what produced the bug in diagnostics/reports/DECAY_RATE_SIGN.md,
+    # so both are named and the conversion is written out explicitly.
     #
-    # For the single powerlaw this is an identity: mag = y0 - a*log10(x) has
-    # secant slope -a over every interval, so `decay_rate` is unchanged to
-    # within floating point and the branch behaves exactly as before.
+    #   mag_slope_per_dex = d(mag)/d(log10 t)
+    #       the physical quantity. POSITIVE means the magnitude is rising,
+    #       i.e. the source is getting FAINTER (fading).
     #
-    # For the broken powerlaw the two differ, and a1 is the wrong one. a1 is
-    # the asymptote as x -> inf, reached only well past the break; when the
-    # fitted break lands near the edge of the 25 d window -- which is common,
-    # because a light curve still declining at 25 d has its turnover fit there
-    # -- a1 runs away to values the data never traverses. Measured on
-    # S251112cm: AT2025adiv fits a1 = -23.3 while the model drops only 1.53 mag
-    # after its break at 20.9 d. The secant reports what the curve does over
-    # the observed interval instead.
-    x_end = float(np.max(dt_days_tofit))
-    x_peak = float(max_time)
-    if not (x_end > x_peak > 0):
-        # peak sits at (or past) the last point: nothing to take a secant over,
-        # so fall back to the full observed span. Still exact for a powerlaw.
-        x_peak = float(np.min(dt_days_tofit))
-    if x_end > x_peak > 0:
-        decay_rate = -float(
-            (model(x_end, *best_fit_params) - model(x_peak, *best_fit_params))
-            / (np.log10(x_end) - np.log10(x_peak))
-        )
+    #   decay_rate = -mag_slope_per_dex
+    #       what this function returns and what `PARAM_RANGES["decay_rate"]`
+    #       is written against. It is the `a` of `mag = y0 - a*log10(t)`, so
+    #       it carries the OPPOSITE sign: a FADING source has decay_rate < 0.
+    #       That is why the kilonova cut is `decay_rate <= -0.1` and not
+    #       `>= +0.1`.
+    #
+    # The value is the LIMITING slope -- what the model approaches at late
+    # times -- because the threshold and the r-process expectation behind it
+    # (L ~ t^-1.3) both refer to a limiting index. A revision that reported the
+    # secant from the peak to the last epoch instead was systematically shallow
+    # (median 2.4x, up to 4x, always the same direction) and was reverted.
+    #
+    # Known caveat, NOT addressed here: when the fitted break `x0` lands near
+    # the end of the window, the limiting slope is an extrapolation into a
+    # regime the data barely samples (AT2025adiv reaches only 0.022 dex past
+    # its break and fits a1 = -23.3). Bounding `x0` inside the data would fix
+    # that at the source. See DECAY_RATE_SIGN.md section 2.6.
+    # ------------------------------------------------------------------
+    decay_rate = -mag_slope_per_dex
 
     return model, best_fit_params, max_time, decay_rate
     

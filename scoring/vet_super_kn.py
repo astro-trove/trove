@@ -38,6 +38,9 @@ logger = logging.getLogger(__name__)
 PARAM_RANGES = dict(
     lum_max=[1e41 * u.erg / u.s, 1e43 * u.erg / u.s],
     peak_time=[10, 70],
+    # unbounded: this mode does not test the decay rate. decay_rate is the
+    # NEGATIVE of d(mag)/d(log10 t) -- see
+    # vet_phot.estimate_max_find_decay_rate.
     decay_rate=[-np.inf, np.inf],
     max_predets=3,
     t_pre=-1.0,

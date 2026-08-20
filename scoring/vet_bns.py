@@ -41,6 +41,10 @@ logger = logging.getLogger(__name__)
 PARAM_RANGES = dict(
     lum_max=[0 * u.erg / u.s, 1e43 * u.erg / u.s],
     peak_time=[0, 4],
+    # decay_rate is the `a` of mag = y0 - a*log10(t), i.e. the NEGATIVE of
+    # d(mag)/d(log10 t). A FADING source has decay_rate < 0, so this window
+    # means "fading by at least 0.1 mag per dex of time". See
+    # vet_phot.estimate_max_find_decay_rate for the full convention.
     decay_rate=[-np.inf, -0.1],
     max_predets=3,
     t_pre=0,
