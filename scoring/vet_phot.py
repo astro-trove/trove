@@ -39,9 +39,27 @@ def _powerlaw(x, a, y0):
 
 def _broken_powerlaw(x, a1, a2, y0, x0):
     """
-    Broken powerlaw with smoothing s that returns a logarithmic y value
+    Smoothly broken powerlaw (Beuermann+1999) returning a logarithmic y value.
+
+    In flux the two components combine reciprocally, F ~ 1/(u**-a1 + u**-a2)
+    with u = x/x0, so that the *smaller* term dominates and the light curve
+    peaks at the break. Magnitudes are -2.5log10(F), hence the PLUS sign here.
+
+    Writing it with a minus sign instead makes the two components add in flux,
+    which produces a curve that is brightest at both ends and faintest at the
+    break -- the inverse of a transient -- and forces the late-time slope to
+    the wrong sign. See diagnostics/reports/DECAY_RATE_SIGN.md.
+
+    With the bounds applied in `estimate_max_find_decay_rate`
+    (a1 < 0 < a2) the asymptotes are
+
+        x << x0:  mag -> y0 - a2*log10(x/x0)   rising  (slope -a2 < 0)
+        x >> x0:  mag -> y0 - a1*log10(x/x0)   fading  (slope -a1 > 0)
+
+    so the late-time decay index in the same convention as `_powerlaw`
+    (mag = y0 - a*log10(x)) is simply a1.
     """
-    return y0 - np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+    return y0 + np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
 
 
 def _ssr(model_y, data_y):
@@ -219,6 +237,45 @@ def estimate_max_find_decay_rate(
     mag_tofit = mag[dt_days <= max_decay_fit_time]
     magerr_tofit = magerr[dt_days <= max_decay_fit_time]
 
+    # Drop rows that repeat a measurement already present. The same ATLAS
+    # detection is routinely ingested twice -- same timestamp, same magnitude,
+    # two ReducedDatum rows -- and a repeated row carries no information while
+    # counting three times over: it double-weights that epoch in the least
+    # squares, inflates `n_samples` in the AIC, and inflates the point count
+    # that gates the broken powerlaw below. Only EXACT repeats of (time,
+    # magnitude) are removed; two bands observed at one timestamp have
+    # different magnitudes and both survive.
+    dt_days_tofit = np.asarray(dt_days_tofit, dtype=float)
+    mag_tofit = np.asarray(mag_tofit, dtype=float)
+    magerr_tofit = np.asarray(magerr_tofit, dtype=float)
+    if dt_days_tofit.size:
+        _, _keep = np.unique(
+            np.column_stack((dt_days_tofit, mag_tofit)), axis=0, return_index=True
+        )
+        _keep.sort()
+        if _keep.size < dt_days_tofit.size:
+            logger.info(
+                "Dropped %d duplicated photometry row(s) before fitting",
+                dt_days_tofit.size - _keep.size,
+            )
+        dt_days_tofit = dt_days_tofit[_keep]
+        mag_tofit = mag_tofit[_keep]
+        magerr_tofit = magerr_tofit[_keep]
+
+    # Distinct epochs, which is what actually constrains a fit in time. Two
+    # rows at one timestamp cannot determine a slope no matter how many there
+    # are: the single powerlaw has two free parameters, so through one distinct
+    # x every (a, y0) on a line through the point is a zero-residual solution
+    # and `curve_fit` returns wherever it stopped. AT2025adtu produced
+    # decay_rate = +65 that way. Refuse instead of inventing a number; the
+    # caller already handles this the same way it handles a failed fit.
+    n_epochs = int(np.unique(dt_days_tofit).size)
+    if n_epochs < 2:
+        raise RuntimeError(
+            f"Only {n_epochs} distinct epoch(s) within {max_decay_fit_time} d "
+            "-- the decay rate is not determined by this data"
+        )
+
     curve_fit_kwargs = dict(
         xdata=dt_days_tofit,
         ydata=mag_tofit,
@@ -243,11 +300,14 @@ def estimate_max_find_decay_rate(
     # aic = 2.0 * (n_params - log_likelihood) + 2.0 * n_params * (n_params + 1.0) / (
     #             n_samples - n_params - 1.0
     #         )
-    # so if len(mag) = n_samples+1 the denominator is 0 and the AIC blows up
-    if len(mag_tofit) > bpl_nparams + 2:
+    # so if n_samples = n_params+1 the denominator is 0 and the AIC blows up.
+    # Counted in DISTINCT EPOCHS, not rows: duplicated rows used to carry
+    # candidates over this threshold on fewer real epochs than it intends
+    # (3 of 456 on S251112cm).
+    if n_epochs > bpl_nparams + 2:
         bpl_bounds = [
-            (-np.inf, 0),  # a1 bound, can be anything
-            (0, np.inf),  # a2 bound, can be anything
+            (-np.inf, 0),  # a1: late-time index, < 0 so the tail fades
+            (0, np.inf),  # a2: early-time index, > 0 so the rise brightens
             (
                 0,
                 2 * mag_tofit.max(),
@@ -300,9 +360,9 @@ def estimate_max_find_decay_rate(
         logger.info("Broken Powerlaw fits better")
         model = _broken_powerlaw
         best_fit_params = bpl_popt
-        decay_rate = -bpl_popt[
-            0
-        ]  # this is the decay slope since we force -inf < a1 < 0 with the bounds, negate b/c magnitudes
+        # a1 is the late-time ASYMPTOTIC index (see `_broken_powerlaw`). It is
+        # not what we report -- see the secant calculation below.
+        decay_rate = bpl_popt[0]
     else:
         raise RuntimeError(
             "Both a powerlaw and broken powerlaw failed to fit the data!"
@@ -317,6 +377,34 @@ def estimate_max_find_decay_rate(
     max_time = xtest[
         np.argmin(ytest)
     ]  # need to use min here b/s magnitudes are backwards
+
+    # Report the slope ACTUALLY TRAVERSED from the peak to the end of the fit
+    # window, which is what this function documents ("the slope of the decay
+    # from peak to max_decay_fit_time") and what the `decay_rate` check means.
+    #
+    # For the single powerlaw this is an identity: mag = y0 - a*log10(x) has
+    # secant slope -a over every interval, so `decay_rate` is unchanged to
+    # within floating point and the branch behaves exactly as before.
+    #
+    # For the broken powerlaw the two differ, and a1 is the wrong one. a1 is
+    # the asymptote as x -> inf, reached only well past the break; when the
+    # fitted break lands near the edge of the 25 d window -- which is common,
+    # because a light curve still declining at 25 d has its turnover fit there
+    # -- a1 runs away to values the data never traverses. Measured on
+    # S251112cm: AT2025adiv fits a1 = -23.3 while the model drops only 1.53 mag
+    # after its break at 20.9 d. The secant reports what the curve does over
+    # the observed interval instead.
+    x_end = float(np.max(dt_days_tofit))
+    x_peak = float(max_time)
+    if not (x_end > x_peak > 0):
+        # peak sits at (or past) the last point: nothing to take a secant over,
+        # so fall back to the full observed span. Still exact for a powerlaw.
+        x_peak = float(np.min(dt_days_tofit))
+    if x_end > x_peak > 0:
+        decay_rate = -float(
+            (model(x_end, *best_fit_params) - model(x_peak, *best_fit_params))
+            / (np.log10(x_end) - np.log10(x_peak))
+        )
 
     return model, best_fit_params, max_time, decay_rate
     
@@ -599,8 +687,13 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # then we can only do the next stuff if there is more than one photometry point
     # at this filter
-    # has to be at least 2 points before max_decay_fit_time, to fit the powerlaw
-    if len(phot[phot.dt < param_ranges["max_decay_fit_time"]]) > 1:
+    # has to be at least 2 distinct EPOCHS before max_decay_fit_time to fit the
+    # powerlaw. Counting rows instead let a measurement ingested twice satisfy
+    # this and hand `estimate_max_find_decay_rate` a rank-deficient problem;
+    # that function now refuses such data as well, so this is the cheap guard
+    # and that one is the authoritative check.
+    _in_window = phot.dt[phot.dt < param_ranges["max_decay_fit_time"]]
+    if _in_window.nunique() > 1:
         # find the maximum and decay rate
         try:
             _model, _best_fit_params, max_time, decay_rate = (
