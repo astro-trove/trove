@@ -37,7 +37,7 @@ def _powerlaw(x, a, y0):
     return y0 - a * np.log10(x)
 
 
-def _broken_powerlaw(x, a1, a2, y0, x0):
+def _broken_powerlaw_concave(x, a1, a2, y0, x0):
     """Smoothly broken powerlaw, CONCAVE branch. Original TROVE model.
 
     With u = x/x0 the two components are combined additively in flux,
@@ -354,7 +354,7 @@ def estimate_max_find_decay_rate(
     # Both curvatures are fitted, because the sign of the log term decides
     # whether the slope may increase or decrease with time and one form cannot
     # do both. Trying only one restricts the model to three of the six break
-    # shapes; see `_broken_powerlaw` / `_broken_powerlaw_convex`.
+    # shapes; see `_broken_powerlaw_concave` / `_broken_powerlaw_convex`.
     #
     # Only worth attempting with more than bpl_nparams + 2 DISTINCT EPOCHS,
     # otherwise the AIC small-sample term 2k(k+1)/(n-k-1) has a zero or
@@ -376,7 +376,7 @@ def estimate_max_find_decay_rate(
             ),  # x0 bound, really shouldn't be greater than max(dt)
         ]
         for label, base in (
-            ("broken_concave", _broken_powerlaw),
+            ("broken_concave", _broken_powerlaw_concave),
             ("broken_convex", _broken_powerlaw_convex),
         ):
             try:
@@ -401,11 +401,12 @@ def estimate_max_find_decay_rate(
         options.append(
             ("powerlaw", _powerlaw, pl_popt, pl_nparams, -pl_popt[0])
         )
+
     for label, (base, popt) in broken_fits.items():
         # with a1 <= a2 the late-time asymptote is governed by a1:
         #   concave  mag -> y0 + a1*log10(t)   =>  slope = +a1
         #   convex   mag -> y0 - a1*log10(t)   =>  slope = -a1
-        slope = popt[0] if base is _broken_powerlaw else -popt[0]
+        slope = popt[0] if base is _broken_powerlaw_concave else -popt[0]
         options.append((label, base, popt, bpl_nparams, slope))
 
     if not options:
@@ -442,7 +443,6 @@ def estimate_max_find_decay_rate(
         np.argmin(ytest)
     ]  # need to use min here b/s magnitudes are backwards
 
-    # ------------------------------------------------------------------
     # SIGN CONVENTION. Two quantities, differing by a minus sign; conflating
     # them is what produced the bug in diagnostics/reports/DECAY_RATE_SIGN.md,
     # so both are named and the conversion is written out explicitly.
@@ -463,13 +463,6 @@ def estimate_max_find_decay_rate(
     # (L ~ t^-1.3) both refer to a limiting index. A revision that reported the
     # secant from the peak to the last epoch instead was systematically shallow
     # (median 2.4x, up to 4x, always the same direction) and was reverted.
-    #
-    # Known caveat, NOT addressed here: when the fitted break `x0` lands near
-    # the end of the window, the limiting slope is an extrapolation into a
-    # regime the data barely samples (AT2025adiv reaches only 0.022 dex past
-    # its break and fits a1 = -23.3). Bounding `x0` inside the data would fix
-    # that at the source. See DECAY_RATE_SIGN.md section 2.6.
-    # ------------------------------------------------------------------
     decay_rate = -mag_slope_per_dex
 
     return model, best_fit_params, max_time, decay_rate
