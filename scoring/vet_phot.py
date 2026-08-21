@@ -38,28 +38,77 @@ def _powerlaw(x, a, y0):
 
 
 def _broken_powerlaw(x, a1, a2, y0, x0):
+    """Smoothly broken powerlaw, CONCAVE branch. Original TROVE model.
+
+    With u = x/x0 the two components are combined additively in flux,
+
+        mag = y0 - log10(u**-a1 + u**-a2)
+
+    `log10(sum of powers of u)` is convex in log10(u), so negating it makes
+    this CONCAVE in the (log10 t, mag) plane: the slope d(mag)/d(log10 t) can
+    only DECREASE with time. Writing a1 <= a2 (enforced by the fitter, see
+    `_fit_broken`), the asymptotes are
+
+        x << x0:  mag -> y0 + a2*log10(x/x0)      slope = a2
+        x >> x0:  mag -> y0 + a1*log10(x/x0)      slope = a1   (a1 <= a2)
+
+    Since slope > 0 means fading, this branch covers exactly the shapes whose
+    behaviour becomes *more brightening* with time:
+
+        decline -> rise        (rebrightening; SN IIb like SN2025ulz)
+        decline -> shallower decline
+        rise    -> steeper rise
+
+    It CANNOT represent rise -> decline, decline -> steeper decline, or
+    rise -> shallower rise. `_broken_powerlaw_convex` covers those.
     """
-    Smoothly broken powerlaw (Beuermann+1999) returning a logarithmic y value.
+    return y0 - np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
 
-    In flux the two components combine reciprocally, F ~ 1/(u**-a1 + u**-a2)
-    with u = x/x0, so that the *smaller* term dominates and the light curve
-    peaks at the break. Magnitudes are -2.5log10(F), hence the PLUS sign here.
 
-    Writing it with a minus sign instead makes the two components add in flux,
-    which produces a curve that is brightest at both ends and faintest at the
-    break -- the inverse of a transient -- and forces the late-time slope to
-    the wrong sign. See diagnostics/reports/DECAY_RATE_SIGN.md.
+def _broken_powerlaw_convex(x, a1, a2, y0, x0):
+    """Smoothly broken powerlaw, CONVEX branch. The complement of the above.
 
-    With the bounds applied in `estimate_max_find_decay_rate`
-    (a1 < 0 < a2) the asymptotes are
+        mag = y0 + log10(u**-a1 + u**-a2)
 
-        x << x0:  mag -> y0 - a2*log10(x/x0)   rising  (slope -a2 < 0)
-        x >> x0:  mag -> y0 - a1*log10(x/x0)   fading  (slope -a1 > 0)
+    Same two components, opposite sign on the log, so this is CONVEX in
+    (log10 t, mag): the slope can only INCREASE with time. With a1 <= a2,
 
-    so the late-time decay index in the same convention as `_powerlaw`
-    (mag = y0 - a*log10(x)) is simply a1.
+        x << x0:  mag -> y0 - a2*log10(x/x0)      slope = -a2
+        x >> x0:  mag -> y0 - a1*log10(x/x0)      slope = -a1  (-a1 >= -a2)
+
+    covering the three shapes the concave branch cannot:
+
+        rise    -> decline     (a transient peaking at the break)
+        decline -> steeper decline
+        rise    -> shallower rise
+
+    WHY BOTH ARE NEEDED. The sign of the log term fixes the curvature, and one
+    functional form cannot do both: log-sum-exp is convex, its negation
+    concave. Fitting only one silently restricts the model to three of the six
+    possible break shapes -- and the original bounds (a1 < 0 < a2) narrowed
+    that to a single shape. See diagnostics/reports/BROKEN_POWERLAW_SHAPES.md.
     """
     return y0 + np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+
+
+def _ordered(base):
+    """Reparameterise `base(x, a1, a2, ...)` as `(x, a1, delta, ...)`, a2 = a1 + delta.
+
+    Both broken powerlaws are symmetric under swapping a1 and a2, which gives
+    the fit two identical minima and makes convergence and interpretation
+    unstable. Requiring `delta >= 0` breaks that symmetry with a box bound,
+    and pins a1 as the LATE-time index for both branches, so one expression
+    reads the decay rate off either.
+
+    This replaces the original device for breaking the same symmetry -- bounding
+    a1 < 0 < a2 -- which also, unintentionally, restricted the model to one of
+    the six break shapes.
+    """
+
+    def wrapped(x, a1, delta, y0, x0):
+        return base(x, a1, a1 + delta, y0, x0)
+
+    return wrapped
 
 
 def _ssr(model_y, data_y):
@@ -294,29 +343,29 @@ def estimate_max_find_decay_rate(
         ftol=1e-8,
     )
 
-    # first fit a regular powerlaw
+    # ---- candidate 1: a single powerlaw -------------------------------
     try:
         pl_popt, pl_pcov = curve_fit(_powerlaw, **curve_fit_kwargs)
     except RuntimeError:
         # RuntimeError will throw if it doesn't converge
         pl_popt, pl_pcov = None, None
 
-    # then fit a broken powerlaw
-    # but we only want to try a broken powerlaw if there are more than 6 points
-    # otherwise the data doesn't give enough constraining power
-    # need to add 2 b/c otherwise we can't compute the AIC
-    # For ref, the equation used in the AIC score is
-    # aic = 2.0 * (n_params - log_likelihood) + 2.0 * n_params * (n_params + 1.0) / (
-    #             n_samples - n_params - 1.0
-    #         )
-    # so if n_samples = n_params+1 the denominator is 0 and the AIC blows up.
-    # Counted in DISTINCT EPOCHS, not rows: duplicated rows used to carry
-    # candidates over this threshold on fewer real epochs than it intends
-    # (3 of 456 on S251112cm).
+    # ---- candidates 2 and 3: the two broken powerlaws -----------------
+    # Both curvatures are fitted, because the sign of the log term decides
+    # whether the slope may increase or decrease with time and one form cannot
+    # do both. Trying only one restricts the model to three of the six break
+    # shapes; see `_broken_powerlaw` / `_broken_powerlaw_convex`.
+    #
+    # Only worth attempting with more than bpl_nparams + 2 DISTINCT EPOCHS,
+    # otherwise the AIC small-sample term 2k(k+1)/(n-k-1) has a zero or
+    # negative denominator.
+    broken_fits = {}
     if n_epochs > bpl_nparams + 2:
+        # a1 free over the whole line -- the sign is no longer used to break
+        # the a1 <-> a2 swap symmetry, `delta >= 0` does that instead.
         bpl_bounds = [
-            (-np.inf, 0),  # a1: late-time index, < 0 so the tail fades
-            (0, np.inf),  # a2: early-time index, > 0 so the rise brightens
+            (-np.inf, np.inf),  # a1: the LATE-time index (see `_ordered`)
+            (0, np.inf),        # delta = a2 - a1, >= 0 to order the two
             (
                 0,
                 2 * mag_tofit.max(),
@@ -326,57 +375,61 @@ def estimate_max_find_decay_rate(
                 dt_days_tofit.max(),
             ),  # x0 bound, really shouldn't be greater than max(dt)
         ]
-        try:
-            bpl_popt, bpl_pcov = curve_fit(
-                _broken_powerlaw, bounds=list(zip(*bpl_bounds)), **curve_fit_kwargs
-            )
-        except (RuntimeError, TypeError) as exc:
-            # RuntimeError will throw if it doesn't converge
-            # TypeError will throw if there are <5 photometry points (and we should be
-            # using the single powerlaw anyways with so few points!)
-            logger.warning(f"Failed on the Broken Powerlaw fit with {exc}")
-            bpl_popt, bpl_pcov = None, None
-    else:
-        bpl_popt, bpl_pcov = None, None
+        for label, base in (
+            ("broken_concave", _broken_powerlaw),
+            ("broken_convex", _broken_powerlaw_convex),
+        ):
+            try:
+                popt, _ = curve_fit(
+                    _ordered(base), bounds=list(zip(*bpl_bounds)), **curve_fit_kwargs
+                )
+            except (RuntimeError, TypeError) as exc:
+                # RuntimeError if it doesn't converge; TypeError if there are
+                # fewer points than parameters
+                logger.warning(f"Failed on the {label} fit with {exc}")
+                continue
+            a1, delta, y0, x0 = popt
+            # store in the model's own (a1, a2, y0, x0) signature
+            broken_fits[label] = (base, np.array([a1, a1 + delta, y0, x0]))
 
-    # define some variables for checking later if one of these methods failed
-    pl_failed = pl_popt is None
-    bpl_failed = bpl_popt is None
+    # ---- choose between them on the AIC -------------------------------
+    # `mag_slope_per_dex` is d(mag)/d(log10 t) at late times: POSITIVE means
+    # the magnitude is rising, i.e. the source is getting FAINTER.
+    options = []
+    if pl_popt is not None:
+        # mag = y0 - a*log10(t)  =>  slope = -a, at all times
+        options.append(
+            ("powerlaw", _powerlaw, pl_popt, pl_nparams, -pl_popt[0])
+        )
+    for label, (base, popt) in broken_fits.items():
+        # with a1 <= a2 the late-time asymptote is governed by a1:
+        #   concave  mag -> y0 + a1*log10(t)   =>  slope = +a1
+        #   convex   mag -> y0 - a1*log10(t)   =>  slope = -a1
+        slope = popt[0] if base is _broken_powerlaw else -popt[0]
+        options.append((label, base, popt, bpl_nparams, slope))
 
-    # then calculate the reduced chi2 for each of these outputs
-    # but we only need to do this if both models succeeded in fitting the data
-    if not pl_failed and not bpl_failed:
-        pl_model_y = _powerlaw(dt_days_tofit, *pl_popt)
-        pl_ssr = _ssr(pl_model_y, mag_tofit)
-        pl_info_crit = info_crit(pl_ssr, pl_nparams, len(mag_tofit))
-
-        bpl_model_y = _broken_powerlaw(dt_days_tofit, *bpl_popt)
-        bpl_ssr = _ssr(bpl_model_y, mag_tofit)
-        bpl_info_crit = info_crit(bpl_ssr, bpl_nparams, len(mag_tofit))
-    else:
-        pl_info_crit = np.inf
-        bpl_info_crit = np.inf
-
-    # now we can prefer the model with the lower AIC score
-    if (not pl_failed and bpl_failed) or (
-        not pl_failed and pl_info_crit < bpl_info_crit
-    ):
-        logger.info("Powerlaw fits better")
-        model = _powerlaw
-        best_fit_params = pl_popt
-        # mag = y0 - a*log10(t)  =>  d(mag)/d(log10 t) = -a
-        mag_slope_per_dex = -pl_popt[0]
-    elif not bpl_failed:
-        logger.info("Broken Powerlaw fits better")
-        model = _broken_powerlaw
-        best_fit_params = bpl_popt
-        # Late-time limit of `_broken_powerlaw`: the u**-a1 term dominates, so
-        # mag -> y0 - a1*log10(t)  =>  d(mag)/d(log10 t) = -a1.
-        # Same form as the single powerlaw above, hence the same expression.
-        mag_slope_per_dex = -bpl_popt[0]
-    else:
+    if not options:
         raise RuntimeError(
             "Both a powerlaw and broken powerlaw failed to fit the data!"
+        )
+
+    if len(options) == 1:
+        # nothing to compare against; AIC is undefined for n <= n_params + 1
+        # and was not computed in this case before either
+        label, model, best_fit_params, _nparams, mag_slope_per_dex = options[0]
+    else:
+        scored = []
+        for label, f, popt, k, slope in options:
+            ssr = _ssr(f(dt_days_tofit, *popt), mag_tofit)
+            scored.append(
+                (info_crit(ssr, k, len(mag_tofit)), label, f, popt, slope)
+            )
+        scored.sort(key=lambda row: row[0])
+        _aic, label, model, best_fit_params, mag_slope_per_dex = scored[0]
+        logger.info(
+            "Model selected: %s (AIC %s)",
+            label,
+            ", ".join(f"{lb}={ac:.2f}" for ac, lb, *_ in scored),
         )
 
     # finally, compute the maximum time using a finely spaced array
