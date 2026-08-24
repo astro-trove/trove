@@ -4,7 +4,7 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponse
+from django.http import JsonResponse, HttpResponse, QueryDict
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.base import View
@@ -15,7 +15,11 @@ from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from scoring.models import ScoreFactor
-from scoring.util import get_event_candidate_scores
+from scoring.util import (
+    get_event_candidate_scores,
+    get_last_vet_all_run,
+    get_vet_all_progress,
+)
 from tom_dataproducts.models import ReducedDatum
 from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
 
@@ -23,6 +27,24 @@ from astropy.coordinates import SkyCoord
 from astropy.time import Time
 
 from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
+
+
+#: How long a scored candidate list is held for. A "Vet All" run rewrites those
+#: scores continuously, so while one is going it is held for less.
+SCORE_CACHE_PERIOD = 60 * 5
+SCORE_CACHE_PERIOD_WHILE_VETTING = 60
+
+def scored_candidates_cache_key(query_params, agn_toggle):
+    """
+    Cache key for the scored candidate list matching a set of filters.
+
+    Everything that reads, writes or invalidates that cache goes through here,
+    so the three cannot drift apart and leave the page serving scores nothing
+    can clear.
+    """
+    query_params = query_params.copy()
+    query_params.pop("page", None)  # every page shares one scored list
+    return f"event_candidates_scored_{query_params.urlencode()}_{agn_toggle}"
 
 
 class EventCandidateListView(FilterView):
@@ -76,12 +98,14 @@ class EventCandidateListView(FilterView):
         context = super().get_context_data(**kwargs)
 
         agn_toggle = cache.get("agn_toggle", True)
+        nle_id = self.request.GET.get("nonlocalizedevent")
 
-        # Create cache key from filters (excluding page number)
-        query_params = self.request.GET.copy()
-        query_params.pop("page", None)
-        filter_key = query_params.urlencode()
-        cache_key = f"event_candidates_scored_{filter_key}_{agn_toggle}"
+        # how far along is the last "Vet All" run for this event? While one is
+        # running the scores below are a mix of new and not-yet-updated values,
+        # which the page has to say out loud
+        vet_all_progress = get_vet_all_progress(nle_id)
+
+        cache_key = scored_candidates_cache_key(self.request.GET, agn_toggle)
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
         # current NLE when the AGN toggle is flipped)
@@ -90,8 +114,13 @@ class EventCandidateListView(FilterView):
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
             scored_candidates = get_event_candidate_scores(all_candidates, agn_toggle=agn_toggle)
-            # Cache for 5 minutes
-            cache.set(cache_key, scored_candidates, 60 * 5)
+            # a run in progress rewrites these scores continuously, so hold them
+            # for less time than usual to keep the page closer to the truth
+            if vet_all_progress and vet_all_progress["running"]:
+                cache_timeout = SCORE_CACHE_PERIOD_WHILE_VETTING
+            else:
+                cache_timeout = SCORE_CACHE_PERIOD
+            cache.set(cache_key, scored_candidates, cache_timeout)
 
         # Paginate the cached scored list
         paginator = Paginator(scored_candidates, self.paginate_by)
@@ -101,8 +130,11 @@ class EventCandidateListView(FilterView):
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
+        context["vet_all_progress"] = vet_all_progress
+        # standing record of when these scores were last refreshed in bulk,
+        # which outlives the transient progress notice above
+        context["last_vet_all"] = get_last_vet_all_run(nle_id)
 
-        nle_id = self.request.GET.get("nonlocalizedevent")
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
 
@@ -303,8 +335,10 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             scored_candidates = get_event_candidate_scores(candidates, agn_toggle=new_val)
 
             # Re-sores all candidates after AGN-toggle change and saves to cache
-            cache_key = f"event_candidates_scored_nonlocalizedevent={nle_id}_{new_val}"
-            cache.set(cache_key, scored_candidates, 60 * 5)
+            cache_key = scored_candidates_cache_key(
+                QueryDict(f"nonlocalizedevent={nle_id}"), new_val
+            )
+            cache.set(cache_key, scored_candidates, SCORE_CACHE_PERIOD)
             return redirect(reverse("custom_code:event-candidates") + f"?nonlocalizedevent={nle_id}")
         return redirect(reverse("custom_code:event-candidates"))
 
@@ -323,11 +357,56 @@ class SkymapPartialView(View):
 
 
 class RefreshCandidateList(LoginRequiredMixin, View):
+    """
+    Throw away the cached scores for the current candidate list and reload it.
+
+    The reload on its own was not a refresh: it sent the user back to a page
+    that served its scores straight out of the cache for up to five minutes,
+    which is precisely the wrong answer while a "Vet All" run is rewriting
+    those scores underneath.
+    """
+
+    def get(self, request, *args, **kwargs):
+        # the AGN toggle is site-wide and can be flipped by anyone, so clear
+        # the cached list for both of its states rather than just the current one
+        for agn_toggle in (True, False):
+            cache.delete(scored_candidates_cache_key(request.GET, agn_toggle))
+
+        # send the user back to the list they were looking at, filters and all
+        query_string = request.GET.urlencode()
+        url = reverse("custom_code:event-candidates")
+        if query_string:
+            url += f"?{query_string}"
+        return redirect(url)
+
+
+class VetAllProgressPartialView(View):
+    """
+    Just the "Vet All" progress notice.
+
+    The candidate list polls this while a run is going so the notice keeps up
+    with the queue, which costs three counts, rather than re-scoring every
+    candidate on the page.
+    """
+
     def get(self, request, *args, **kwargs):
         nle_id = request.GET.get("nonlocalizedevent")
-        if nle_id:
-            return redirect(reverse('custom_code:event-candidates') + f'?nonlocalizedevent={nle_id}')
-        return redirect(reverse('curstom_code:event-candidates'))
+
+        # This view answers with a fragment, which is not a page. Anyone who
+        # arrives here directly -- a reload, a bookmark, a stale history entry --
+        # wants the candidate list, so send them there rather than showing them
+        # a stray notice on a blank page.
+        if not getattr(request, "htmx", False):
+            url = reverse("custom_code:event-candidates")
+            if nle_id:
+                url += f"?nonlocalizedevent={nle_id}"
+            return redirect(url)
+
+        return render(
+            request,
+            "trove_nonlocalizedevents/partials/vet_all_progress.html",
+            {"vet_all_progress": get_vet_all_progress(nle_id)},
+        )
 
 def vet_all_cooldown_notice(request):
     messages.warning(

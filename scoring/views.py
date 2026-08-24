@@ -37,6 +37,7 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      DETECTION_HORIZON_DEFAULTS
                      )
 from .tasks import vet_all_async, associate_targets_with_nle_async
+from .util import get_vet_all_progress
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .dynamic_catalogs import UserGalaxy
@@ -334,6 +335,20 @@ class TargetVettingAllFormView(FormView):
             ] # set initial to basic if most likely class not recognized
         return form
 
+    # overriding the get_context_data function
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # tell the user what they are about to set off before they set it off:
+        # this vets every candidate of the event, one at a time, and for a
+        # well-populated event that is a job of hours rather than seconds
+        nle_id = self.kwargs["pk"]
+        context["vet_all_candidate_count"] = EventCandidate.objects.filter(
+            nonlocalizedevent_id=nle_id
+        ).count()
+        context["vet_all_progress"] = get_vet_all_progress(nle_id)
+        return context
+
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
         if referer:
@@ -404,12 +419,20 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
             "target__name"
         )
 
+        n_candidates = ecs.count()
+
         # then run the vetting, asynchronously
         messages.info(
             request,
-            f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate; check back later.",
+            f"Vetting all {n_candidates} candidates in {vetting_mode} vetting "
+            "mode. Each candidate is queued as its own job, so the run can take "
+            "anywhere from minutes to hours depending on how busy the workers "
+            "are. The candidate list shows how far the run has got, and scores "
+            "update as each candidate finishes, so treat the scores and the "
+            "ranking as incomplete until it does.",
         )
-        vet_all_async(ecs, nle, vetting_mode)
+        vet_all_async(ecs, nle, vetting_mode,
+                      started_by=request.user.get_username())
 
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"

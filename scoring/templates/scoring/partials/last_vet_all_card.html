@@ -1,0 +1,52 @@
+{% comment %}
+When this candidate was last picked up by a Vet All run.
+
+Deliberately titled "Vet All": this reads the task queue, and vetting a single
+target from this page runs synchronously without queueing anything, so it leaves
+no trace here. Saying "last vetted" would therefore be a lie in that case.
+{% endcomment %}
+<div class="card mb-3">
+  <div class="card-header"><h5 class="mb-0">Most Recent Vet All</h5></div>
+  <div class="card-body">
+    {% if last_vet_all.in_progress %}
+    <p class="mb-2">
+      <span class="badge badge-warning">Vetting now</span>
+      This candidate is queued or being vetted right now, so its score is about
+      to change.
+    </p>
+    {% endif %}
+
+    {% if last_vet_all.last %}
+    <dl class="row mb-0">
+      <dt class="col-sm-4">Completed</dt>
+      <dd class="col-sm-8">
+        {{ last_vet_all.last.finished|date:"Y-m-d H:i" }} UTC
+        <span class="text-muted">({{ last_vet_all.last.finished|timesince }} ago)</span>
+      </dd>
+      <dt class="col-sm-4">Vetting mode</dt>
+      <dd class="col-sm-8">{{ last_vet_all.last.vetting_mode|default:"unknown" }}</dd>
+      <dt class="col-sm-4">Event</dt>
+      <dd class="col-sm-8">{{ last_vet_all.last.event_id|default:"unknown" }}</dd>
+      <dt class="col-sm-4">Result</dt>
+      <dd class="col-sm-8">
+        {% if last_vet_all.last.succeeded %}
+        <span class="badge badge-success">succeeded</span>
+        {% else %}
+        <span class="badge badge-danger">{{ last_vet_all.last.status|lower }}</span>
+        &mdash; this candidate still shows the score from before that run
+        {% endif %}
+      </dd>
+    </dl>
+    {% elif not last_vet_all.in_progress %}
+    <p class="mb-0 text-muted">
+      No Vet All run has covered this candidate. Any score shown was produced by
+      vetting this target individually, or not at all.
+    </p>
+    {% endif %}
+
+    <small class="text-muted d-block mt-2">
+      Vetting a single target from this page runs immediately and is not
+      recorded here &mdash; this card tracks Vet All runs only.
+    </small>
+  </div>
+</div>

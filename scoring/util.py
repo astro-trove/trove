@@ -3,11 +3,17 @@ Some common functions used in multiple places throughout the app
 """
 
 from collections import OrderedDict
+from datetime import timedelta
 import math
 import logging
 from astropy.units import Quantity
-from django.db.models import FloatField
+from django.db import DatabaseError
+from django.db.models import Count, FloatField, Max, Min, Q
 from django.db.models.functions import Cast
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from django_tasks import ResultStatus
+from django_tasks.backends.database.models import DBTaskResult
 from tom_nonlocalizedevents.models import (
     EventCandidate,
     EventLocalization,
@@ -25,6 +31,7 @@ from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 from .models import ScoreFactor
+from .tasks import VET_ALL_QUEUE_NAME, async_vet
 
 import time
 
@@ -253,3 +260,215 @@ def get_target_score(target_id):
         out[nonlocalized_name] = event_candidate.priority
 
     return out
+
+
+VET_ALL_FINISHED_NOTICE_PERIOD = 3600  # 1 hour in seconds
+
+
+def _latest_run(tasks, latest):
+    """
+    Narrow an event's vetting tasks to those of its most recent run.
+
+    Runs are told apart by the `run_started` stamp `vet_all_async` puts on every
+    task it enqueues. Rows predating that stamp fall back on timing: a run
+    enqueues all of its tasks within seconds, so anything appreciably older than
+    the newest task belongs to an earlier run.
+    """
+    stamp = (latest.args_kwargs.get("kwargs") or {}).get("run_started")
+    if stamp:
+        return tasks.filter(args_kwargs__kwargs__run_started=stamp)
+    return tasks.filter(
+        enqueued_at__gte=latest.enqueued_at - timedelta(minutes=2))
+
+
+def get_vet_all_progress(nonlocalizedevent_id):
+    """
+    Summarize how far the most recent "Vet All" run for an event has got.
+
+    "Vet All" enqueues one task per candidate, so the queue *is* the progress
+    bar: every task still waiting or running is a candidate whose score has not
+    been updated yet. Returns None when there is nothing worth telling the user
+    about (no run on record, and nothing left in the queue).
+    """
+    if not nonlocalizedevent_id:
+        return None
+
+    try:
+        nle = NonLocalizedEvent.objects.get(id=nonlocalizedevent_id)
+    except (NonLocalizedEvent.DoesNotExist, ValueError):
+        return None
+
+    # Pin this to the one task that "Vet All" enqueues, not just to its queue.
+    # Production queues are shared and outlive any one feature, so a second kind
+    # of task landing on this one later must not start counting as candidates.
+    tasks = DBTaskResult.objects.filter(
+        queue_name=VET_ALL_QUEUE_NAME,
+        task_path=async_vet.module_path,
+        args_kwargs__kwargs__nle_event_id=nle.event_id,
+    )
+    pending_statuses = [ResultStatus.NEW, ResultStatus.RUNNING]
+
+    try:
+        latest = tasks.order_by("-enqueued_at").first()
+        if latest is None:
+            return None
+
+        # What is still outstanding is counted across every run, not just the
+        # newest. If a second run starts before the first has drained, the
+        # leftovers of the first are still rewriting scores, and the page would
+        # otherwise call itself up to date while they did.
+        pending = tasks.filter(status__in=pending_statuses).count()
+        run = _latest_run(tasks, latest).aggregate(
+            total=Count("id"),
+            pending=Count("id", filter=Q(status__in=pending_statuses)),
+            failed=Count("id", filter=Q(status=ResultStatus.FAILED)),
+            last_finished=Max("finished_at"),
+            first_enqueued=Min("enqueued_at"),
+        )
+    except DatabaseError:
+        # the progress notice is never worth taking the candidate list down for
+        logger.exception("Could not read Vet All progress for %s", nle.event_id)
+        return None
+
+    if not run["total"] and not pending:
+        return None
+
+    last_finished = run["last_finished"]
+    run_kwargs = latest.args_kwargs.get("kwargs") or {}
+    started = (parse_datetime(run_kwargs["run_started"])
+               if run_kwargs.get("run_started") else run["first_enqueued"])
+
+    # a finished run is only news for as long as the button stays on cooldown;
+    # after that, stop reporting it
+    if not pending:
+        if last_finished is None:
+            return None
+        if timezone.now() - last_finished > timedelta(
+            seconds=VET_ALL_FINISHED_NOTICE_PERIOD
+        ):
+            return None
+
+    total = run["total"]
+    done = max(total - run["pending"], 0)
+
+    return {
+        "running": bool(pending),
+        "pending": pending,
+        "done": done,
+        "total": total,
+        "failed": run["failed"],
+        "percent": int(round(100 * done / total)) if total else None,
+        "started": started,
+        "finished": last_finished if not pending else None,
+        "vetting_mode": run_kwargs.get("vetting_mode"),
+        "username": run_kwargs.get("started_by"),
+    }
+
+
+def get_last_vetting(target_id, nonlocalizedevent_id=None):
+    """
+    When was this candidate last vetted, and did it work?
+
+    Read off the task queue, which records one row per candidate per run. Note
+    the ``target_ids__0`` lookup: ``vet_all_async`` enqueues exactly one target
+    per task, so the first element is the whole list. A task carrying several
+    targets would be missed, which nothing currently creates.
+    """
+    if target_id is None:
+        return None
+
+    tasks = DBTaskResult.objects.filter(
+        queue_name=VET_ALL_QUEUE_NAME,
+        task_path=async_vet.module_path,
+        args_kwargs__kwargs__target_ids__0=int(target_id),
+    )
+    if nonlocalizedevent_id:
+        try:
+            nle = NonLocalizedEvent.objects.get(id=nonlocalizedevent_id)
+        except (NonLocalizedEvent.DoesNotExist, ValueError):
+            return None
+        tasks = tasks.filter(args_kwargs__kwargs__nle_event_id=nle.event_id)
+
+    try:
+        latest = tasks.order_by("-enqueued_at").first()
+        if latest is None:
+            return None
+        finished = (tasks.filter(finished_at__isnull=False)
+                    .order_by("-finished_at").first())
+    except DatabaseError:
+        logger.exception("Could not read last vetting for target %s", target_id)
+        return None
+
+    def describe(task):
+        if task is None:
+            return None
+        kwargs = task.args_kwargs.get("kwargs", {})
+        return {
+            "finished": task.finished_at,
+            "enqueued": task.enqueued_at,
+            "status": task.status,
+            "succeeded": task.status == ResultStatus.SUCCEEDED,
+            "vetting_mode": kwargs.get("vetting_mode"),
+            "event_id": kwargs.get("nle_event_id"),
+        }
+
+    return {
+        # a queued or running task means the score on screen is about to change
+        "in_progress": latest.status in (ResultStatus.NEW, ResultStatus.RUNNING),
+        "last": describe(finished),
+        "queued_at": latest.enqueued_at if latest.status == ResultStatus.NEW else None,
+    }
+
+
+def get_last_vet_all_run(nonlocalizedevent_id):
+    """
+    Summarize the most recent "Vet All" run for an event, however long ago.
+
+    Distinct from `get_vet_all_progress`, which is a transient notice about a
+    run happening now. This is the standing record of when the scores on the
+    page were last refreshed.
+    """
+    if not nonlocalizedevent_id:
+        return None
+
+    try:
+        nle = NonLocalizedEvent.objects.get(id=nonlocalizedevent_id)
+    except (NonLocalizedEvent.DoesNotExist, ValueError):
+        return None
+
+    tasks = DBTaskResult.objects.filter(
+        queue_name=VET_ALL_QUEUE_NAME,
+        task_path=async_vet.module_path,
+        args_kwargs__kwargs__nle_event_id=nle.event_id,
+    )
+    try:
+        latest = tasks.order_by("-enqueued_at").first()
+        if latest is None:
+            return None
+        counts = _latest_run(tasks, latest).aggregate(
+            total=Count("id"),
+            succeeded=Count("id", filter=Q(status=ResultStatus.SUCCEEDED)),
+            failed=Count("id", filter=Q(status=ResultStatus.FAILED)),
+            pending=Count(
+                "id",
+                filter=Q(status__in=[ResultStatus.NEW, ResultStatus.RUNNING]),
+            ),
+            finished=Max("finished_at"),
+            first_enqueued=Min("enqueued_at"),
+        )
+    except DatabaseError:
+        logger.exception("Could not read last Vet All run for %s", nle.event_id)
+        return None
+
+    run_kwargs = latest.args_kwargs.get("kwargs") or {}
+    return {
+        "finished": counts["finished"],
+        "started": (parse_datetime(run_kwargs["run_started"])
+                    if run_kwargs.get("run_started") else counts["first_enqueued"]),
+        "vetting_mode": run_kwargs.get("vetting_mode"),
+        "username": run_kwargs.get("started_by"),
+        "total": counts["total"],
+        "succeeded": counts["succeeded"],
+        "failed": counts["failed"],
+        "running": bool(counts["pending"]),
+    }

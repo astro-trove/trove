@@ -9,6 +9,7 @@ import numpy as np
 
 from django_tasks import task
 from django.conf import settings
+from django.utils import timezone
 
 from candidate_vetting.public_catalogs.phot_catalogs import ATLAS_Forced_Phot
 from candidate_vetting.vet import run_mpc
@@ -23,6 +24,11 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent
 
 logger = logging.getLogger(__name__)
 
+#: Queue the per-candidate "Vet All" tasks are enqueued on. The candidate list
+#: counts the tasks still sitting on it to show how far a run has got, so the
+#: name is shared rather than repeated.
+VET_ALL_QUEUE_NAME = "vet_all"
+
 
 ## tasks
 @task(queue_name="atlas_fphot", priority=settings.PRIORITY_MID)
@@ -36,13 +42,15 @@ def async_mpc(target_id: int, *args, **kwargs) -> None:
     run_mpc(target_id, *args, **kwargs)
 
 
-@task(queue_name="vet_all", priority=settings.PRIORITY_HIGH)
+@task(queue_name=VET_ALL_QUEUE_NAME, priority=settings.PRIORITY_HIGH)
 def async_vet(
     target_ids: list,
     nle_event_id: str,
     vetting_mode: str,
     *args, **kwargs
 ) -> None:
+    # `run_started` and `started_by` arrive in **kwargs. They are metadata for
+    # the candidate list, not inputs to the vetting, so they are ignored here.
     from .config import (
         FORM_CHOICE_FUNC_MAP,
     )  # import within function to avoid circular import error
@@ -121,16 +129,25 @@ def async_associate_targets_nle(
     
     
 ## functions which enqueue tasks
-def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
+def vet_all_async(eventcandidates, nle, vetting_mode, started_by=None) -> None:
     """
     Asychronously vet according to vetting mode, wraps async_vet for a list of
     eventcandidates
+
+    Every task of one run carries the same `run_started` stamp, which is what
+    lets the candidate list tell one run from the next and report progress
+    against it. It rides on the task rows rather than in a cache deliberately:
+    a Vet All is a shared action whose results everyone sees, and the cache is
+    per-process, so it would show different users different things.
     """
+    run_started = timezone.now().isoformat()
     for ec in eventcandidates:
         async_vet.enqueue(
             target_ids=[ec.target_id],
             nle_event_id=nle.event_id,
             vetting_mode=vetting_mode,
+            run_started=run_started,
+            started_by=started_by,
         )
 
 def associate_targets_with_nle_async(

@@ -1,0 +1,43 @@
+{% if vet_all_progress.running %}
+<div class="alert alert-warning mb-2" role="alert">
+  <strong><i class="fa fa-hourglass-half"></i> Vet All is still running.</strong>
+  {% if vet_all_progress.total %}
+  {{ vet_all_progress.done }} of {{ vet_all_progress.total }} candidate{{ vet_all_progress.total|pluralize }} re-scored{% if vet_all_progress.failed %},
+  {{ vet_all_progress.failed }} failed{% endif %}.
+  {% else %}
+  {{ vet_all_progress.pending }} candidate{{ vet_all_progress.pending|pluralize }} still queued.
+  {% endif %}
+  <div>
+    The scores and the ranking below are <strong>incomplete until it
+    finishes</strong> &mdash; candidates it has not reached yet are still
+    showing the score from before the run.
+  </div>
+  {% if vet_all_progress.total %}
+  <div class="progress mt-2 mb-1" style="height: 6px">
+    <div class="progress-bar bg-warning"
+         role="progressbar"
+         style="width: {{ vet_all_progress.percent }}%"
+         aria-valuenow="{{ vet_all_progress.percent }}"
+         aria-valuemin="0"
+         aria-valuemax="100"></div>
+  </div>
+  {% endif %}
+  <small class="text-muted">
+    Started {{ vet_all_progress.started|timesince }} ago{% if vet_all_progress.username %}
+    by {{ vet_all_progress.username }}{% endif %}{% if vet_all_progress.vetting_mode %}
+    in {{ vet_all_progress.vetting_mode }} mode{% endif %}. 
+    This notice updates on its own; use
+    <em>Refresh</em> to pull the latest scores into the table.
+  </small>
+</div>
+{% elif vet_all_progress %}
+<div class="alert alert-success mb-2" role="alert">
+  <strong><i class="fa fa-check"></i> Vet All finished</strong>
+  {{ vet_all_progress.finished|timesince }} ago{% if vet_all_progress.total %},
+  {{ vet_all_progress.total }} candidate{{ vet_all_progress.total|pluralize }} re-scored{% endif %}
+  {% if vet_all_progress.failed %}
+  <strong>{{ vet_all_progress.failed }} failed</strong> and still show their previous score
+  {% endif %}.
+  Use <em>Refresh</em> if the table has not caught up yet.
+</div>
+{% endif %}

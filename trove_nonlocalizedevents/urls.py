@@ -5,6 +5,7 @@ from .views import (
     ToggleAgnCacheView,
     RefreshCandidateList,
     SkymapPartialView,
+    VetAllProgressPartialView,
     vet_all_cooldown_notice
 )
 
@@ -31,6 +32,11 @@ urlpatterns = [
         "skymap/",
         SkymapPartialView.as_view(),
         name="skymap"
+    ),
+    path(
+        "vet-all-progress/",
+        VetAllProgressPartialView.as_view(),
+        name="vet-all-progress"
     ),
     path(
         'vet-all-cooldown/',

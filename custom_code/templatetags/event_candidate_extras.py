@@ -14,6 +14,7 @@ from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
+    get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
     TARGETEXTRA_KEYS,
 )
@@ -41,6 +42,12 @@ def vet_all_is_allowed(context):
     request = context['request']
     nle_id = request.GET.get('nonlocalizedevent')
     cooldown_cache_key = settings.VETTING_COOLDOWN_KEY+"_"+nle_id
+
+@register.inclusion_tag("scoring/partials/last_vet_all_card.html")
+def last_vet_all_card(target_id):
+    """Card showing when a Vet All run last covered this candidate."""
+    return {"last_vet_all": _get_last_vetting(target_id)}
+
 
 @register.simple_tag(takes_context=True)
 def display_score_details(context, target_id):
