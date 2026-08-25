@@ -190,7 +190,6 @@ def display_score_details(context, target_id):
         event_card = None
         
         for score_factor in queryset:
-            print(score_factor.key)
             ec = score_factor.event_candidate
             nle = ec.nonlocalizedevent
             

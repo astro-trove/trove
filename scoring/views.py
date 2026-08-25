@@ -37,6 +37,11 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      DETECTION_HORIZON_DEFAULTS
                      )
 from .tasks import vet_all_async, associate_targets_with_nle_async
+from .phot_method import (
+    PHOT_METHOD_CHOICES,
+    PHOT_METHOD_LABELS,
+    get_phot_method,
+)
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .dynamic_catalogs import UserGalaxy
@@ -44,6 +49,20 @@ from .dynamic_catalogs import UserGalaxy
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
 
+
+
+def _phot_method_field(form):
+    """Offer the scorer choice, defaulting to whatever the site toggle shows."""
+    form.fields["phot_method"].choices = [
+        (m, PHOT_METHOD_LABELS[m]) for m in PHOT_METHOD_CHOICES
+    ]
+    form.fields["phot_method"].initial = get_phot_method()
+    return form
+
+
+def _clean_phot_method(value):
+    """A submitted scorer name, or None to leave the decision to the callee."""
+    return value if value in PHOT_METHOD_CHOICES else None
 
 
 class TargetVettingFormView(FormView):
@@ -95,7 +114,7 @@ class TargetVettingFormView(FormView):
                 ] # set initial to basic if most likely class not recognized
         else:
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
-        return form
+        return _phot_method_field(form)
 
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
@@ -113,11 +132,12 @@ class TargetVettingFormView(FormView):
 
         # then also preserve the query parameters
         query_str = self.request.session.pop("nle_id", "")
-        print("QUERY STRING:", query_str)
-        if query_str:
-            print(base_url)
-            base_url += f"?{query_str}"
-            print(base_url)
+        params = [query_str] if query_str else []
+        phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
+        if phot_method:
+            params.append(f"phot_method={phot_method}")
+        if params:
+            base_url += "?" + "&".join(params)
         return redirect(base_url)
 
 
@@ -148,8 +168,13 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
                 + "vetting, ensure an NLE is specified in the URL.",
             )
         else:
-            vetting_func(target.id, nonlocalized_event_name)
-            messages.info(request, f"Ran vetting in {vetting_mode} mode.")
+            # Only the KN pipeline takes a scorer; the others have just one.
+            phot_method = _clean_phot_method(request.GET.get("phot_method"))
+            extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
+            vetting_func(target.id, nonlocalized_event_name, **extra)
+            label = (f" using {PHOT_METHOD_LABELS[phot_method]} photometry"
+                     if extra else "")
+            messages.info(request, f"Ran vetting in {vetting_mode} mode{label}.")
 
         if nonlocalized_event_name:
             toreverse = (
@@ -332,7 +357,7 @@ class TargetVettingAllFormView(FormView):
             form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
                 ""
             ] # set initial to basic if most likely class not recognized
-        return form
+        return _phot_method_field(form)
 
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
@@ -373,12 +398,15 @@ class TargetVettingAllFormView(FormView):
         base_url = reverse(
             "scoring:vet_all", kwargs=dict(pk=pk, vetting_mode=vetting_mode)
         )
+        phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
 
         # then also preserve the query parameters
         query_str = self.request.session.pop("nle_id", "")
-        print("QUERY STRING:", query_str)
-        if query_str:
-            base_url += f"?{query_str}"
+        params = [query_str] if query_str else []
+        if phot_method:
+            params.append(f"phot_method={phot_method}")
+        if params:
+            base_url += "?" + "&".join(params)
         return redirect(base_url)
 
 
@@ -404,12 +432,20 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
             "target__name"
         )
 
+        # The scorer the user picked on the form, sent with every task so the
+        # whole run uses it -- workers cannot read the site-wide toggle, and it
+        # could be flipped mid-run in any case.
+        phot_method = _clean_phot_method(request.GET.get("phot_method"))
+
         # then run the vetting, asynchronously
+        label = (f" using {PHOT_METHOD_LABELS[phot_method]} photometry"
+                 if phot_method and vetting_mode == "KN" else "")
         messages.info(
             request,
-            f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate; check back later.",
+            f"Vetting all candidates in {vetting_mode} vetting mode{label}. "
+            "This may take a few seconds per candidate; check back later.",
         )
-        vet_all_async(ecs, nle, vetting_mode)
+        vet_all_async(ecs, nle, vetting_mode, phot_method=phot_method)
 
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"

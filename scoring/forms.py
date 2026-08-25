@@ -13,6 +13,17 @@ class VettingChoiceForm(Form):
         widget = Select(),
         label = "Vetting Method"
     )
+    # Which photometry scorer this run should use. Chosen per run, here, rather
+    # than read from the site-wide toggle on the candidate list: that toggle
+    # decides which stored score is DISPLAYED and switching it rescores nothing,
+    # so letting it also steer vetting made one control mean two things. Only
+    # the KN pipeline consults this; the other modes have one scorer.
+    phot_method = ChoiceField(
+        choices = [], # these are specified in the view
+        widget = Select(),
+        label = "Photometry Scoring (KN vetting only)",
+        required = False,
+    )
     
 class RedshiftUpdateForm(Form):
     host_galaxy_id = ChoiceField(

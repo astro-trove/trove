@@ -186,15 +186,6 @@ def _connection(dsn: Optional[str] = None):
     return conn
 
 
-def close_connection() -> None:
-    """Drop the cached connection (tests, and after a fork)."""
-    global _CONN
-
-    if _CONN is not None and not _CONN[1].closed:
-        _CONN[1].close()
-    _CONN = None
-
-
 SCHEMA_SQL = f"""
 CREATE TABLE IF NOT EXISTS {AXIS_TABLE} (
     grid         text PRIMARY KEY,

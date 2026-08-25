@@ -44,18 +44,35 @@ def async_vet(
     target_ids: list,
     nle_event_id: str,
     vetting_mode: str,
+    phot_method: str = None,
     *args, **kwargs
 ) -> None:
+    """
+    `phot_method` is the scorer the user had selected when they pressed the
+    button, captured then and carried here.
+
+    It is NOT read from the toggle inside this task. The toggle lives in
+    `cache`, which is a per-process FileBasedCache, and workers run in their own
+    containers -- so a worker reading it would get the default rather than the
+    user's choice, and would quietly score with the other scorer while the page
+    reported this one. Passing it makes the task say which scorer it ran, and a
+    toggle flipped mid-run cannot change the answer halfway through the event.
+    """
     from .config import (
         FORM_CHOICE_FUNC_MAP,
     )  # import within function to avoid circular import error
+
+    # Only the KN pipeline has a choice of photometry scorer; the others take no
+    # such argument and must not be handed one.
+    extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
+
     if vetting_mode == "basic":
         for ti in target_ids:
             FORM_CHOICE_FUNC_MAP[vetting_mode](target_id=ti)
     else:
         for ti in target_ids:
             FORM_CHOICE_FUNC_MAP[vetting_mode](
-                target_id=ti, nonlocalized_event_name=nle_event_id
+                target_id=ti, nonlocalized_event_name=nle_event_id, **extra
             )
 
 @task(queue_name="associate_targets", priority=settings.PRIORITY_HIGH)
@@ -124,7 +141,7 @@ def async_associate_targets_nle(
     
     
 ## functions which enqueue tasks
-def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
+def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None) -> None:
     """
     Asychronously vet according to vetting mode, wraps async_vet for a list of
     eventcandidates
@@ -145,7 +162,12 @@ def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
     """
     ecs = list(eventcandidates)
 
-    if vetting_mode == "KN" and get_phot_method() == PHOT_METHOD_KILONOVA:
+    # The caller (the vetting form) picks the scorer. The site-wide toggle is
+    # only a fallback for callers that do not, and is read here in the web
+    # process -- never in the worker, which cannot see it.
+    phot_method = phot_method or get_phot_method()
+
+    if vetting_mode == "KN" and phot_method == PHOT_METHOD_KILONOVA:
         from scoring.scoring import get_eventcandidate_default_distance
 
         def _dist(ec):
@@ -167,6 +189,7 @@ def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
             target_ids=[ec.target_id],
             nle_event_id=nle.event_id,
             vetting_mode=vetting_mode,
+            phot_method=phot_method,
         )
 
 def associate_targets_with_nle_async(

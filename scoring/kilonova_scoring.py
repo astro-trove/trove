@@ -27,7 +27,50 @@ from pandas.api.types import union_categoricals
 
 logger = logging.getLogger(__name__)
 
+#: The reference rung, and the grid this scoring was built and validated
+#: against. Callers that need every candidate compared against ONE population
+#: pin it explicitly -- the diagnostics do.
+#:
+#: Scoring never falls back to it. Routing a candidate here because its own rung
+#: could not be determined would compare it against a population at the wrong
+#: redshift, which changes the SHAPE of the simulated magnitude distribution per
+#: band and epoch and cannot be undone downstream -- a wrong answer, delivered
+#: silently, and indistinguishable on the page from a right one.
 DEFAULT_GRID = "simulations_two_component_kilonova_model_259Mpc_30d"
+
+#: Rungs the scorer may route candidates to, in Mpc; None uses every rung in the
+#: store. Distances above :data:`MAX_DISTANCE_MPC` are refused outright rather
+#: than routed to the top rung, so this ladder only ever covers 0-1000 Mpc.
+#:
+#: This is the full ladder: 25 Mpc steps to 250, then 100 Mpc steps to 1000.
+#:
+#: It can be cut down, and diagnostics/reports/RUNG_LADDER.md measures what that
+#: would cost. Scoring 20 real S251112cm candidates against all 19 rungs -- 380
+#: scorings -- found the ladder barely moves the answer: median spread 0.000 dex
+#: in log10(score) across the whole range, Spearman 1.0000, zero ABC verdict
+#: flips. The saving would be grid I/O rather than disk: with the full ladder one
+#: S251112cm pass needed 89 grid reads for 147 candidates, because consecutive
+#: candidates land on different rungs and the band cache is keyed by
+#: (grid, band). A single rung needs ~12, one per band.
+#:
+#: Reasons that reduction has NOT been made here:
+#:
+#: * The near field is untested. The measured sample spans 49-997 Mpc, so
+#:   anything below 49 Mpc is extrapolated -- and that is exactly where a real
+#:   nearby kilonova would land, AT2017gfo being at 43 Mpc.
+#: * The cost side is not timed per ladder. Section 5 measures storage, which is
+#:   linear in rung count, and the read counts above; no wall-clock for any
+#:   particular reduced ladder follows from that.
+#: * Every reduced ladder in section 4 preserved the ranking exactly, which is
+#:   what TROVE is for -- so the measurement does not discriminate between them
+#:   either, and picking one is a judgement rather than a result.
+#:
+#: To trim it, list the rungs to keep; the nearest available rung to each is
+#: used, so a store missing one degrades to its neighbour rather than losing it.
+RUNG_LADDER_MPC = (
+    25.0, 50.0, 75.0, 100.0, 125.0, 150.0, 175.0, 200.0, 225.0, 250.0,
+    300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0,
+)
 
 # 202/456 candidates for S251112cm are greater than this
 MAX_DISTANCE_MPC = 1000.0
@@ -91,11 +134,14 @@ def _grid_inventory(refresh: bool = False):
     inv = []
     try:
         df = available_grids_db()
-    except Exception as exc:  # noqa: BLE001 - fall back to the single default
-        logger.warning("could not read the grid inventory (%s: %s); "
-                       "falling back to %s", type(exc).__name__, exc, DEFAULT_GRID)
-        _GRID_INVENTORY = []
-        return _GRID_INVENTORY
+    except Exception as exc:  # noqa: BLE001 - surfaced as unscoreable below
+        # Deliberately not cached: a transient database hiccup should not pin
+        # the whole worker into a failed state for its lifetime.
+        logger.error("could not read the grid inventory (%s: %s)",
+                     type(exc).__name__, exc)
+        raise KilonovaScoreUnavailable(
+            f"grid inventory unavailable ({type(exc).__name__}: {exc})"
+        ) from exc
 
     for row in df.itertuples():
         ref = row.path
@@ -105,11 +151,35 @@ def _grid_inventory(refresh: bool = False):
             continue
         inv.append((ref.name, float(row.distance_mpc)))
     inv.sort(key=lambda t: t[1])
+    inv = _restrict_to_ladder(inv)
     _GRID_INVENTORY = inv
     logger.info("grid inventory: %d rung(s) spanning %.0f-%.0f Mpc",
                 len(inv), inv[0][1] if inv else float("nan"),
                 inv[-1][1] if inv else float("nan"))
     return _GRID_INVENTORY
+
+
+def _restrict_to_ladder(inv):
+    """Reduce the store's rungs to the ones :data:`RUNG_LADDER_MPC` asks for.
+
+    Nearest available rung to each ladder distance, rather than an exact match,
+    so a store missing one of them degrades to its neighbour instead of losing a
+    rung silently. Filtering here rather than deleting grids keeps the store
+    intact -- the extra rungs cost only disk, and dropping them is not something
+    a scoring change should decide.
+    """
+    if not inv or not RUNG_LADDER_MPC:
+        return inv
+    keep = {}
+    for target in RUNG_LADDER_MPC:
+        name, dist = min(inv, key=lambda t: abs(t[1] - float(target)))
+        keep[name] = dist
+    reduced = sorted(keep.items(), key=lambda t: t[1])
+    if len(reduced) < len(inv):
+        logger.info("restricting %d rung(s) in the store to the %d-rung ladder: %s",
+                    len(inv), len(reduced),
+                    ", ".join(f"{d:.0f} Mpc" for _, d in reduced))
+    return reduced
 
 
 def grid_for_distance(dist_mpc: float, refresh: bool = False) -> str:
@@ -123,7 +193,9 @@ def grid_for_distance(dist_mpc: float, refresh: bool = False) -> str:
     """
     inv = _grid_inventory(refresh=refresh)
     if not inv:
-        return DEFAULT_GRID
+        raise KilonovaScoreUnavailable(
+            "no simulation grid in the store spans the scored window"
+        )
     name, _ = min(inv, key=lambda t: abs(t[1] - float(dist_mpc)))
     return name
 
@@ -486,7 +558,9 @@ def score_candidate(
         grid = grid_for_distance(dist_mpc)
         logger.debug("target %s at %.0f Mpc -> grid %s", target_id, dist_mpc, grid)
     elif grid is None:
-        grid = DEFAULT_GRID
+        # Only a label from here on: `grid_df` overrides the name entirely, so
+        # naming a real rung would misreport which population was used.
+        grid = "caller-supplied grid"
 
     phot = _get_post_disc_phot(target_id=target_id,
                                nonlocalized_event=nonlocalized_event,
