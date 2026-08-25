@@ -7,9 +7,10 @@ has an answer at any time.
 {% endcomment %}
 {% if last_vet_all %}
 <div class="row">
+  {% if request.user.is_superuser %}
   <div class="col-md-10">
     <div class="card mb-3">
-      <div class="card-header"><h5 class="mb-0">Most Recent Vet All</h5></div>
+      <div class="card-header"><h5 class="mb-0">Most Recent <em>Vet All</em> run (superuser-viewable only)</h5></div>
       <div class="card-body">
         <dl class="row mb-0">
           {% if last_vet_all.running %}
@@ -46,5 +47,6 @@ has an answer at any time.
       </div>
     </div>
   </div>
+  {% endif %}
 </div>
 {% endif %}

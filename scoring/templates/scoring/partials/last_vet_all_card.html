@@ -6,7 +6,8 @@ target from this page runs synchronously without queueing anything, so it leaves
 no trace here. Saying "last vetted" would therefore be a lie in that case.
 {% endcomment %}
 <div class="card mb-3">
-  <div class="card-header"><h5 class="mb-0">Most Recent Vet All</h5></div>
+  {% if request.user.is_superuser %}
+  <div class="card-header"><h5 class="mb-0">Most Recent <em>Vet All</em> run (superuser-viewable only)</h5></div>
   <div class="card-body">
     {% if last_vet_all.in_progress %}
     <p class="mb-2">
@@ -49,4 +50,5 @@ no trace here. Saying "last vetted" would therefore be a lie in that case.
       recorded here &mdash; this card tracks Vet All runs only.
     </small>
   </div>
+  {% endif %}
 </div>
