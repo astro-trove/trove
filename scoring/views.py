@@ -407,7 +407,7 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
         # then run the vetting, asynchronously
         messages.info(
             request,
-            f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per candidate; check back later.",
+            f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per each of {len(ecs):.0f} candidates; check back later.",
         )
         vet_all_async(ecs, nle, vetting_mode)
 
