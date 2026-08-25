@@ -212,7 +212,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         ), None  # None because there is no host name
 
     # first, some cleanup
-    # this is already done in vet_bns, vet_kn_in_sn, and vet_super_kn,
+    # this is already done in vet_kn, vet_kn_in_sn, and vet_super_kn,
     # but we need to account for users calling this function for arbitrary
     # host_df, target, and NLE without prior filtering on host_df
     if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database

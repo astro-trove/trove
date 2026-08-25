@@ -4,7 +4,7 @@ TROVE can judge a candidate's photometry two ways:
 
 ``trove``
     ``vet_phot._score_phot``: fit the light curve, then range-check peak
-    luminosity, peak time and decay rate against ``vet_bns.PARAM_RANGES``. The
+    luminosity, peak time and decay rate against ``vet_kn.PARAM_RANGES``. The
     factor is 1 if every fitted value is in range and 0.1 per violation.
 
 ``kilonova``

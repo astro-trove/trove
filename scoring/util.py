@@ -22,7 +22,7 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 from candidate_vetting.vet import localization_sequence_from_name
 
 from .vet_phot import PHOT_SCORE_MIN
-from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
+from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 from .models import ScoreFactor
@@ -43,10 +43,10 @@ DICT_TRANSIENTS_PARAM_RANGES = {
 
 
 # ScoreFactor key holding KilonovaSCORER's photometry factor, written by
-# `vet_bns` when the site-wide `phot_method` toggle is on KilonovaSCORER
+# `vet_kn` when the site-wide `phot_method` toggle is on KilonovaSCORER
 KILONOVA_SCORE_KEY = "kilonova_score"
 
-# why KilonovaSCORER could not score a candidate, written by `vet_bns` in place of score
+# why KilonovaSCORER could not score a candidate, written by `vet_kn` in place of score
 KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
 
 # default subscore names
