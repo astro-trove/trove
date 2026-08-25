@@ -158,4 +158,34 @@
         </form>
     </div>
 </div>
+
+<script>
+// Keep the Photometry Scoring Method in step with the Vetting Method.
+// KilonovaSCORER's grid is a two-component kilonova population, so it can only
+// answer for kilonova vetting; the other modes fit the light curve instead.
+// The values come from the widgets' data attributes so they are not restated
+// here -- see `_phot_method_field` in scoring/views.py. The form re-applies
+// this rule server-side, because a disabled <option> is only a browser hint.
+(function () {
+    var vetting = document.getElementById("id_vetting_method");
+    var phot = document.getElementById("id_phot_method");
+    if (!vetting || !phot) { return; }
+
+    var knMode = vetting.dataset.knMode;
+    var knOnly = phot.dataset.knOnly;
+    var fallback = phot.dataset.fallback;
+    var knOption = phot.querySelector('option[value="' + knOnly + '"]');
+
+    function sync() {
+        var isKN = vetting.value === knMode;
+        if (knOption) { knOption.disabled = !isKN; }
+        if (!isKN && phot.value === knOnly) { phot.value = fallback; }
+        phot.title = isKN ? "" :
+            "KilonovaSCORER only scores kilonova vetting";
+    }
+
+    vetting.addEventListener("change", sync);
+    sync();  // the form can load with a non-KN mode already selected
+})();
+</script>
 {% endblock %}

@@ -38,8 +38,11 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      )
 from .tasks import vet_all_async, associate_targets_with_nle_async
 from .phot_method import (
+    KILONOVA_VETTING_MODE,
     PHOT_METHOD_CHOICES,
+    PHOT_METHOD_KILONOVA,
     PHOT_METHOD_LABELS,
+    PHOT_METHOD_TROVE,
     get_phot_method,
 )
 from .util import get_vet_all_progress
@@ -53,11 +56,21 @@ from custom_code.templatetags.target_list_extras import galaxy_table
 
 
 def _phot_method_field(form):
-    """Offer the scorer choice, defaulting to whatever the site toggle shows."""
+    """Offer the scorer choice, defaulting to whatever the site toggle shows.
+
+    The values the template needs to keep the two selects in step ride along as
+    data attributes rather than being repeated in the JavaScript, so the vetting
+    mode and the scorer names are still defined in exactly one place.
+    """
     form.fields["phot_method"].choices = [
         (m, PHOT_METHOD_LABELS[m]) for m in PHOT_METHOD_CHOICES
     ]
     form.fields["phot_method"].initial = get_phot_method()
+    form.fields["phot_method"].widget.attrs.update({
+        "data-kn-only": PHOT_METHOD_KILONOVA,
+        "data-fallback": PHOT_METHOD_TROVE,
+    })
+    form.fields["vetting_method"].widget.attrs["data-kn-mode"] = KILONOVA_VETTING_MODE
     return form
 
 

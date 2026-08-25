@@ -1,38 +1,5 @@
-"""TROVE-side helpers for the ``KilonovaScorer`` package.
 
-The scorer itself is a dependency (``kilonova_scorer`` in requirements.txt) and
-nothing in here reimplements any of it. This package holds only the two things
-the package genuinely cannot supply, both of which are about **getting TROVE's
-data into the shape the scorer expects**:
-
-* :mod:`.grid_db` — reading a simulation grid out of Postgres (``spanda_db``).
-  ``KilonovaScorer`` has no grid store at all; it takes ``data_sim`` as a frame
-  and leaves persistence to the caller. ``load_grid_db`` returns exactly that
-  frame: ``sample_id`` / ``time`` / ``absolute_magnitude`` / ``filter_mapped``.
-
-* :data:`FILTER_LOOKUP` — TROVE's filter names mapped onto the scorer's
-  canonical bands. TROVE ingests from ATLAS, ZTF, Pan-STARRS and TNS, which all
-  spell the same bandpass differently; the package assumes the caller has
-  already normalised.
-
-Everything else — the PPD, ``P_tail``, the ABC survival chain, the cumulative
-logit combination — comes from ``KilonovaScorer.core2`` and is not duplicated.
-"""
 from __future__ import annotations
-
-from dataclasses import dataclass
-
-#: TROVE filter name -> the scorer's canonical band, for ``mode="canonical"``.
-#: Only needed when an observation must be compared against simulations in a
-#: *different* survey's bandpass; ``mode="survey"`` (the default) matches a
-#: bandpass to itself and never consults this.
-FILTER_LOOKUP = {
-    "lsstg": "g-band", "g-ztf": "g-band", "ztfg": "g-band", "g-p1": "g-band", "g": "g-band",
-    "lsstr": "r-band", "r-ztf": "r-band", "ztfr": "r-band", "r-p1": "r-band", "r": "r-band",
-    "lssti": "i-band", "i-ztf": "i-band", "ztfi": "i-band", "i-p1": "i-band", "i": "i-band",
-    "lsstz": "z-band", "z-ztf": "z-band", "ztfz": "z-band", "z-p1": "z-band", "z": "z-band",
-}
-
 
 #: Telescope/source name -> the grid's bandpass family. Matched as a prefix on
 #: the upper-cased source, so "ATLAS", "ATLAS-STH (TNS)" and "ATLAS-CHL (TNS)"
@@ -101,45 +68,8 @@ def survey_band(telescope, filter_name) -> str | None:
     return _GENERIC_BANDS.get(f)
 
 
-@dataclass(frozen=True)
-class GridRef:
-    """A grid in the database, standing where a :class:`~pathlib.Path` would.
-
-    Frozen so it is hashable: candidates get bucketed into a dict keyed on
-    their grid so one load serves many of them. ``name`` mirrors ``Path.name``
-    for log lines.
-    """
-
-    name: str
-    distance_mpc: float
-    backend: str = "postgres"
-    #: Last epoch the grid covers, in days. A 10-day and a 30-day grid at the
-    #: same distance are NOT interchangeable, so selection needs this.
-    t_max: float = float("nan")
-
-    def __str__(self) -> str:
-        return self.name
-
-
-from .grid_db import (  # noqa: E402
-    available_grids_db,
-    grid_axis,
-    grid_bands,
-    grid_dsn,
-    grid_exists,
-    grid_store_ready,
-    load_grid_db,
-)
-
-__all__ = [
-    "FILTER_LOOKUP",
-    "GridRef",
-    "available_grids_db",
-    "grid_axis",
-    "grid_bands",
-    "grid_dsn",
-    "grid_exists",
-    "grid_store_ready",
-    "load_grid_db",
-    "survey_band",
-]
+#: Only the pure band-name mapping lives here. The models and the loader are
+#: deliberately NOT re-exported: Django imports this package while building the
+#: app registry, before models are ready, so a model import at this level would
+#: raise AppRegistryNotReady. Import them from `.models` / `.grid_db` directly.
+__all__ = ["survey_band"]

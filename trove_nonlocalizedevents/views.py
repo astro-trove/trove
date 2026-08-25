@@ -116,15 +116,8 @@ class EventCandidateListView(FilterView):
         agn_toggle = cache.get("agn_toggle", True)
         nle_id = self.request.GET.get("nonlocalizedevent")
 
-        # `phot_method` IS part of the key: unlike the toggle's effect on future
-        # vetting, which the page does not render, switching it changes which
-        # stored factor each row displays -- so a cached list scored under the
-        # other method is stale, not merely older.
         phot_method = get_phot_method()
 
-        # how far along is the last "Vet All" run for this event? While one is
-        # running the scores below are a mix of new and not-yet-updated values,
-        # which the page has to say out loud
         vet_all_progress = get_vet_all_progress(nle_id)
 
         cache_key = scored_candidates_cache_key(self.request.GET, agn_toggle,

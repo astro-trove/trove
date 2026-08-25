@@ -338,8 +338,16 @@ def get_vet_all_progress(nonlocalizedevent_id):
         if latest is None:
             return None
 
-        # count what is still outstanding
-        pending = tasks.filter(status__in=pending_statuses).count()
+        # ONE queryset behind every number below, scoped to the latest run.
+        # These used to be split: the running flag counted every pending task
+        # for the EVENT while the totals counted only the latest run, so a task
+        # left pending by some earlier run read as "still running" next to
+        # "88 of 88 scored".
+        #
+        # That is not hypothetical -- trove_test carries five S250206dm tasks
+        # stuck in RUNNING since 14 July, workers that died mid-task without
+        # releasing the row. They are not part of the current run and must not
+        # be counted as either its progress or its totals.
         run = _latest_run(tasks, latest).aggregate(
             total=Count("id"),
             pending=Count("id", filter=Q(status__in=pending_statuses)),
@@ -352,7 +360,8 @@ def get_vet_all_progress(nonlocalizedevent_id):
         logger.exception("Could not read Vet All progress for %s", nle.event_id)
         return None
 
-    if not run["total"] and not pending:
+    pending = run["pending"]
+    if not run["total"]:
         return None
 
     last_finished = run["last_finished"]

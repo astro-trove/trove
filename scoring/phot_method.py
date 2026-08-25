@@ -37,6 +37,11 @@ PHOT_METHOD_DEFAULT = PHOT_METHOD_TROVE
 
 PHOT_METHOD_CHOICES = (PHOT_METHOD_TROVE, PHOT_METHOD_KILONOVA)
 
+# the one vetting mode KilonovaSCORER can score: its grid is a two-component
+# kilonova population, so the choice is meaningless for the other modes, which
+# fit the light curve and have no second scorer to pick between
+KILONOVA_VETTING_MODE = "KN"
+
 # what the toggle shows for each value
 PHOT_METHOD_LABELS = {
     PHOT_METHOD_TROVE: "Light curve metrics",
