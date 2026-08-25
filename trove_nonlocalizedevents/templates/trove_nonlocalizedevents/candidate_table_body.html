@@ -8,17 +8,46 @@
           <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
             {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
           </a>
-          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}"
-             class="btn {% if is_kilonova %}btn-success{% else %}btn-light{% endif %} mb-2"
-             title="Which stored photometry score this page displays. It does not rescore anything, and it no longer decides what a Vet All computes — that is chosen on the Vet All form.">
-            Photometry: {{ phot_method_label }}
+          <div class="btn-group-toggle" role="group" aria-label="Photometry scoring method">
+          {% if not is_kilonova %}
+          <span class="btn btn-primary" aria-disabled="true">
+            ☑ Photometry: Light curve metrics
+          </span>
+          {% else %}
+          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?{% if request.GET.nonlocalizedevent and is_kilonova %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" 
+             title="Score photometry according to light curve metrics"
+             class="btn {% if not is_kilonova %}btn-primary{% else %}btn-secondary{% endif %}"
+             aria-pressed="{% if not is_kilonova %}true{% else %}false{% endif %}">
+             ☐ Photometry: Light curve metrics
           </a>
+          {% endif %}
+
+          {% if is_kilonova %}
+          <span class="btn btn-primary" aria-disabled="true">
+            ☑ Photometry: KilonovaSCORER
+          </span>
+          {% else %}
+          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" 
+             title="Score photometry according to KilonovaSCORER" 
+             class="btn {% if is_kilonova %}btn-primary{% else %}btn-secondary{% endif %}" 
+             aria-pressed="{% if is_kilonova %}true{% else %}false{% endif %}">
+             ☐ Photometry: KilonovaSCORER
+          </a>
+          {% endif %}
+          </div>
         </div>
         <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
            class="btn btn-outline-secondary mb-2"
            title="Discard the cached scores and reload this list">
           <i class="fa fa-refresh"></i> Refresh
         </a>
+      </div>
+   {% endif %}
+   {% if is_kilonova and kilonova_scores_missing %}
+     <div class="alert alert-info mb-2" role="alert">
+     <i class="fa fa-info-circle"></i>
+       <strong>No KilonovaSCORER scores yet.</strong> 
+       Vet all candidates or vet those of interest using KilonovaSCORER for photometry scoring.
       </div>
    {% endif %}
    {% if request.GET.nonlocalizedevent %}
