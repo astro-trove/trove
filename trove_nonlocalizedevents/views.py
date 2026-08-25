@@ -150,18 +150,12 @@ class EventCandidateListView(FilterView):
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
-        # Not part of `cache_key` above: the photometry method changes what a
-        # FUTURE Vet All computes, not the already-stored factors this page
-        # renders, so it must not invalidate the scored-candidate cache.
+
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label()
-        # True when KilonovaSCORER is selected but NOTHING in the current list
-        # has a stored score, i.e. no Vet All has run under it yet. The page
-        # then says so instead of silently showing TROVE numbers under a
-        # KilonovaSCORER heading. Partial coverage is not a warning: a Vet All
-        # in progress legitimately has some scored and some not.
+
         context["kilonova_scores_missing"] = is_kilonova and bool(scored_candidates) and not any(
-            getattr(ec, "phot_source", "trove") == "kilonova" for ec in scored_candidates
+            getattr(ec, "kilonova_score", None) is not None for ec in scored_candidates
         )
         context["is_kilonova"] = is_kilonova
         context["vet_all_progress"] = vet_all_progress
@@ -356,6 +350,15 @@ We encourage additional follow up of these candidates to determine whether they 
     return JsonResponse({"text": "\n".join(lines)})
 
 
+def _return_to(request, fallback):
+    nxt = request.GET.get("next")
+    if nxt and url_has_allowed_host_and_scheme(
+        nxt, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        return nxt
+    return fallback
+
+
 class ToggleAgnCacheView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         new_val = not cache.get("agn_toggle", True)
@@ -380,9 +383,11 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             )
             cache.set(cache_key, scored_candidates, SCORE_CACHE_PERIOD)
             params = {"nonlocalizedevent": nle_id}
-            return redirect(reverse("custom_code:event-candidates")
-                            + "?" + urlencode(params))
-        return redirect(reverse("custom_code:event-candidates"))
+            return redirect(_return_to(
+                request,
+                reverse("custom_code:event-candidates") + "?" + urlencode(params),
+            ))
+        return redirect(_return_to(request, reverse("custom_code:event-candidates")))
 
 
 class TogglePhotMethodCacheView(LoginRequiredMixin, View):
@@ -416,7 +421,7 @@ class TogglePhotMethodCacheView(LoginRequiredMixin, View):
             params["nonlocalizedevent"] = nle_id
         if params:
             url += "?" + urlencode(params)
-        return redirect(url)
+        return redirect(_return_to(request, url))
 
 
 class SkymapPartialView(View):

@@ -10,6 +10,6 @@ class KilonovaScorerHelpersConfig(AppConfig):
     migration state.
     """
 
-    name = "scoring.KilonovaScorerHelpers"
+    name = "scoring.kilonova_scorer_helpers"
     label = "kilonovascorer"
     verbose_name = "KilonovaSCORER grid store"

@@ -10,7 +10,7 @@ TROVE can judge a candidate's photometry two ways:
 ``kilonova``
     KilonovaSCORER's cumulative ``P_tail``: compare the light curve against a
     simulated kilonova population and report where the observations fall in it.
-    Needs a simulation grid (see :mod:`scoring.KilonovaScorerHelpers`).
+    Needs a simulation grid (see :mod:`scoring.kilonova_scorer_helpers`).
 
 The choice lives in the cache rather than the database because it is a display
 and run-time preference, not per-candidate data — the same reasoning as

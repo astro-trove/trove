@@ -9,13 +9,16 @@ from django import template
 from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
 from django.conf import settings
+from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
+from scoring.models import ScoreFactor
 from scoring.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
+    KILONOVA_SCORE_KEY,
     TARGETEXTRA_KEYS,
 )
 from scoring.phot_method import (
@@ -82,6 +85,26 @@ def vet_all_is_allowed(context):
         return True
     cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
     return not cache.get(cooldown_cache_key)
+
+@register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
+def scoring_toggles(context, target_id=None):
+    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+
+    is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
+    # Switching to KilonovaSCORER only changes anything if this candidate has a
+    # score to switch TO -- with none stored, `get_event_candidate_scores`
+    # falls back to the light curve product and the page is identical either
+    # way. Offering the button then just invites a click that does nothing.
+    has_kilonova_score = bool(target_id) and ScoreFactor.objects.filter(
+        event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
+    ).exists()
+    return {
+        "agn_toggle": cache.get("agn_toggle", True),
+        "is_kilonova": is_kilonova,
+        "has_kilonova_score": has_kilonova_score,
+        "next": context["request"].get_full_path(),
+    }
+
 
 @register.inclusion_tag("scoring/partials/last_vet_all_card.html")
 def last_vet_all_card(target_id):
@@ -154,7 +177,13 @@ def display_score_details(context, target_id):
     for event_candidate in target.eventcandidate_set.all():
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
-            + ["mpc_score", "predetection_score"]
+            # `localization_id` is bookkeeping, not a score: it stamped which
+            # skymap a candidate was scored against so a new one could re-vet
+            # the stale ones. That machinery is gone, nothing writes the key
+            # any more, and it was never part of the score product -- but the
+            # rows it left behind have no keymap entry, so the card rendered
+            # them under their raw key as a bare database id.
+            + ["mpc_score", "predetection_score", "localization_id"]
         ).all()
         # `order.index` raises ValueError on a key that is not in `keymap`,
         # which took the whole target page down whenever a new ScoreFactor key
@@ -218,10 +247,11 @@ def display_score_details(context, target_id):
                 label = score_factor.key
                 fmter = _float_format
             
-            numeric = label not in (
-                "Host Galaxy used for Distance Scoring",
-                "Host Galaxy Source Catalog",
-            )
+            # Taken from the formatter, not a hand-kept list of labels: the
+            # list had to be updated for every new text-valued factor, and
+            # `kilonova_skip_reason` was added without it, so its sentence went
+            # down the float() path and out through the except branch.
+            numeric = fmter not in (_str_format, _str_int_format)
             value = _safe_format(score_factor.value, fmter, numeric=numeric)
             
             # KilonovaSCORER scores only the KN model, so its score and its
@@ -234,6 +264,10 @@ def display_score_details(context, target_id):
                 {
                     "label": label,
                     "value": value,
+                    # a sentence, not a number: the value column is nowrap so
+                    # that figures stay on one line, which sent the skip reason
+                    # off the edge of the card instead of wrapping
+                    "text": not numeric,
                     "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
         
@@ -276,12 +310,24 @@ def display_score_details(context, target_id):
         html += '    <div class="event-cards">\n'
         for idx, card in enumerate(event_cards):
             ec = card.pop("ec")
+            # Was left at the default, so this page scored as though AGN were
+            # always on while the candidate list scored with the toggle -- one
+            # candidate, two numbers. Also lets the AGN row say truthfully
+            # whether it fed the score.
+            agn_toggle = get_agn_toggle()
             ec_score_details = _get_event_candidate_scores(
                 [ec],
-                include_subscores=True
+                include_subscores=True,
+                agn_toggle=agn_toggle,
             )[0]
             ec_scores = ec_score_details.score
             ec_subscores = ec_score_details.subscores
+            # Which photometry factor actually fed the overall score. Taken
+            # from `phot_source` rather than the site-wide toggle, because a
+            # candidate KilonovaSCORER could not score falls back to the TROVE
+            # product even while the toggle says KilonovaSCORER -- and the
+            # highlight has to follow what was really used.
+            kn_is_active = getattr(ec_score_details, "phot_source", "trove") == "kilonova"
 
             score_details = card["details"]
 
@@ -317,9 +363,13 @@ def display_score_details(context, target_id):
                     if "Score" not in detail["label"]: continue
                     if detail.get("only") and detail["only"] != em_transient_type:
                         continue
-                    html += f'                <div class="detail-row">\n'
+                    row_class = _factor_row_class(
+                        detail["label"], em_transient_type, kn_is_active, agn_toggle
+                    )
+                    value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
+                    html += f'                <div class="{row_class}">\n'
                     html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
-                    html += f'                  <span class="detail-value">{detail["value"]}</span>\n'
+                    html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
                     html += f'                </div>\n'
 
                 # then the photometry scores too. Both lookups are guarded:
@@ -328,7 +378,10 @@ def display_score_details(context, target_id):
                 # the page and lose every other score on it.
                 for key, subscore in ec_subscores.get(em_transient_type, {}).items():
                     label, fmter = keymap.get(key + "_score", (key, _float_format))
-                    html += f'                <div class="detail-row">\n'
+                    row_class = _factor_row_class(
+                        label, em_transient_type, kn_is_active, agn_toggle
+                    )
+                    html += f'                <div class="{row_class}">\n'
                     html += f'                  <span class="detail-label">{label}</span>\n'
                     html += f'                  <span class="detail-value">{fmter(subscore)}</span>\n'
                     html += f'                </div>\n'
@@ -340,9 +393,10 @@ def display_score_details(context, target_id):
                     if "Score" in detail["label"]: continue
                     if detail.get("only") and detail["only"] != em_transient_type:
                         continue
+                    value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
                     html += f'                <div class="detail-row">\n'
                     html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
-                    html += f'                  <span class="detail-value">{detail["value"]}</span>\n'
+                    html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
                     html += f'                </div>\n'
                 html += f'              </div>\n'
                 html += f'            </div>\n'
@@ -355,24 +409,53 @@ def display_score_details(context, target_id):
     return mark_safe(html)
 
 
-def _safe_format(raw, fmter, numeric=True):
-    """Render a ScoreFactor value, never raising.
+#: Alternatives to one another: exactly one group feeds the overall score, and
+#: which one is the whole point of the photometry toggle.
+_KILONOVA_FACTOR_LABELS = {"KilonovaSCORER Photometry Score"}
+_TROVE_FACTOR_LABELS = {
+    "Score from Maximum Luminosity",
+    "Score from Time of Maximum Light Curve",
+    "Score from Light Curve Slope",
+}
 
-    Two things reach here that the old inline formatting could not survive: a
-    value that is text rather than a number (``kilonova_skip_reason`` is a
-    sentence), and a key with no entry in ``keymap``, whose fallback formatter
-    is numeric. Either one raised ValueError and returned a 500 for the whole
-    target page -- losing every other score on it to make one cell unrenderable.
-    Falling back to the raw string keeps the page up and still shows the value.
+#: A switch rather than a choice: with the toggle off, `agn_score` is dropped
+#: from the product, so the value still shown is not part of the score.
+_AGN_FACTOR_LABELS = {"AGN Score (0.1 or 1.0)"}
+
+#: Everything else (skymap, host distance, predetection) contributes either
+#: way and is left unmarked.
+
+
+def _factor_row_class(label, transient, kn_is_active, agn_toggle=True):
+    if label in _KILONOVA_FACTOR_LABELS:
+        live = kn_is_active and transient == "KN"
+    elif label in _TROVE_FACTOR_LABELS:
+        live = not (kn_is_active and transient == "KN")
+    elif label in _AGN_FACTOR_LABELS:
+        live = bool(agn_toggle)
+    else:
+        return "detail-row"
+    return "detail-row factor-active" if live else "detail-row factor-inactive"
+
+
+def _safe_format(raw, fmter, numeric=True):
+    """Render a ScoreFactor value, never raising and never emitting raw HTML.
+
+    Text values are escaped because the caller wraps the whole page in
+    `mark_safe`. `kilonova_skip_reason` is an exception message, and those
+    quote dtypes and types -- "<f4", "<class 'ValueError'>" -- which the
+    browser then swallowed as unknown tags, so the reason rendered blank.
+    Numeric output is left alone: it comes from a float, and `_sci_format`
+    emits a <sup> on purpose.
     """
     if raw is None or (isinstance(raw, str) and raw.strip() in ("", "nan", "None")):
         return raw
     try:
         if numeric:
             return fmter(float(raw))
-        return fmter(raw)
+        return escape(fmter(raw))
     except (TypeError, ValueError):
-        return str(raw)
+        return escape(str(raw))
 
 
 def _float_format(flt, unit="", precision=2):

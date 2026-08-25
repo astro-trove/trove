@@ -248,10 +248,8 @@ def get_event_candidate_scores(
             # "KN-in-SN" / "super-KN" acceptance windows, which is the whole
             # content of those two columns.
             kn = sf_dict.get(KILONOVA_SCORE_KEY)
-            if (use_kilonova and
-                transient == "KN" and
-                kn is not None and
-                math.isfinite(kn)):
+            kn_available = kn is not None and math.isfinite(kn)
+            if use_kilonova and transient == "KN" and kn_available:
                 # KilonovaSCORER's factor stands in for the whole TROVE
                 # photometry product -- not multiplied with it, which would
                 # apply the photometry twice.
@@ -269,6 +267,13 @@ def get_event_candidate_scores(
             # scored.
             if transient == "KN":
                 ec.phot_source = phot_source
+                # Recorded whether or not it is the factor feeding `ec.score`,
+                # because "was this candidate scored by KilonovaSCORER at all"
+                # is a different question from "is that score in use". The
+                # "no scores yet" notice asks the first one: keying it on
+                # `phot_source` meant a completed Vet All still reported
+                # nothing to anyone whose toggle sat on light curve metrics.
+                ec.kilonova_score = kn if kn_available else None
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object

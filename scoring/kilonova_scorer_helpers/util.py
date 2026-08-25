@@ -44,7 +44,7 @@ def _grid_inventory():
     if _GRID_INVENTORY is not None:
         return _GRID_INVENTORY
 
-    from scoring.KilonovaScorerHelpers.grid_db import scoreable_grids
+    from .grid_db import scoreable_grids
 
     try:
         rungs = scoreable_grids()
@@ -127,7 +127,7 @@ def _load_band_cached(grid: str, band: str, min_time: float, max_time: float):
         _GRID_CACHE.move_to_end(key)
         return _GRID_CACHE[key]
 
-    from scoring.KilonovaScorerHelpers.grid_db import load_grid_db
+    from .grid_db import load_grid_db
 
     try:
         df = load_grid_db(grid, bands=[band], min_time=min_time,
@@ -205,7 +205,7 @@ def build_data_obs(phot: pd.DataFrame, dist_mpc: float, dist_err_mpc: float) -> 
         magerr, dist_mpc=float(dist_mpc), dist_err_mpc=float(dist_err_mpc),
     )
     
-    from scoring.KilonovaScorerHelpers import survey_band
+    from . import survey_band
 
     scope = det["telescope"].astype(str) if "telescope" in det.columns else ""
     mapped = [survey_band(t, f) for t, f in
@@ -242,12 +242,6 @@ def _cumulative_factor(results: pd.DataFrame) -> float:
     if results is None or not len(results):
         raise KilonovaScoreUnavailable("scorer returned no per-epoch rows")
     
-    # The package already builds this chain: `overlap_chain` intersects the
-    # per-epoch consistent-simulation sets within each band and writes the
-    # running size into `running_survivors_n`. The chain is monotone, so a
-    # single 0 anywhere means that band's chain emptied and never recovered --
-    # no groupby needed, and NaN (a row the package left unchained) compares
-    # False, so it is ignored.
     if "running_survivors_n" in results.columns and (results["running_survivors_n"] == 0).any():
         logger.info("ABC chain empty -- no simulation is consistent with every "
                     "epoch; flooring the score to 0")

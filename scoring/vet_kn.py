@@ -38,7 +38,7 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 logger = logging.getLogger(__name__)
 
-from scoring.kilonova_scoring import (
+from scoring.kilonova_scorer_helpers.util import (
     KilonovaScoreUnavailable,
     score_candidate as kilonova_score_candidate,
 )
