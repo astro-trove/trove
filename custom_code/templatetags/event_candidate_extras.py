@@ -130,7 +130,7 @@ def display_score_details(context, target_id):
         ),
         kilonova_score=(
             "KilonovaSCORER Photometry Score",
-            partial(_float_format, precision=4),
+            partial(_float_format, precision=2),
         ),
         kilonova_skip_reason=(
             "KilonovaSCORER: could not score",
