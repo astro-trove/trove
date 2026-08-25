@@ -7,6 +7,8 @@ from django.forms import (
     Select
 )
 
+from .phot_method import KILONOVA_VETTING_MODE, PHOT_METHOD_TROVE
+
 class VettingChoiceForm(Form):
     vetting_method = ChoiceField(
         choices = [], # these are specified in the view
@@ -19,6 +21,19 @@ class VettingChoiceForm(Form):
         widget = Select(),
         label = "Photometry Scoring Method",
     )
+
+    def clean(self):
+        """Only KN vetting can use KilonovaSCORER.
+
+        The template disables the option for the other modes, but a disabled
+        <option> is a hint to the browser, not a constraint -- a hand-made POST
+        can still carry it. Forcing it here means the rule holds wherever the
+        request came from.
+        """
+        cleaned = super().clean()
+        if cleaned.get("vetting_method") != KILONOVA_VETTING_MODE:
+            cleaned["phot_method"] = PHOT_METHOD_TROVE
+        return cleaned
     
 class RedshiftUpdateForm(Form):
     host_galaxy_id = ChoiceField(
