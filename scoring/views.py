@@ -443,7 +443,8 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
         messages.info(
             request,
             f"Vetting all candidates in {vetting_mode} vetting mode{label}. "
-            "This may take a few seconds per candidate; check back later.",
+            f"This may take a few seconds per each of {len(ecs):.0f} candidates; "
+            "check back later.",
         )
         vet_all_async(ecs, nle, vetting_mode, phot_method=phot_method)
 
