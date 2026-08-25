@@ -186,7 +186,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             phot_method = _clean_phot_method(request.GET.get("phot_method"))
             extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
             vetting_func(target.id, nonlocalized_event_name, **extra)
-            label = (f" using {PHOT_METHOD_LABELS[phot_method]} photometry"
+            label = (f" using {PHOT_METHOD_LABELS[phot_method]} for scoring photometry"
                      if extra else "")
             messages.info(request, f"Ran vetting in {vetting_mode} mode{label}.")
 
