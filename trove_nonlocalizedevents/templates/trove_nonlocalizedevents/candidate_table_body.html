@@ -21,16 +21,6 @@
         </a>
       </div>
    {% endif %}
-    {% if kilonova_scores_missing %}
-      <div class="alert alert-info mb-2" role="alert">
-        <i class="fa fa-info-circle"></i>
-        <strong>No KilonovaSCORER scores yet.</strong>
-        Switching the photometry method does not rescore anything, and none of
-        these candidates has a stored KilonovaSCORER score — the scores below are
-        still TROVE's photometry factor. Run <strong>Vet All</strong> on this
-        event, choosing KilonovaSCORER on the form, to compute them.
-      </div>
-    {% endif %}
    {% if request.GET.nonlocalizedevent %}
     <div id="vet-all-progress"
          hx-get="{% url 'trove_nonlocalizedevents:vet-all-progress' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
