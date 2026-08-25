@@ -25,21 +25,21 @@ from __future__ import annotations
 
 from django.core.cache import cache
 
-#: Cache key. Site-wide and unscoped by event, matching ``agn_toggle``.
+# cache key. Site-wide and unscoped by event, matching ``agn_toggle``.
 PHOT_METHOD_KEY = "phot_method"
 
 PHOT_METHOD_TROVE = "trove"
 PHOT_METHOD_KILONOVA = "kilonova"
 
-#: TROVE's own check stays the default: it needs no simulation grid, so it can
-#: never fail for want of one.
+# TROVE's own check stays the default: it needs no simulation grid, so it can
+# never fail for want of one
 PHOT_METHOD_DEFAULT = PHOT_METHOD_TROVE
 
 PHOT_METHOD_CHOICES = (PHOT_METHOD_TROVE, PHOT_METHOD_KILONOVA)
 
-#: What the toggle shows for each value.
+# what the toggle shows for each value
 PHOT_METHOD_LABELS = {
-    PHOT_METHOD_TROVE: "TROVE",
+    PHOT_METHOD_TROVE: "Light curve metrics",
     PHOT_METHOD_KILONOVA: "KilonovaSCORER",
 }
 
