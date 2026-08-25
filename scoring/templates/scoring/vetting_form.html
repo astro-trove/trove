@@ -87,6 +87,24 @@
         box-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
     }
 
+    /* Warnings shown before a "Vet All" run is started */
+    .vetting-warning {
+        background: rgba(255, 193, 7, 0.12);
+        border: 1px solid rgba(255, 193, 7, 0.6);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 20px;
+        color: #ffe6a1;
+        font-size: 0.85rem;
+        line-height: 1.45;
+    }
+
+    .vetting-warning-active {
+        background: rgba(220, 53, 69, 0.15);
+        border-color: rgba(220, 53, 69, 0.7);
+        color: #ffc9cf;
+    }
+
     /* Cancel Link */
     .cancel-link {
         display: block;
@@ -104,7 +122,31 @@
 <div class="container d-flex justify-content-center">
     <div class="vetting-card">
         <h2>Target Vetting Submission Page</h2>
-        
+
+        {% if vet_all_candidate_count %}
+        <div class="vetting-warning">
+            <strong>This vets all {{ vet_all_candidate_count }} candidate{{ vet_all_candidate_count|pluralize }} of this event.</strong>
+            Each candidate is queued as its own job, so how long the run takes
+            depends on how many workers are free and what else is queued &mdash;
+            minutes for a small event, hours for a large or busy one. Scores
+            update as each candidate finishes, so until the run is done the
+            scores and the ranking on the candidate list are incomplete. The
+            candidate list will show you how far the run has got.
+        </div>
+        {% endif %}
+
+        {% if vet_all_progress.running %}
+        <div class="vetting-warning vetting-warning-active">
+            <strong>A run is already in progress</strong>
+            {% if vet_all_progress.total %}
+            ({{ vet_all_progress.done }} of {{ vet_all_progress.total }} candidates done).
+            {% else %}
+            ({{ vet_all_progress.pending }} candidate{{ vet_all_progress.pending|pluralize }} still queued).
+            {% endif %}
+            Starting another one now will queue every candidate a second time.
+        </div>
+        {% endif %}
+
         <form action="" method="post">
             {% csrf_token %}
           

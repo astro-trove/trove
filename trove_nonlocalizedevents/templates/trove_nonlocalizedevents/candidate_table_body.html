@@ -10,11 +10,13 @@
           </a>
           <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}"
              class="btn {% if is_kilonova %}btn-success{% else %}btn-light{% endif %} mb-2"
-             title="Which photometry scorer the next Vet All uses. Switching does not rescore anything.">
+             title="Which stored photometry score this page displays. It does not rescore anything, and it no longer decides what a Vet All computes — that is chosen on the Vet All form.">
             Photometry: {{ phot_method_label }}
           </a>
         </div>
-        <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn btn-outline-secondary mb-2">
+        <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+           class="btn btn-outline-secondary mb-2"
+           title="Discard the cached scores and reload this list">
           <i class="fa fa-refresh"></i> Refresh
         </a>
       </div>
@@ -26,9 +28,20 @@
         Switching the photometry method does not rescore anything, and none of
         these candidates has a stored KilonovaSCORER score — the scores below are
         still TROVE's photometry factor. Run <strong>Vet All</strong> on this
-        event to compute them.
+        event, choosing KilonovaSCORER on the form, to compute them.
       </div>
     {% endif %}
+   {% if request.GET.nonlocalizedevent %}
+    <div id="vet-all-progress"
+         hx-get="{% url 'trove_nonlocalizedevents:vet-all-progress' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+         hx-trigger="every 60s"
+         hx-target="this"
+         hx-swap="innerHTML"
+         hx-push-url="false"
+         hx-history="false">
+      {% include 'trove_nonlocalizedevents/partials/vet_all_progress.html' %}
+    </div>
+   {% endif %}
     </br>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     <table class="table table-sm table-hover">

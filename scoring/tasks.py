@@ -10,6 +10,7 @@ import numpy as np
 
 from django_tasks import task
 from django.conf import settings
+from django.utils import timezone
 
 from candidate_vetting.public_catalogs.phot_catalogs import ATLAS_Forced_Phot
 from candidate_vetting.vet import run_mpc
@@ -26,6 +27,11 @@ logger = logging.getLogger(__name__)
 
 from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
+#: Queue the per-candidate "Vet All" tasks are enqueued on. The candidate list
+#: counts the tasks still sitting on it to show how far a run has got, so the
+#: name is shared rather than repeated.
+VET_ALL_QUEUE_NAME = "vet_all"
+
 
 ## tasks
 @task(queue_name="atlas_fphot", priority=settings.PRIORITY_MID)
@@ -39,7 +45,7 @@ def async_mpc(target_id: int, *args, **kwargs) -> None:
     run_mpc(target_id, *args, **kwargs)
 
 
-@task(queue_name="vet_all", priority=settings.PRIORITY_HIGH)
+@task(queue_name=VET_ALL_QUEUE_NAME, priority=settings.PRIORITY_HIGH)
 def async_vet(
     target_ids: list,
     nle_event_id: str,
@@ -57,6 +63,10 @@ def async_vet(
     user's choice, and would quietly score with the other scorer while the page
     reported this one. Passing it makes the task say which scorer it ran, and a
     toggle flipped mid-run cannot change the answer halfway through the event.
+
+    `run_started` and `started_by` arrive in **kwargs for the same reason and
+    are likewise not inputs to the vetting: they let the candidate list tell one
+    run from the next and report progress against it.
     """
     from .config import (
         FORM_CHOICE_FUNC_MAP,
@@ -141,7 +151,8 @@ def async_associate_targets_nle(
     
     
 ## functions which enqueue tasks
-def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None) -> None:
+def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None,
+                  started_by=None) -> None:
     """
     Asychronously vet according to vetting mode, wraps async_vet for a list of
     eventcandidates
@@ -159,8 +170,15 @@ def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None) -> None:
     the tens of minutes of grid reads it removes, and it keeps `async_vet`
     self-contained rather than having to trust a distance passed in from
     outside.
+
+    Every task of one run also carries the same `run_started` stamp, which is
+    what lets the candidate list tell one run from the next and report progress
+    against it. It rides on the task rows rather than in a cache deliberately:
+    a Vet All is a shared action whose results everyone sees, and the cache is
+    per-process, so it would show different users different things.
     """
     ecs = list(eventcandidates)
+    run_started = timezone.now().isoformat()
 
     # The caller (the vetting form) picks the scorer. The site-wide toggle is
     # only a fallback for callers that do not, and is read here in the web
@@ -190,6 +208,8 @@ def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None) -> None:
             nle_event_id=nle.event_id,
             vetting_mode=vetting_mode,
             phot_method=phot_method,
+            run_started=run_started,
+            started_by=started_by,
         )
 
 def associate_targets_with_nle_async(
