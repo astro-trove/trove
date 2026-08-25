@@ -126,18 +126,13 @@
         {% if vet_all_candidate_count %}
         <div class="vetting-warning">
             <strong>This vets all {{ vet_all_candidate_count }} candidate{{ vet_all_candidate_count|pluralize }} of this event.</strong>
-            Each candidate is queued as its own job, so how long the run takes
-            depends on how many workers are free and what else is queued &mdash;
-            minutes for a small event, hours for a large or busy one. Scores
-            update as each candidate finishes, so until the run is done the
-            scores and the ranking on the candidate list are incomplete. The
-            candidate list will show you how far the run has got.
+            Each candidate is queued as its own task, run in parallel, taking a few seconds each.
         </div>
         {% endif %}
 
         {% if vet_all_progress.running %}
         <div class="vetting-warning vetting-warning-active">
-            <strong>A run is already in progress</strong>
+            <strong>Vet All tasks are already in progress</strong>
             {% if vet_all_progress.total %}
             ({{ vet_all_progress.done }} of {{ vet_all_progress.total }} candidates done).
             {% else %}

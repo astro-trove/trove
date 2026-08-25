@@ -27,11 +27,6 @@ logger = logging.getLogger(__name__)
 
 from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
-#: Queue the per-candidate "Vet All" tasks are enqueued on. The candidate list
-#: counts the tasks still sitting on it to show how far a run has got, so the
-#: name is shared rather than repeated.
-VET_ALL_QUEUE_NAME = "vet_all"
-
 
 ## tasks
 @task(queue_name="atlas_fphot", priority=settings.PRIORITY_MID)
@@ -45,7 +40,7 @@ def async_mpc(target_id: int, *args, **kwargs) -> None:
     run_mpc(target_id, *args, **kwargs)
 
 
-@task(queue_name=VET_ALL_QUEUE_NAME, priority=settings.PRIORITY_HIGH)
+@task(queue_name="vet_all", priority=settings.PRIORITY_HIGH)
 def async_vet(
     target_ids: list,
     nle_event_id: str,

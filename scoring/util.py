@@ -2,7 +2,6 @@
 Some common functions used in multiple places throughout the app
 """
 
-from collections import OrderedDict
 from datetime import timedelta
 import math
 import logging
@@ -14,11 +13,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django_tasks import ResultStatus
 from django_tasks.backends.database.models import DBTaskResult
-from tom_nonlocalizedevents.models import (
-    EventCandidate,
-    EventLocalization,
-    NonLocalizedEvent,
-)
+from tom_nonlocalizedevents.models import NonLocalizedEvent
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
@@ -31,7 +26,7 @@ from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 from .models import ScoreFactor
-from .tasks import VET_ALL_QUEUE_NAME, async_vet
+from .tasks import async_vet
 
 import time
 
@@ -40,11 +35,6 @@ logger = logging.getLogger(__name__)
 # map imported parameter ranges to transients
 TRANSIENTS = ["KN", "KN-in-SN", "super-KN"]
 
-#: The one transient type KilonovaSCORER models. Its simulation grid is a
-#: two-component kilonova population, so its factor is only meaningful for
-#: "KN" -- "KN-in-SN" and "super-KN" ask a different question of the same
-#: photometry and keep TROVE's own factor.
-KILONOVA_SCORER_TRANSIENT = "KN"
 DICT_TRANSIENTS_PARAM_RANGES = {
     "KN": KN_PARAM_RANGES,
     "KN-in-SN": KN_IN_SN_PARAM_RANGES,
@@ -52,20 +42,14 @@ DICT_TRANSIENTS_PARAM_RANGES = {
 }
 
 
-# default subscore names
-#: ScoreFactor key holding KilonovaSCORER's photometry factor, written by
-#: `vet_bns` when the site-wide `phot_method` toggle is on KilonovaSCORER.
-#: Listed in SUBSCORE_NAMES so it is fetched, and excluded from the generic
-#: product below so it is never multiplied in as just another subscore -- it
-#: REPLACES the TROVE photometry factor rather than joining it.
+# ScoreFactor key holding KilonovaSCORER's photometry factor, written by
+# `vet_bns` when the site-wide `phot_method` toggle is on KilonovaSCORER
 KILONOVA_SCORE_KEY = "kilonova_score"
 
-#: Why KilonovaSCORER could not score a candidate, written by `vet_bns` in place
-#: of a score. Its PRESENCE is what distinguishes "the scorer ran and failed"
-#: from "this candidate has not been vetted yet" -- the two look identical if
-#: you only check for a missing score, and only the first is worth flagging.
+# why KilonovaSCORER could not score a candidate, written by `vet_bns` in place of score
 KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
 
+# default subscore names
 SUBSCORE_NAMES = [
     "kilonova_score",
     "skymap_score",
@@ -124,18 +108,11 @@ def get_event_candidate_scores(
         include_subscores=False,
         phot_method=None,
 ):
-    """Get the event candidate scores for everything in subscore_names
+    """Get the event candidate scores for all subscores in subscore_names.
 
-    event_candidates should be a django queryset of EventCandidate objects
-
-    ``phot_method`` selects which photometry factor the score uses. ``None``
-    reads the site-wide toggle. On ``kilonova`` a candidate with a stored
-    ``kilonova_score`` uses it INSTEAD of the product of TROVE's peak-luminosity
-    / peak-time / decay-rate checks; a candidate without one falls back to the
-    TROVE factor, because the toggle deliberately does not rescore and a
-    candidate that has never been vetted under KilonovaSCORER has nothing else
-    to show. Each candidate is marked with ``ec.phot_source`` so the page can
-    say which it is displaying rather than leaving the two indistinguishable.
+    event_candidates should be a django queryset of EventCandidate objects.
+    `phot_method` selects which photometry factor the score uses (`None`
+    reads the site-wide toggle.)
     """
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
@@ -271,8 +248,10 @@ def get_event_candidate_scores(
             # "KN-in-SN" / "super-KN" acceptance windows, which is the whole
             # content of those two columns.
             kn = sf_dict.get(KILONOVA_SCORE_KEY)
-            if (use_kilonova and transient == KILONOVA_SCORER_TRANSIENT
-                    and kn is not None and math.isfinite(kn)):
+            if (use_kilonova and
+                transient == "KN" and
+                kn is not None and
+                math.isfinite(kn)):
                 # KilonovaSCORER's factor stands in for the whole TROVE
                 # photometry product -- not multiplied with it, which would
                 # apply the photometry twice.
@@ -288,7 +267,7 @@ def get_event_candidate_scores(
             # it from whichever transient happened to be last would report
             # "trove" for every candidate as soon as more than one type is
             # scored.
-            if transient == KILONOVA_SCORER_TRANSIENT:
+            if transient == "KN":
                 ec.phot_source = phot_source
 
             # save the score to a temporary field (dictionary) in the
@@ -323,17 +302,9 @@ def get_target_score(target_id):
     return out
 
 
-VET_ALL_FINISHED_NOTICE_PERIOD = 3600  # 1 hour in seconds
-
-
 def _latest_run(tasks, latest):
     """
-    Narrow an event's vetting tasks to those of its most recent run.
-
-    Runs are told apart by the `run_started` stamp `vet_all_async` puts on every
-    task it enqueues. Rows predating that stamp fall back on timing: a run
-    enqueues all of its tasks within seconds, so anything appreciably older than
-    the newest task belongs to an earlier run.
+    Get running vetting tasks for the most recent "Vet All" run for some event.
     """
     stamp = (latest.args_kwargs.get("kwargs") or {}).get("run_started")
     if stamp:
@@ -344,12 +315,7 @@ def _latest_run(tasks, latest):
 
 def get_vet_all_progress(nonlocalizedevent_id):
     """
-    Summarize how far the most recent "Vet All" run for an event has got.
-
-    "Vet All" enqueues one task per candidate, so the queue *is* the progress
-    bar: every task still waiting or running is a candidate whose score has not
-    been updated yet. Returns None when there is nothing worth telling the user
-    about (no run on record, and nothing left in the queue).
+    Get the progress for the most recent "Vet All" run.
     """
     if not nonlocalizedevent_id:
         return None
@@ -359,11 +325,9 @@ def get_vet_all_progress(nonlocalizedevent_id):
     except (NonLocalizedEvent.DoesNotExist, ValueError):
         return None
 
-    # Pin this to the one task that "Vet All" enqueues, not just to its queue.
-    # Production queues are shared and outlive any one feature, so a second kind
-    # of task landing on this one later must not start counting as candidates.
+    # get tasks for given NLE
     tasks = DBTaskResult.objects.filter(
-        queue_name=VET_ALL_QUEUE_NAME,
+        queue_name="vet_all",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__nle_event_id=nle.event_id,
     )
@@ -374,10 +338,7 @@ def get_vet_all_progress(nonlocalizedevent_id):
         if latest is None:
             return None
 
-        # What is still outstanding is counted across every run, not just the
-        # newest. If a second run starts before the first has drained, the
-        # leftovers of the first are still rewriting scores, and the page would
-        # otherwise call itself up to date while they did.
+        # count what is still outstanding
         pending = tasks.filter(status__in=pending_statuses).count()
         run = _latest_run(tasks, latest).aggregate(
             total=Count("id"),
@@ -405,7 +366,7 @@ def get_vet_all_progress(nonlocalizedevent_id):
         if last_finished is None:
             return None
         if timezone.now() - last_finished > timedelta(
-            seconds=VET_ALL_FINISHED_NOTICE_PERIOD
+            seconds=3600 # 1 hour
         ):
             return None
 
@@ -427,19 +388,12 @@ def get_vet_all_progress(nonlocalizedevent_id):
 
 
 def get_last_vetting(target_id, nonlocalizedevent_id=None):
-    """
-    When was this candidate last vetted, and did it work?
-
-    Read off the task queue, which records one row per candidate per run. Note
-    the ``target_ids__0`` lookup: ``vet_all_async`` enqueues exactly one target
-    per task, so the first element is the whole list. A task carrying several
-    targets would be missed, which nothing currently creates.
-    """
+    """When was this candidate last vetted?"""
     if target_id is None:
         return None
 
     tasks = DBTaskResult.objects.filter(
-        queue_name=VET_ALL_QUEUE_NAME,
+        queue_name="vet_all",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__target_ids__0=int(target_id),
     )
@@ -483,11 +437,8 @@ def get_last_vetting(target_id, nonlocalizedevent_id=None):
 
 def get_last_vet_all_run(nonlocalizedevent_id):
     """
-    Summarize the most recent "Vet All" run for an event, however long ago.
-
-    Distinct from `get_vet_all_progress`, which is a transient notice about a
-    run happening now. This is the standing record of when the scores on the
-    page were last refreshed.
+    Summarize the most recent "Vet All" run. Distinct from
+    `get_vet_all_progress`, describes an ongoing run.
     """
     if not nonlocalizedevent_id:
         return None
@@ -498,7 +449,7 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         return None
 
     tasks = DBTaskResult.objects.filter(
-        queue_name=VET_ALL_QUEUE_NAME,
+        queue_name="vet_all",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__nle_event_id=nle.event_id,
     )
