@@ -447,24 +447,15 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
             "target__name"
         )
 
-        n_candidates = ecs.count()
-
         # The scorer the user picked on the form, sent with every task so the
         # whole run uses it -- workers cannot read the site-wide toggle, and it
         # could be flipped mid-run in any case.
         phot_method = _clean_phot_method(request.GET.get("phot_method"))
 
         # then run the vetting, asynchronously
-        label = (f" using {PHOT_METHOD_LABELS[phot_method]} photometry"
-                 if phot_method and vetting_mode == "KN" else "")
         messages.info(
             request,
-            f"Vetting all {n_candidates} candidates in {vetting_mode} vetting "
-            f"mode{label}. Each candidate is queued as its own job, so the run "
-            "can take anywhere from minutes to hours depending on how busy the "
-            "workers are. The candidate list shows how far the run has got, and "
-            "scores update as each candidate finishes, so treat the scores and "
-            "the ranking as incomplete until it does.",
+            f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per each of {ecs.count():.0f} candidates; check back later.",
         )
         vet_all_async(ecs, nle, vetting_mode, phot_method=phot_method,
                       started_by=request.user.get_username())

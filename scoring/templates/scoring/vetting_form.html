@@ -130,7 +130,7 @@
         </div>
         {% endif %}
 
-        {% if vet_all_progress.running %}
+        {% if vet_all_progress.running and vet_all_progress.percent < 100 %}
         <div class="vetting-warning vetting-warning-active">
             <strong>Vet All tasks are already in progress</strong>
             {% if vet_all_progress.total %}
