@@ -820,6 +820,9 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                     min_significance=param_ranges.get(
                         "min_decay_significance", 3.0
                     ),
+                    min_baseline_days=param_ranges.get(
+                        "min_decay_baseline_days", 0.1
+                    ),
                     decay_rate_pass_range=param_ranges["decay_rate"],
                 )
             )

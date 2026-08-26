@@ -54,6 +54,20 @@ PARAM_RANGES = dict(
     max_decay_fit_time=25,
     phot_score_snr_min=5,
     min_decay_significance=3.0,
+    # minimum dt_max - dt_min (over de-duplicated points) to attempt a fit at
+    # all, REGARDLESS of significance or which side of `decay_rate` it would
+    # land on -- unlike min_decay_significance, this is unconditional. It
+    # exists for a failure mode significance cannot see: a systematic
+    # miscalibration (same-visit cross-instrument offset, an image-
+    # differencing artifact) can produce a tight-but-WRONG magerr, which
+    # makes a spurious decline look highly significant rather than
+    # insignificant. 0.1 d (~2.4 h) targets same-epoch/same-visit
+    # contamination specifically, without touching next-night-or-later
+    # baselines -- see vet_phot.estimate_max_find_decay_rate's
+    # `min_baseline_days` and diagnostics/results/45_real_significance_S251112cm.csv
+    # (on S251112cm this catches 2/201 candidates, both already caught by
+    # the significance gate -- i.e. free insurance, not a new rejection).
+    min_decay_baseline_days=0.1,
 )
 
 
