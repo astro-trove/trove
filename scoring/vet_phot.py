@@ -289,6 +289,7 @@ def estimate_max_find_decay_rate(
     max_decay_fit_time: Optional[int] = 25,
     min_significance: float = 3.0,
     min_baseline_days: Optional[float] = None,
+    decay_rate_pass_range: Optional[Tuple[float, float]] = None,
 ) -> Tuple[float, float, float]:
     """
     Fit's both a single and broken powerlaw to the data, computes the AIC and then
@@ -308,38 +309,23 @@ def estimate_max_find_decay_rate(
         The default is 25 days based on discussion from Rastinejad+2022.
     min_significance: float
         Minimum |decay_rate| / sigma(decay_rate), sigma propagated from the
-        photometric errors, required to accept the fit. Two epochs close in
-        time (or with large error bars) can produce an enormous decay_rate
-        that is nonetheless consistent with zero
+        photometric errors, required to accept a PASSING decay_rate (see
+        `decay_rate_pass_range`) as measured rather than refuse it.
+    decay_rate_pass_range: (float, float), optional
+        The `[low, high]` window `decay_rate` must fall in to PASS the
+        downstream kilonova check (`param_ranges["decay_rate"]` in the
+        caller). 
     min_baseline_days: float, optional
         A NAIVE, purely temporal alternative/complement to `min_significance`:
         refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
-        used for fitting) is below this many days. Disabled (`None`) by
-        default -- see diagnostics/reports/DECAY_FIX_RESULTS.md Sec 7, which
-        proposed exactly this and retracted it, because it looks only at time
-        separation and not at the size of the error bars: it rejects short,
-        precisely-measured baselines that ARE significant, and accepts long,
-        noisy baselines that AREN'T. Kept here so it can be compared directly
-        against `min_significance` -- see
-        diagnostics/scripts/42_naive_baseline_vs_significance.py.
+        used for fitting) is below this many days. 
 
     RETURNS
     -------
     max_time: float
         Days since GW discovery for max to occur
     decay_rate: float
-        The late-time logarithmic slope of the light curve, in **magnitudes per
-        dex of time** -- NOT mag/day. For a power law d(mag)/d(log10 t) is
-        constant, which is why it is quoted per dex; the same curve expressed
-        in mag/day varies by a factor ~24 across the 25 d window and would not
-        be a single number.
-
-        SIGN: this is the `a` of `mag = y0 - a*log10(t)`, so it is the NEGATIVE
-        of d(mag)/d(log10 t). A source getting FAINTER has d(mag)/d(log10 t) > 0
-        and therefore `decay_rate < 0`. Hence the kilonova cut is
-        `decay_rate <= -0.1`. Relation to the flux index: for F ~ t^-alpha,
-        decay_rate = -2.5*alpha, so r-process heating (alpha ~ 1.3) corresponds
-        to about -3.25 and the -0.1 cut to alpha ~ 0.04.
+        The late-time logarithmic slope of the light curve, in d(mag)/d(log(10))
     """
 
     # define some useful variables
@@ -353,14 +339,7 @@ def estimate_max_find_decay_rate(
     mag_tofit = mag[dt_days <= max_decay_fit_time]
     magerr_tofit = magerr[dt_days <= max_decay_fit_time]
 
-    # Drop rows that repeat a measurement already present. The same ATLAS
-    # detection is routinely ingested twice -- same timestamp, same magnitude,
-    # two ReducedDatum rows -- and a repeated row carries no information while
-    # counting three times over: it double-weights that epoch in the least
-    # squares, inflates `n_samples` in the AIC, and inflates the point count
-    # that gates the broken powerlaw below. Only EXACT repeats of (time,
-    # magnitude) are removed; two bands observed at one timestamp have
-    # different magnitudes and both survive.
+    # Drop rows that repeat a measurement already present
     dt_days_tofit = np.asarray(dt_days_tofit, dtype=float)
     mag_tofit = np.asarray(mag_tofit, dtype=float)
     magerr_tofit = np.asarray(magerr_tofit, dtype=float)
@@ -378,13 +357,6 @@ def estimate_max_find_decay_rate(
         mag_tofit = mag_tofit[_keep]
         magerr_tofit = magerr_tofit[_keep]
 
-    # Distinct epochs, which is what actually constrains a fit in time. Two
-    # rows at one timestamp cannot determine a slope no matter how many there
-    # are: the single powerlaw has two free parameters, so through one distinct
-    # x every (a, y0) on a line through the point is a zero-residual solution
-    # and `curve_fit` returns wherever it stopped. AT2025adtu produced
-    # decay_rate = +65 that way. Refuse instead of inventing a number; the
-    # caller already handles this the same way it handles a failed fit.
     n_epochs = int(np.unique(dt_days_tofit).size)
     if n_epochs < 2:
         raise RuntimeError(
@@ -392,11 +364,6 @@ def estimate_max_find_decay_rate(
             "-- the decay rate is not determined by this data"
         )
 
-    # NAIVE baseline gate -- disabled unless `min_baseline_days` is set. This
-    # looks only at time separation, not at how precisely each point is
-    # measured, so it is a blunter instrument than `min_significance` below
-    # and is kept only for comparison -- see the docstring and
-    # diagnostics/scripts/42_naive_baseline_vs_significance.py.
     if min_baseline_days is not None:
         baseline_days = float(dt_days_tofit.max() - dt_days_tofit.min())
         if baseline_days < min_baseline_days:
@@ -421,15 +388,6 @@ def estimate_max_find_decay_rate(
         # RuntimeError will throw if it doesn't converge
         pl_popt, pl_pcov = None, None
 
-    # ---- candidates 2 and 3: the two broken powerlaws -----------------
-    # Both curvatures are fitted, because the sign of the log term decides
-    # whether the slope may increase or decrease with time and one form cannot
-    # do both. Trying only one restricts the model to three of the six break
-    # shapes; see `_broken_powerlaw_concave` / `_broken_powerlaw_convex`.
-    #
-    # Only worth attempting with more than bpl_nparams + 2 DISTINCT EPOCHS,
-    # otherwise the AIC small-sample term 2k(k+1)/(n-k-1) has a zero or
-    # negative denominator.
     broken_fits = {}
     if n_epochs > bpl_nparams + 2:
         # a1 free over the whole line -- the sign is no longer used to break
@@ -514,57 +472,39 @@ def estimate_max_find_decay_rate(
         np.argmin(ytest)
     ]  # need to use min here b/s magnitudes are backwards
 
-    # SIGN CONVENTION. Two quantities, differing by a minus sign; conflating
-    # them is what produced the bug in diagnostics/reports/DECAY_RATE_SIGN.md,
-    # so both are named and the conversion is written out explicitly.
-    #
-    #   mag_slope_per_dex = d(mag)/d(log10 t)
-    #       the physical quantity. POSITIVE means the magnitude is rising,
-    #       i.e. the source is getting FAINTER (fading).
-    #
-    #   decay_rate = -mag_slope_per_dex
-    #       what this function returns and what `PARAM_RANGES["decay_rate"]`
-    #       is written against. It is the `a` of `mag = y0 - a*log10(t)`, so
-    #       it carries the OPPOSITE sign: a FADING source has decay_rate < 0.
-    #       That is why the kilonova cut is `decay_rate <= -0.1` and not
-    #       `>= +0.1`.
     decay_rate = -mag_slope_per_dex
 
-    # SIGNIFICANCE. A short baseline or large error bars can produce a huge
-    # |decay_rate| that is nonetheless consistent with zero -- e.g. two
-    # exposures 86 s apart genuinely ARE two epochs, but their fitted slope
-    # can be indistinguishable from a flat light curve (see
-    # diagnostics/reports/DECAY_UNCERTAINTY.md, AT2025aebb:
-    # decay_rate = -226.48 +/- 360.32, 0.63 sigma). Refit the winning model
-    # once more, weighted by the photometric errors this function otherwise
-    # ignores, purely to get a usable covariance, and refuse to report
-    # peak_time/decay_rate if that covariance says the slope is not measured.
-    # `decay_rate` is always +/- the raw fit's parameter 0 (see the sign
-    # convention above and `_ordered`), so its sigma is that parameter's.
-    if label == "powerlaw":
-        raw_func, p0, bounds = _powerlaw, tuple(best_fit_params), None
-    else:
-        a1, a2, y0, x0 = best_fit_params
-        raw_func = _ordered(model)
-        p0 = (a1, a2 - a1, y0, x0)
-        bounds = list(zip(*bpl_bounds))
-    sigma_decay_rate = _decay_rate_sigma(
-        raw_func, p0, bounds, dt_days_tofit, mag_tofit, magerr_tofit
+    would_pass = (
+        decay_rate_pass_range is None
+        or decay_rate_pass_range[0] <= decay_rate <= decay_rate_pass_range[1]
     )
-    significance = (
-        abs(decay_rate) / sigma_decay_rate
-        if sigma_decay_rate and np.isfinite(sigma_decay_rate) and sigma_decay_rate > 0
-        else np.nan
-    )
-    if not (significance >= min_significance):
-        sig_str = (
-            f"{significance:.2g}" if np.isfinite(significance) else "an unmeasurable number of"
+    if would_pass:
+        if label == "powerlaw":
+            raw_func, p0, bounds = _powerlaw, tuple(best_fit_params), None
+        else:
+            a1, a2, y0, x0 = best_fit_params
+            raw_func = _ordered(model)
+            p0 = (a1, a2 - a1, y0, x0)
+            bounds = list(zip(*bpl_bounds))
+        sigma_decay_rate = _decay_rate_sigma(
+            raw_func, p0, bounds, dt_days_tofit, mag_tofit, magerr_tofit
         )
-        raise RuntimeError(
-            f"decay_rate {decay_rate:.3g} is only {sig_str} sigma from zero "
-            f"(need >= {min_significance}) -- the photometry is not sufficiently "
-            "separated in time to constrain a slope"
+        # Significance = 1 / relative uncertainty
+        significance = (
+            abs(decay_rate) / sigma_decay_rate
+            if sigma_decay_rate and np.isfinite(sigma_decay_rate) and sigma_decay_rate > 0
+            else np.nan
         )
+        if not (significance >= min_significance):
+            sig_str = (
+                f"{significance:.2g}" if np.isfinite(significance) else "an unmeasurable number of"
+            )
+            raise RuntimeError(
+                f"decay_rate {decay_rate:.3g} would pass the check but is only "
+                f"{sig_str} sigma from zero (need >= {min_significance}) -- the "
+                "photometry is not sufficiently separated in time to constrain "
+                "a slope"
+            )
 
     return model, best_fit_params, max_time, decay_rate
     
@@ -881,6 +821,7 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                     min_significance=param_ranges.get(
                         "min_decay_significance", 3.0
                     ),
+                    decay_rate_pass_range=param_ranges["decay_rate"],
                 )
             )
         except RuntimeError as exc:
