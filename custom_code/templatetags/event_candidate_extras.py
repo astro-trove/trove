@@ -91,9 +91,11 @@ def scoring_toggles(context, target_id=None):
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
     # switching to KilonovaSCORER only changes anything if this candidate has a
-    # score to switch TO 
+    # score to switch TO. With no target_id (e.g. the candidate list page,
+    # which isn't scoped to one candidate) there's nothing to gate on, so the
+    # toggle is always available.
     is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
-    has_kilonova_score = bool(target_id) and ScoreFactor.objects.filter(
+    has_kilonova_score = not target_id or ScoreFactor.objects.filter(
         event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
     ).exists()
     return {

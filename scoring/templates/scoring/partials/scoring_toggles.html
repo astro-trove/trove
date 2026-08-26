@@ -1,36 +1,92 @@
-<div style="display:flex; gap:0.5rem; flex-wrap:wrap" class="mb-2">
-  <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?next={{ next|urlencode }}"
-     class="btn btn-sm {% if agn_toggle %}btn-success{% else %}btn-light{% endif %}"
-     title="Whether the AGN factor contributes to the overall score.">
-    {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} AGN Score
-  </a>
-  <div class="btn-group-toggle" role="group" aria-label="Photometry scoring method">
+<div style="display:flex; flex-direction:row; align-items:center; flex-wrap:wrap; gap:0.75rem" class="mb-2">
+  <div class="phot-method-slider {% if is_kilonova %}phot-method-slider--right{% endif %}" role="group" aria-label="Photometry scoring method">
+    <span class="phot-method-slider-thumb" aria-hidden="true"></span>
     {% if is_kilonova %}
     <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
-       class="btn btn-sm btn-secondary"
+       class="phot-method-slider-option"
        title="Score photometry according to light curve metrics">
-      &#9744; Photometry: Light curve metrics
+      Light curve metrics
     </a>
-    <span class="btn btn-sm btn-primary" aria-disabled="true">
-      &#9745; Photometry: KilonovaSCORER
+    <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
+      KilonovaSCORER
     </span>
     {% else %}
-    <span class="btn btn-sm btn-primary" aria-disabled="true">
-      &#9745; Photometry: Light curve metrics
+    <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
+      Light curve metrics
     </span>
     {% if has_kilonova_score %}
     <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
-       class="btn btn-sm btn-secondary"
+       class="phot-method-slider-option"
        title="Score photometry according to KilonovaSCORER">
-      &#9744; Photometry: KilonovaSCORER
+      KilonovaSCORER
     </a>
     {% else %}
-    <span class="btn btn-sm btn-secondary disabled" aria-disabled="true"
-          style="pointer-events:none; opacity:0.5"
+    <span class="phot-method-slider-option phot-method-slider-option--disabled" aria-disabled="true"
           title="This candidate has no KilonovaSCORER score. Vet it with KilonovaSCORER first.">
-      &#9744; Photometry: KilonovaSCORER
+      KilonovaSCORER
     </span>
     {% endif %}
     {% endif %}
   </div>
+  <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?next={{ next|urlencode }}"
+     class="btn agn-toggle {% if agn_toggle %}btn-success{% else %}btn-light{% endif %}"
+     title="Whether the AGN factor contributes to the overall score.">
+    {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} Include AGN sub-score
+  </a>
 </div>
+
+<style>
+  .phot-method-slider {
+    position: relative;
+    display: inline-grid;
+    grid-template-columns: 1fr 1fr;
+    min-width: 380px;
+    border-radius: 20px;
+    background: #e9ecef;
+    border: 1px solid #ced4da;
+  }
+  .phot-method-slider-thumb {
+    position: absolute;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc(50% - 6px);
+    border-radius: 17px;
+    background: #007bff;
+    transition: left 0.2s ease;
+  }
+  .phot-method-slider--right .phot-method-slider-thumb {
+    left: calc(50% + 3px);
+  }
+  .phot-method-slider-option {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.95rem;
+    color: #495057;
+    text-decoration: none;
+  }
+  .phot-method-slider-option--active {
+    color: #fff;
+    font-weight: 600;
+  }
+  .phot-method-slider-option--disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+  .phot-method-slider-option:not(.phot-method-slider-option--active):not(.phot-method-slider-option--disabled):hover {
+    color: #212529;
+  }
+  .btn.agn-toggle {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.6rem 1rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border-radius: 20px;
+  }
+</style>
