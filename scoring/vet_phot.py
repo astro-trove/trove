@@ -381,7 +381,6 @@ def estimate_max_find_decay_rate(
         ftol=1e-8,
     )
 
-    # ---- candidate 1: a single powerlaw -------------------------------
     try:
         pl_popt, pl_pcov = curve_fit(_powerlaw, **curve_fit_kwargs)
     except RuntimeError:
