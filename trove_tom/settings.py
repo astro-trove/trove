@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "trove_targets",
     "trove_nonlocalizedevents",
     "scoring",
+    "scoring.kilonova_scorer_helpers",
     "sphinx_docs",
     "dal",
     "dal_select2",
