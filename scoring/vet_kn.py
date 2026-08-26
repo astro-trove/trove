@@ -57,6 +57,10 @@ PARAM_RANGES = dict(
     t_post=np.inf,
     max_decay_fit_time=25,
     phot_score_snr_min=5,
+    # minimum |decay_rate| / sigma(decay_rate) to accept peak_time/decay_rate
+    # as measured rather than refuse them -- see
+    # vet_phot.estimate_max_find_decay_rate and diagnostics/reports/DECAY_UNCERTAINTY.md
+    min_decay_significance=3.0,
 )
 
 
