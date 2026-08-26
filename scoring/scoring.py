@@ -319,6 +319,40 @@ def skymap_association(
     return 1 - cumprob[0][0]
 
 
+def _host_used_for_distance_scoring(host_df, target_id, nonlocalized_event_name):
+    if not len(host_df) or "ID" not in host_df.columns:
+        return None
+    try:
+        nle = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
+        factors = dict(
+            ScoreFactor.objects.filter(
+                event_candidate__target_id=target_id,
+                event_candidate__nonlocalizedevent_id=nle.id,
+                key__in=["host_name", "host_catalog"],
+            ).values_list("key", "value")
+        )
+    except (NonLocalizedEvent.DoesNotExist, ValueError):
+        return None
+
+    host_name = factors.get("host_name")
+    if not host_name or host_name == "None":
+        return None
+
+    match = host_df[host_df["ID"].astype(str) == str(host_name)]
+    # IDs are only unique within a catalog, so disambiguate when we know it
+    catalog = factors.get("host_catalog")
+    if len(match) > 1 and catalog and "Source" in host_df.columns:
+        match = match[match["Source"].astype(str) == str(catalog)]
+    if len(match) != 1:
+        return None
+
+    row = match.iloc[0]
+    dist = pd.to_numeric(getattr(row, "Dist", None), errors="coerce")
+    if dist is None or not np.isfinite(dist) or dist <= 0:
+        return None
+    return row
+
+
 def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name: str):
 
     # first check if this target has a redshift associated with it
@@ -346,8 +380,13 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     if not len(host_df):
         return _distance_at_healpix(nonlocalized_event_name, target_id)
 
-    # if we've gotten to this point then the target has host galaxies associated with it!
-    # first thing we need to do is assign a rank ordering to the various catalogs,
+    scored_host = _host_used_for_distance_scoring(
+        host_df, target_id, nonlocalized_event_name
+    )
+    if scored_host is not None:
+        return scored_host.Dist, scored_host.DistErr
+
+    # otherwise fall back to a rank ordering of the various catalogs,
     # this will help later
     host_df["_rank_order"] = host_df.Source.replace(GALAXY_CATALOG_RANKING)
     host_df = host_df.sort_values(by=["_rank_order", "PCC"])
