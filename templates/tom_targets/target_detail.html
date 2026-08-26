@@ -47,6 +47,7 @@
     </ul>
     <div class="tab-content">
       <div class="tab-pane active" id="score-details">
+	{% if request.user.is_authenticated %}{% scoring_toggles target.id %}{% endif %}
 	{% display_score_details target.id %}
 	<details open>
 	  <summary><h5 style="display:inline-block">Host Galaxies</h5></summary>
@@ -77,6 +78,7 @@
     </div>
   </div>
 </div>
+
 
 <script src="{% static 'tom_targets/js/tabs.js' %}"></script>
   
