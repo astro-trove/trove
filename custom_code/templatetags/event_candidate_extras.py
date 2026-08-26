@@ -90,11 +90,9 @@ def vet_all_is_allowed(context):
 def scoring_toggles(context, target_id=None):
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
+    # switching to KilonovaSCORER only changes anything if this candidate has a
+    # score to switch TO 
     is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
-    # Switching to KilonovaSCORER only changes anything if this candidate has a
-    # score to switch TO -- with none stored, `get_event_candidate_scores`
-    # falls back to the light curve product and the page is identical either
-    # way. Offering the button then just invites a click that does nothing.
     has_kilonova_score = bool(target_id) and ScoreFactor.objects.filter(
         event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
     ).exists()
@@ -156,7 +154,7 @@ def display_score_details(context, target_id):
             partial(_float_format, precision=2),
         ),
         kilonova_skip_reason=(
-            "KilonovaSCORER: could not score",
+            "KilonovaSCORER: Could not score",
             _str_format,
         ),
     )
@@ -177,18 +175,8 @@ def display_score_details(context, target_id):
     for event_candidate in target.eventcandidate_set.all():
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
-            # `localization_id` is bookkeeping, not a score: it stamped which
-            # skymap a candidate was scored against so a new one could re-vet
-            # the stale ones. That machinery is gone, nothing writes the key
-            # any more, and it was never part of the score product -- but the
-            # rows it left behind have no keymap entry, so the card rendered
-            # them under their raw key as a bare database id.
             + ["mpc_score", "predetection_score", "localization_id"]
         ).all()
-        # `order.index` raises ValueError on a key that is not in `keymap`,
-        # which took the whole target page down whenever a new ScoreFactor key
-        # appeared -- `kilonova_score` did exactly that. Unknown keys sort to
-        # the end and are rendered with their raw key as the label instead.
         sf_set = sorted(
             sf_set,
             key=lambda sf: order.index(sf.key) if sf.key in order else len(order),

@@ -287,7 +287,7 @@ def score_candidate(
     # the answer cannot change once the distance is known.
     if dist_mpc > MAX_DISTANCE_MPC:
         raise KilonovaScoreUnavailable(
-            f"distance {dist_mpc:,.0f} Mpc is beyond the {MAX_DISTANCE_MPC:,.0f} Mpc "
+            f"Distance {dist_mpc:,.0f} Mpc is beyond the {MAX_DISTANCE_MPC:,.0f} Mpc "
             f"limit of the simulation ladder"
         )
 
