@@ -1,0 +1,36 @@
+<div style="display:flex; gap:0.5rem; flex-wrap:wrap" class="mb-2">
+  <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?next={{ next|urlencode }}"
+     class="btn btn-sm {% if agn_toggle %}btn-success{% else %}btn-light{% endif %}"
+     title="Whether the AGN factor contributes to the overall score.">
+    {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} AGN Score
+  </a>
+  <div class="btn-group-toggle" role="group" aria-label="Photometry scoring method">
+    {% if is_kilonova %}
+    <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
+       class="btn btn-sm btn-secondary"
+       title="Score photometry according to light curve metrics">
+      &#9744; Photometry: Light curve metrics
+    </a>
+    <span class="btn btn-sm btn-primary" aria-disabled="true">
+      &#9745; Photometry: KilonovaSCORER
+    </span>
+    {% else %}
+    <span class="btn btn-sm btn-primary" aria-disabled="true">
+      &#9745; Photometry: Light curve metrics
+    </span>
+    {% if has_kilonova_score %}
+    <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
+       class="btn btn-sm btn-secondary"
+       title="Score photometry according to KilonovaSCORER">
+      &#9744; Photometry: KilonovaSCORER
+    </a>
+    {% else %}
+    <span class="btn btn-sm btn-secondary disabled" aria-disabled="true"
+          style="pointer-events:none; opacity:0.5"
+          title="This candidate has no KilonovaSCORER score. Vet it with KilonovaSCORER first.">
+      &#9744; Photometry: KilonovaSCORER
+    </span>
+    {% endif %}
+    {% endif %}
+  </div>
+</div>

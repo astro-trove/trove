@@ -1,7 +1,5 @@
 import math
-# from typing import List
-from ninja import Router# , Schema
-# from ninja.orm import create_schema
+from ninja import Router
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
 from trove_targets.models import Target

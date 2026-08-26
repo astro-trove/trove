@@ -5,7 +5,7 @@ from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_dataproducts.models import ReducedDatum
 
-from scoring.vet_bns import vet_bns
+from scoring.vet_kn import vet_kn
 from scoring.vet_kn_in_sn import vet_kn_in_sn
 from scoring.vet_super_kn import vet_super_kn
 from scoring.vet_basic import vet_basic
@@ -188,7 +188,7 @@ def target_post_save(
         #       For now we are just always all types of vetting
         if len(new_candidates):
             for cand in new_candidates:
-                vet_bns(cand.target.id, cand.nonlocalizedevent.event_id)
+                vet_kn(cand.target.id, cand.nonlocalizedevent.event_id)
                 vet_kn_in_sn(cand.target.id, cand.nonlocalizedevent.event_id)
                 vet_super_kn(cand.target.id, cand.nonlocalizedevent.event_id)
         else:

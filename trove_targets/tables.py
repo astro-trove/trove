@@ -1,4 +1,3 @@
-# from tom_targets.tables import TargetTable
 from trove_targets.models import Target
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_common.htmx_table import HTMXTable

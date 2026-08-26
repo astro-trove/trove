@@ -4,11 +4,13 @@ Asynchronous tasks for (1) querying public services that takes a long time,
 """
 
 import logging
+import time
 from datetime import datetime, timedelta
 import numpy as np
 
 from django_tasks import task
 from django.conf import settings
+from django.utils import timezone
 
 from candidate_vetting.public_catalogs.phot_catalogs import ATLAS_Forced_Phot
 from candidate_vetting.vet import run_mpc
@@ -22,6 +24,8 @@ from trove_targets.models import Target
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 
 logger = logging.getLogger(__name__)
+
+from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
 
 ## tasks
@@ -41,18 +45,23 @@ def async_vet(
     target_ids: list,
     nle_event_id: str,
     vetting_mode: str,
+    phot_method: str = None,
     *args, **kwargs
 ) -> None:
     from .config import (
         FORM_CHOICE_FUNC_MAP,
     )  # import within function to avoid circular import error
+
+    # Adds KN scoring for vet all and vetting individual candidates
+    extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
+
     if vetting_mode == "basic":
         for ti in target_ids:
             FORM_CHOICE_FUNC_MAP[vetting_mode](target_id=ti)
     else:
         for ti in target_ids:
             FORM_CHOICE_FUNC_MAP[vetting_mode](
-                target_id=ti, nonlocalized_event_name=nle_event_id
+                target_id=ti, nonlocalized_event_name=nle_event_id, **extra
             )
 
 @task(queue_name="associate_targets", priority=settings.PRIORITY_HIGH)
@@ -121,16 +130,38 @@ def async_associate_targets_nle(
     
     
 ## functions which enqueue tasks
-def vet_all_async(eventcandidates, nle, vetting_mode) -> None:
-    """
-    Asychronously vet according to vetting mode, wraps async_vet for a list of
-    eventcandidates
-    """
-    for ec in eventcandidates:
+def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None,
+                  started_by=None) -> None:
+    ecs = list(eventcandidates)
+    run_started = timezone.now().isoformat()
+
+    phot_method = phot_method or get_phot_method()
+
+    if vetting_mode == "KN" and phot_method == PHOT_METHOD_KILONOVA:
+        # Sorting candidates by distance so that the grid stays in cache for
+        # at least a few candidates
+        from scoring.scoring import get_eventcandidate_default_distance
+
+        def _dist(ec):
+            try:
+                d, _ = get_eventcandidate_default_distance(ec.target_id, nle.event_id)
+                return float(d) if np.isfinite(d) and d > 0 else float("inf")
+            except Exception: 
+                return float("inf")
+
+        t0 = time.time()
+        ecs.sort(key=_dist)
+        logger.info("ordered %d candidate(s) by distance for grid grouping in %.1fs",
+                    len(ecs), time.time() - t0)
+
+    for ec in ecs:
         async_vet.enqueue(
             target_ids=[ec.target_id],
             nle_event_id=nle.event_id,
             vetting_mode=vetting_mode,
+            phot_method=phot_method,
+            run_started=run_started,
+            started_by=started_by,
         )
 
 def associate_targets_with_nle_async(
