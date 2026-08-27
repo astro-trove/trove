@@ -20,7 +20,7 @@ from tom_nonlocalizedevents.healpix_utils import (
     # update_all_credible_region_percents_for_candidates
 )
 
-from tom_nonlocalizedevents.models import EventLocalization
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
 from tom_targets.models import TargetExtra
 
 from astropy import units as u
@@ -39,53 +39,26 @@ GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate([UserGalaxy] + GAL
 
 ### TODO: these are filler values, should just change them to nulls in our database
 # LS DR9 North / DELVE DR3, PS1-STRM, SDSS DR12 photo-z / DELVE DR3
-Z_SENTINELS = (-99.0, -999.0, -9999.0)
+Z_BAD_VALUES = (-99.0, -999.0, -9999.0)
 
 
 def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Drop host-galaxy rows that cannot yield a meaningful distance score.
-
-    Two classes of bad row are removed:
-
-    1. Redshift sentinels and nulls. Several catalogs write -99 / -999 / -9999
-       instead of a null redshift.
-    2. Non-physical distances and uncertainties. Photo-z codes are trained on
-       galaxy SEDs, so fitting one to a star extrapolates off the training
-       manifold and can return a negative redshift -- which becomes a negative
-       luminosity distance. Separately, Legacy Survey photo-z PDFs sometimes
-       have inverted 68% bounds (z_phot_u68 < z_phot_mean), which makes
-       lumdist_pos_err negative. Neither is caught by the sentinel check.
-
-    Upstream filtering in candidate_vetting >= v0.5.2 (DelveDr3Galaxy's
-    extendedness cut, the tightened Ps1Galaxy classifier cuts) removes most of
-    the sources responsible, but no catalog except DESI DR1 guards positivity
-    directly, so this stays as a version-independent backstop.
-    See LIMITATIONS.md section 7.
-    """
+    """Drop host galaxy rows with bad values."""
     if not len(host_df):
         return host_df
 
-    # (1) sentinels and nulls, and (2) non-physical redshifts. z > 0 subsumes
-    # the sentinels, which are all negative, but both are kept so the intent
-    # stays readable.
     z = pd.to_numeric(host_df.z, errors="coerce")
-    host_df = host_df[z.notna() & ~z.isin(Z_SENTINELS) & (z > 0)]
+    host_df = host_df[z.notna() & ~z.isin(Z_BAD_VALUES)]
 
-    # (2) non-physical distances. "lumdist" is the in-memory name from
-    # candidate_vetting.host_association; "Dist" is the name used in the
-    # "Host Galaxies" TargetExtra JSON.
     for col in ("lumdist", "Dist"):
         if col in host_df.columns:
             dist = pd.to_numeric(host_df[col], errors="coerce")
-            host_df = host_df[dist.notna() & (dist > 0)]
+            host_df = host_df[dist.notna()]
 
-    # (2) non-physical uncertainties. Zero is left in place: it is degenerate
-    # rather than impossible, and hybrid_distance_score handles it explicitly.
     for col in ("lumdist_neg_err", "lumdist_pos_err"):
         if col in host_df.columns:
             err = pd.to_numeric(host_df[col], errors="coerce")
-            host_df = host_df[err.notna() & (err >= 0)]
+            host_df = host_df[err.notna()]
 
     return host_df
 
@@ -119,8 +92,7 @@ def host_distance_match(
     The score blends an analytic Bhattacharyya coefficient (for galaxies whose
     distance uncertainty is comparable to or larger than the GW distance
     uncertainty) with a top-hat style score (for galaxies whose distance is
-    much better constrained than the GW distance). See
-    :mod:`scoring.distance_helpers`.
+    much better constrained than the GW distance)
 
     Parameters
     ----------
@@ -399,24 +371,6 @@ def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
     return dist, dist_err
 
 
-# The max_time arguments in this module all default to None, meaning "now",
-# resolved here per call. They used to default to Time.now() directly in the
-# signature, which does not mean "now": a default argument is evaluated once,
-# when the module is imported, so every caller who did not pass max_time
-# explicitly shared one Time object frozen at process start.
-#
-# That was harmless in a web request and actively wrong in a long-running
-# db_worker, which is where Vet All runs. Only localizations dated at or before
-# max_time are eligible below, so a worker that had been up since before a new
-# skymap arrived could never see that skymap -- it kept scoring every candidate
-# against the stale localization until the process was restarted, and silently,
-# since candidates vetted by a fresh worker and by an old one referenced
-# different skymaps with nothing recording which.
-#
-# That also made the automatic re-vet in custom_code.alertstream_handlers
-# unsafe: the listener compares each candidate's stored localization_id against
-# the current localization, so a worker stamping an older one would leave those
-# candidates permanently stale and re-queued on every alert.
 def _localization_from_name(nonlocalized_event_name, max_time=None):
     """Find the most recent EventLocalization object for this nonlocalized event
 
@@ -427,12 +381,6 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
     if max_time is None:
         max_time = Time.now()
 
-    # Let the database do the filtering and the ordering. This used to pull
-    # every localization for the event into python, build an astropy Time for
-    # each one and sort them by hand, which is a lot of work for something
-    # called several times per candidate -- skymap_association,
-    # host_distance_match and get_distance_score each resolve the localization
-    # separately.
     max_datetime = max_time.to_datetime(timezone=timezone.utc)
     all_localizations = EventLocalization.objects.filter(
         nonlocalizedevent__event_id=nonlocalized_event_name
@@ -444,8 +392,6 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
     if localization is not None:
         return localization
 
-    # Nothing at or before max_time, so fall back to the earliest localization
-    # we have. This preserves the old behaviour, which seeded its search with
-    # the oldest localization and only replaced it when a later one also fit
-    # under max_time.
+    # nothing at or before max_time, so fall back to earliest localization
+    # we have
     return all_localizations.order_by("date").first()
