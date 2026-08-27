@@ -7,22 +7,10 @@ target. Does the following:
 3. AGN crossmatching
 4. Host association
 
-But without any direct scoring!
+PS and MPC crossmatches come early because may produce subscores of 0 or 1.
 
-The point source and MPC crossmatches come first because they are the only
-checks here that produce a hard zero: both are 0-or-1 and both multiply into
-the final candidate score (see scoring.util.get_event_candidate_scores), so a
-match in either one means nothing computed afterwards can change the outcome.
-Unless stop_on_zero_score is turned off, a zero in either ends the vetting
-before the slow catalog queries below it.
-
-Steps 0 and 2 are not carried out if no new photometry and user has said
-not to carry out those steps in absence of new photometry. In that case they
-also cannot run first, since whether they run at all depends on step 1.
-
-This should also be called before any photometry vetting in the NLE-related
+This should be called before any photometry vetting in the NLE-related
 vetting modules. That way we can reduce the code duplication between them!
-
 """
 
 import importlib.metadata
@@ -39,7 +27,6 @@ from django.db.models import Count, Max
 
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
-
 
 
 from candidate_vetting.vet import (
@@ -260,25 +247,8 @@ def _cached_host_df(target_extras, cache_key: str):
     return df
 
 
-def _point_source_score(target, target_extras, overwrite: bool = False) -> float:
-    """The 0-or-1 point source score, running (and caching) the crossmatch if
-    we don't have it yet. 1 means no point source match, which is the good case
-    """
-    cached = target_extras.filter(key="ps_score")
-    if not overwrite and cached.exists():
-        return float(cached[0].value)
-
-    logger.info("Running Point Source Matching...")
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")
-        ps_matches = point_source_association(target.id)
-    ps_score = int(len(ps_matches) < 1)  # 1 if no ps_matches, 0 otherwise
-    save_score_to_targetextra(target, "ps_score", ps_score)
-    return ps_score
-
-
 def _minor_planet_score(
-    target, target_extras, overwrite: bool = False, use_async_mpc: bool = False
+    target, target_extras, use_async_mpc: bool = False
 ):
     """The 0-or-1 minor planet score, running the MPC match if we don't have it
     yet. 1 means no minor planet match, which is the good case. Returns None
@@ -288,29 +258,25 @@ def _minor_planet_score(
     How the stored mpc_match_name becomes a score is duplicated from
     scoring.util.get_event_candidate_scores, so keep the two in sync!
     """
-    if overwrite or not target_extras.filter(key="mpc_match_name").exists():
-        if use_async_mpc:
-            logger.info("Sending MPC to the async queue, check back later for results")
-            async_mpc.enqueue(target.id)
-            return None
-        logger.info("Running MPC in real-time, this may take a bit...")
-        try:
-            run_mpc(target.id)
-        except Exception as e:
-            # run_mpc downloads orbit data from an external service, so this
-            # fails for reasons that have nothing to do with the candidate --
-            # an empty response parsed as JSON, a timeout, a rate limit. That
-            # must not abort the vetting run: before the 0-or-1 checks were
-            # moved to the front, a failure here at least left the AGN and host
-            # associations already saved, whereas now it would lose them too.
-            # No verdict means no gate, and the rest of the vetting continues.
-            logger.warning(f"MPC lookup failed for {target.name}, skipping it: {e}")
-            return None
-
+    if use_async_mpc:
+        logger.info("Sending MPC to the async queue, check back later for results")
+        async_mpc.enqueue(target.id)
+        return None
+    logger.info("Running MPC in real-time, this may take a bit...")
+    try:
+        run_mpc(target.id)
+    except Exception as e:
+        # run_mpc downloads orbit data from an external service, so this
+        # fails for reasons that have nothing to do with the candidate --
+        # an empty response parsed as JSON, a timeout, a rate limit.
+        # do not want this to terminate vetting.
+        logger.warning(f"MPC lookup failed for {target.name}, skipping it: {e}")
+        return None
     match = target_extras.filter(key="mpc_match_name")
-    if not match.exists():
+    if match.exists():
+        return int(match[0].value == str(None))
+    else:
         return 1
-    return int(match[0].value == str(None))
 
 
 def vet_basic(
@@ -320,19 +286,16 @@ def vet_basic(
     queue_priority: int = 0,
     skip_vet_if_no_new_phot: bool = False,
     use_async_mpc: bool = False,
-    stop_on_zero_score: bool = True,
+    stop_on_zero: bool = True,
 ):
-    """Run the NLE-independent vetting for a target.
+    """Run the NLE-independent vetting for a target and return
+    (`host_df`, `agn_df`, `keep_vetting`). `keep_vetting` is False when PS or
+    MPC has already zero'd this target's score and we stopped early, in which
+    case the two dataframes are empty the AGN / host associations have *not*
+    been reperformed.
 
-    Returns (host_df, agn_df, keep_vetting). keep_vetting is False when the
-    point source or minor planet crossmatch has already zeroed this target's
-    score and we stopped early, in which case the two dataframes are empty and
-    the AGN / host associations have *not* been refreshed. Callers doing
-    NLE-dependent scoring should return as soon as they see keep_vetting=False.
-
-    Pass stop_on_zero_score=False to always do the full pass, e.g. when a user
-    asks for one specific target and wants the host / AGN tables regardless of
-    the score.
+    Pass `stop_on_zero = False` to always do the full pass and not stop
+    regardless of PS or MPC association.
     """
     logger.info("Running basic vetting")
 
@@ -342,23 +305,23 @@ def vet_basic(
     # get the TargetExtra object associated with this target_id
     te = TargetExtra.objects.filter(target_id=target.id)
 
-    # can the 0-or-1 checks go first? Only if they are unconditional: when
-    # skip_vet_if_no_new_phot is set, whether they run at all depends on the
-    # photometry query below, so we have to keep them after it
-    gate_first = not skip_vet_if_no_new_phot
-
-    # point source matching is the cheapest check we have (a few indexed cone
-    # searches, no network), so it goes ahead of even the photometry query
-    if gate_first:
-        ps_score = _point_source_score(target, te, overwrite=overwrite)
-        if stop_on_zero_score and not ps_score:
+    # (0) point source association
+    # perform if overwrite **OR** PS score doesn't exist
+    if overwrite or not te.filter(key="ps_score").exists():
+        logger.info("Running Point Source Matching...")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ps_matches = point_source_association(target_id)
+            ps_score = int(len(ps_matches) < 1)  # 1 if no ps_matches, 0 otherwise
+            save_score_to_targetextra(target, "ps_score", ps_score)
+        if stop_on_zero and ps_score == 0:
             logger.info(
                 f"{target.name} matches a known point source, so it scores 0 "
-                + "regardless of anything else; skipping the rest of the vetting"
+                +"regardless of anything else; skipping rest of vetting"
             )
             return pd.DataFrame(), pd.DataFrame(), False
 
-    # then check for new photometry
+    # (1) check for new photometry
     phot_query_start = time.time()
     created_new_phot = find_public_phot(
         target=target,
@@ -366,32 +329,39 @@ def vet_basic(
         days_ago_max=days_ago_max,
         queue_priority=queue_priority,
     )
-    logger.info(f"Finding public photometry took {time.time() - phot_query_start}s")
+    logger.info("Finding public photometry took "+
+                f"{(time.time() - phot_query_start):.2f}s")
 
-    # the minor planet check has to come after the photometry query, since it
-    # decides what to do based on how many detections the target has
-    if gate_first:
-        mpc_score = _minor_planet_score(
-            target, te, overwrite=overwrite, use_async_mpc=use_async_mpc
-        )
-        if stop_on_zero_score and mpc_score == 0:
+    # (2) Minor Planet Center association
+    # proceed if overwrite **OR** MPC score doesn't exist...
+    if overwrite or not te.filter(key="mpc_match_name").exists():
+        if skip_vet_if_no_new_phot and not created_new_phot: # ... but stop if skip_vet_if_no_new_phot **AND** no new phot created
             logger.info(
-                f"{target.name} matches a known minor planet, so it scores 0 "
-                + "regardless of anything else; skipping the rest of the vetting"
+                        "Skipping Minor Planet Center association because no new "
+                        +"photometry and skip_vet_if_no_new_phot=True"
             )
-            return pd.DataFrame(), pd.DataFrame(), False
+        else: # ... proceed otherwise
+            mpc_score = _minor_planet_score(
+                target, te, use_async_mpc=use_async_mpc
+            )
+            if stop_on_zero and mpc_score == 0:
+                logger.info(
+                    f"{target.name} matches a Minor Planet Center object, so it "
+                    +"scores 0 regardless of anything else; skipping rest of vetting"
+                )
+                return pd.DataFrame(), pd.DataFrame(), False
 
-    # get associated AGN, host galaxies
+    # (3), (4) get associated AGN, host galaxies
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         # search for an AGN associated with the target
         agn_df = agn_association_2d(target_id)
 
-        # do the Pcc analysis and find a host. These cone searches run against
-        # every galaxy catalog we have and are the slowest thing in this
-        # function, but they depend only on inputs that almost never change, so
-        # reuse the saved dataframe whenever the fingerprint still matches
-        cache_key = _host_galaxy_cache_key(target)
+        # do the Pcc analysis and find a host
+        # these cone searches run against every galaxy catalog we have and are
+        # the slowest thing in this function, so reuse the cached dataframe
+        # whenever the fingerprint still matches
+        cache_key = _host_galaxy_cache_key(target) # may be None
         host_df = None if overwrite else _cached_host_df(te, cache_key)
         if host_df is None:
             galaxy_catalogs = [UserGalaxy] + GALAXY_CATALOGS
@@ -403,20 +373,6 @@ def vet_basic(
                 f"Reusing the saved host galaxy association for {target.name}, "
                 + "nothing it depends on has changed"
             )
-
-    if not gate_first:
-        # stop here and return if no further vetting needed
-        if not created_new_phot:
-            logger.info(
-                "Skipping point source and minor planet vetting because no new "
-                + "photometry and skip_vet_if_no_new_phot=True"
-            )
-            return host_df, agn_df, True
-
-        _point_source_score(target, te, overwrite=overwrite)
-        _minor_planet_score(
-            target, te, overwrite=overwrite, use_async_mpc=use_async_mpc
-        )
 
     # return both agn_df and host_df
     return host_df, agn_df, True
