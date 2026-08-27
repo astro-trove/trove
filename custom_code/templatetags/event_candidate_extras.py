@@ -126,14 +126,14 @@ def display_score_details(context, target_id):
         return f"No target with id {target_id}"
 
     keymap = OrderedDict(
-        ps_score=("Point Source Association?", _bool_format_yesno),
-        mpc_score=("Minor Planet Score Association?", _bool_format_yesno),
-        mpc_match_name=("MPC Match Name", _str_format),
-        mpc_match_date=("MPC Match Date", _str_format),
-        mpc_match_sep=('MPC Match Separation', partial(_float_format, unit='"')),
+        ps_score=("Point Source Associated?", _bool_format_yesno),
+        mpc_score=("Minor Planet Center Object Associated?", _bool_format_yesno),
+        mpc_match_name=("Minor Planet Center Match Name", _str_format),
+        mpc_match_date=("Minor Planet Center Match Date", _str_format),
+        mpc_match_sep=('Minor Planet Center Match Separation (")', partial(_float_format, unit='"')),
         skymap_score=("Localization Score", _float_format),
         host_distance_score=("Distance Score", _float_format),
-        host_name=("Host Galaxy used for Distance Scoring", _str_int_format),
+        host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
         agn_score=("AGN Score (0.1 or 1.0)", partial(_float_format, precision=1)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
@@ -246,7 +246,7 @@ def display_score_details(context, target_id):
                 fmter = _float_format
                 
             numeric = fmter not in (_str_format, _str_int_format)
-            value = _safe_format(score_factor.value, fmter, numeric=numeric)
+            value = _safe_format(score_factor.value, fmter)
             
             # KilonovaSCORER scores only the KN model, so its score and its
             # "could not score" reason belong in the KN subtab alone
