@@ -178,8 +178,8 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             vet_basic(target.id)
             messages.info(
                 request,
-                "Ran basic vetting. If you expected non-localized event (NLE)-dependent "
-                + "vetting, ensure an NLE is specified in the URL.",
+                "Ran basic vetting. If you expected event-dependent "
+                + "vetting, ensure an event is specified in the URL.",
             )
         else:
             # Only the KN pipeline takes a scorer; the others have just one.
