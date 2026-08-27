@@ -3,39 +3,8 @@
 <div class="row">
   <div class="col-md-10">
   {% if request.user.is_authenticated %}
-      <div style="display:flex; justify-content:space-between; width:100%">
-        <div style="display:flex; gap:0.5rem">
-          <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
-            {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
-          </a>
-          <div class="btn-group-toggle" role="group" aria-label="Photometry scoring method">
-          {% if not is_kilonova %}
-          <span class="btn btn-primary" aria-disabled="true">
-            ☑ Photometry: Light curve metrics
-          </span>
-          {% else %}
-          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?{% if request.GET.nonlocalizedevent and is_kilonova %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" 
-             title="Score photometry according to light curve metrics"
-             class="btn {% if not is_kilonova %}btn-primary{% else %}btn-secondary{% endif %}"
-             aria-pressed="{% if not is_kilonova %}true{% else %}false{% endif %}">
-             ☐ Photometry: Light curve metrics
-          </a>
-          {% endif %}
-
-          {% if is_kilonova %}
-          <span class="btn btn-primary" aria-disabled="true">
-            ☑ Photometry: KilonovaSCORER
-          </span>
-          {% else %}
-          <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?{% if request.GET.nonlocalizedevent %}nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" 
-             title="Score photometry according to KilonovaSCORER" 
-             class="btn {% if is_kilonova %}btn-primary{% else %}btn-secondary{% endif %}" 
-             aria-pressed="{% if is_kilonova %}true{% else %}false{% endif %}">
-             ☐ Photometry: KilonovaSCORER
-          </a>
-          {% endif %}
-          </div>
-        </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; width:100%">
+        {% scoring_toggles %}
         <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
            class="btn btn-outline-secondary mb-2"
            title="Discard the cached scores and reload this list">
