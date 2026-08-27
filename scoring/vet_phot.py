@@ -118,45 +118,6 @@ def _ssr(model_y, data_y):
     return np.sum(residuals**2)
 
 
-def _decay_rate_sigma(raw_func, p0, bounds, dt_days, mag, magerr):
-    """Uncertainty on parameter 0 of `raw_func`, from a refit weighted by `magerr`.
-
-    `decay_rate` is always +/- parameter 0 of whichever raw fit function won
-    (`_powerlaw`'s `a`, or the `_ordered`-reparameterised broken powerlaw's
-    `a1`) -- see the sign-convention comment in `estimate_max_find_decay_rate`.
-    A sign flip does not change a variance, so this is the uncertainty on
-    `decay_rate` itself; no delta method / numerical gradient is needed.
-
-    The point estimate TROVE reports comes from the UNWEIGHTED fit (`sigma`
-    is not passed to the primary `curve_fit` call -- see
-    diagnostics/reports/DECAY_UNCERTAINTY.md Sec 3), so this refits the same
-    model once more with the photometric errors switched on, purely to get a
-    covariance the unweighted fit cannot provide. `p0` should be the
-    unweighted solution, already inside `bounds`, so this refit is a short
-    correction rather than an independent search. Returns NaN if the refit
-    does not converge or the covariance is not usable.
-    """
-    kwargs = dict(
-        xdata=dt_days,
-        ydata=mag,
-        sigma=magerr,
-        p0=p0,
-        absolute_sigma=True,
-        maxfev=5_000,
-        ftol=1e-8,
-    )
-    if bounds is not None:
-        kwargs["bounds"] = bounds
-    try:
-        _, pcov = curve_fit(raw_func, **kwargs)
-    except (RuntimeError, TypeError):
-        return np.nan
-    if pcov is None or not np.all(np.isfinite(pcov)):
-        return np.nan
-    var = pcov[0, 0]
-    return float(np.sqrt(var)) if var > 0 else np.nan
-
-
 def _flux_to_lum(flux, lumdist):
     """convert flux to lum. Everything should be astropy quantities"""
     return 4 * np.pi * lumdist**2 * flux
@@ -287,9 +248,7 @@ def estimate_max_find_decay_rate(
     mag: Iterable[float],
     magerr: Iterable[float],
     max_decay_fit_time: Optional[int] = 25,
-    min_significance: float = 3.0,
     min_baseline_days: Optional[float] = None,
-    decay_rate_pass_range: Optional[Tuple[float, float]] = None,
 ) -> Tuple[float, float, float]:
     """
     Fit's both a single and broken powerlaw to the data, computes the AIC and then
@@ -307,18 +266,9 @@ def estimate_max_find_decay_rate(
     max_decay_fit_time: int
         The maximum time after the GW discovery in days that we should fit the decay to.
         The default is 25 days based on discussion from Rastinejad+2022.
-    min_significance: float
-        Minimum |decay_rate| / sigma(decay_rate), sigma propagated from the
-        photometric errors, required to accept a PASSING decay_rate (see
-        `decay_rate_pass_range`) as measured rather than refuse it.
-    decay_rate_pass_range: (float, float), optional
-        The `[low, high]` window `decay_rate` must fall in to PASS the
-        downstream kilonova check (`param_ranges["decay_rate"]` in the
-        caller). 
     min_baseline_days: float, optional
-        A NAIVE, purely temporal alternative/complement to `min_significance`:
-        refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
-        used for fitting) is below this many days. 
+        Refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
+        used for fitting) is below this many days.
 
     RETURNS
     -------
@@ -375,7 +325,7 @@ def estimate_max_find_decay_rate(
     curve_fit_kwargs = dict(
         xdata=dt_days_tofit,
         ydata=mag_tofit,
-        # sigma = magerr_tofit,
+        sigma = magerr_tofit,
         absolute_sigma=True,
         maxfev=5_000,
         ftol=1e-8,
@@ -472,38 +422,6 @@ def estimate_max_find_decay_rate(
     ]  # need to use min here b/s magnitudes are backwards
 
     decay_rate = -mag_slope_per_dex
-
-    would_pass = (
-        decay_rate_pass_range is None
-        or decay_rate_pass_range[0] <= decay_rate <= decay_rate_pass_range[1]
-    )
-    if would_pass:
-        if label == "powerlaw":
-            raw_func, p0, bounds = _powerlaw, tuple(best_fit_params), None
-        else:
-            a1, a2, y0, x0 = best_fit_params
-            raw_func = _ordered(model)
-            p0 = (a1, a2 - a1, y0, x0)
-            bounds = list(zip(*bpl_bounds))
-        sigma_decay_rate = _decay_rate_sigma(
-            raw_func, p0, bounds, dt_days_tofit, mag_tofit, magerr_tofit
-        )
-        # Significance = 1 / relative uncertainty
-        significance = (
-            abs(decay_rate) / sigma_decay_rate
-            if sigma_decay_rate and np.isfinite(sigma_decay_rate) and sigma_decay_rate > 0
-            else np.nan
-        )
-        if not (significance >= min_significance):
-            sig_str = (
-                f"{significance:.2g}" if np.isfinite(significance) else "an unmeasurable number of"
-            )
-            raise RuntimeError(
-                f"decay_rate {decay_rate:.3g} would pass the check but is only "
-                f"{sig_str} sigma from zero (need >= {min_significance}) -- the "
-                "photometry is not sufficiently separated in time to constrain "
-                "a slope"
-            )
 
     return model, best_fit_params, max_time, decay_rate
     
@@ -817,13 +735,9 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                     phot.mag,
                     phot.magerr,
                     max_decay_fit_time=param_ranges["max_decay_fit_time"],
-                    min_significance=param_ranges.get(
-                        "min_decay_significance", 3.0
-                    ),
                     min_baseline_days=param_ranges.get(
                         "min_decay_baseline_days", 0.1
                     ),
-                    decay_rate_pass_range=param_ranges["decay_rate"],
                 )
             )
         except RuntimeError as exc:
