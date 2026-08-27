@@ -177,7 +177,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         if vetting_mode == "basic" or nonlocalized_event_name is None:
             # a user asking for this one target wants the host / AGN tables
             # even if its point source or MPC score has already zeroed it
-            vet_basic(target.id, stop_on_zero_score=False)
+            vet_basic(target.id, stop_on_zero=False)
             messages.info(
                 request,
                 "Ran basic vetting. If you expected event-dependent "
