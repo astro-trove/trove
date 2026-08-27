@@ -1,38 +1,38 @@
 <div style="display:flex; flex-direction:row; align-items:center; flex-wrap:wrap; gap:0.75rem" class="mb-2">
+  <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?next={{ next|urlencode }}"
+     class="btn agn-toggle {% if agn_toggle %}btn-success{% else %}btn-light{% endif %}"
+     title="Whether the AGN factor contributes to the overall score.">
+    {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} Include AGN sub-score
+  </a>
   <div class="phot-method-slider {% if is_kilonova %}phot-method-slider--right{% endif %}" role="group" aria-label="Photometry scoring method">
     <span class="phot-method-slider-thumb" aria-hidden="true"></span>
     {% if is_kilonova %}
     <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
        class="phot-method-slider-option"
        title="Score photometry according to light curve metrics">
-      Light curve metrics
+      Photometry: Light curve metrics
     </a>
     <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
-      KilonovaSCORER
+      Photometry: KilonovaSCORER
     </span>
     {% else %}
     <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
-      Light curve metrics
+      Photometry: Light curve metrics
     </span>
     {% if has_kilonova_score %}
     <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
        class="phot-method-slider-option"
        title="Score photometry according to KilonovaSCORER">
-      KilonovaSCORER
+      Photometry: KilonovaSCORER
     </a>
     {% else %}
     <span class="phot-method-slider-option phot-method-slider-option--disabled" aria-disabled="true"
           title="This candidate has no KilonovaSCORER score. Vet it with KilonovaSCORER first.">
-      KilonovaSCORER
+      Photometry: KilonovaSCORER
     </span>
     {% endif %}
     {% endif %}
   </div>
-  <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?next={{ next|urlencode }}"
-     class="btn agn-toggle {% if agn_toggle %}btn-success{% else %}btn-light{% endif %}"
-     title="Whether the AGN factor contributes to the overall score.">
-    {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} Include AGN sub-score
-  </a>
 </div>
 
 <style>
