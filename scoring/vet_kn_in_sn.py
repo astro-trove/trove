@@ -80,7 +80,10 @@ def vet_kn_in_sn(
     update_score_factor(event_candidate, "skymap_score", skymap_score)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    if not keep_vetting:
+        # same as vet_kn.py
+        return
     # some cleanup
     host_df = clean_host_df(host_df)
 

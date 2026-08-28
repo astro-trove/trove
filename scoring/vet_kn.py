@@ -98,7 +98,11 @@ def vet_kn(
     update_score_factor(event_candidate, "skymap_score", skymap_score)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    if not keep_vetting:
+        # Scoring has already produced 0, so there is no point in scoring
+        # the distance or photometry because it can't change the score
+        return
     # some cleanup
     host_df = clean_host_df(host_df)
 
