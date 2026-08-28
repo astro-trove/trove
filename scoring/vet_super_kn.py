@@ -12,6 +12,7 @@ import numpy as np
 from .scoring import (
     update_score_factor,
     delete_score_factor,
+    clean_host_df,
     host_distance_match,
     get_distance_score,
     skymap_association,
@@ -79,13 +80,12 @@ def vet_super_kn(
     update_score_factor(event_candidate, "skymap_score", skymap_score)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    if not keep_vetting:
+        # same as vet_kn.py
+        return
     # some cleanup
-    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
-        host_df = host_df[host_df.z != -99.0] # LS DR9 North
-        host_df = host_df[host_df.z != -999.0] # PS1-STRM
-        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
-        host_df = host_df[~np.isnan(host_df.z)]
+    host_df = clean_host_df(host_df)
 
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
