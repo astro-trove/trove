@@ -148,32 +148,71 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         )
         targ_dist = cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
         targ_dist_err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
-        return hybrid_distance_score(
+        targ_score = hybrid_distance_score(
             nle_dist, targ_dist, nle_dist_err, targ_dist_err, targ_dist_err
-        ), None # None because there is no host name
+        )
+        # This should be done here and not in the hybrid_distance_score
+        # because if hybrid_distance_score gives a 1 for an unscorable host galaxy,
+        # then the .idxmax() would always prefer unscorable host galaxies to real scores,
+        # even if the real scores are very good
+        if np.isnan(targ_score):
+            targ_score = 1.0
+        return targ_score, None # None because there is no host name
 
     # callers may pass an unfiltered host_df, so clean it here too
     host_df = clean_host_df(host_df)
 
-    # Trust user redshifts first, then redshift-independent distances, then
-    # spec-z's, then photo-z's. Use the best-scoring galaxy in the first tier
-    # that has one.
-    tiers = (
-        host_df.z_type == "user spec-z",
-        host_df.z_type == "z ind.",
-        host_df.z_type.str.contains("spec-z", na=False),
-        host_df.z_type == "photo-z",
-    )
-    for tier in tiers:
-        hosts = host_df[tier]
-        # A NaN score is a galaxy we could not score -- a non-physical redshift
-        # or distance. Those stay in host_df so they still show up in the score
-        # details table, but they must not win the max.
-        scores = hosts["hybrid_distance_score"].dropna()
-        if not len(scores):
-            continue
-        best = hosts.loc[scores.idxmax()]
-        return best["hybrid_distance_score"], best["name"], best["catalog"]
+    # then use the redshift of user-uploaded host galaxies
+    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
+    userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
+    if userz_distance_hosts["hybrid_distance_score"].notna().any():
+        max_score = userz_distance_hosts.hybrid_distance_score.max()
+        max_score_host_name = userz_distance_hosts.iloc[
+            userz_distance_hosts["hybrid_distance_score"].idxmax()
+        ]["name"]
+        max_score_host_catalog = userz_distance_hosts.iloc[
+            userz_distance_hosts["hybrid_distance_score"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
+
+    # then use the redshift independent measurements of distances
+    ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+    ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
+    if ind_distance_hosts["hybrid_distance_score"].notna().any():
+        max_score = ind_distance_hosts.hybrid_distance_score.max()
+        max_score_host_name = ind_distance_hosts.iloc[
+            ind_distance_hosts["hybrid_distance_score"].idxmax()
+        ]["name"]
+        max_score_host_catalog = ind_distance_hosts.iloc[
+            ind_distance_hosts["hybrid_distance_score"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
+
+    # then use the specz hosts
+    specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
+    specz_hosts.reset_index(inplace=True)  # avoid iloc exception
+    if specz_hosts["hybrid_distance_score"].notna().any():
+        max_score = specz_hosts.hybrid_distance_score.max()
+        max_score_host_name = specz_hosts.iloc[
+            specz_hosts["hybrid_distance_score"].idxmax()
+        ]["name"]
+        max_score_host_catalog = specz_hosts.iloc[
+            specz_hosts["hybrid_distance_score"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
+
+    # then if we don't know the spec-z or have an independent distance measure use the photo-z's
+    photoz_hosts = host_df[host_df.z_type == "photo-z"]
+    photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
+    if photoz_hosts["hybrid_distance_score"].notna().any():
+        max_score = photoz_hosts.hybrid_distance_score.max()
+        max_score_host_name = photoz_hosts.iloc[
+            photoz_hosts["hybrid_distance_score"].idxmax()
+        ]["name"]
+        max_score_host_catalog = photoz_hosts.iloc[
+            photoz_hosts["hybrid_distance_score"].idxmax()
+        ]["catalog"]
+        return max_score, max_score_host_name, max_score_host_catalog
 
     # no potential host
     return 1.0, None, None # Nones because there are no host names or host catalogs

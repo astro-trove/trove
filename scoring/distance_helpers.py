@@ -140,32 +140,18 @@ def hybrid_distance_score(gw_mean, galaxy_mean, gw_std, galaxy_std_minus, galaxy
     Returns NaN for rows that cannot be scored, so that a .max() over host
     galaxies skips them rather than being handed a confident wrong answer.
     """
-    # Non-physical catalog rows: some catalogs return small negative photo-z's,
-    # which become negative luminosity distances and negative uncertainties.
-    # bc() would return a finite value there -- 1.6377 has been observed -- and
-    # the final clip would turn that into a perfect score.
     args = (gw_mean, gw_std, galaxy_mean, galaxy_std_minus, galaxy_std_plus)
     if not all(np.isfinite(v) for v in args):
         return np.nan
     if gw_std <= 0 or galaxy_mean < 0 or galaxy_std_minus < 0 or galaxy_std_plus < 0:
         return np.nan
 
-    # A zero on ONE side is missing data, not a claim of infinite precision on
-    # that side -- catalogs emit it when z_err is absent, since
-    # lumdist_err = luminosity_distance(0) = 0. Fill it from the other tail so
-    # the galaxy stays on the normal path. Without this, bc() cannot be
-    # evaluated, bc_score falls back to 0, and that unavailable-value-treated-
-    # as-observed-zero drags the blend down: a perfectly centred galaxy with
-    # (0, 300) scored 0.018.
     if galaxy_std_minus == 0 and galaxy_std_plus > 0:
         galaxy_std_minus = galaxy_std_plus
     elif galaxy_std_plus == 0 and galaxy_std_minus > 0:
         galaxy_std_plus = galaxy_std_minus
 
     if galaxy_std_minus == 0 or galaxy_std_plus == 0:
-        # both tails zero: genuinely delta-like, so r -> 0 and the weighting
-        # hands the score to the top-hat, which is the correct sigma_gal -> 0
-        # limit. bc_score is unused in that limit.
         bc_score = 0
     else:
         bc_score = bc(gw_mean, gw_std, galaxy_mean, galaxy_std_minus, galaxy_std_plus)
@@ -175,9 +161,10 @@ def hybrid_distance_score(gw_mean, galaxy_mean, gw_std, galaxy_std_minus, galaxy
     r = sigma_ratio(gw_std, galaxy_std_minus, galaxy_std_plus)
     w = np.clip(weight_logistic(r), 0.0, 1.0)
 
-    # BC is bounded by 1 for normalised PDFs; anything else means the analytic
-    # form broke down and the row is unusable.
-    if not np.isfinite(bc_score) or bc_score > 1.0:
+    # BC is bounded by 1 for normalised PDFs. A perfectly matched galaxy lands
+    # one ULP over (1.0000000000000002), which the final clip absorbs; a larger
+    # excess needs non-physical inputs, rejected above.
+    if not np.isfinite(bc_score):
         return np.nan
 
     return np.clip((1-w)*ts + w*bc_score, 0, 1)

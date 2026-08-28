@@ -119,11 +119,8 @@ def display_score_details(context, target_id):
     
     if target_id is None:
         return "Target ID is None!"
-
-    try:
-        target = Target.objects.get(id=target_id)
-    except Target.DoesNotExist:
-        return f"No target with id {target_id}"
+    
+    target = Target.objects.get(id=target_id)
 
     keymap = OrderedDict(
         ps_score=("Point Source Associated?", _bool_format_yesno),
@@ -183,9 +180,7 @@ def display_score_details(context, target_id):
             # exclude keys in TargetExtra + exclude mpc_score, predetection_score
             + ["mpc_score", "predetection_score", "localization_id"]
         ).all()
-        # Reorder them for user-friendly printing later. A ScoreFactor key that
-        # is not in keymap sorts to the end rather than raising -- a new scorer
-        # writing an unregistered key must not take the target page down.
+
         sf_set = sorted(
             sf_set,
             key=lambda sf: (order.index(sf.key) if sf.key in order else len(order),
@@ -416,14 +411,6 @@ _AGN_FACTOR_LABELS = {"AGN Score (0.1 or 1.0)"}
 
 # formatting
 def _safe_format(value, fmter):
-    """Apply `fmter` to a ScoreFactor/TargetExtra value without ever raising.
-
-    Values arrive as strings and may be numeric ("0.97") or free text (e.g.
-    kilonova_skip_reason). The previous code decided whether to call float()
-    by comparing the display label to "Host Galaxy Name", so any other
-    non-numeric key crashed the whole target page. Try numeric, then raw, then
-    fall back to str().
-    """
     for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
         try:
             return candidate()
@@ -457,7 +444,6 @@ def _bool_format(flt):
     return int(flt) 
 
 def _bool_format_yesno(flt):
-    # yes, this order is correct because a score of 0 means an association!
     return "No" if bool(flt) else "Yes"
   
 def _str_int_format(s):

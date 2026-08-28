@@ -97,9 +97,6 @@ def vet_kn(
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
 
-    if skymap_score < 1e-2:
-        return
-
     ## get dataframes of potential hosts / AGN
     host_df, agn_df = vet_basic(event_candidate.target.id)
     # some cleanup
