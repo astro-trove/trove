@@ -6,7 +6,6 @@ from candidate_vetting.vet import GALAXY_CATALOGS
 
 import io
 import logging
-from datetime import timezone
 
 import numpy as np
 import pandas as pd
@@ -83,7 +82,7 @@ def host_distance_match(
     host_df: pd.DataFrame,
     target_id: int,
     nonlocalized_event_name: str,
-    max_time: Time = None,
+    max_time: Time = Time.now(),
 ):
     """
     Compute the hybrid distance score of putative host galaxies' distance
@@ -153,63 +152,28 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
             nle_dist, targ_dist, nle_dist_err, targ_dist_err, targ_dist_err
         ), None # None because there is no host name
 
-    # first, some cleanup
-    # this is already done in vet_kn, vet_kn_in_sn, and vet_super_kn,
-    # but we need to account for users calling this function for arbitrary
-    # host_df, target, and NLE without prior filtering on host_df
+    # callers may pass an unfiltered host_df, so clean it here too
     host_df = clean_host_df(host_df)
 
-    # then use the redshift of user-uploaded host galaxies
-    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
-    userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(userz_distance_hosts):
-        max_score = userz_distance_hosts["hybrid_distance_score"].max()
-        max_score_host_name = userz_distance_hosts.iloc[
-            userz_distance_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = userz_distance_hosts.iloc[
-            userz_distance_hosts["dist_norm_joint_prob"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
-
-    # then use the redshift independent measurements of distances
-    ind_distance_hosts = host_df[host_df.z_type == "z ind."]
-    ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(ind_distance_hosts):
-        max_score = ind_distance_hosts["hybrid_distance_score"].max()
-        max_score_host_name = ind_distance_hosts.iloc[
-            ind_distance_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = ind_distance_hosts.iloc[
-            ind_distance_hosts["dist_norm_joint_prob"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
-
-    # then use the specz hosts
-    specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
-    specz_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(specz_hosts):
-        max_score = specz_hosts["hybrid_distance_score"].max()
-        max_score_host_name = specz_hosts.iloc[
-            specz_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = specz_hosts.iloc[
-            specz_hosts["dist_norm_joint_prob"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
-
-    # then if we don't know the spec-z or have an independent distance measure use the photo-z's
-    photoz_hosts = host_df[host_df.z_type == "photo-z"]
-    photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(photoz_hosts):
-        max_score = photoz_hosts["hybrid_distance_score"].max()
-        max_score_host_name = photoz_hosts.iloc[
-            photoz_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = photoz_hosts.iloc[
-            photoz_hosts["dist_norm_joint_prob"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
+    # Trust user redshifts first, then redshift-independent distances, then
+    # spec-z's, then photo-z's. Use the best-scoring galaxy in the first tier
+    # that has one.
+    tiers = (
+        host_df.z_type == "user spec-z",
+        host_df.z_type == "z ind.",
+        host_df.z_type.str.contains("spec-z", na=False),
+        host_df.z_type == "photo-z",
+    )
+    for tier in tiers:
+        hosts = host_df[tier]
+        # A NaN score is a galaxy we could not score -- a non-physical redshift
+        # or distance. Those stay in host_df so they still show up in the score
+        # details table, but they must not win the max.
+        scores = hosts["hybrid_distance_score"].dropna()
+        if not len(scores):
+            continue
+        best = hosts.loc[scores.idxmax()]
+        return best["hybrid_distance_score"], best["name"], best["catalog"]
 
     # no potential host
     return 1.0, None, None # Nones because there are no host names or host catalogs
@@ -218,7 +182,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 def skymap_association(
     nonlocalized_event_name: str,
     target_id: int,
-    max_time=None,
+    max_time=Time.now(),
     prob: float = 0.95,
 ) -> float:
 
@@ -353,7 +317,7 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     return to_ret.Dist, to_ret.DistErr
 
 
-def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
+def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()):
     """Computes the GW distance at the target_id healpix location"""
 
     localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
@@ -371,27 +335,26 @@ def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
     return dist, dist_err
 
 
-def _localization_from_name(nonlocalized_event_name, max_time=None):
-    """Find the most recent EventLocalization object for this nonlocalized event
+def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
+    """Find the most recenet LocalizationEvent object from the nonlocalized event name"""
+    # first find the localization to use
+    localization_queryset = NonLocalizedEvent.objects.filter(
+        event_id=nonlocalized_event_name
+    )[0]
 
-    Only localizations dated at or before max_time are eligible, so a candidate
-    can be scored against the skymap that was current at a chosen point in time
-    rather than always the latest one. max_time=None means now.
-    """
-    if max_time is None:
-        max_time = Time.now()
-
-    max_datetime = max_time.to_datetime(timezone=timezone.utc)
     all_localizations = EventLocalization.objects.filter(
-        nonlocalizedevent__event_id=nonlocalized_event_name
+        nonlocalizedevent_id=localization_queryset.id
     )
 
-    localization = (
-        all_localizations.filter(date__lte=max_datetime).order_by("-date").first()
-    )
-    if localization is not None:
-        return localization
+    all_localizations_sorted = sorted(all_localizations, key=lambda x: x.date)
 
-    # nothing at or before max_time, so fall back to earliest localization
-    # we have
-    return all_localizations.order_by("date").first()
+    # now choose the most recent localization
+    localization = all_localizations_sorted[0]
+    if len(all_localizations_sorted) > 1:
+        for loc in all_localizations_sorted[1:]:
+            curr_loc_time = Time(localization.date, format="datetime")
+            test_loc_time = Time(loc.date, format="datetime")
+            if test_loc_time > curr_loc_time and test_loc_time <= max_time:
+                localization = loc
+
+    return localization

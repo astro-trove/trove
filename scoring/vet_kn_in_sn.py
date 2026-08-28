@@ -16,7 +16,6 @@ from .scoring import (
     host_distance_match,
     get_distance_score,
     skymap_association,
-    _localization_from_name,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -80,24 +79,11 @@ def vet_kn_in_sn(
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
 
-    # record which localization these NLE-dependent scores were computed
-    # against. Both the skymap score above and the distance score below are
-    # only meaningful for one particular skymap -- a later one moves the
-    # credible region and the distance at this target's healpix -- and until
-    # now nothing stored alongside the scores said which skymap that was. See
-    # the TODO in custom_code.alertstream_handlers about acting on this.
-    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
-    update_score_factor(event_candidate, "localization_id", localization.id)
     if skymap_score < 1e-2:
         return
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
-    if not keep_vetting:
-        # a point source or minor planet match already zeroes this candidate's
-        # score, so the slower checks below cannot change its ranking
-        return
-
+    host_df, agn_df = vet_basic(event_candidate.target.id)
     # some cleanup
     host_df = clean_host_df(host_df)
 

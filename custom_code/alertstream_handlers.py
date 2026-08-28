@@ -36,10 +36,7 @@ from .healpix_utils import create_elliptical_localization
 from .models import CredibleRegionContour
 
 from candidate_vetting.vet import localization_sequence_from_name
-from scoring.config import DETECTION_HORIZON_DEFAULTS, VETTING_FORM_INITIALS
-from scoring.models import ScoreFactor
-from scoring.scoring import _localization_from_name
-from scoring.tasks import vet_all_async
+from scoring.config import DETECTION_HORIZON_DEFAULTS
 from trove_targets.models import Target
 
 import logging
@@ -310,71 +307,6 @@ def _message_payload_for_json_dump(message):
     return message
 
 
-def revet_stale_candidates(nle, most_likely_class):
-    """Re-vet the candidates whose scores predate the current localization.
-
-    A new skymap moves the credible region and the distance at every target's
-    healpix, so a candidate's skymap_score and host_distance_score are only
-    valid for the localization they were computed against. The NLE-dependent
-    vetting modes record that as a "localization_id" ScoreFactor, so anything
-    carrying a different one -- or none at all, meaning it was vetted before we
-    started recording it, or has never been vetted -- is stale.
-
-    Candidates already scored against the current localization are left alone,
-    which is what stops a sequence that reuses an existing skymap from kicking
-    off a pointless full re-vet. It also means this converges: once a candidate
-    has been re-vetted, the next alert skips it.
-
-    Returns the number of candidates queued.
-    """
-    # basic vetting writes no localization-dependent scores at all, so there is
-    # nothing for a new skymap to invalidate -- and since it never stamps a
-    # localization_id, re-vetting would re-queue the same candidates forever
-    vetting_mode = VETTING_FORM_INITIALS.get(
-        most_likely_class, VETTING_FORM_INITIALS[""]
-    )[0]
-    if vetting_mode == "basic":
-        logger.info(
-            f"{nle.event_id} vets in basic mode, which has no "
-            + "localization-dependent scores; not re-vetting"
-        )
-        return 0
-
-    candidates = EventCandidate.objects.filter(nonlocalizedevent_id=nle.id)
-    if not candidates.exists():
-        return 0
-
-    # resolve the localization the vetting code itself would use, so the two
-    # cannot disagree about what "current" means
-    localization = _localization_from_name(nle.event_id)
-    if localization is None:
-        logger.warning(f"No localization for {nle.event_id}, not re-vetting")
-        return 0
-
-    current = ScoreFactor.objects.filter(
-        event_candidate__in=candidates,
-        key="localization_id",
-        value=str(localization.id),
-    ).values_list("event_candidate_id", flat=True)
-
-    stale = candidates.exclude(id__in=list(current))
-    n_stale = stale.count()
-    if not n_stale:
-        logger.info(
-            f"All {candidates.count()} candidates for {nle.event_id} are "
-            + f"already scored against localization {localization.id}"
-        )
-        return 0
-
-    logger.info(
-        f"Re-vetting {n_stale} of {candidates.count()} candidates for "
-        + f"{nle.event_id} in {vetting_mode} mode against localization "
-        + f"{localization.id} ({localization.date})"
-    )
-    vet_all_async(stale, nle, vetting_mode)
-    return n_stale
-
-
 def handle_message_and_send_alerts(message, metadata):
     jname = str(Time.now()).replace(" ", "T") + "-alert.json"
     try:
@@ -428,12 +360,6 @@ def handle_message_and_send_alerts(message, metadata):
         DETECTION_HORIZON_DEFAULTS[nle_most_likely_class][0],
         DETECTION_HORIZON_DEFAULTS[nle_most_likely_class][-1]
     )
-
-    # a new skymap invalidates the scores computed against the old one
-    try:
-        revet_stale_candidates(nle, nle_most_likely_class)
-    except Exception as e:  # never let re-vetting break alert ingestion
-        logger.error(f"Could not re-vet candidates for {nle.event_id}: {e}")
 
     logger.info(f"Finished processing alert for {nle.event_id}")
     return nle, seq
