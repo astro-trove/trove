@@ -85,10 +85,7 @@ def vet_kn_in_sn(
     update_score_factor(event_candidate, "localization_id", localization.id)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
-    if not keep_vetting:
-        # same as vet_kn.py
-        return
+    host_df, agn_df = vet_basic(event_candidate.target.id)
     # some cleanup
     if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
         host_df = host_df[host_df.z != -99.0] # LS DR9 North

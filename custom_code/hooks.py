@@ -174,11 +174,6 @@ def target_post_save(
                 messages.append(f"MW E(B-V) set to {mwebv:.4f}")
 
         # do the "basic" vetting (PS, MPC, Host association)
-        # a new target needs its host / AGN tables for the target page even if
-        # its point source or MPC score has already zeroed it, same as a user
-        # vetting one target from the UI. setdefault rather than a keyword
-        # because callers forward arbitrary kwargs into this hook
-        kwargs.setdefault("stop_on_zero", False)
         vet_basic(target.id, **kwargs)
 
         # then check if this target is associated with any NLEs
