@@ -1,5 +1,10 @@
 from django.urls import path
-from .views import CustomTargetCreateView, NLEAutocompleteView, TargetAutocompleteView
+from .views import (
+    CustomTargetCreateView,
+    NLEAutocompleteView,
+    TargetAutocompleteView,
+    TroveTargetListView
+)
 
 app_name = "trove_targets"
 
@@ -15,5 +20,9 @@ urlpatterns = [
         TargetAutocompleteView.as_view(),
         name="target-autocomplete",
     ),
-    # ... other urls
+    path(
+        "",
+        TroveTargetListView.as_view(),
+        name="targetlist"
+    )
 ]

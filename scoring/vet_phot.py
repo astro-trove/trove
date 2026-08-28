@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 
+from django.conf import settings
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
 from trove_targets.models import Target
@@ -537,6 +538,22 @@ def find_public_phot(
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
+
+    # `SKIP_ATLAS_FORCED_PHOT` is an opt-out for development databases, where a
+    # Vet All over a few hundred candidates would otherwise enqueue a forced
+    # photometry query per target against the real ATLAS service.
+    #
+    # The setting already existed in settings_local.py but NOTHING read it, so
+    # it protected nothing -- vetting still queued every request. It is honoured
+    # here, at the enqueue, rather than inside `async_atlas_query`: a task that
+    # is never created cannot be run later by a worker that happens to pick up
+    # the atlas_fphot queue.
+    if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
+        logger.info(
+            "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
+            "photometry for %s", target.name
+        )
+        query_atlas = False
 
     if query_atlas:
         print(
