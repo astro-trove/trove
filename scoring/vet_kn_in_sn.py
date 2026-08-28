@@ -87,8 +87,7 @@ def vet_kn_in_sn(
     ## get dataframes of potential hosts / AGN
     host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
     if not keep_vetting:
-        # a point source or minor planet match already zeroes this candidate,
-        # so the slower checks below cannot change its ranking
+        # same as vet_kn.py
         return
     # some cleanup
     if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database

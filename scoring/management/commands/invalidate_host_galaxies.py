@@ -2,20 +2,16 @@
 Invalidate the saved host galaxy associations so the next vetting run redoes
 the galaxy catalog cone searches.
 
-vet_basic reuses the "Host Galaxies" TargetExtra instead of re-querying every
-galaxy catalog, guarded by a fingerprint of the things it can cheaply check:
-the target's position, the catalog list, the association cuts, the
-user-uploaded galaxies, and the installed candidate_vetting version. What it
-cannot see is the *contents* of the static catalog tables -- if GLADE+, PS1,
-Legacy Survey and friends are re-ingested or edited in place, every saved
-association is stale and nothing notices.
-
-So catalog ingestion has to say so, by running this afterwards:
+vet_basic notices an ingest on its own, from each catalog's write counters in
+pg_stat_all_tables. What it cannot notice is those counters being lost -- a
+pg_stat_reset(), a crash, a restore into a fresh cluster -- which returns them
+to where they started and can make a stale cache look current. Run this after
+any of those, and after any ingest that bypassed the statistics collector:
 
     python manage.py invalidate_host_galaxies
 
-That drops the fingerprints, not the associations themselves, so the target
-pages keep rendering their host galaxies until each target is next vetted.
+It drops the fingerprints, not the "Host Galaxies" rows, so target pages keep
+rendering hosts until each target is next vetted.
 """
 
 import logging

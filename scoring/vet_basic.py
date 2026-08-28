@@ -22,7 +22,6 @@ import time
 
 import pandas as pd
 
-from django.db import connections
 from django.db.models import Count, Max
 
 from trove_targets.models import Target
@@ -42,19 +41,15 @@ from candidate_vetting.vet import (
 )
 
 from .dynamic_catalogs import UserGalaxy
-from .models import UserGalaxyQ3C
+from .models import PgStatAllTables, UserGalaxyQ3C
 from .vet_phot import find_public_phot
 from .tasks import async_mpc
 
 logger = logging.getLogger(__name__)
 
-# TargetExtra key holding the inputs the saved "Host Galaxies" dataframe was
 # built from, so we can tell whether it is still current
 HOST_GALAXY_CACHE_KEY = "Host Galaxies Cache Key"
 
-# Columns the scoring code reads off a rebuilt host dataframe: z / z_type drive
-# the tier selection in get_distance_score, lumdist and its two uncertainties
-# drive host_distance_match, and name is reported as the matched host
 REQUIRED_HOST_COLUMNS = ("name", "z", "z_type", "lumdist", "z_err", "lumdist_err")
 
 # how long to reuse a reading of the galaxy catalog state, in seconds
@@ -63,15 +58,13 @@ _CATALOG_STATE = {"read_at": 0.0, "state": None}
 
 
 def _catalog_state():
-    """Fingerprint inputs shared by every target: galaxy catalog row counts and
-    the user-galaxy table.
+    """Fingerprint inputs shared by every target: galaxy catalog write activity
+    and the user-galaxy table.
 
-    Row counts are the re-ingestion signal, read from pg_class rather than
-    counted -- these tables run to billions of rows. Cached for
-    CATALOG_STATE_TTL so a Vet All pays one round trip per minute, not one per
-    candidate; a TTL rather than a permanent memo so a long-lived worker cannot
-    pin a stale answer. catalog_rows is None if unreadable, in which case only
-    invalidate_host_galaxy_cache() invalidates.
+    Each catalog contributes its relid and its cumulative insert + update +
+    delete count, so we can use this to detect when any new host galaxies have
+    been ingested or anything has changed in the catalogs. relid also catches a
+    catalog rebuilt as a new table and renamed over the old one
     """
     now = time.time()
     if (
@@ -82,22 +75,23 @@ def _catalog_state():
 
     tables = sorted(c.catalog_model._meta.db_table for c in GALAXY_CATALOGS)
     try:
-        with connections["catalogs"].cursor() as cursor:
-            cursor.execute(
-                "SELECT relname, reltuples::bigint FROM pg_class "
-                "WHERE relname = ANY(%s) ORDER BY relname",
-                [tables],
+        catalog_writes = {
+            name: [relid, (ins or 0) + (upd or 0) + (dels or 0)]
+            for name, relid, ins, upd, dels in PgStatAllTables.objects.using(
+                "catalogs"
             )
-            catalog_rows = dict(cursor.fetchall())
+            .filter(relname__in=tables)
+            .values_list("relname", "relid", "n_tup_ins", "n_tup_upd", "n_tup_del")
+        }
     except Exception as e:  # a stats lookup must never break vetting
-        logger.warning(f"Could not read galaxy catalog row counts: {e}")
-        catalog_rows = None
+        logger.warning(f"Could not read galaxy catalog write counters: {e}")
+        catalog_writes = None
 
-    # count *and* max id, so that a deletion invalidates the cache too
+    # count and max id, so that a deletion invalidates the cache too
     user_galaxies = UserGalaxyQ3C.objects.aggregate(n=Count("id"), latest=Max("id"))
 
     state = {
-        "catalog_rows": catalog_rows,
+        "catalog_writes": catalog_writes,
         "user_galaxies": [user_galaxies["n"], user_galaxies["latest"]],
     }
     _CATALOG_STATE.update(read_at=now, state=state)
@@ -107,11 +101,6 @@ def _catalog_state():
 def invalidate_host_galaxy_cache(target_ids=None) -> int:
     """Drop saved host association fingerprints so the next vet re-queries the
     galaxy catalogs. Returns how many targets were invalidated.
-
-    Call after re-ingesting a galaxy catalog: the catalog tables live in the
-    separate "catalogs" database, and row counts alone cannot see an in-place
-    edit. Only fingerprints are deleted, not the "Host Galaxies" rows, so
-    target pages keep rendering hosts until each target is next vetted.
     """
     fingerprints = TargetExtra.objects.filter(key=HOST_GALAXY_CACHE_KEY)
     if target_ids is not None:
@@ -123,16 +112,7 @@ def invalidate_host_galaxy_cache(target_ids=None) -> int:
 
 
 def _host_galaxy_cache_key(target) -> str:
-    """Fingerprint of the host association inputs we can check cheaply.
-
-    Covers the target position, catalog list and cuts, user-uploaded galaxies,
-    the installed candidate_vetting version (which changes both which galaxies
-    come back and which columns are stored), and each catalog's row count.
-
-    Row counts catch a re-ingest that adds or replaces rows, but not an
-    in-place edit that leaves the count unchanged -- so this is a backstop, not
-    a guarantee. Ingestion should still call invalidate_host_galaxy_cache().
-    """
+    """Fingerprint of the host association inputs we can check cheaply"""
     try:
         vetting_version = importlib.metadata.version("candidate_vetting")
     except importlib.metadata.PackageNotFoundError:
@@ -208,9 +188,6 @@ def _minor_planet_score(
     yet. 1 means no minor planet match, which is the good case. Returns None
     when there is no verdict -- the match was queued rather than run, or the
     lookup failed -- in which case the caller has nothing to gate on.
-
-    How the stored mpc_match_name becomes a score is duplicated from
-    scoring.util.get_event_candidate_scores, so keep the two in sync!
     """
     if use_async_mpc:
         logger.info("Sending MPC to the async queue, check back later for results")
@@ -220,10 +197,8 @@ def _minor_planet_score(
     try:
         run_mpc(target.id)
     except Exception as e:
-        # run_mpc downloads orbit data from an external service, so this
-        # fails for reasons that have nothing to do with the candidate --
-        # an empty response parsed as JSON, a timeout, a rate limit.
-        # do not want this to terminate vetting.
+        # I was having a few errors with this, so wrapped it in a try/except, 
+        # but possibly unnecessary
         logger.warning(f"MPC lookup failed for {target.name}, skipping it: {e}")
         return None
     match = target_extras.filter(key="mpc_match_name")
@@ -253,14 +228,11 @@ def vet_basic(
     """
     logger.info("Running basic vetting")
 
-    # get the Target object associated with this target_id
     target = Target.objects.get(id=target_id)
-
-    # get the TargetExtra object associated with this target_id
     te = TargetExtra.objects.filter(target_id=target.id)
 
     # (0) point source association
-    # perform if overwrite **OR** PS score doesn't exist
+    # perform if overwrite or PS score doesn't exist
     if overwrite or not te.filter(key="ps_score").exists():
         logger.info("Running Point Source Matching...")
         with warnings.catch_warnings():
