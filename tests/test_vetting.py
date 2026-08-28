@@ -347,9 +347,10 @@ class TestAtlasForcedPhotParsing:
                 "mags": [100.0, 95.0, 105.0],
                 "magErrs": [10.0, 10.0, 10.0],
                 "lim5sig": [20.0, 20.0, 20.0],
+                "tels":["HKO", "TDO", "TDO"]
             },
-            "c": {"mjds": [], "mags": [], "magErrs": [], "lim5sig": []},
-            "I": {"mjds": [], "mags": [], "lim5sig": [], "magErrs": []},
+            "c": {"mjds": [], "mags": [], "magErrs": [], "lim5sig": [], "tels":[]},
+            "I": {"mjds": [], "mags": [], "lim5sig": [], "magErrs": [], "tels":[]},
         }
 
         result = cat._stack_photometry(magnitudes, binningDays=1.0)
