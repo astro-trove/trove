@@ -53,7 +53,7 @@ PARAM_RANGES = dict(
     t_post=np.inf,
     max_decay_fit_time=25,
     phot_score_snr_min=5,
-    min_decay_baseline_days=0.1,
+    min_time_separation=1/24,
 )
 
 

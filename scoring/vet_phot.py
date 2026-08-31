@@ -30,6 +30,53 @@ PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
 )
 
+FILTER_EFF_FREQ = {
+    'u': 8.468e14 * u.Hz,
+    'g': 6.289e14 * u.Hz,
+    'r': 4.832e14 * u.Hz,
+    'i': 3.948e14 * u.Hz,
+    'z': 3.343e14 * u.Hz,
+    'y': 3.043e14 * u.Hz,
+    'U': 8.468e14 * u.Hz,
+    'B': 6.810e14 * u.Hz,
+    'V': 5.483e14 * u.Hz,
+    'R': 4.610e14 * u.Hz,
+    'I': 3.807e14 * u.Hz,
+    'c': 5.4e14 * u.Hz, # ATLAS cyan
+    'o': 4.8e14 * u.Hz, # ATLAS orange
+    'G': 5.5e14 * u.Hz, # Gaia G-band
+    'w': 5.208e14 * u.Hz, # Pan-STARRS w (wide)
+    'F070W': 4.310e14 * u.Hz, # JWST
+    'F090W': 3.362e14 * u.Hz,
+    'F115W': 2.629e14 * u.Hz,
+    'F150W': 2.019e14 * u.Hz,
+    'F182M': 1.631e14 * u.Hz,
+    'F200W': 1.526e14 * u.Hz,
+    'F250M': 1.199e14 * u.Hz,
+    'F277W': 1.101e14 * u.Hz,
+    'F300M': 1.006e14 * u.Hz,
+    'F335M': 0.894e14 * u.Hz,
+    'F356W': 0.850e14 * u.Hz,
+    'F360M': 0.829e14 * u.Hz,
+    'F444W': 0.690e14 * u.Hz,
+    'F560W': 0.537e14 * u.Hz,
+    'F770W': 0.399e14 * u.Hz,
+    'F1000W': 0.303e14 * u.Hz,
+    'F1130W': 0.265e14 * u.Hz,
+    'F1280W': 0.236e14 * u.Hz,
+    'F1500W': 0.201e14 * u.Hz,
+    'F1800W': 0.168e14 * u.Hz,
+    'F2100W': 0.146e14 * u.Hz,
+    'F2550W': 0.119e14 * u.Hz,
+    'F062': 4.962e14 * u.Hz, # Roman
+    'F087': 3.494e14 * u.Hz,
+    'F106': 2.876e14 * u.Hz,
+    'F129': 2.355e14 * u.Hz,
+    'F146': 2.355e14 * u.Hz,
+    'F158': 1.929e14 * u.Hz,
+    'F213': 1.421e14 * u.Hz,
+}
+
 
 def _powerlaw(x, a, y0):
     """
@@ -121,6 +168,7 @@ def _ssr(model_y, data_y):
 def _flux_to_lum(flux, lumdist):
     """convert flux to lum. Everything should be astropy quantities"""
     return 4 * np.pi * lumdist**2 * flux
+
 
 def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataFrame:
     """
@@ -248,12 +296,12 @@ def estimate_max_find_decay_rate(
     mag: Iterable[float],
     magerr: Iterable[float],
     max_decay_fit_time: Optional[int] = 25,
-    min_baseline_days: Optional[float] = None,
+    min_time_separation: Optional[float] = None,
 ) -> Tuple[float, float, float]:
     """
-    Fit's both a single and broken powerlaw to the data, computes the AIC and then
-    takes the "better" fit (lower AIC) and uses that to find an analytic time of maximum and decay
-    rate over peak_time -> max_decay_fit_time.
+    Fit both a single and broken powerlaw to the data, compute AIC, and
+    takes the "better" fit (lower AIC) and uses that to find an analytic time
+    of maximum and decay rate over peak_time -> max_decay_fit_time.
 
     PARAMETERS
     ---------
@@ -266,7 +314,7 @@ def estimate_max_find_decay_rate(
     max_decay_fit_time: int
         The maximum time after the GW discovery in days that we should fit the decay to.
         The default is 25 days based on discussion from Rastinejad+2022.
-    min_baseline_days: float, optional
+    min_baseline_days: float
         Refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
         used for fitting) is below this many days.
 
@@ -310,16 +358,16 @@ def estimate_max_find_decay_rate(
     n_epochs = int(np.unique(dt_days_tofit).size)
     if n_epochs < 2:
         raise RuntimeError(
-            f"Only {n_epochs} distinct epoch(s) within {max_decay_fit_time} d "
-            "-- the decay rate is not determined by this data"
+            f"Only {n_epochs} distinct epoch(s) within {max_decay_fit_time}; "+
+            "decay rate is not determined by this data"
         )
 
-    if min_baseline_days is not None:
-        baseline_days = float(dt_days_tofit.max() - dt_days_tofit.min())
-        if baseline_days < min_baseline_days:
+    if min_time_separation is not None:
+        time_separation_days = float(dt_days_tofit.max() - dt_days_tofit.min())
+        if time_separation_days < min_time_separation:
             raise RuntimeError(
-                f"baseline {baseline_days:.3g} d < min_baseline_days="
-                f"{min_baseline_days:.3g} d -- refusing to fit"
+                f"Baseline {time_separation_days:.3f} days < min_time_separation ="
+                f"{min_time_separation:.3f} days; refusing to fit"
             )
 
     curve_fit_kwargs = dict(
@@ -425,52 +473,6 @@ def estimate_max_find_decay_rate(
 
     return model, best_fit_params, max_time, decay_rate
     
-FILTER_EFF_FREQ = {
-    'u': 8.468e14 * u.Hz,
-    'g': 6.289e14 * u.Hz,
-    'r': 4.832e14 * u.Hz,
-    'i': 3.948e14 * u.Hz,
-    'z': 3.343e14 * u.Hz,
-    'y': 3.043e14 * u.Hz,
-    'U': 8.468e14 * u.Hz,
-    'B': 6.810e14 * u.Hz,
-    'V': 5.483e14 * u.Hz,
-    'R': 4.610e14 * u.Hz,
-    'I': 3.807e14 * u.Hz,
-    'c': 5.4e14 * u.Hz, # ATLAS cyan
-    'o': 4.8e14 * u.Hz, # ATLAS orange
-    'G': 5.5e14 * u.Hz, # Gaia G-band
-    'w': 5.208e14 * u.Hz, # Pan-STARRS w (wide)
-    'F070W': 4.310e14 * u.Hz, # JWST
-    'F090W': 3.362e14 * u.Hz,
-    'F115W': 2.629e14 * u.Hz,
-    'F150W': 2.019e14 * u.Hz,
-    'F182M': 1.631e14 * u.Hz,
-    'F200W': 1.526e14 * u.Hz,
-    'F250M': 1.199e14 * u.Hz,
-    'F277W': 1.101e14 * u.Hz,
-    'F300M': 1.006e14 * u.Hz,
-    'F335M': 0.894e14 * u.Hz,
-    'F356W': 0.850e14 * u.Hz,
-    'F360M': 0.829e14 * u.Hz,
-    'F444W': 0.690e14 * u.Hz,
-    'F560W': 0.537e14 * u.Hz,
-    'F770W': 0.399e14 * u.Hz,
-    'F1000W': 0.303e14 * u.Hz,
-    'F1130W': 0.265e14 * u.Hz,
-    'F1280W': 0.236e14 * u.Hz,
-    'F1500W': 0.201e14 * u.Hz,
-    'F1800W': 0.168e14 * u.Hz,
-    'F2100W': 0.146e14 * u.Hz,
-    'F2550W': 0.119e14 * u.Hz,
-    'F062': 4.962e14 * u.Hz, # Roman
-    'F087': 3.494e14 * u.Hz,
-    'F106': 2.876e14 * u.Hz,
-    'F129': 2.355e14 * u.Hz,
-    'F146': 2.355e14 * u.Hz,
-    'F158': 1.929e14 * u.Hz,
-    'F213': 1.421e14 * u.Hz,
-}
 
 def _mag_to_flux(mag, magerr=None):
     """
@@ -486,6 +488,7 @@ def _mag_to_flux(mag, magerr=None):
         dflux = np.abs(flux * magerr * np.log(10) / 2.5)
         return flux, dflux
     return flux
+
 
 def compute_peak_lum(
     mag: Iterable[float],
@@ -735,9 +738,7 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                     phot.mag,
                     phot.magerr,
                     max_decay_fit_time=param_ranges["max_decay_fit_time"],
-                    min_baseline_days=param_ranges.get(
-                        "min_decay_baseline_days", 0.1
-                    ),
+                    min_time_separation=param_ranges["min_time_separation"],
                 )
             )
         except RuntimeError as exc:
