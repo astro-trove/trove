@@ -311,10 +311,10 @@ def estimate_max_find_decay_rate(
         A list/array of the magnitudes since the GW discovery
     magerr: Iterable[float]
         A list/array of the magnitude errors since the GW discovery
-    max_decay_fit_time: int
+    max_decay_fit_time: float, optional
         The maximum time after the GW discovery in days that we should fit the decay to.
         The default is 25 days based on discussion from Rastinejad+2022.
-    min_baseline_days: float
+    min_time_separation: float, optional
         Refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
         used for fitting) is below this many days.
 
