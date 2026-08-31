@@ -154,6 +154,11 @@
     let currentPhotometryPage = 1;
 
     const initialTraceStyles = {};
+    // traces the table filters don't know how to rebuild (the decay fit,
+    // discovery-time markers, the abs-mag y2 axis dummy) -- captured once so
+    // updatePlotFromTable can re-append them after Plotly.react replaces
+    // the whole trace list with only what it rebuilds from the table
+    let extraTraces = [];
 
     function captureInitialTraceStyles() {
         const plotDiv = document.querySelector('.plotly-graph-div');
@@ -166,6 +171,7 @@
                 };
             }
         });
+        extraTraces = plotDiv.data.filter(trace => trace.mode === 'lines' || trace.yaxis === 'y2');
     }
 
     captureInitialTraceStyles();
@@ -436,7 +442,7 @@
     function updatePlotFromTable() {
         const plotDiv = document.querySelector('.plotly-graph-div');
         if (!plotDiv || !window.Plotly) return;
-        const traces = buildPlotlyTracesFromTable();
+        const traces = buildPlotlyTracesFromTable().concat(extraTraces);
         // preserve layout if present
         const layout = plotDiv.layout || {};
         try {
