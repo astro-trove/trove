@@ -1,20 +1,16 @@
 """
 Basic vetting , possible even if no nonlocalized event associated with a
 target. Does the following:
-0. Checks for new photometry
-1. AGN crossmatching
-2. Host association
-3. Point source association
-4. MPC crossmatching
+0. Point source association
+1. Checks for new photometry
+2. MPC crossmatching
+3. AGN crossmatching
+4. Host association
 
-But without any direct scoring!
+PS and MPC crossmatches come early because may produce subscores of 0 or 1.
 
-Steps 3 and 4 are not carried out if no new photometry and user has said
-not to carry out those steps in absence of new photometry.
-
-This should also be called before any photometry vetting in the NLE-related
+This should be called before any photometry vetting in the NLE-related
 vetting modules. That way we can reduce the code duplication between them!
-
 """
 
 import importlib.metadata
@@ -185,6 +181,33 @@ def _cached_host_df(target_extras, cache_key: str):
     return df
 
 
+def _minor_planet_score(
+    target, target_extras, use_async_mpc: bool = False
+):
+    """The 0-or-1 minor planet score, running the MPC match if we don't have it
+    yet. 1 means no minor planet match, which is the good case. Returns None
+    when there is no verdict -- the match was queued rather than run, or the
+    lookup failed -- in which case the caller has nothing to gate on.
+    """
+    if use_async_mpc:
+        logger.info("Sending MPC to the async queue, check back later for results")
+        async_mpc.enqueue(target.id)
+        return None
+    logger.info("Running MPC in real-time, this may take a bit...")
+    try:
+        run_mpc(target.id)
+    except Exception as e:
+        # I was having a few errors with this, so wrapped it in a try/except, 
+        # but possibly unnecessary
+        logger.warning(f"MPC lookup failed for {target.name}, skipping it: {e}")
+        return None
+    match = target_extras.filter(key="mpc_match_name")
+    if match.exists():
+        return int(match[0].value == str(None))
+    else:
+        return 1
+
+
 def vet_basic(
     target_id: int,
     days_ago_max: int = 200,
@@ -192,16 +215,39 @@ def vet_basic(
     queue_priority: int = 0,
     skip_vet_if_no_new_phot: bool = False,
     use_async_mpc: bool = False,
+    stop_on_zero: bool = True,
 ):
+    """Run the NLE-independent vetting for a target and return
+    (`host_df`, `agn_df`, `keep_vetting`). `keep_vetting` is False when PS or
+    MPC has already zero'd this target's score and we stopped early, in which
+    case the two dataframes are empty the AGN / host associations have *not*
+    been reperformed.
+
+    Pass `stop_on_zero = False` to always do the full pass and not stop
+    regardless of PS or MPC association.
+    """
     logger.info("Running basic vetting")
 
-    # get the Target object associated with this target_id
     target = Target.objects.get(id=target_id)
-
-    # get the TargetExtra object associated with this target_id
     te = TargetExtra.objects.filter(target_id=target.id)
 
-    # then check for new photometry
+    # (0) point source association
+    # perform if overwrite or PS score doesn't exist
+    if overwrite or not te.filter(key="ps_score").exists():
+        logger.info("Running Point Source Matching...")
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            ps_matches = point_source_association(target_id)
+            ps_score = int(len(ps_matches) < 1)  # 1 if no ps_matches, 0 otherwise
+            save_score_to_targetextra(target, "ps_score", ps_score)
+        if stop_on_zero and ps_score == 0:
+            logger.info(
+                f"{target.name} matches a known point source, so it scores 0 "
+                +"regardless of anything else; skipping rest of vetting"
+            )
+            return pd.DataFrame(), pd.DataFrame(), False
+
+    # (1) check for new photometry
     phot_query_start = time.time()
     created_new_phot = find_public_phot(
         target=target,
@@ -209,9 +255,29 @@ def vet_basic(
         days_ago_max=days_ago_max,
         queue_priority=queue_priority,
     )
-    logger.info(f"Finding public photometry took {time.time() - phot_query_start}s")
+    logger.info("Finding public photometry took "+
+                f"{(time.time() - phot_query_start):.2f}s")
 
-    # get associated AGN, host galaxies
+    # (2) Minor Planet Center association
+    # proceed if overwrite **OR** MPC score doesn't exist...
+    if overwrite or not te.filter(key="mpc_match_name").exists():
+        if skip_vet_if_no_new_phot and not created_new_phot: # ... but stop if skip_vet_if_no_new_phot **AND** no new phot created
+            logger.info(
+                        "Skipping Minor Planet Center association because no new "
+                        +"photometry and skip_vet_if_no_new_phot=True"
+            )
+        else: # ... proceed otherwise
+            mpc_score = _minor_planet_score(
+                target, te, use_async_mpc=use_async_mpc
+            )
+            if stop_on_zero and mpc_score == 0:
+                logger.info(
+                    f"{target.name} matches a Minor Planet Center object, so it "
+                    +"scores 0 regardless of anything else; skipping rest of vetting"
+                )
+                return pd.DataFrame(), pd.DataFrame(), False
+
+    # (3), (4) get associated AGN, host galaxies
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         # search for an AGN associated with the target
@@ -234,31 +300,5 @@ def vet_basic(
                 + "nothing it depends on has changed"
             )
 
-    # stop here and return if no further vetting needed
-    if skip_vet_if_no_new_phot and not created_new_phot:
-        logger.info(
-            "Skipping point source and minor planet vetting because no new "
-            + "photometry and skip_vet_if_no_new_phot=True"
-        )
-        return host_df, agn_df
-
-    # run the point source checker
-    if overwrite or not te.filter(key="ps_score").exists():
-        logger.info("Running Point Source Matching...")
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            ps_matches = point_source_association(target_id)
-            ps_score = int(len(ps_matches) < 1)  # 1 if no ps_matches, 0 otherwise
-            save_score_to_targetextra(target, "ps_score", ps_score)
-
-    # run the minor planet checker
-    if overwrite or not te.filter(key="mpc_match_name").exists():
-        if use_async_mpc:
-            logger.info("Sending MPC to the async queue, check back later for results")
-            async_mpc.enqueue(target_id)
-        else:
-            logger.info("Running MPC in real-time, this may take a bit...")
-            run_mpc(target_id)
-
     # return both agn_df and host_df
-    return host_df, agn_df
+    return host_df, agn_df, True

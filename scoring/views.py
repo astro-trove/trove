@@ -175,7 +175,9 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         # then run the vetting
         vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
         if vetting_mode == "basic" or nonlocalized_event_name is None:
-            vet_basic(target.id)
+            # a user asking for this one target wants the host / AGN tables
+            # even if its point source or MPC score has already zeroed it
+            vet_basic(target.id, stop_on_zero=False)
             messages.info(
                 request,
                 "Ran basic vetting. If you expected event-dependent "
