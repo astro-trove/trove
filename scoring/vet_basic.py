@@ -41,7 +41,7 @@ from candidate_vetting.vet import (
 )
 
 from .dynamic_catalogs import UserGalaxy
-from .models import PgStatAllTables, UserGalaxyQ3C
+from .models import CatalogWriteCounters, UserGalaxyQ3C
 from .vet_phot import find_public_phot
 from .tasks import async_mpc
 
@@ -77,7 +77,7 @@ def _catalog_state():
     try:
         catalog_writes = {
             name: [relid, (ins or 0) + (upd or 0) + (dels or 0)]
-            for name, relid, ins, upd, dels in PgStatAllTables.objects.using(
+            for name, relid, ins, upd, dels in CatalogWriteCounters.objects.using(
                 "catalogs"
             )
             .filter(relname__in=tables)
@@ -293,7 +293,13 @@ def vet_basic(
             galaxy_catalogs = [UserGalaxy] + GALAXY_CATALOGS
             host_df = host_association(target_id,
                                        galaxy_catalogs=galaxy_catalogs)
-            save_score_to_targetextra(target, HOST_GALAXY_CACHE_KEY, cache_key)
+            if _catalog_state()["catalog_writes"] is not None:
+                save_score_to_targetextra(target, HOST_GALAXY_CACHE_KEY, cache_key)
+            else:
+                logger.warning(
+                    f"Not saving the host galaxy fingerprint for {target.name}: "
+                    + "couldn't confirm the galaxy catalogs are unchanged"
+                )
         else:
             logger.info(
                 f"Reusing the saved host galaxy association for {target.name}, "
