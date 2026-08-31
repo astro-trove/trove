@@ -376,13 +376,7 @@ def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
 
 
 def _localization_from_name(nonlocalized_event_name, max_time=None):
-    """Most recent EventLocalization for this event, dated at or before max_time.
-
-    max_time=None now, resolved per call. It used to default to
-    Time.now() in the signature, which is evaluated once at import -- so a
-    long-running db_worker froze "now" at process start and could never see a
-    new skymap.
-    """
+    """Most recent EventLocalization for this event, dated at or before max_time."""
     if max_time is None:
         max_time = Time.now()
 
@@ -395,5 +389,5 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
         .order_by("-date")
         .first()
     )
-    # nothing at or before max_time: fall back to the earliest, as before
+    # nothing at or before max_time: fall back to the earliest
     return localization or all_localizations.order_by("date").first()
