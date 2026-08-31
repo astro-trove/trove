@@ -405,15 +405,6 @@ def get_photometry_data(context, target, target_share=False):
             klass=photometry,
         )
     
-
-    # Possibilities for reduced_datums from ZTF/MARS:
-    # reduced_datum.value: {'error': 0.0929680392146111, 'filter': 'r', 'magnitude': 18.2364940643311}
-    # reduced_datum.value: {'limit': 20.1023998260498, 'filter': 'g'}
-
-    # for limit magnitudes, set the value of the limit key to True and
-    # the value of the magnitude key to the limit so the template and
-    # treat magnitudes as such and prepend a '>' to the limit magnitudes
-    # see recent_photometry.html
     data = []
     for reduced_datum in photometry:
         rd_data = {'id': reduced_datum.pk,
