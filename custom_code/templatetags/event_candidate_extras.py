@@ -91,9 +91,11 @@ def scoring_toggles(context, target_id=None):
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
     # switching to KilonovaSCORER only changes anything if this candidate has a
-    # score to switch TO 
+    # score to switch TO. With no target_id (e.g. the candidate list page,
+    # which isn't scoped to one candidate) there's nothing to gate on, so the
+    # toggle is always available.
     is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
-    has_kilonova_score = bool(target_id) and ScoreFactor.objects.filter(
+    has_kilonova_score = not target_id or ScoreFactor.objects.filter(
         event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
     ).exists()
     return {
@@ -117,18 +119,18 @@ def display_score_details(context, target_id):
     
     if target_id is None:
         return "Target ID is None!"
-
+    
     target = Target.objects.get(id=target_id)
 
     keymap = OrderedDict(
-        ps_score=("Point Source Association?", _bool_format_yesno),
-        mpc_score=("Minor Planet Score Association?", _bool_format_yesno),
-        mpc_match_name=("MPC Match Name", _str_format),
-        mpc_match_date=("MPC Match Date", _str_format),
-        mpc_match_sep=('MPC Match Separation', partial(_float_format, unit='"')),
+        ps_score=("Point Source Associated?", _bool_format_yesno),
+        mpc_score=("Minor Planet Center Object Associated?", _bool_format_yesno),
+        mpc_match_name=("Minor Planet Center Match Name", _str_format),
+        mpc_match_date=("Minor Planet Center Match Date", _str_format),
+        mpc_match_sep=('Minor Planet Center Match Separation (")', partial(_float_format, unit='"')),
         skymap_score=("Localization Score", _float_format),
         host_distance_score=("Distance Score", _float_format),
-        host_name=("Host Galaxy used for Distance Scoring", _str_int_format),
+        host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
         agn_score=("AGN Score (0.1 or 1.0)", partial(_float_format, precision=1)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
@@ -175,11 +177,14 @@ def display_score_details(context, target_id):
     for event_candidate in target.eventcandidate_set.all():
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
+            # exclude keys in TargetExtra + exclude mpc_score, predetection_score
             + ["mpc_score", "predetection_score", "localization_id"]
         ).all()
+
         sf_set = sorted(
             sf_set,
-            key=lambda sf: order.index(sf.key) if sf.key in order else len(order),
+            key=lambda sf: (order.index(sf.key) if sf.key in order else len(order),
+                            sf.key),
         )
         score_details.append(sf_set)
 
@@ -234,20 +239,12 @@ def display_score_details(context, target_id):
             else:
                 label = score_factor.key
                 fmter = _float_format
-            
-            # Taken from the formatter, not a hand-kept list of labels: the
-            # list had to be updated for every new text-valued factor, and
-            # `kilonova_skip_reason` was added without it, so its sentence went
-            # down the float() path and out through the except branch.
+                
             numeric = fmter not in (_str_format, _str_int_format)
-            value = _safe_format(score_factor.value, fmter, numeric=numeric)
+            value = _safe_format(score_factor.value, fmter)
             
             # KilonovaSCORER scores only the KN model, so its score and its
-            # "could not score" reason belong in the KN subtab alone. The detail
-            # loops below run once per transient subtab, so without this tag the
-            # same row is repeated under KN-in-SN and super-KN, where it is not
-            # just redundant but wrong -- it reads as a verdict on models the
-            # scorer never evaluated.
+            # "could not score" reason belong in the KN subtab alone
             event_card["details"].append(
                 {
                     "label": label,
@@ -280,7 +277,7 @@ def display_score_details(context, target_id):
         html += f'      </div>\n'
     html += f'    </div>\n'
     html += f'  </div>\n'
-
+    
     # Render event tabs and cards
     if event_cards:
         html += '  <div class="event-tabs-container">\n'
@@ -397,8 +394,8 @@ def display_score_details(context, target_id):
     return mark_safe(html)
 
 
-#: Alternatives to one another: exactly one group feeds the overall score, and
-#: which one is the whole point of the photometry toggle.
+# alternatives to one another: exactly one group feeds the overall score, and
+# which one is the whole point of the photometry toggle.
 _KILONOVA_FACTOR_LABELS = {"KilonovaSCORER Photometry Score"}
 _TROVE_FACTOR_LABELS = {
     "Score from Maximum Luminosity",
@@ -406,12 +403,20 @@ _TROVE_FACTOR_LABELS = {
     "Score from Light Curve Slope",
 }
 
-#: A switch rather than a choice: with the toggle off, `agn_score` is dropped
-#: from the product, so the value still shown is not part of the score.
+
+# switch rather than a choice: with the toggle off, `agn_score` is dropped
+# from the product, so the value still shown is not part of the score.
 _AGN_FACTOR_LABELS = {"AGN Score (0.1 or 1.0)"}
 
-#: Everything else (skymap, host distance, predetection) contributes either
-#: way and is left unmarked.
+
+# formatting
+def _safe_format(value, fmter):
+    for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
+        try:
+            return candidate()
+        except (TypeError, ValueError):
+            continue
+    return str(value)
 
 
 def _factor_row_class(label, transient, kn_is_active, agn_toggle=True):
@@ -426,29 +431,8 @@ def _factor_row_class(label, transient, kn_is_active, agn_toggle=True):
     return "detail-row factor-active" if live else "detail-row factor-inactive"
 
 
-def _safe_format(raw, fmter, numeric=True):
-    """Render a ScoreFactor value, never raising and never emitting raw HTML.
-
-    Text values are escaped because the caller wraps the whole page in
-    `mark_safe`. `kilonova_skip_reason` is an exception message, and those
-    quote dtypes and types -- "<f4", "<class 'ValueError'>" -- which the
-    browser then swallowed as unknown tags, so the reason rendered blank.
-    Numeric output is left alone: it comes from a float, and `_sci_format`
-    emits a <sup> on purpose.
-    """
-    if raw is None or (isinstance(raw, str) and raw.strip() in ("", "nan", "None")):
-        return raw
-    try:
-        if numeric:
-            return fmter(float(raw))
-        return escape(fmter(raw))
-    except (TypeError, ValueError):
-        return escape(str(raw))
-
-
 def _float_format(flt, unit="", precision=2):
     return f"{flt:.{precision}f} {unit}"
-
 
 def _sci_format(flt, unit=""):
     prefactor, power = f"{flt:.2e}".split("e")
@@ -456,20 +440,17 @@ def _sci_format(flt, unit=""):
         power = power[1:]
     return f"{prefactor} x 10<sup>{power}</sup> {unit}"
 
-
 def _bool_format(flt):
     return int(flt) 
 
 def _bool_format_yesno(flt):
-    # yes, this order is correct because a score of 0 means an association!
     return "No" if bool(flt) else "Yes"
-
+  
 def _str_int_format(s):
     try:
         return str(int(s))
     except ValueError:
         return str(s)
 
-    
 def _str_format(s):
     return str(s)
