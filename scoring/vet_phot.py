@@ -85,56 +85,23 @@ def _powerlaw(x, a, y0):
     return y0 - a * np.log10(x)
 
 
-def _broken_powerlaw_concave(x, a1, a2, y0, x0):
-    """Smoothly broken powerlaw, CONCAVE branch. Original TROVE model.
+def _broken_powerlaw_concave_down(x, a1, a2, y0, x0):
+    """Smoothly broken powerlaw, CONCAVE DOWN branch. Original TROVE model.
 
     With u = x/x0 the two components are combined additively in flux,
 
         mag = y0 - log10(u**-a1 + u**-a2)
 
-    `log10(sum of powers of u)` is convex in log10(u), so negating it makes
-    this CONCAVE in the (log10 t, mag) plane: the slope d(mag)/d(log10 t) can
-    only DECREASE with time. Writing a1 <= a2 (enforced by the fitter, see
-    `_fit_broken`), the asymptotes are
-
-        x << x0:  mag -> y0 + a2*log10(x/x0)      slope = a2
-        x >> x0:  mag -> y0 + a1*log10(x/x0)      slope = a1   (a1 <= a2)
-
-    Since slope > 0 means fading, this branch covers exactly the shapes whose
-    behaviour becomes *more brightening* with time:
-
-        decline -> rise        (rebrightening; SN IIb like SN2025ulz)
-        decline -> shallower decline
-        rise    -> steeper rise
-
-    It CANNOT represent rise -> decline, decline -> steeper decline, or
-    rise -> shallower rise. `_broken_powerlaw_convex` covers those.
+    `log10(sum of powers of u)` is concave up in log10(u), so negating it
+    makes this CONCAVE DOWN in the (log10 t, mag) plane.
     """
     return y0 - np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
 
 
-def _broken_powerlaw_convex(x, a1, a2, y0, x0):
-    """Smoothly broken powerlaw, CONVEX branch. The complement of the above.
+def _broken_powerlaw_concave_up(x, a1, a2, y0, x0):
+    """Smoothly broken powerlaw, CONCAVE UP branch. The complement of the above.
 
         mag = y0 + log10(u**-a1 + u**-a2)
-
-    Same two components, opposite sign on the log, so this is CONVEX in
-    (log10 t, mag): the slope can only INCREASE with time. With a1 <= a2,
-
-        x << x0:  mag -> y0 - a2*log10(x/x0)      slope = -a2
-        x >> x0:  mag -> y0 - a1*log10(x/x0)      slope = -a1  (-a1 >= -a2)
-
-    covering the three shapes the concave branch cannot:
-
-        rise    -> decline     (a transient peaking at the break)
-        decline -> steeper decline
-        rise    -> shallower rise
-
-    WHY BOTH ARE NEEDED. The sign of the log term fixes the curvature, and one
-    functional form cannot do both: log-sum-exp is convex, its negation
-    concave. Fitting only one silently restricts the model to three of the six
-    possible break shapes -- and the original bounds (a1 < 0 < a2) narrowed
-    that to a single shape. See diagnostics/reports/BROKEN_POWERLAW_SHAPES.md.
     """
     return y0 + np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
 
@@ -306,7 +273,7 @@ def estimate_max_find_decay_rate(
     PARAMETERS
     ---------
     dt_days: Iterable[float]
-        A list/array of the days since the GW discovery. These should all be positive
+        A list/array of the days since the GW discovery. 
     mag: Iterable[float]
         A list/array of the magnitudes since the GW discovery
     magerr: Iterable[float]
@@ -332,15 +299,29 @@ def estimate_max_find_decay_rate(
         4  # the degrees of freedom in a broken powerlaw model (y0, x0, s, m1, m2)
     )
 
-    # only fit data before `max_decay_fit_time`
-    dt_days_tofit = dt_days[dt_days <= max_decay_fit_time]
-    mag_tofit = mag[dt_days <= max_decay_fit_time]
-    magerr_tofit = magerr[dt_days <= max_decay_fit_time]
+    dt_days = np.asarray(dt_days, dtype=float)
+    mag = np.asarray(mag, dtype=float)
+    magerr = np.asarray(magerr, dtype=float)
+
+    _in_domain = (
+        (dt_days > 0)
+        & (dt_days <= max_decay_fit_time)
+        & np.isfinite(mag)
+        & np.isfinite(magerr)
+        & (magerr > 0)
+    )
+    n_dropped_domain = int((~_in_domain).sum())
+    if n_dropped_domain:
+        logger.info(
+            "Dropped %d photometry row(s) with dt <= 0, non-finite mag/magerr, "
+            "or magerr <= 0 before fitting",
+            n_dropped_domain,
+        )
+    dt_days_tofit = dt_days[_in_domain]
+    mag_tofit = mag[_in_domain]
+    magerr_tofit = magerr[_in_domain]
 
     # Drop rows that repeat a measurement already present
-    dt_days_tofit = np.asarray(dt_days_tofit, dtype=float)
-    mag_tofit = np.asarray(mag_tofit, dtype=float)
-    magerr_tofit = np.asarray(magerr_tofit, dtype=float)
     if dt_days_tofit.size:
         _, _keep = np.unique(
             np.column_stack((dt_days_tofit, mag_tofit)), axis=0, return_index=True
@@ -381,8 +362,10 @@ def estimate_max_find_decay_rate(
 
     try:
         pl_popt, pl_pcov = curve_fit(_powerlaw, **curve_fit_kwargs)
-    except RuntimeError:
-        # RuntimeError will throw if it doesn't converge
+    except (RuntimeError, ValueError):
+        # RuntimeError if it doesn't converge; ValueError if the model
+        # produced a non-finite residual (belt-and-suspenders -- the dt > 0
+        # filter above should already rule this out for these two models)
         pl_popt, pl_pcov = None, None
 
     broken_fits = {}
@@ -397,21 +380,23 @@ def estimate_max_find_decay_rate(
                 2 * mag_tofit.max(),
             ),  # y0 bound, really shouldn't be outside this range
             (
-                0,
+                # x0 == 0 would divide by zero in (x/x0)**exponent; a tiny
+                # positive floor keeps the optimizer away from that boundary
+                # without meaningfully narrowing the search (it's far below
+                # any real observing cadence).
+                1e-6,
                 dt_days_tofit.max(),
             ),  # x0 bound, really shouldn't be greater than max(dt)
         ]
         for label, base in (
-            ("broken_concave", _broken_powerlaw_concave),
-            ("broken_convex", _broken_powerlaw_convex),
+            ("broken_concave_down", _broken_powerlaw_concave_down),
+            ("broken_concave_up", _broken_powerlaw_concave_up),
         ):
             try:
                 popt, _ = curve_fit(
                     _ordered(base), bounds=list(zip(*bpl_bounds)), **curve_fit_kwargs
                 )
-            except (RuntimeError, TypeError) as exc:
-                # RuntimeError if it doesn't converge; TypeError if there are
-                # fewer points than parameters
+            except (RuntimeError, TypeError, ValueError) as exc:
                 logger.warning(f"Failed on the {label} fit with {exc}")
                 continue
             a1, delta, y0, x0 = popt
@@ -430,9 +415,9 @@ def estimate_max_find_decay_rate(
 
     for label, (base, popt) in broken_fits.items():
         # with a1 <= a2 the late-time asymptote is governed by a1:
-        #   concave  mag -> y0 + a1*log10(t)   =>  slope = +a1
-        #   convex   mag -> y0 - a1*log10(t)   =>  slope = -a1
-        slope = popt[0] if base is _broken_powerlaw_concave else -popt[0]
+        #   concave down  mag -> y0 + a1*log10(t)   =>  slope = +a1
+        #   concave up    mag -> y0 - a1*log10(t)   =>  slope = -a1
+        slope = popt[0] if base is _broken_powerlaw_concave_down else -popt[0]
         options.append((label, base, popt, bpl_nparams, slope))
 
     if not options:
@@ -520,12 +505,16 @@ def compute_peak_lum(
     -------
     The peak luminosity (nu L_nu) in erg/s
     """
-    mag = np.asarray(mag)
-    magerr = np.asarray(magerr)
-    
+    mag = np.asarray(mag, dtype=float)
+    magerr = np.asarray(magerr, dtype=float)
+    filters = np.asarray(filters)
+
+    _valid = np.isfinite(mag) & np.isfinite(magerr)
+    mag, magerr, filters = mag[_valid], magerr[_valid], filters[_valid]
+
     if len(mag) == 0:
         return None
-    
+
     flux, dflux = _mag_to_flux(mag, magerr)
     
     fluxmax_idx = np.argmax(flux)
@@ -646,15 +635,6 @@ def find_public_phot(
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
 
-    # `SKIP_ATLAS_FORCED_PHOT` is an opt-out for development databases, where a
-    # Vet All over a few hundred candidates would otherwise enqueue a forced
-    # photometry query per target against the real ATLAS service.
-    #
-    # The setting already existed in settings_local.py but NOTHING read it, so
-    # it protected nothing -- vetting still queued every request. It is honoured
-    # here, at the enqueue, rather than inside `async_atlas_query`: a task that
-    # is never created cannot be run later by a worker that happens to pick up
-    # the atlas_fphot queue.
     if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
         logger.info(
             "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
