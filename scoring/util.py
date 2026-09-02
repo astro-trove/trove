@@ -24,6 +24,7 @@ from .vet_phot import PHOT_SCORE_MIN
 from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
+from .vet_bbh import PARAM_RANGES as AGN_FLARE_PARAM_RANGES
 from .models import ScoreFactor
 
 import time
@@ -36,6 +37,7 @@ DICT_TRANSIENTS_PARAM_RANGES = {
     "KN": KN_PARAM_RANGES,
     "KN-in-SN": KN_IN_SN_PARAM_RANGES,
     "super-KN": SUPER_KN_PARAM_RANGES,
+    "AGN-flare": AGN_FLARE_PARAM_RANGES,
 }
 
 
@@ -49,6 +51,8 @@ SUBSCORE_NAMES = [
     "phot_peak_lum",
     "phot_peak_time",
     "phot_decay_rate",
+    "host_nuclear_score",
+    "agn_flare_score",
 ]
 
 # some of the keys in ScoreFactor are really just calculated values
@@ -128,9 +132,11 @@ def get_event_candidate_scores(
         transients = ["KN", "SN"] # SN is not yet implemented as a vetting mode
     elif most_likely_class == "FXT":
         transients = ["KN", "SN", "TDE"] # SN and TDE are not yet implemented as a vetting mode
+    elif most_likely_class == "BBH":
+        transients = ["AGN-flare"]
     else:
         return []
-        
+
 
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
@@ -232,9 +238,12 @@ def get_event_candidate_scores(
 
     print("Finished computing the scores, sorting and returning...", time.time())
 
-    # sort by kilonova score, for now
-    ## TODO: generalize this
-    return sorted(ecs_out, reverse=True, key=lambda x: x.score["KN"])
+    # sort by the best transient score this candidate has (each event only ever
+    # populates a subset of `transients`, e.g. just "AGN-flare" for BBH, so there's
+    # no single fixed key to sort by across all event types)
+    return sorted(
+        ecs_out, reverse=True, key=lambda x: max(x.score.values()) if x.score else 0
+    )
 
 
 def get_target_score(target_id):

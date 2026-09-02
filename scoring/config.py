@@ -5,6 +5,7 @@ from .vet_basic import vet_basic
 from .vet_bns import vet_bns
 from .vet_kn_in_sn import vet_kn_in_sn
 from .vet_super_kn import vet_super_kn
+from .vet_bbh import vet_bbh
 
 VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
     "": # if NLE most likely class not known, everything goes
@@ -12,7 +13,7 @@ VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
          ("KN", "Transient: Kilonova"),
          ("KN-in-SN", "Transient: Kilonova-in-Supernova"),
          ("super-KN", "Transient: Super-Kilonova"),
-         #("AGN-flare", "Transient: BBH-induced AGN Flare"),
+         ("AGN-flare", "Transient: BBH-induced AGN Flare"),
         ],
     "BNS":
         [("basic", "Basic Vetting"),
@@ -31,8 +32,8 @@ VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
         ],
     "BBH":
         [("basic", "Basic Vetting"),
-         ("KN", "Transient: Kilonova"), ## TODO: remove this 
-         #("AGN-flare", "Transient: BBH-induced AGN Flare"),
+         ("KN", "Transient: Kilonova"), ## TODO: remove this
+         ("AGN-flare", "Transient: BBH-induced AGN Flare"),
         ]
     }
 
@@ -41,15 +42,15 @@ VETTING_FORM_INITIALS = {
     "BNS":("KN", "Transient: Kilonova"),
     "NSBH":("KN", "Transient: Kilonova"),
     "SSM":("KN-in-SN", "Transient: Kilonova-in-Supernova"), # not a statement on reality of KNe-in-SNe, just to distinguish from BNS/NSBH
-    "BBH":("basic", "Basic Vetting"),
+    "BBH":("AGN-flare", "Transient: BBH-induced AGN Flare"),
     }
-        
+
 FORM_CHOICE_FUNC_MAP = { # this should have the same keys as the first value in the tuples in the VETTING_FORM_CHOICES variable!
     "basic":vet_basic,
     "KN":vet_bns,
     "KN-in-SN":vet_kn_in_sn,
     "super-KN":vet_super_kn,
-    # "AGN-flare":???,
+    "AGN-flare":vet_bbh,
 }
 
 
