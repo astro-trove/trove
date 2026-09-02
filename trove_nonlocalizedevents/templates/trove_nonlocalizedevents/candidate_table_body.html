@@ -3,14 +3,32 @@
 <div class="row">
   <div class="col-md-10">
   {% if request.user.is_authenticated %}
-      <div style="display:flex; justify-content:space-between; width:100%">
-        <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn {% if agn_toggle %}btn-success{% else %}btn-light{% endif %} mb-2">
-          {% if agn_toggle %}☑ AGN Score{% else %}☐ AGN Score{% endif %}
-        </a>
-        <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.nonlocalizedevent %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}{% endif %}" class="btn btn-outline-secondary mb-2">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; width:100%">
+        {% scoring_toggles %}
+        <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
+           class="btn btn-outline-secondary mb-2"
+           title="Discard the cached scores and reload this list">
           <i class="fa fa-refresh"></i> Refresh
         </a>
       </div>
+   {% endif %}
+   {% if is_kilonova and kilonova_scores_missing %}
+     <div class="alert alert-info mb-2" role="alert">
+     <i class="fa fa-info-circle"></i>
+       <strong>No KilonovaSCORER scores yet.</strong> 
+       Vet all candidates or vet those of interest using KilonovaSCORER for photometry scoring.
+      </div>
+   {% endif %}
+   {% if request.GET.nonlocalizedevent %}
+    <div id="vet-all-progress"
+         hx-get="{% url 'trove_nonlocalizedevents:vet-all-progress' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+         hx-trigger="every 60s"
+         hx-target="this"
+         hx-swap="innerHTML"
+         hx-push-url="false"
+         hx-history="false">
+      {% include 'trove_nonlocalizedevents/partials/vet_all_progress.html' %}
+    </div>
    {% endif %}
     </br>
   {% if no_score_message %}
@@ -58,6 +76,8 @@
       </tbody>
     </table>
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+
+
   </div>
 </div>
 

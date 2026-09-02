@@ -12,9 +12,11 @@ import numpy as np
 from .scoring import (
     update_score_factor,
     delete_score_factor,
+    clean_host_df,
     host_distance_match,
     get_distance_score,
     skymap_association,
+    _localization_from_name,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -38,6 +40,12 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 logger = logging.getLogger(__name__)
 
+from scoring.kilonova_scorer_helpers.util import (
+    KilonovaScoreUnavailable,
+    score_candidate as kilonova_score_candidate,
+)
+from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+
 PARAM_RANGES = dict(
     lum_max=[0 * u.erg / u.s, 1e43 * u.erg / u.s],
     peak_time=[0, 4],
@@ -47,14 +55,22 @@ PARAM_RANGES = dict(
     t_post=np.inf,
     max_decay_fit_time=25,
     phot_score_snr_min=5,
+    min_time_separation=1/24,
 )
 
 
-def vet_bns(
+def vet_kn(
     target_id: int,
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
+    phot_method: Optional[str] = None,
 ):
+    """
+    `phot_method` names the photometry scorer to use. None means "read the
+    site-wide toggle", which is right for the single-target path -- that runs in
+    the web process, where the toggle is. `async_vet` passes it explicitly
+    instead, because a worker in its own container cannot see that cache.
+    """
     logger.info("Running BNS vetting (KN vetting)")
 
     # get the correct EventCandidate object for this target_id and nonlocalized event
@@ -83,14 +99,19 @@ def vet_bns(
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
 
+    # the skymap and distance scores are only valid for one localization, so
+    # record which one produced them
+    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
+    update_score_factor(event_candidate, "localization_id", localization.id)
+
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    if not keep_vetting:
+        # Scoring has already produced 0, so there is no point in scoring
+        # the distance or photometry because it can't change the score
+        return
     # some cleanup
-    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
-        host_df = host_df[host_df.z != -99.0] # LS DR9 North
-        host_df = host_df[host_df.z != -999.0] # PS1-STRM
-        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
-        host_df = host_df[~np.isnan(host_df.z)]
+    host_df = clean_host_df(host_df)
 
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
@@ -153,6 +174,27 @@ def vet_bns(
             "c",
         ],  # common optical filters + some Roman filters + ATLAS o,c
     )
+    # The photometry factor can come from either scorer -- the site-wide
+    # `phot_method` toggle picks. The TROVE fit above always runs regardless,
+    # because its `lum` / `max_time` / `decay_rate` are displayed on the
+    # candidate page in their own right, not only as inputs to the factor.
+    if (phot_method or get_phot_method()) == PHOT_METHOD_KILONOVA:
+        try:
+            phot_score = kilonova_score_candidate(
+                target_id=target_id,
+                nonlocalized_event=nonlocalized_event,
+                candidate_name=target.name,
+            )
+            update_score_factor(event_candidate, "kilonova_score", phot_score)
+            delete_score_factor(event_candidate, "kilonova_skip_reason")
+        except KilonovaScoreUnavailable as exc:
+            # Unscoreable is not the same as rejected. Falling through to the
+            # TROVE factor keeps the candidate rankable instead of zeroing it
+            # for missing a distance or a grid band.
+            logger.warning("KilonovaSCORER unavailable for %s: %s", target.name, exc)
+            update_score_factor(event_candidate, "kilonova_skip_reason", str(exc))
+            delete_score_factor(event_candidate, "kilonova_score")
+
     if lum is not None:
         update_score_factor(event_candidate, "phot_peak_lum", lum.value)
     else:

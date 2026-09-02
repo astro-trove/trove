@@ -31,4 +31,4 @@ build/
 !sphinx_docs/docs/build/
 trove.egg-info/
 .claude/
-*json
+*.json

@@ -11,6 +11,7 @@
    :hidden:
 
    introduction
+   rules
    details
    scoringexplained
    updatingredshifts
@@ -18,4 +19,5 @@
    dev
    faq
    citations
+   
    

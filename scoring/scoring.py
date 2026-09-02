@@ -6,15 +6,10 @@ from candidate_vetting.vet import GALAXY_CATALOGS
 
 import io
 import logging
+from datetime import timezone
 
 import numpy as np
 import pandas as pd
-from scipy.stats import norm, rv_continuous
-from scipy.integrate import trapezoid
-
-from astropy.utils.introspection import minversion
-
-import warnings
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Session
@@ -24,7 +19,6 @@ from tom_nonlocalizedevents.healpix_utils import (
     # uniq_to_bigintrange,
     # update_all_credible_region_percents_for_candidates
 )
-
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
 from tom_targets.models import TargetExtra
@@ -36,57 +30,37 @@ from trove_targets.models import Target
 
 from django.conf import settings
 
+from .distance_helpers import hybrid_distance_score
+
 cosmo = settings.COSMO
 logger = logging.getLogger(__name__)
 
 GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate([UserGalaxy] + GALAXY_CATALOGS)}
 
-# upper / lower bounds on distance for computing normal / asymmetric Gaussian
-# distributions
-D_LIM_LOWER = 1e-5  # 0.00001 Mpc
-D_LIM_UPPER = 1e4  # 10,000 Mpc
-
-if minversion(np, "2.0.0"):
-    np_trapz_fn = np.trapezoid
-else:
-    np_trapz_fn = np.trapz  # np.trapz is deprecated in numpy >2.0.0
+### TODO: these are filler values, should just change them to nulls in our database
+# LS DR9 North / DELVE DR3, PS1-STRM, SDSS DR12 photo-z / DELVE DR3
+Z_BAD_VALUES = (-99.0, -999.0, -9999.0)
 
 
-class AsymmetricGaussian(rv_continuous):
-    """
-    Custom Asymmetric Gaussian distribution for uneven uncertainties
-    """
+def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
+    """Drop host galaxy rows with bad values."""
+    if not len(host_df):
+        return host_df
 
-    def _pdf_unnorm(self, x, mean, unc_minus, unc_plus):
-        """**Unnormalized** asymmetric Gaussian PDF"""
-        # piecewise return a Gaussian depending on the side of the mean you are on
-        where_minus = np.where(x < mean)[0]
-        where_plus = np.where(x >= mean)[0]
+    z = pd.to_numeric(host_df.z, errors="coerce")
+    host_df = host_df[z.notna() & ~z.isin(Z_BAD_VALUES)]
 
-        minus_dist = np.exp(
-            -0.5 * ((x[where_minus] - mean[where_minus]) / unc_minus[where_minus]) ** 2
-        )  # Left side Gaussian-like
-        plus_dist = np.exp(
-            -0.5 * ((x[where_plus] - mean[where_plus]) / unc_plus[where_plus]) ** 2
-        )  # Right side Gaussian-like
+    for col in ("lumdist", "Dist"):
+        if col in host_df.columns:
+            dist = pd.to_numeric(host_df[col], errors="coerce")
+            host_df = host_df[dist.notna()]
 
-        return np.concatenate((minus_dist, plus_dist))
+    for col in ("lumdist_neg_err", "lumdist_pos_err"):
+        if col in host_df.columns:
+            err = pd.to_numeric(host_df[col], errors="coerce")
+            host_df = host_df[err.notna()]
 
-    def _pdf(self, x, mean, unc_minus, unc_plus, integ_a, integ_b):
-        """**Normalized** asymmetric Gaussian PDF"""
-        # unclear why, but even when floats are passed to this function for
-        # args mean, unc_minus, unc_plus, integ_a, integ_b, they become lists
-        # of the same value repeated len(x) times
-
-        # numerically integrate asymmetric Gaussian, for normalization
-        integ_x = np.linspace(integ_a[0], integ_b[0], x.shape[0])
-        integ = np_trapz_fn(
-            y=self._pdf_unnorm(integ_x, mean, unc_minus, unc_plus), x=integ_x
-        )
-        integ_norm = 1 / integ
-
-        # return unnormalized PDF multiplied by normalization factor
-        return self._pdf_unnorm(x, mean, unc_minus, unc_plus) * integ_norm
+    return host_df
 
 
 def update_score_factor(event_candidate, key, value):
@@ -105,39 +79,20 @@ def delete_score_factor(event_candidate, key):
         matches.delete()
 
 
-def _get_nle_distance_pdf(
-    lumdist_array: np.ndarray,
-    nonlocalized_event_name: str,
-    target_id,
-    max_time=Time.now(),
-):
-    # find the distance at the healpix
-    dist, dist_err = _distance_at_healpix(
-        nonlocalized_event_name, target_id, max_time=max_time
-    )
-
-    # let user know about hard-coded bounds on luminosity distance array
-    warnings.warn(
-        f"Using hard-coded D_LIM_LOWER = {D_LIM_LOWER} and "
-        + f"D_LIM_UPPER = {D_LIM_UPPER} to construct log-spaced "
-        + "distance array for calculating distance probability "
-        + "distribution functions"
-    )
-
-    test_pdf = norm.pdf(lumdist_array, loc=dist, scale=dist_err)
-    return test_pdf
-
-
 def host_distance_match(
     host_df: pd.DataFrame,
     target_id: int,
     nonlocalized_event_name: str,
-    max_time: Time = Time.now(),
+    max_time: Time = None,
 ):
     """
-    Compute integrated joint probability (Bhattacharyya coefficient) of
-    putative host galaxies' distance distributions and nonlocalized event
-    distance distribution.
+    Compute the hybrid distance score of putative host galaxies' distance
+    distributions against the nonlocalized event distance distribution.
+
+    The score blends an analytic Bhattacharyya coefficient (for galaxies whose
+    distance uncertainty is comparable to or larger than the GW distance
+    uncertainty) with a top-hat style score (for galaxies whose distance is
+    much better constrained than the GW distance)
 
     Parameters
     ----------
@@ -154,41 +109,28 @@ def host_distance_match(
     Returns
     -------
     host_df : pd.DataFrame
-        Dataframe containing information on host galaxy, with added integrated
-        joint probability
+        Dataframe containing information on host galaxy, with added
+        hybrid_distance_score column
 
     """
-
     if not len(host_df):
-        host_df["dist_norm_joint_prob"] = []
+        host_df["hybrid_distance_score"] = []
         return host_df  # continue to return an empty dataframe here, but with the correct columns
 
-    # now crossmatch this distance to the host galaxy dataframe
-    _lumdist = np.linspace(D_LIM_LOWER, D_LIM_UPPER, int(10 * D_LIM_UPPER))
-
-    test_pdf = _get_nle_distance_pdf(
-        _lumdist, nonlocalized_event_name, target_id, max_time=max_time
+    nle_dist, nle_dist_err = _distance_at_healpix(
+        nonlocalized_event_name, target_id, max_time=max_time
     )
-    host_pdfs = np.array(
-        [
-            AsymmetricGaussian().pdf(
-                _lumdist,
-                mean=row.lumdist,
-                unc_minus=row.lumdist_neg_err,
-                unc_plus=row.lumdist_pos_err,
-                integ_a=1e-9,
-                integ_b=_lumdist[-1],
-            )
-            for _, row in host_df.iterrows()
-        ]
-    )
-    joint_prob = host_pdfs * test_pdf
 
-    # finally, compute the Bhattacharyya coefficient for the overlap of these
-    # two distributions. https://en.wikipedia.org/wiki/Bhattacharyya_distance
-    # This coefficient is non-parametric which is good for our Asymmetric Gaussian
-    # Original paper: http://www.jstor.org/stable/25047806
-    host_df["dist_norm_joint_prob"] = trapezoid(np.sqrt(joint_prob), x=_lumdist, axis=1)
+    host_df["hybrid_distance_score"] = [
+        hybrid_distance_score(
+            nle_dist,
+            row.lumdist,
+            nle_dist_err,
+            row.lumdist_neg_err,
+            row.lumdist_pos_err,
+        )
+        for _, row in host_df.iterrows()
+    ]
     return host_df
 
 
@@ -202,74 +144,74 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     # first check if this target has a measured redshift
     targ = Target.objects.get(id=target_id)
     if targ.redshift is not None and not np.isnan(targ.redshift):
-        _lumdist = np.linspace(D_LIM_LOWER, D_LIM_UPPER, int(10 * D_LIM_UPPER))
-        nle_pdf = _get_nle_distance_pdf(_lumdist, nonlocalized_event_name, target_id)
+        nle_dist, nle_dist_err = _distance_at_healpix(
+            nonlocalized_event_name, target_id
+        )
         targ_dist = cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
         targ_dist_err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
-        targ_pdf = norm.pdf(_lumdist, loc=targ_dist, scale=targ_dist_err)
-        return trapezoid(
-            np.sqrt(targ_pdf * nle_pdf), x=_lumdist
-        ), None  # None because there is no host name
+        targ_score = hybrid_distance_score(
+            nle_dist, targ_dist, nle_dist_err, targ_dist_err, targ_dist_err
+        )
+        # This should be done here and not in the hybrid_distance_score
+        # because if hybrid_distance_score gives a 1 for an unscorable host galaxy,
+        # then the .idxmax() would always prefer unscorable host galaxies to real scores,
+        # even if the real scores are very good
+        if np.isnan(targ_score):
+            targ_score = 1.0
+        return targ_score, None # None because there is no host name
 
-    # first, some cleanup
-    # this is already done in vet_bns, vet_kn_in_sn, and vet_super_kn,
-    # but we need to account for users calling this function for arbitrary
-    # host_df, target, and NLE without prior filtering on host_df
-    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
-        host_df = host_df[host_df.z != -99.0] # LS DR9 North; DELVE DR3
-        host_df = host_df[host_df.z != -999.0] # PS1-STRM
-        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z; DELVE DR3
-        host_df = host_df[~np.isnan(host_df.z)]
+    # callers may pass an unfiltered host_df, so clean it here too
+    host_df = clean_host_df(host_df)
 
     # then use the redshift of user-uploaded host galaxies
     userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
     userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(userz_distance_hosts):
-        max_score = userz_distance_hosts.dist_norm_joint_prob.max()
+    if userz_distance_hosts["hybrid_distance_score"].notna().any():
+        max_score = userz_distance_hosts.hybrid_distance_score.max()
         max_score_host_name = userz_distance_hosts.iloc[
-            userz_distance_hosts["dist_norm_joint_prob"].idxmax()
+            userz_distance_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
         max_score_host_catalog = userz_distance_hosts.iloc[
-            userz_distance_hosts["dist_norm_joint_prob"].idxmax()
+            userz_distance_hosts["hybrid_distance_score"].idxmax()
         ]["catalog"]
         return max_score, max_score_host_name, max_score_host_catalog
 
     # then use the redshift independent measurements of distances
     ind_distance_hosts = host_df[host_df.z_type == "z ind."]
     ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(ind_distance_hosts):
-        max_score = ind_distance_hosts.dist_norm_joint_prob.max()
+    if ind_distance_hosts["hybrid_distance_score"].notna().any():
+        max_score = ind_distance_hosts.hybrid_distance_score.max()
         max_score_host_name = ind_distance_hosts.iloc[
-            ind_distance_hosts["dist_norm_joint_prob"].idxmax()
+            ind_distance_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
         max_score_host_catalog = ind_distance_hosts.iloc[
-            ind_distance_hosts["dist_norm_joint_prob"].idxmax()
+            ind_distance_hosts["hybrid_distance_score"].idxmax()
         ]["catalog"]
         return max_score, max_score_host_name, max_score_host_catalog
 
     # then use the specz hosts
     specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
     specz_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(specz_hosts):
-        max_score = specz_hosts.dist_norm_joint_prob.max()
+    if specz_hosts["hybrid_distance_score"].notna().any():
+        max_score = specz_hosts.hybrid_distance_score.max()
         max_score_host_name = specz_hosts.iloc[
-            specz_hosts["dist_norm_joint_prob"].idxmax()
+            specz_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
         max_score_host_catalog = specz_hosts.iloc[
-            specz_hosts["dist_norm_joint_prob"].idxmax()
+            specz_hosts["hybrid_distance_score"].idxmax()
         ]["catalog"]
         return max_score, max_score_host_name, max_score_host_catalog
 
     # then if we don't know the spec-z or have an independent distance measure use the photo-z's
     photoz_hosts = host_df[host_df.z_type == "photo-z"]
     photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if len(photoz_hosts):
-        max_score = photoz_hosts.dist_norm_joint_prob.max()
+    if photoz_hosts["hybrid_distance_score"].notna().any():
+        max_score = photoz_hosts.hybrid_distance_score.max()
         max_score_host_name = photoz_hosts.iloc[
-            photoz_hosts["dist_norm_joint_prob"].idxmax()
+            photoz_hosts["hybrid_distance_score"].idxmax()
         ]["name"]
         max_score_host_catalog = photoz_hosts.iloc[
-            photoz_hosts["dist_norm_joint_prob"].idxmax()
+            photoz_hosts["hybrid_distance_score"].idxmax()
         ]["catalog"]
         return max_score, max_score_host_name, max_score_host_catalog
 
@@ -280,7 +222,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 def skymap_association(
     nonlocalized_event_name: str,
     target_id: int,
-    max_time=Time.now(),
+    max_time=None,
     prob: float = 0.95,
 ) -> float:
 
@@ -319,6 +261,40 @@ def skymap_association(
     return 1 - cumprob[0][0]
 
 
+def _host_used_for_distance_scoring(host_df, target_id, nonlocalized_event_name):
+    if not len(host_df) or "ID" not in host_df.columns:
+        return None
+    try:
+        nle = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
+        factors = dict(
+            ScoreFactor.objects.filter(
+                event_candidate__target_id=target_id,
+                event_candidate__nonlocalizedevent_id=nle.id,
+                key__in=["host_name", "host_catalog"],
+            ).values_list("key", "value")
+        )
+    except (NonLocalizedEvent.DoesNotExist, ValueError):
+        return None
+
+    host_name = factors.get("host_name")
+    if not host_name or host_name == "None":
+        return None
+
+    match = host_df[host_df["ID"].astype(str) == str(host_name)]
+    # IDs are only unique within a catalog, so disambiguate when we know it
+    catalog = factors.get("host_catalog")
+    if len(match) > 1 and catalog and "Source" in host_df.columns:
+        match = match[match["Source"].astype(str) == str(catalog)]
+    if len(match) != 1:
+        return None
+
+    row = match.iloc[0]
+    dist = pd.to_numeric(getattr(row, "Dist", None), errors="coerce")
+    if dist is None or not np.isfinite(dist) or dist <= 0:
+        return None
+    return row
+
+
 def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name: str):
 
     # first check if this target has a redshift associated with it
@@ -337,17 +313,18 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     )  # since we store the host info as a json str in the db
 
     # clean up dataframe
-    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
-        host_df = host_df[host_df.z != -99.0] # LS DR9 North
-        host_df = host_df[host_df.z != -999.0] # PS1-STRM
-        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
-        host_df = host_df[~np.isnan(host_df.z)]
+    host_df = clean_host_df(host_df)
 
     if not len(host_df):
         return _distance_at_healpix(nonlocalized_event_name, target_id)
 
-    # if we've gotten to this point then the target has host galaxies associated with it!
-    # first thing we need to do is assign a rank ordering to the various catalogs,
+    scored_host = _host_used_for_distance_scoring(
+        host_df, target_id, nonlocalized_event_name
+    )
+    if scored_host is not None:
+        return scored_host.Dist, scored_host.DistErr
+
+    # otherwise fall back to a rank ordering of the various catalogs,
     # this will help later
     host_df["_rank_order"] = host_df.Source.replace(GALAXY_CATALOG_RANKING)
     host_df = host_df.sort_values(by=["_rank_order", "PCC"])
@@ -355,9 +332,13 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     # because we already sorted the dataframe by our "preferred" catalogs, we can
     # just always take the distances from the first row and return them
     # start with user-provided host spec z's
-    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
-    ind_distance_hosts = host_df[host_df.z_type == "z ind."]
-    specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
+    if "z_type" in host_df.columns:
+        userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
+        ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+        specz_hosts = host_df[host_df.z_type.str.contains("spec-z", na=False)]
+    else:
+        _none = host_df.iloc[:0]
+        userz_distance_hosts = ind_distance_hosts = specz_hosts = _none
     if len(userz_distance_hosts):
         to_ret = userz_distance_hosts.iloc[0]
 
@@ -376,7 +357,7 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     return to_ret.Dist, to_ret.DistErr
 
 
-def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()):
+def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
     """Computes the GW distance at the target_id healpix location"""
 
     localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
@@ -394,26 +375,19 @@ def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()
     return dist, dist_err
 
 
-def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
-    """Find the most recenet LocalizationEvent object from the nonlocalized event name"""
-    # first find the localization to use
-    localization_queryset = NonLocalizedEvent.objects.filter(
-        event_id=nonlocalized_event_name
-    )[0]
+def _localization_from_name(nonlocalized_event_name, max_time=None):
+    """Most recent EventLocalization for this event, dated at or before max_time."""
+    if max_time is None:
+        max_time = Time.now()
 
     all_localizations = EventLocalization.objects.filter(
-        nonlocalizedevent_id=localization_queryset.id
+        nonlocalizedevent__event_id=nonlocalized_event_name
     )
-
-    all_localizations_sorted = sorted(all_localizations, key=lambda x: x.date)
-
-    # now choose the most recent localization
-    localization = all_localizations_sorted[0]
-    if len(all_localizations_sorted) > 1:
-        for loc in all_localizations_sorted[1:]:
-            curr_loc_time = Time(localization.date, format="datetime")
-            test_loc_time = Time(loc.date, format="datetime")
-            if test_loc_time > curr_loc_time and test_loc_time <= max_time:
-                localization = loc
-
-    return localization
+    localization = (
+        all_localizations
+        .filter(date__lte=max_time.to_datetime(timezone=timezone.utc))
+        .order_by("-date")
+        .first()
+    )
+    # nothing at or before max_time: fall back to the earliest
+    return localization or all_localizations.order_by("date").first()

@@ -22,6 +22,7 @@ dustmaps==1.0.14
 fitsio==1.3.0
 healpix-alchemy==1.1.0
 healpy==1.19.0
+kilonova_scorer @ git+https://github.com/phelipedarc/KilonovaSCORER.git@v0.1.0
 ligo.skymap==2.4.0
 lxml==6.0.2
 matplotlib==3.10.9
@@ -38,7 +39,7 @@ skypatrol==0.6.21
 slack_sdk==3.42.0
 specutils==1.20.3
 sphinx==9.0.4
-candidate_vetting @ git+https://github.com/astro-trove/candidate_vetting.git@v0.5.2
+candidate_vetting @ git+https://github.com/astro-trove/candidate_vetting.git@v0.5.3
 sphinx_book_theme==1.2.0
 sphinx_design==0.7.0
 SQLAlchemy==2.0.50
