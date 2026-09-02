@@ -89,6 +89,19 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
+def get_no_score_message(nonlocalizedevent_name):
+    try:
+        nle_eventseq = localization_sequence_from_name(nonlocalizedevent_name)
+        most_likely_class = get_most_likely_class(nle_eventseq.details)
+    except IndexError:
+        return None
+
+    if most_likely_class in {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}:
+        return None
+
+    return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}"
+
+
 def get_event_candidate_scores(
         event_candidates,
         dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
@@ -111,7 +124,6 @@ def get_event_candidate_scores(
     event_candidates_list = list(event_candidates)
 
     # which transient types to consider?
-    ### TODO: Right now, just does KN unless SSM; change this for BBH events
     try:
         nle_eventseq = localization_sequence_from_name(
             event_candidates_list[0].nonlocalizedevent.event_id
@@ -120,7 +132,7 @@ def get_event_candidate_scores(
     except IndexError:
         return []
     
-    if most_likely_class == "SSM":
+    if most_likely_class in {"SSM", "Terrestrial"}:
         transients = TRANSIENTS
     elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
         transients = ["KN"]
@@ -129,8 +141,8 @@ def get_event_candidate_scores(
     elif most_likely_class == "FXT":
         transients = ["KN", "SN", "TDE"] # SN and TDE are not yet implemented as a vetting mode
     else:
-        return []
-        
+        transients = []
+
 
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
@@ -232,9 +244,10 @@ def get_event_candidate_scores(
 
     print("Finished computing the scores, sorting and returning...", time.time())
 
-    # sort by kilonova score, for now
-    ## TODO: generalize this
-    return sorted(ecs_out, reverse=True, key=lambda x: x.score["KN"])
+    for key in TRANSIENTS:
+        if key in transients:
+            return sorted(ecs_out, reverse=True, key=lambda x: x.score.get(key, 0))
+    return ecs_out
 
 
 def get_target_score(target_id):

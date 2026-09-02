@@ -15,7 +15,7 @@ from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from scoring.models import ScoreFactor
-from scoring.util import get_event_candidate_scores
+from scoring.util import get_event_candidate_scores, get_no_score_message
 from tom_dataproducts.models import ReducedDatum
 from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
 
@@ -105,6 +105,12 @@ class EventCandidateListView(FilterView):
         nle_id = self.request.GET.get("nonlocalizedevent")
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
+
+        context["no_score_message"] = None
+        if nle_id:
+            nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
+            if nle:
+                context["no_score_message"] = get_no_score_message(nle.event_id)
 
         return context
 
