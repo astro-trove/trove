@@ -31,6 +31,9 @@
     </div>
    {% endif %}
     </br>
+  {% if no_score_message %}
+    <div class="alert alert-info">{{ no_score_message }}</div>
+  {% endif %}
   {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     <table class="table table-sm table-hover">
       <thead>

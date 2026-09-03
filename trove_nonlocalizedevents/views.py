@@ -20,6 +20,7 @@ from scoring.models import ScoreFactor
 from scoring.util import (
     get_event_candidate_scores,
     get_last_vet_all_run,
+    get_no_score_message,
     get_vet_all_progress,
 )
 from scoring.phot_method import (
@@ -165,6 +166,12 @@ class EventCandidateListView(FilterView):
 
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
+
+        context["no_score_message"] = None
+        if nle_id:
+            nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
+            if nle:
+                context["no_score_message"] = get_no_score_message(nle.event_id)
 
         return context
 
