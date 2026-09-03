@@ -10,7 +10,7 @@ Frequently Asked Questions (FAQ)
     
 .. dropdown:: What does TROVE do which other tools do not?
 
-    ...
+    Coming soon!
 
 
 Glossary of Frequently Used Terms
@@ -32,13 +32,17 @@ Glossary of Frequently Used Terms
     
     **candidate**: Sometimes used as shorthand for event candidate.
     
+    **event**: Sometimes used as shorthand for *nonlocalized (poorly localized) event*.
+
     **event candidate**: A *target* which has been associated with a *nonlocalized event (NLE)*.
     A candidate electromagnetic counterpart to said NLE.
     
-    **forced photometry**:
+    **forced photometry**: Count the flux coming from pixels within some circle at specified coordinates. One of the main ways astronomers measure how bright something is. Can be used to indicate that something is *not* detected to some significance.
     
     **FXT**: Fast X-ray transient
     
+    **GCN**: General Coordinates Network. A server for sending out notices of interesting astrophysical phenomena, broadly used in the time-domain astronomy community.
+
     **GRB**: Gamma-ray burst
     
     **GW**: Gravitational wave
@@ -51,7 +55,7 @@ Glossary of Frequently Used Terms
     Hypothesized electromagnetic counterpart to *SSM* events. Sometimes used 
     interchangably with *super-kilonova*.
     
-    **neutrino**:
+    **neutrino**: Elementary particle (lepton) with no charge, which interacts via the weak force. Produced in a variety of scenarios, such as a fusion in the core of the Sun or in supernovae. Thought to be a signal in some multi-messenger events.
     
     **NLE**: Nonlocalized event. A nonlocalized event (NLE)—sometimes more aptly termed a poorly 
     localized event—is some astrophysical source with an uncertain position on the sky. These can be 
@@ -62,6 +66,8 @@ Glossary of Frequently Used Terms
     
     **SSM**: Subsolar mass merger; merger involving at least one object subsolar in mass
     
+    **supernova**: Explosive death of a star, either from thermonuclear detonation or the collapse of a massive star.
+
     **super-kilonova (super-KN)**: Longer-lasting, "scaled up" *kilonova* 
     hypothesized to occur following the collapse of extremely massive (helium core in excess of 100 solar masses), 
     rapidly-rotating stars. Sometimes used interchangably with *kilonova-in-supernova*. 
