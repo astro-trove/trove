@@ -132,7 +132,10 @@ def display_score_details(context, target_id):
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
-        agn_score=("AGN Score (0.1 or 1.0)", partial(_float_format, precision=1)),
+        agn_score=("AGN Association Score", partial(_float_format, precision=1)),
+        host_nuclear_score=("Host Nuclear Offset Score", partial(_float_format, precision=2)),
+        agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
+        flare_shape_score=("Flare Shape Score", partial(_float_format, precision=2)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",

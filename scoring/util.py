@@ -67,6 +67,7 @@ SUBSCORE_NAMES = [
     "phot_decay_rate",
     "host_nuclear_score",
     "agn_flare_score",
+    "flare_shape_score",
 ]
 
 # some of the keys in ScoreFactor are really just calculated values
@@ -114,7 +115,7 @@ def get_no_score_message(nonlocalizedevent_name):
     except IndexError:
         return None
 
-    if most_likely_class in {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}:
+    if most_likely_class in {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT", "BBH"}:
         return None
 
     return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."

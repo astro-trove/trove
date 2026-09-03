@@ -8,16 +8,17 @@ import pandas as pd
 import pytest
 
 
-def _phot_df(mag, magerr, filt, upperlimit=None):
+def _phot_df(mag, magerr, filt, upperlimit=None, dt=None):
     n = len(mag)
-    return pd.DataFrame(
-        dict(
-            mag=mag,
-            magerr=magerr,
-            filter=filt,
-            upperlimit=[False] * n if upperlimit is None else upperlimit,
-        )
+    d = dict(
+        mag=mag,
+        magerr=magerr,
+        filter=filt,
+        upperlimit=[False] * n if upperlimit is None else upperlimit,
     )
+    if dt is not None:
+        d["dt"] = dt
+    return pd.DataFrame(d)
 
 
 class TestClamp:
@@ -147,3 +148,169 @@ class TestDetectFlare:
         postphot = _phot_df([18.02], [0.05], ["r"])
         sig, row = detect_flare(postphot, baseline, sigma_thresh=5.0)
         assert sig < 5.0
+
+
+class TestNuclearOffsetScore:
+    def test_zero_offset_gives_full_score(self):
+        from scoring.vet_bbh import nuclear_offset_score
+
+        assert nuclear_offset_score(0.0, 0.5) == pytest.approx(1.0)
+
+    def test_offset_equal_to_scale_gives_half_score(self):
+        from scoring.vet_bbh import nuclear_offset_score
+
+        assert nuclear_offset_score(0.5, 0.5) == pytest.approx(0.5)
+
+    def test_large_offset_floors_at_phot_score_min(self):
+        from scoring.vet_bbh import nuclear_offset_score
+        from scoring.vet_phot import PHOT_SCORE_MIN
+
+        assert nuclear_offset_score(1000.0, 0.5) == pytest.approx(PHOT_SCORE_MIN)
+
+    def test_monotonically_decreasing_with_offset(self):
+        from scoring.vet_bbh import nuclear_offset_score
+
+        offsets = [0.0, 0.1, 0.5, 1.0, 2.0, 5.0]
+        scores = [nuclear_offset_score(o, 0.5) for o in offsets]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_negative_offset_treated_as_zero(self):
+        from scoring.vet_bbh import nuclear_offset_score
+
+        assert nuclear_offset_score(-0.1, 0.5) == pytest.approx(1.0)
+
+
+class TestFlareConfidenceScore:
+    def test_zero_significance_near_floor(self):
+        from scoring.vet_bbh import flare_confidence_score
+        from scoring.vet_phot import PHOT_SCORE_MIN
+
+        score = flare_confidence_score(0.0, thresh=5.0, floor=PHOT_SCORE_MIN)
+        assert score == pytest.approx(PHOT_SCORE_MIN, abs=0.05)
+
+    def test_at_threshold_score_is_high_but_not_capped(self):
+        from scoring.vet_bbh import flare_confidence_score
+
+        score = flare_confidence_score(5.0, thresh=5.0)
+        assert 0.8 < score < 1.0
+
+    def test_well_above_threshold_saturates_near_one(self):
+        from scoring.vet_bbh import flare_confidence_score
+
+        score = flare_confidence_score(20.0, thresh=5.0)
+        assert score == pytest.approx(1.0, abs=1e-3)
+
+    def test_well_below_zero_floors(self):
+        from scoring.vet_bbh import flare_confidence_score
+        from scoring.vet_phot import PHOT_SCORE_MIN
+
+        score = flare_confidence_score(-5.0, thresh=5.0, floor=PHOT_SCORE_MIN)
+        assert score == pytest.approx(PHOT_SCORE_MIN, abs=1e-3)
+
+    def test_monotonically_increasing_with_significance(self):
+        from scoring.vet_bbh import flare_confidence_score
+
+        sigs = [-5, 0, 2.5, 5, 10, 20]
+        scores = [flare_confidence_score(s, thresh=5.0) for s in sigs]
+        assert scores == sorted(scores)
+
+
+class TestEstimateFlareExtent:
+    def test_no_baseline_returns_none_none(self):
+        from scoring.vet_bbh import estimate_flare_extent
+
+        postphot = _phot_df([17.0], [0.05], ["r"], dt=[30.0])
+        delay, duration = estimate_flare_extent(postphot, {})
+        assert delay is None
+        assert duration is None
+
+    def test_single_significant_point_gives_delay_no_duration(self):
+        from scoring.vet_bbh import estimate_flare_extent
+
+        baseline = {"r": dict(mag=18.0, std=0.05, n=10)}
+        postphot = _phot_df([16.0], [0.05], ["r"], dt=[42.0])
+        delay, duration = estimate_flare_extent(postphot, baseline)
+        assert delay == pytest.approx(42.0)
+        assert duration is None
+
+    def test_two_significant_points_bracket_duration(self):
+        from scoring.vet_bbh import estimate_flare_extent
+
+        baseline = {"r": dict(mag=18.0, std=0.05, n=10)}
+        # both well above the default extent_sigma_thresh=3.0; the second (dt=60) is
+        # also the most significant, so it should be reported as the delay
+        postphot = _phot_df(
+            [17.0, 16.0], [0.05, 0.05], ["r", "r"], dt=[30.0, 60.0]
+        )
+        delay, duration = estimate_flare_extent(postphot, baseline)
+        assert delay == pytest.approx(60.0)
+        assert duration == pytest.approx(30.0)
+
+    def test_insignificant_points_dont_count_toward_duration(self):
+        from scoring.vet_bbh import estimate_flare_extent
+
+        baseline = {"r": dict(mag=18.0, std=0.05, n=10)}
+        # one clearly significant point (dt=50) and one consistent-with-baseline
+        # point (dt=10) that shouldn't count toward the elevated-episode span
+        postphot = _phot_df(
+            [16.0, 18.01], [0.05, 0.05], ["r", "r"], dt=[50.0, 10.0]
+        )
+        delay, duration = estimate_flare_extent(postphot, baseline)
+        assert delay == pytest.approx(50.0)
+        assert duration is None
+
+
+class TestBoxEdgeScore:
+    def test_inside_box_is_full_score(self):
+        from scoring.vet_bbh import _box_edge_score
+
+        assert _box_edge_score(50.0, 0.0, 100.0, 100.0, 0.1) == 1.0
+
+    def test_at_edges_is_full_score(self):
+        from scoring.vet_bbh import _box_edge_score
+
+        assert _box_edge_score(0.0, 0.0, 100.0, 100.0, 0.1) == 1.0
+        assert _box_edge_score(100.0, 0.0, 100.0, 100.0, 0.1) == 1.0
+
+    def test_far_outside_box_floors(self):
+        from scoring.vet_bbh import _box_edge_score
+
+        assert _box_edge_score(10000.0, 0.0, 100.0, 100.0, 0.1) == pytest.approx(0.1, abs=1e-3)
+
+    def test_monotonically_decreasing_away_from_box(self):
+        from scoring.vet_bbh import _box_edge_score
+
+        xs = [100.0, 150.0, 200.0, 500.0]
+        scores = [_box_edge_score(x, 0.0, 100.0, 100.0, 0.1) for x in xs]
+        assert scores == sorted(scores, reverse=True)
+
+
+class TestFlareShapeScore:
+    def test_delay_and_duration_inside_a_model_scores_high(self):
+        from scoring.vet_bbh import flare_shape_score
+
+        # inside jrr_i's (50-150, 20-150) box
+        assert flare_shape_score(80.0, 60.0) == pytest.approx(1.0)
+
+    def test_delay_only_still_checked_against_delay_range(self):
+        from scoring.vet_bbh import flare_shape_score
+
+        # duration unconstrained (None); delay=80 still inside multiple models'
+        # delay ranges, so shouldn't be penalized for the missing duration
+        assert flare_shape_score(80.0, None) == pytest.approx(1.0)
+
+    def test_delay_far_outside_all_models_floors(self):
+        from scoring.vet_bbh import flare_shape_score
+        from scoring.vet_phot import PHOT_SCORE_MIN
+
+        score = flare_shape_score(1e6, None)
+        assert score == pytest.approx(PHOT_SCORE_MIN, abs=1e-3)
+
+    def test_best_matching_model_wins(self):
+        from scoring.vet_bbh import flare_shape_score
+
+        # delay=10 is outside jrr_i's (50-150) range but inside mck19's and
+        # tgw24's (0-300) ranges -- should still score well via those, not be
+        # dragged down by jrr_i
+        score = flare_shape_score(10.0, None)
+        assert score == pytest.approx(1.0)

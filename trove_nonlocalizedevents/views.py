@@ -242,7 +242,7 @@ We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational w
 
 Below, we report the top {ncands} candidates that remain viable after running our vetting procedure using publicly available information on all publicly reported sources, to date, on the Transient Name Server (TNS).  We include their TNS identifier, instrument with earliest detection, coordinates, cumulative probability at the coordinate location in the latest LVK map, most likely host redshift, joint GW luminosity distance and candidate redshift probability, most recent magnitude, epoch of that most recent magnitude, TROVE KN score. Candidates are ranked using a scoring procedure designed to identify kilonova counterparts to GW events (N. Franz, et al., 2025, arXiv:2510.17104). The reported candidates are not clearly identified as kilonovae.
 
-| Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most Likely Host-z | Joint Distance Probability | Most Recent Mag | Most Recent Mag Time [MJD] | TROVE KN Score |
+| Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most Likely Host-z | Joint Distance Probability | Most Recent Mag | Most Recent Mag Time [MJD] | TROVE Score |
 | :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
 
     subscore_keys_to_report = ["skymap_score", "host_distance_score"]
@@ -343,10 +343,13 @@ Below, we report the top {ncands} candidates that remain viable after running ou
         else:
             phot_str_latest = None
             epoch_str_latest = None
-        # TODO: Currently we are defaulting to reporting the KN score, this should
-        #       probably be fixed once we support BBH vetting!
+        # report whichever transient type this candidate scored best as -- for KN
+        # events that's (typically) "KN", but a BBH event's ec.score only ever has
+        # an "AGN-flare" key (see scoring/util.py's most_likely_class branching), so
+        # a hardcoded ec.score["KN"] would KeyError for every BBH candidate
+        best_score = max(ec.score.values()) if ec.score else float("nan")
         lines.append(
-            f"| {t.name} | {src_str_first} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest} | {epoch_str_latest} | {float(ec.score['KN']):.2f} |"
+            f"| {t.name} | {src_str_first} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest} | {epoch_str_latest} | {best_score:.2f} |"
         )
 
     lines.append(
