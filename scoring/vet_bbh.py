@@ -1,141 +1,3 @@
-"""
-The "pipeline" to vet candidate counterparts to nonlocalized BBH events based on
-their resemblance to an AGN flare: a brightening of a pre-existing, persistently
-variable AGN rather than a fresh transient.
-
-Reuses the skymap / host / AGN-catalog / distance scoring machinery from the KN-style
-vetters (see vet_bns.py) as-is. Most of that reused machinery, plus `agn_score` and the
-short-delay/long-delay flare-timescale split behind `t_post`, is not a new design here
--- it is this same collaboration's own published methodology, Vieira et al. 2026 (the
-S251112cm follow-up paper, arXiv:2603.17009), Appendix A "Vetting for BBH
-Merger-Induced AGN Flaring" and Section 4.1. What *is* new relative to that paper:
-
-1. `agn_score` reproduces Vieira+2026's S_AGN exactly: a Milliquas (Flesch 2023) match
-   within 2" is supporting evidence when vetting for AGN-flares (it can only help, not
-   disqualify, since a *missing* match may just mean that AGN hasn't been ingested
-   yet) -- inverted from S_AGN for KNe/KN-in-SNe/super-KNe, where an AGN match instead
-   disqualifies the candidate. Vieira+2026 uses a hard 0/1 S_AGN; the x5
-   `agn_boost_multiplier` used here instead of a flat 1.0 is TROVE's own choice, not
-   from the paper.
-2. `host_nuclear_score`: how close the candidate sits to its best-matched host's
-   nucleus, scored continuously via `nuclear_offset_score` (a smooth score/(scale+
-   offset) falloff, no plateau/hard-cut) rather than Vieira+2026's binary "<2 arcsec"
-   S_AGN gate. The half-credit scale stays anchored at Vieira+2026's own 2" (~1 kpc at
-   their ~93 Mpc event), for a reason that took a second literature pass to get right:
-   the *true* physical offset of a BBH-induced AGN flare from the SMBH is far below
-   arcsec resolution at any realistic GW host distance, so there's no case for
-   tightening past 2" -- see the note on `nuclear_offset_scale` below.
-3. `agn_flare_score`: the photometric anomaly-detection piece. Vieira+2026 explicitly
-   did *not* build this -- "it is challenging to impose robust constraints on the
-   luminosities and timescales of BBH-induced AGN flares" (Appendix A), and their one
-   AGN-associated candidate with S_AGN-flare > 0 (S251112cm X3) used an unconstrained
-   S_phot,AGN-flare = 1 (i.e. photometry wasn't actually scored: 0.62 x 0.21 x 1 x 1 x
-   1 = 0.13, matching their reported score). This module's `fit_agn_baseline`/
-   `detect_flare`/`flare_confidence_score` is TROVE's attempt to actually fill that
-   gap: model-agnostic, since no AGN intrinsic-variability model (DRW, CARMA, PSD,
-   etc.) has been fit here -- it just characterizes the empirical pre-merger scatter
-   per filter (robust median + MAD) and scores a *brightening* excursion above that
-   envelope within the post-merger window continuously via a normal-CDF sigmoid in
-   significance, rather than a hard pass/fail at 5-sigma. Distinguishing a genuine BBH
-   flare from ordinary AGN variability from photometry alone is still an open problem
-   -- spectroscopy (asymmetric broadening of emission lines) is the actual
-   literature-endorsed discriminant, which is out of scope for TROVE's automated
-   pipeline.
-4. `flare_shape_score` (NOT model-agnostic, excluded from the default score): goes one step past "is there an
-   excursion" (`agn_flare_score`) to "is its *timing* consistent with a real
-   BBH-flare mechanism". Positional offset from the nucleus turned out not to be a
-   usable photometric-independent discriminant (point 2 above) since the true offset
-   is unresolvable, so this leans on photometry instead, per Darc et al. 2025 (PhRvD
-   112, 063019 -- the same paper behind the short-delay/long-delay split in `t_post`,
-   which actually fits three physical emission-mechanism models against real
-   long-term photometry of a GW/AGN-flare candidate, S231206cc): McKernan et al. 2019
-   (ram-pressure-stripped Hill sphere), Rodriguez-Ramirez et al. 2025 (jet-cocoon
-   emergence), and Tagawa et al. 2024 (jet breakout + shock cooling).
-
-   Unlike `agn_flare_score`, this is explicitly *not* model-agnostic, and it's worth
-   being precise about why: it only scores a candidate well if its (delay, duration)
-   falls near the envelope one of these three *specific* papers happened to predict
-   from *their own* chosen parameter grids (particular kick-velocity ranges,
-   particular SMBH-mass ranges). A real flare from a mechanism outside these three,
-   or from parameters outside what these authors explored, would be penalized here
-   even though `agn_flare_score` wouldn't care. (Even Darc+2025's own method is a
-   hybrid, not purely agnostic: a model-agnostic ~10-20% flux-amplitude gate,
-   methodologically close to this module's MAD-based `agn_flare_score`, followed by
-   model-specific timing checks -- so "adopt Darc+2025's method" and "stay
-   model-agnostic" are in tension, not the same thing.) Because of that, this factor
-   is always computed and stored (it's cheap -- no external calls), but kept out of
-   the default score product: `scoring/util.get_event_candidate_scores`'
-   `flare_shape_toggle` (default False) decides at *read* time whether it's
-   included, exactly the way `agn_toggle` decides whether `agn_score` is -- not a
-   vet-time flag here, so a user can flip it live from the BBH scoring-adjustments
-   panel without triggering a re-vet. See `flare_shape_score`'s docstring for the
-   exact bounds and their provenance.
-
-   Caveat found by validating against realistic TROVE-grade photometry (sparse
-   ATLAS-forced-photometry-like cadence/depth, not ZTF-partnership-grade data --
-   see the validation script referenced in the PR/commit this was added in): two of
-   the three models' delay windows (mck19, tgw24) span the *entire* 0-300 day
-   post-merger range, so `flare_shape_score` returns ~1.0 for essentially any
-   post-merger detection, real excursion or pure noise, once a delay/duration can be
-   estimated at all. It has little power to reject noise on its own; its practical
-   value is as a secondary "which mechanism, if any, is favored" annotation on top
-   of `agn_flare_score` (which does carry real discriminating power -- see that
-   validation), not as an independent gate.
-
-`nuclear_offset_scale` (2.0"): kept at Vieira+2026's own S_AGN radius rather than
-tightened to the sub-arcsec nuclear-vs-off-nuclear boundaries used in local SN/AGN
-morphological classification (e.g. Sanders et al. 2015, PS1-MDS, arXiv:1501.01314,
-~0.26"/~0.48" nuclear/off-nuclear populations with a ~0.54" dividing line). That
-literature answers a different question -- resolved host morphology in nearby,
-well-sampled surveys -- than what actually matters here: how far from the SMBH can a
-BBH-induced flare *physically* occur? McKernan et al. 2019 (ApJL 884, L50,
-doi:10.3847/2041-8213/ab4886)'s ram-pressure-stripped-Hill-sphere channel puts the
-off-center flare at ~1e3 gravitational radii, which for a 1e6-1e8 Msun SMBH is order
-10-1e3 AU -- and Rodriguez-Ramirez et al. 2025 (PhRvD 111, 083020,
-doi:10.1103/PhysRevD.111.083020)'s disk-wind/kick-angle model likewise displaces the
-remnant by a small fraction of the local disk scale height before jet formation. Both
-are many orders of magnitude below the ~kpc scale that 1" subtends at any plausible GW
-host distance (tens-hundreds of Mpc), so no currently modeled BBH-flare mechanism
-predicts an offset that arcsec-scale astrometry could actually resolve as
-"off-nucleus". A resolved offset therefore argues *against* nuclear origin rather than
-being a fine discriminator near zero, and there's no theoretical support for scoring
-sub-arcsec offsets any differently from offset=0; 2" (matching `agn_score`'s own
-radius) stays a generously-inclusive, not overly tight, envelope.
-
-`t_post` (400 days): Vieira+2026 (Appendix A) cites Darc et al. 2025 (PhRvD 112,
-063019, doi:10.1103/6rg8-2xxz) for a two-population classification of BBH-AGN flares
-by delay time -- "short-delay flares are expected to occur within <~50 days of the
-merger and are typically associated with relatively short durations. In contrast,
-long-delay flares can peak between ~50 and ~400 days, and last longer." 400 days is
-therefore the literature-motivated upper edge of the long-delay population, not an
-arbitrary wide net: it's sized to catch both the fast "kicked remnant punches through
-the disk" channel (days-to-weeks; Kimura et al. 2021, ApJ 916, 111,
-doi:10.3847/1538-4357/ac0535; McKernan et al. 2019 above; the O3 ZTF systematic
-search of Graham et al. 2023, ApJ 942, 99, doi:10.3847/1538-4357/aca480, used a
-tighter <=60 day window for exactly this short-delay population) and the slower
-disk-response/viscous-afterglow channel (Rodriguez-Ramirez et al. 2023, MNRAS 527,
-6076, doi:10.1093/mnras/stad3575; Tagawa et al. 2024, ApJ 966, 21,
-doi:10.3847/1538-4357/ad2e0b; Rodriguez-Ramirez et al. 2025 above -- their disk-wind
-parameter study finds peak times of ~10-80 days for v_k = 200-400 km/s,
-M_SMBH = 1e6-1e7 Msun). The tradeoff is that the longer window also gives ordinary AGN
-variability more time to produce a false positive in `agn_flare_score`; that's an
-open recall-vs-precision question, not one the literature settles further.
-
-References
-----------
-Darc et al. 2025, PhRvD 112, 063019, doi:10.1103/6rg8-2xxz
-Graham et al. 2020, PhRvL 124, 251102, doi:10.1103/PhysRevLett.124.251102
-Graham et al. 2023, ApJ 942, 99, doi:10.3847/1538-4357/aca480
-Kimura, Murase & Bartos 2021, ApJ 916, 111, doi:10.3847/1538-4357/ac0535
-McKernan et al. 2019, ApJL 884, L50, doi:10.3847/2041-8213/ab4886
-Rodriguez-Ramirez et al. 2023, MNRAS 527, 6076, doi:10.1093/mnras/stad3575
-Rodriguez-Ramirez, Nemmen & Bom 2025, PhRvD 111, 083020, doi:10.1103/PhysRevD.111.083020
-Sanders et al. 2015 (PS1-MDS), arXiv:1501.01314
-Tagawa et al. 2024, ApJ 966, 21, doi:10.3847/1538-4357/ad2e0b
-Vieira et al. 2026, arXiv:2603.17009 ("Search For a Counterpart to the Subsolar Mass
-    Gravitational Wave Candidate S251112cm" -- this collaboration's own paper)
-"""
-
 import logging
 from typing import Optional
 from astropy.time import Time, TimeDelta
@@ -175,45 +37,20 @@ PARAM_RANGES = dict(
     # of the "long-delay" flare population of Darc et al. 2025 (PhRvD 112, 063019),
     # as reported in Vieira et al. 2026 (arXiv:2603.17009) Appendix A; see module
     # docstring for the short-delay (<=~50 day) vs. long-delay (~50-400 day) split
-    min_baseline_pts=5,  # minimum pre-trigger points in a filter to trust its baseline
+    min_baseline_pts=1,  # minimum pre-trigger points in a filter to compute a
+    # baseline at all. Deliberately not raised to demand a "robust" baseline (e.g.
+    # 5+): TROVE photometry is often sparse, and KN scoring already commits to
+    # giving a reasonable score off as little as 1-2 points rather than refusing
+    # to score at all -- see fit_agn_baseline's docstring for how the same
+    # median+MAD formula degrades gracefully down to n=1 without a separate
+    # code path for "not enough points."
     flare_sigma_thresh=5.0,  # reference significance for "confident flare" in
     # flare_confidence_score, matches PREDETECTION_SNR_THRESHOLD's 5-sigma
     # convention elsewhere in vet_phot.py
     flare_score_center_frac=0.5,  # sigmoid midpoint, as a fraction of flare_sigma_thresh
     flare_score_width_frac=0.25,  # sigmoid transition width, as a fraction of flare_sigma_thresh
-    nuclear_offset_scale=2.0 * u.arcsec,  # half-credit offset in nuclear_offset_score;
-    # matches agn_score's own Milliquas match radius (Vieira et al. 2026 Section 4.1,
-    # ~1 kpc at their ~93 Mpc event) -- see module docstring for why this is *not*
-    # tightened further despite sub-arcsec thresholds appearing elsewhere in the
-    # nuclear-transient literature
     agn_boost_multiplier=5.0,
 )
-
-
-def _clamp(x: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, x))
-
-
-def nuclear_offset_score(offset: float, scale: float, floor: float = PHOT_SCORE_MIN) -> float:
-    """
-    Continuously graded "is this candidate at its host's nucleus" score.
-
-    score = scale / (scale + offset): 1.0 at offset=0, 0.5 at offset=scale, falling
-    off smoothly (no plateau, no hard cut) and floored at `floor` for very large
-    offsets. See the module docstring for how `scale` (nuclear_offset_scale) was
-    chosen from the literature.
-
-    Parameters
-    ----------
-    offset : float
-        Angular offset from the candidate to its best-matched host, in arcsec.
-        Negative values (shouldn't occur, but not worth erroring over) are treated
-        as zero.
-    scale : float
-        The half-credit offset, in arcsec.
-    """
-    offset = max(offset, 0.0)
-    return _clamp(scale / (scale + offset), floor, 1.0)
 
 
 def flare_confidence_score(
@@ -237,10 +74,10 @@ def flare_confidence_score(
     center = center_frac * thresh
     width = max(width_frac * thresh, 1e-6)
     raw = norm.cdf(significance, loc=center, scale=width)
-    return _clamp(floor + (1.0 - floor) * raw, floor, 1.0)
+    return float(np.clip(floor + (1.0 - floor) * raw, floor, 1.0))
 
 
-def fit_agn_baseline(prephot: Optional[pd.DataFrame], min_baseline_pts: int = 5) -> dict:
+def fit_agn_baseline(prephot: Optional[pd.DataFrame], min_baseline_pts: int = 1) -> dict:
     """
     Characterize the pre-merger "typical variability envelope" of the candidate host
     AGN, per filter, without assuming any particular variability model.
@@ -251,19 +88,35 @@ def fit_agn_baseline(prephot: Optional[pd.DataFrame], min_baseline_pts: int = 5)
     etc.), only how much it has historically varied, which is all that's needed to
     flag a later excursion as unusual.
 
+    Degrades gracefully with sparse photometry rather than refusing to score, the
+    same choice TROVE's KN scoring already makes (a kilonova can be scored off a
+    single detection): with few points the MAD estimate itself shrinks toward 0
+    (at n=1 it's exactly 0, at n=2 both points are equidistant from their median so
+    it's still 0), but it's floored at the median measurement error a few lines
+    below, so the "baseline" for a thinly-sampled filter is effectively just its
+    most recent pre-merger point plus its own reported uncertainty -- a plain
+    two-point brightening comparison, not a claim of having characterized the AGN's
+    long-term variability. `min_baseline_pts` exists to cut this off entirely (0
+    points = no baseline for that filter at all), not to gate "how many points
+    until this is trustworthy" -- there's no such threshold built into the formula
+    itself, only progressively wider uncertainty as points get scarcer.
+
     Parameters
     ----------
     prephot : pd.DataFrame or None
         Pre-merger photometry, as returned by `vet_phot._get_pre_disc_phot`. Expected
         columns: mag, magerr, filter, upperlimit.
     min_baseline_pts : int
-        Minimum number of detections required in a filter before its baseline is
-        considered trustworthy.
+        Minimum number of detections required in a filter before it gets a baseline
+        entry at all. Low by default (see module docstring) -- this is a floor
+        against zero data, not a robustness gate.
 
     Returns
     -------
-    dict mapping filter -> dict(mag=<median mag>, std=<robust scatter>, n=<n points>)
-    Filters with too few points are simply absent from the returned dict.
+    dict mapping filter -> dict(mag=<median mag>, std=<robust scatter, floored at
+    measurement error>, n=<n points>)
+    Filters with fewer than `min_baseline_pts` points are simply absent from the
+    returned dict.
     """
     baseline = {}
     if prephot is None or not len(prephot):
@@ -419,7 +272,47 @@ def _box_edge_score(x: float, lo: float, hi: float, margin: float, floor: float)
     if lo <= x <= hi:
         return 1.0
     excess = (lo - x) if x < lo else (x - hi)
-    return _clamp(margin / (margin + excess), floor, 1.0)
+    return float(np.clip(margin / (margin + excess), floor, 1.0))
+
+
+def flare_shape_scores_by_model(
+    delay_days: float,
+    duration_days: Optional[float],
+    models: dict = FLARE_SHAPE_MODELS,
+    floor: float = PHOT_SCORE_MIN,
+) -> dict:
+    """
+    Score how consistent an observed flare's timing is with *each* published
+    BBH-in-AGN-disk emission model in `models` individually, rather than
+    collapsing straight to a single aggregate -- TROVE has no way to know a
+    priori which mechanism (if any) applies to a given candidate, since that
+    depends on kick velocity, SMBH mass, and merger location within the disk, so
+    the per-model breakdown is worth keeping around to see (e.g. on the
+    candidate page) which specific published picture, if any, a candidate
+    actually resembles.
+
+    Each model's fit is `delay_score * duration_score`, each of which is 1.0 inside
+    that model's envelope and falls off smoothly (not a hard cut) outside it, via
+    `_box_edge_score` with the box's own width as the falloff scale.
+
+    `duration_days` may be None (too little post-merger photometry above the
+    extent-detection threshold in `estimate_flare_extent` to bracket a span) -- in
+    that case only delay is checked, since a single data point can't rule a model's
+    duration range in or out.
+
+    Returns
+    -------
+    dict mapping model name (e.g. "mck19") -> score.
+    """
+    scores = {}
+    for name, model in models.items():
+        delay_lo, delay_hi = model["delay"]
+        score = _box_edge_score(delay_days, delay_lo, delay_hi, delay_hi - delay_lo, floor)
+        if duration_days is not None:
+            dur_lo, dur_hi = model["duration"]
+            score *= _box_edge_score(duration_days, dur_lo, dur_hi, dur_hi - dur_lo, floor)
+        scores[name] = score
+    return scores
 
 
 def flare_shape_score(
@@ -431,29 +324,11 @@ def flare_shape_score(
     """
     Score how consistent an observed flare's timing is with *any one* of the
     published BBH-in-AGN-disk emission models in `models`, rather than a single
-    one-size-fits-all cut -- TROVE has no way to know a priori which mechanism (if
-    any) applies to a given candidate, since that depends on kick velocity, SMBH
-    mass, and merger location within the disk. Takes the best-fitting model's score,
-    not a penalized combination across all three.
-
-    Each model's fit is `delay_score * duration_score`, each of which is 1.0 inside
-    that model's envelope and falls off smoothly (not a hard cut) outside it, via
-    `_box_edge_score` with the box's own width as the falloff scale.
-
-    `duration_days` may be None (too little post-merger photometry above the
-    extent-detection threshold in `estimate_flare_extent` to bracket a span) -- in
-    that case only delay is checked, since a single data point can't rule a model's
-    duration range in or out.
+    one-size-fits-all cut. Takes the best-fitting model's score (see
+    `flare_shape_scores_by_model`), not a penalized combination across all three.
     """
-    best = floor
-    for model in models.values():
-        delay_lo, delay_hi = model["delay"]
-        score = _box_edge_score(delay_days, delay_lo, delay_hi, delay_hi - delay_lo, floor)
-        if duration_days is not None:
-            dur_lo, dur_hi = model["duration"]
-            score *= _box_edge_score(duration_days, dur_lo, dur_hi, dur_hi - dur_lo, floor)
-        best = max(best, score)
-    return best
+    scores = flare_shape_scores_by_model(delay_days, duration_days, models, floor)
+    return max(scores.values(), default=floor)
 
 
 def vet_bbh(
@@ -469,16 +344,6 @@ def vet_bbh(
         nonlocalizedevent_id=nonlocalized_event.id, target_id=target_id
     )
     target = Target.objects.get(id=target_id)
-
-    # vet_bbh never writes these -- they're KN/KN-in-SN/super-KN-specific factors.
-    # A candidate can carry them from an earlier vetting pass, e.g. from before its
-    # event was (re)classified as BBH. AGN-flare's PARAM_RANGES has no lum_max/
-    # peak_time/decay_rate bounds to check them against, so a leftover row here
-    # crashes scoring/util.py's get_event_candidate_scores with a KeyError for
-    # every candidate in that call, not just this one -- clear them out on every
-    # BBH vetting pass so they can't linger.
-    for stale_key in ("phot_peak_lum", "phot_peak_time", "phot_decay_rate"):
-        delete_score_factor(event_candidate, stale_key)
 
     ## check skymap association
     if np.isfinite(param_ranges["t_post"]):
@@ -508,22 +373,6 @@ def vet_bbh(
         # PS or MPC association already zeroed this candidate's score and the
         # host/AGN associations were not (re)performed -- same as vet_kn.py
         return
-
-    ## host-nuclear-offset scoring: how close is the candidate to its best-matched
-    ## host's nucleus? host_df already comes back sorted by ascending Pcc (best match
-    ## first). Uses the unfiltered host_df since offset doesn't depend on redshift.
-    nuclear_scale = param_ranges["nuclear_offset_scale"].to(u.arcsec).value
-    if len(host_df):
-        offset = host_df.iloc[0].offset
-        if offset is not None and np.isfinite(offset):
-            host_nuclear_score = nuclear_offset_score(offset, nuclear_scale)
-            update_score_factor(event_candidate, "host_nuclear_score", host_nuclear_score)
-        else:
-            delete_score_factor(event_candidate, "host_nuclear_score")
-    else:
-        # no host found at all -- don't bias the score, consistent with how
-        # host_distance_score is left neutral below when no host is found
-        delete_score_factor(event_candidate, "host_nuclear_score")
 
     # some cleanup before distance scoring
     host_df = clean_host_df(host_df)
@@ -597,14 +446,28 @@ def vet_bbh(
         # flare_shape_toggle decides whether it's included, at read time, the same
         # way agn_toggle decides whether agn_score is. That -- not a vet-time
         # PARAM_RANGES flag -- is what lets a user flip it live without a re-vet.
+        # Every individual model's score is stored too (flare_shape_score_<name>),
+        # not just the aggregate max -- these are display-only (not in
+        # scoring/util.SUBSCORE_NAMES, so they never enter the score product) and
+        # let the candidate page show which specific published picture, if any,
+        # a candidate resembles.
+        flare_shape_model_keys = [f"flare_shape_score_{name}" for name in FLARE_SHAPE_MODELS]
         delay_days, duration_days = estimate_flare_extent(postphot, baseline)
         if delay_days is not None:
-            shape_score = flare_shape_score(delay_days, duration_days)
-            update_score_factor(event_candidate, "flare_shape_score", shape_score)
+            model_scores = flare_shape_scores_by_model(delay_days, duration_days)
+            for name, score in model_scores.items():
+                update_score_factor(event_candidate, f"flare_shape_score_{name}", score)
+            update_score_factor(
+                event_candidate, "flare_shape_score", max(model_scores.values())
+            )
         else:
             delete_score_factor(event_candidate, "flare_shape_score")
+            for key in flare_shape_model_keys:
+                delete_score_factor(event_candidate, key)
     else:
         # not enough baseline and/or post-merger photometry to judge either way --
         # don't bias the score
         delete_score_factor(event_candidate, "agn_flare_score")
         delete_score_factor(event_candidate, "flare_shape_score")
+        for name in FLARE_SHAPE_MODELS:
+            delete_score_factor(event_candidate, f"flare_shape_score_{name}")

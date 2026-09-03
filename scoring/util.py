@@ -65,7 +65,6 @@ SUBSCORE_NAMES = [
     "phot_peak_lum",
     "phot_peak_time",
     "phot_decay_rate",
-    "host_nuclear_score",
     "agn_flare_score",
     "flare_shape_score",
 ]
@@ -273,16 +272,6 @@ def get_event_candidate_scores(
                 continue # this is fine, some transient scoring algorithms aren't implemented yet
             param_ranges = dict_transients_param_ranges[transient]
 
-            # compute the photometry score. Guarded on param_range_key being in
-            # param_ranges because not every transient's PARAM_RANGES defines
-            # lum_max/peak_time/decay_rate -- AGN-flare doesn't, since it scores
-            # photometry through agn_flare_score/flare_shape_score instead. Without
-            # this guard, a candidate carrying a leftover phot_peak_lum/etc.
-            # ScoreFactor from an earlier KN-style vetting pass (e.g. before its
-            # event was reclassified to BBH) crashes scoring for every candidate in
-            # the call with a KeyError, not just itself. For every KN-family
-            # transient (KN, KN-in-SN, super-KN) this is a no-op: they all define
-            # all three keys, so the guard never excludes anything for them.
             phot_subscores = {
                 subscore_key: _check_phot_val(
                     val_dict[subscore_key], param_ranges, param_range_key

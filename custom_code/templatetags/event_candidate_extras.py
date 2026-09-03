@@ -180,9 +180,11 @@ def display_score_details(context, target_id):
         host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
         agn_score=("AGN Association Score", partial(_float_format, precision=1)),
-        host_nuclear_score=("Host Nuclear Offset Score", partial(_float_format, precision=2)),
         agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
-        flare_shape_score=("Flare Shape Score", partial(_float_format, precision=2)),
+        flare_shape_score=("Flare Shape Score (best of the models below)", partial(_float_format, precision=2)),
+        flare_shape_score_mck19=("Flare Shape Score -- McKernan+2019 (Hill-sphere)", partial(_float_format, precision=2)),
+        flare_shape_score_jrr_i=("Flare Shape Score -- Rodriguez-Ramirez+2025 (jet-cocoon)", partial(_float_format, precision=2)),
+        flare_shape_score_tgw24=("Flare Shape Score -- Tagawa+2024 (jet breakout)", partial(_float_format, precision=2)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",

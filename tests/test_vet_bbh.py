@@ -21,23 +21,6 @@ def _phot_df(mag, magerr, filt, upperlimit=None, dt=None):
     return pd.DataFrame(d)
 
 
-class TestClamp:
-    def test_within_bounds_unchanged(self):
-        from scoring.vet_bbh import _clamp
-
-        assert _clamp(0.5, 0.1, 1.0) == 0.5
-
-    def test_clamps_to_lower_bound(self):
-        from scoring.vet_bbh import _clamp
-
-        assert _clamp(0.01, 0.1, 1.0) == 0.1
-
-    def test_clamps_to_upper_bound(self):
-        from scoring.vet_bbh import _clamp
-
-        assert _clamp(5.0, 0.1, 1.0) == 1.0
-
-
 class TestFitAgnBaseline:
     def test_none_input_returns_empty(self):
         from scoring.vet_bbh import fit_agn_baseline
@@ -148,36 +131,6 @@ class TestDetectFlare:
         postphot = _phot_df([18.02], [0.05], ["r"])
         sig, row = detect_flare(postphot, baseline, sigma_thresh=5.0)
         assert sig < 5.0
-
-
-class TestNuclearOffsetScore:
-    def test_zero_offset_gives_full_score(self):
-        from scoring.vet_bbh import nuclear_offset_score
-
-        assert nuclear_offset_score(0.0, 0.5) == pytest.approx(1.0)
-
-    def test_offset_equal_to_scale_gives_half_score(self):
-        from scoring.vet_bbh import nuclear_offset_score
-
-        assert nuclear_offset_score(0.5, 0.5) == pytest.approx(0.5)
-
-    def test_large_offset_floors_at_phot_score_min(self):
-        from scoring.vet_bbh import nuclear_offset_score
-        from scoring.vet_phot import PHOT_SCORE_MIN
-
-        assert nuclear_offset_score(1000.0, 0.5) == pytest.approx(PHOT_SCORE_MIN)
-
-    def test_monotonically_decreasing_with_offset(self):
-        from scoring.vet_bbh import nuclear_offset_score
-
-        offsets = [0.0, 0.1, 0.5, 1.0, 2.0, 5.0]
-        scores = [nuclear_offset_score(o, 0.5) for o in offsets]
-        assert scores == sorted(scores, reverse=True)
-
-    def test_negative_offset_treated_as_zero(self):
-        from scoring.vet_bbh import nuclear_offset_score
-
-        assert nuclear_offset_score(-0.1, 0.5) == pytest.approx(1.0)
 
 
 class TestFlareConfidenceScore:
@@ -314,3 +267,27 @@ class TestFlareShapeScore:
         # dragged down by jrr_i
         score = flare_shape_score(10.0, None)
         assert score == pytest.approx(1.0)
+
+
+class TestFlareShapeScoresByModel:
+    def test_returns_one_score_per_model(self):
+        from scoring.vet_bbh import flare_shape_scores_by_model, FLARE_SHAPE_MODELS
+
+        scores = flare_shape_scores_by_model(80.0, 60.0)
+        assert set(scores.keys()) == set(FLARE_SHAPE_MODELS.keys())
+
+    def test_max_of_breakdown_matches_aggregate(self):
+        from scoring.vet_bbh import flare_shape_score, flare_shape_scores_by_model
+
+        for delay, duration in [(80.0, 60.0), (10.0, None), (1e6, None)]:
+            scores = flare_shape_scores_by_model(delay, duration)
+            assert flare_shape_score(delay, duration) == pytest.approx(max(scores.values()))
+
+    def test_penalizes_model_whose_delay_range_is_missed(self):
+        from scoring.vet_bbh import flare_shape_scores_by_model
+
+        # delay=10 is outside jrr_i's (50-150) range, so its score should be
+        # lower than mck19/tgw24's, which both cover 0-300
+        scores = flare_shape_scores_by_model(10.0, None)
+        assert scores["jrr_i"] < scores["mck19"]
+        assert scores["jrr_i"] < scores["tgw24"]
