@@ -16,6 +16,7 @@ from .scoring import (
     host_distance_match,
     get_distance_score,
     skymap_association,
+    _localization_from_name,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -54,6 +55,7 @@ PARAM_RANGES = dict(
     t_post=np.inf,
     max_decay_fit_time=25,
     phot_score_snr_min=5,
+    min_time_separation=1/24,
 )
 
 
@@ -96,6 +98,11 @@ def vet_kn(
         nonlocalized_event_name, target_id, max_time=max_time
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
+
+    # the skymap and distance scores are only valid for one localization, so
+    # record which one produced them
+    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
+    update_score_factor(event_candidate, "localization_id", localization.id)
 
     ## get dataframes of potential hosts / AGN
     host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)

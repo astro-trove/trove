@@ -30,6 +30,53 @@ PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
 )
 
+FILTER_EFF_FREQ = {
+    'u': 8.468e14 * u.Hz,
+    'g': 6.289e14 * u.Hz,
+    'r': 4.832e14 * u.Hz,
+    'i': 3.948e14 * u.Hz,
+    'z': 3.343e14 * u.Hz,
+    'y': 3.043e14 * u.Hz,
+    'U': 8.468e14 * u.Hz,
+    'B': 6.810e14 * u.Hz,
+    'V': 5.483e14 * u.Hz,
+    'R': 4.610e14 * u.Hz,
+    'I': 3.807e14 * u.Hz,
+    'c': 5.4e14 * u.Hz, # ATLAS cyan
+    'o': 4.8e14 * u.Hz, # ATLAS orange
+    'G': 5.5e14 * u.Hz, # Gaia G-band
+    'w': 5.208e14 * u.Hz, # Pan-STARRS w (wide)
+    'F070W': 4.310e14 * u.Hz, # JWST
+    'F090W': 3.362e14 * u.Hz,
+    'F115W': 2.629e14 * u.Hz,
+    'F150W': 2.019e14 * u.Hz,
+    'F182M': 1.631e14 * u.Hz,
+    'F200W': 1.526e14 * u.Hz,
+    'F250M': 1.199e14 * u.Hz,
+    'F277W': 1.101e14 * u.Hz,
+    'F300M': 1.006e14 * u.Hz,
+    'F335M': 0.894e14 * u.Hz,
+    'F356W': 0.850e14 * u.Hz,
+    'F360M': 0.829e14 * u.Hz,
+    'F444W': 0.690e14 * u.Hz,
+    'F560W': 0.537e14 * u.Hz,
+    'F770W': 0.399e14 * u.Hz,
+    'F1000W': 0.303e14 * u.Hz,
+    'F1130W': 0.265e14 * u.Hz,
+    'F1280W': 0.236e14 * u.Hz,
+    'F1500W': 0.201e14 * u.Hz,
+    'F1800W': 0.168e14 * u.Hz,
+    'F2100W': 0.146e14 * u.Hz,
+    'F2550W': 0.119e14 * u.Hz,
+    'F062': 4.962e14 * u.Hz, # Roman
+    'F087': 3.494e14 * u.Hz,
+    'F106': 2.876e14 * u.Hz,
+    'F129': 2.355e14 * u.Hz,
+    'F146': 2.355e14 * u.Hz,
+    'F158': 1.929e14 * u.Hz,
+    'F213': 1.421e14 * u.Hz,
+}
+
 
 def _powerlaw(x, a, y0):
     """
@@ -38,11 +85,45 @@ def _powerlaw(x, a, y0):
     return y0 - a * np.log10(x)
 
 
-def _broken_powerlaw(x, a1, a2, y0, x0):
-    """
-    Broken powerlaw with smoothing s that returns a logarithmic y value
+def _broken_powerlaw_concave_down(x, a1, a2, y0, x0):
+    """Smoothly broken powerlaw, CONCAVE DOWN branch. Original TROVE model.
+
+    With u = x/x0 the two components are combined additively in flux,
+
+        mag = y0 - log10(u**-a1 + u**-a2)
+
+    `log10(sum of powers of u)` is concave up in log10(u), so negating it
+    makes this CONCAVE DOWN in the (log10 t, mag) plane.
     """
     return y0 - np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+
+
+def _broken_powerlaw_concave_up(x, a1, a2, y0, x0):
+    """Smoothly broken powerlaw, CONCAVE UP branch. The complement of the above.
+
+        mag = y0 + log10(u**-a1 + u**-a2)
+    """
+    return y0 + np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+
+
+def _ordered(base):
+    """Reparameterise `base(x, a1, a2, ...)` as `(x, a1, delta, ...)`, a2 = a1 + delta.
+
+    Both broken powerlaws are symmetric under swapping a1 and a2, which gives
+    the fit two identical minima and makes convergence and interpretation
+    unstable. Requiring `delta >= 0` breaks that symmetry with a box bound,
+    and pins a1 as the LATE-time index for both branches, so one expression
+    reads the decay rate off either.
+
+    This replaces the original device for breaking the same symmetry -- bounding
+    a1 < 0 < a2 -- which also, unintentionally, restricted the model to one of
+    the six break shapes.
+    """
+
+    def wrapped(x, a1, delta, y0, x0):
+        return base(x, a1, a1 + delta, y0, x0)
+
+    return wrapped
 
 
 def _ssr(model_y, data_y):
@@ -54,6 +135,7 @@ def _ssr(model_y, data_y):
 def _flux_to_lum(flux, lumdist):
     """convert flux to lum. Everything should be astropy quantities"""
     return 4 * np.pi * lumdist**2 * flux
+
 
 def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataFrame:
     """
@@ -181,32 +263,34 @@ def estimate_max_find_decay_rate(
     mag: Iterable[float],
     magerr: Iterable[float],
     max_decay_fit_time: Optional[int] = 25,
+    min_time_separation: Optional[float] = None,
 ) -> Tuple[float, float, float]:
     """
-    Fit's both a single and broken powerlaw to the data, computes the AIC and then
-    takes the "better" fit (lower AIC) and uses that to find an analytic time of maximum and decay
-    rate over peak_time -> max_decay_fit_time.
+    Fit both a single and broken powerlaw to the data, compute AIC, and
+    takes the "better" fit (lower AIC) and uses that to find an analytic time
+    of maximum and decay rate over peak_time -> max_decay_fit_time.
 
     PARAMETERS
     ---------
     dt_days: Iterable[float]
-        A list/array of the days since the GW discovery. These should all be positive
+        A list/array of the days since the GW discovery. 
     mag: Iterable[float]
         A list/array of the magnitudes since the GW discovery
     magerr: Iterable[float]
         A list/array of the magnitude errors since the GW discovery
-    max_decay_fit_time: int
+    max_decay_fit_time: float, optional
         The maximum time after the GW discovery in days that we should fit the decay to.
         The default is 25 days based on discussion from Rastinejad+2022.
+    min_time_separation: float, optional
+        Refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
+        used for fitting) is below this many days.
 
     RETURNS
     -------
     max_time: float
         Days since GW discovery for max to occur
-    decay_slope: float
-        The slope of the decay from peak between peak and max_decay_fit_time if the
-        if the data has a maximum in the mag array. Otherwise this is just the slope
-        of the light curve in mag/day.
+    decay_rate: float
+        The late-time logarithmic slope of the light curve, in d(mag)/d(log(10))
     """
 
     # define some useful variables
@@ -215,98 +299,149 @@ def estimate_max_find_decay_rate(
         4  # the degrees of freedom in a broken powerlaw model (y0, x0, s, m1, m2)
     )
 
-    # only fit data before `max_decay_fit_time`
-    dt_days_tofit = dt_days[dt_days <= max_decay_fit_time]
-    mag_tofit = mag[dt_days <= max_decay_fit_time]
-    magerr_tofit = magerr[dt_days <= max_decay_fit_time]
+    dt_days = np.asarray(dt_days, dtype=float)
+    mag = np.asarray(mag, dtype=float)
+    magerr = np.asarray(magerr, dtype=float)
+
+    _in_domain = (
+        (dt_days > 0)
+        & (dt_days <= max_decay_fit_time)
+        & np.isfinite(mag)
+        & np.isfinite(magerr)
+        & (magerr > 0)
+    )
+    n_dropped_domain = int((~_in_domain).sum())
+    if n_dropped_domain:
+        logger.info(
+            "Dropped %d photometry row(s) with dt <= 0, non-finite mag/magerr, "
+            "or magerr <= 0 before fitting",
+            n_dropped_domain,
+        )
+    dt_days_tofit = dt_days[_in_domain]
+    mag_tofit = mag[_in_domain]
+    magerr_tofit = magerr[_in_domain]
+
+    # Drop rows that repeat a measurement already present
+    if dt_days_tofit.size:
+        _, _keep = np.unique(
+            np.column_stack((dt_days_tofit, mag_tofit)), axis=0, return_index=True
+        )
+        _keep.sort()
+        if _keep.size < dt_days_tofit.size:
+            logger.info(
+                "Dropped %d duplicated photometry row(s) before fitting",
+                dt_days_tofit.size - _keep.size,
+            )
+        dt_days_tofit = dt_days_tofit[_keep]
+        mag_tofit = mag_tofit[_keep]
+        magerr_tofit = magerr_tofit[_keep]
+
+    n_epochs = int(np.unique(dt_days_tofit).size)
+    if n_epochs < 2:
+        raise RuntimeError(
+            f"Only {n_epochs} distinct epoch(s) within {max_decay_fit_time}; "+
+            "decay rate is not determined by this data"
+        )
+
+    if min_time_separation is not None:
+        time_separation_days = float(dt_days_tofit.max() - dt_days_tofit.min())
+        if time_separation_days < min_time_separation:
+            raise RuntimeError(
+                f"Baseline {time_separation_days:.3f} days < min_time_separation ="
+                f"{min_time_separation:.3f} days; refusing to fit"
+            )
 
     curve_fit_kwargs = dict(
         xdata=dt_days_tofit,
         ydata=mag_tofit,
-        # sigma = magerr_tofit,
+        sigma = magerr_tofit,
         absolute_sigma=True,
         maxfev=5_000,
         ftol=1e-8,
     )
 
-    # first fit a regular powerlaw
     try:
         pl_popt, pl_pcov = curve_fit(_powerlaw, **curve_fit_kwargs)
-    except RuntimeError:
-        # RuntimeError will throw if it doesn't converge
+    except (RuntimeError, ValueError):
+        # RuntimeError if it doesn't converge; ValueError if the model
+        # produced a non-finite residual (belt-and-suspenders -- the dt > 0
+        # filter above should already rule this out for these two models)
         pl_popt, pl_pcov = None, None
 
-    # then fit a broken powerlaw
-    # but we only want to try a broken powerlaw if there are more than 6 points
-    # otherwise the data doesn't give enough constraining power
-    # need to add 2 b/c otherwise we can't compute the AIC
-    # For ref, the equation used in the AIC score is
-    # aic = 2.0 * (n_params - log_likelihood) + 2.0 * n_params * (n_params + 1.0) / (
-    #             n_samples - n_params - 1.0
-    #         )
-    # so if len(mag) = n_samples+1 the denominator is 0 and the AIC blows up
-    if len(mag_tofit) > bpl_nparams + 2:
+    broken_fits = {}
+    if n_epochs > bpl_nparams + 2:
+        # a1 free over the whole line -- the sign is no longer used to break
+        # the a1 <-> a2 swap symmetry, `delta >= 0` does that instead.
         bpl_bounds = [
-            (-np.inf, 0),  # a1 bound, can be anything
-            (0, np.inf),  # a2 bound, can be anything
+            (-np.inf, np.inf),  # a1: the LATE-time index (see `_ordered`)
+            (0, np.inf),        # delta = a2 - a1, >= 0 to order the two
             (
                 0,
                 2 * mag_tofit.max(),
             ),  # y0 bound, really shouldn't be outside this range
             (
-                0,
+                # x0 == 0 would divide by zero in (x/x0)**exponent; a tiny
+                # positive floor keeps the optimizer away from that boundary
+                # without meaningfully narrowing the search (it's far below
+                # any real observing cadence).
+                1e-6,
                 dt_days_tofit.max(),
             ),  # x0 bound, really shouldn't be greater than max(dt)
         ]
-        try:
-            bpl_popt, bpl_pcov = curve_fit(
-                _broken_powerlaw, bounds=list(zip(*bpl_bounds)), **curve_fit_kwargs
-            )
-        except (RuntimeError, TypeError) as exc:
-            # RuntimeError will throw if it doesn't converge
-            # TypeError will throw if there are <5 photometry points (and we should be
-            # using the single powerlaw anyways with so few points!)
-            logger.warning(f"Failed on the Broken Powerlaw fit with {exc}")
-            bpl_popt, bpl_pcov = None, None
-    else:
-        bpl_popt, bpl_pcov = None, None
+        for label, base in (
+            ("broken_concave_down", _broken_powerlaw_concave_down),
+            ("broken_concave_up", _broken_powerlaw_concave_up),
+        ):
+            try:
+                popt, _ = curve_fit(
+                    _ordered(base), bounds=list(zip(*bpl_bounds)), **curve_fit_kwargs
+                )
+            except (RuntimeError, TypeError, ValueError) as exc:
+                logger.warning(f"Failed on the {label} fit with {exc}")
+                continue
+            a1, delta, y0, x0 = popt
+            # store in the model's own (a1, a2, y0, x0) signature
+            broken_fits[label] = (base, np.array([a1, a1 + delta, y0, x0]))
 
-    # define some variables for checking later if one of these methods failed
-    pl_failed = pl_popt is None
-    bpl_failed = bpl_popt is None
+    # ---- choose between them on the AIC -------------------------------
+    # `mag_slope_per_dex` is d(mag)/d(log10 t) at late times: POSITIVE means
+    # the magnitude is rising, i.e. the source is getting FAINTER.
+    options = []
+    if pl_popt is not None:
+        # mag = y0 - a*log10(t)  =>  slope = -a, at all times
+        options.append(
+            ("powerlaw", _powerlaw, pl_popt, pl_nparams, -pl_popt[0])
+        )
 
-    # then calculate the reduced chi2 for each of these outputs
-    # but we only need to do this if both models succeeded in fitting the data
-    if not pl_failed and not bpl_failed:
-        pl_model_y = _powerlaw(dt_days_tofit, *pl_popt)
-        pl_ssr = _ssr(pl_model_y, mag_tofit)
-        pl_info_crit = info_crit(pl_ssr, pl_nparams, len(mag_tofit))
+    for label, (base, popt) in broken_fits.items():
+        # with a1 <= a2 the late-time asymptote is governed by a1:
+        #   concave down  mag -> y0 + a1*log10(t)   =>  slope = +a1
+        #   concave up    mag -> y0 - a1*log10(t)   =>  slope = -a1
+        slope = popt[0] if base is _broken_powerlaw_concave_down else -popt[0]
+        options.append((label, base, popt, bpl_nparams, slope))
 
-        bpl_model_y = _broken_powerlaw(dt_days_tofit, *bpl_popt)
-        bpl_ssr = _ssr(bpl_model_y, mag_tofit)
-        bpl_info_crit = info_crit(bpl_ssr, bpl_nparams, len(mag_tofit))
-    else:
-        pl_info_crit = np.inf
-        bpl_info_crit = np.inf
-
-    # now we can prefer the model with the lower AIC score
-    if (not pl_failed and bpl_failed) or (
-        not pl_failed and pl_info_crit < bpl_info_crit
-    ):
-        logger.info("Powerlaw fits better")
-        model = _powerlaw
-        best_fit_params = pl_popt
-        decay_rate = pl_popt[0]  # this is the slope
-    elif not bpl_failed:
-        logger.info("Broken Powerlaw fits better")
-        model = _broken_powerlaw
-        best_fit_params = bpl_popt
-        decay_rate = -bpl_popt[
-            0
-        ]  # this is the decay slope since we force -inf < a1 < 0 with the bounds, negate b/c magnitudes
-    else:
+    if not options:
         raise RuntimeError(
             "Both a powerlaw and broken powerlaw failed to fit the data!"
+        )
+
+    if len(options) == 1:
+        # nothing to compare against; AIC is undefined for n <= n_params + 1
+        # and was not computed in this case before either
+        label, model, best_fit_params, _nparams, mag_slope_per_dex = options[0]
+    else:
+        scored = []
+        for label, f, popt, k, slope in options:
+            ssr = _ssr(f(dt_days_tofit, *popt), mag_tofit)
+            scored.append(
+                (info_crit(ssr, k, len(mag_tofit)), label, f, popt, slope)
+            )
+        scored.sort(key=lambda row: row[0])
+        _aic, label, model, best_fit_params, mag_slope_per_dex = scored[0]
+        logger.info(
+            "Model selected: %s (AIC %s)",
+            label,
+            ", ".join(f"{lb}={ac:.2f}" for ac, lb, *_ in scored),
         )
 
     # finally, compute the maximum time using a finely spaced array
@@ -319,54 +454,10 @@ def estimate_max_find_decay_rate(
         np.argmin(ytest)
     ]  # need to use min here b/s magnitudes are backwards
 
+    decay_rate = -mag_slope_per_dex
+
     return model, best_fit_params, max_time, decay_rate
     
-FILTER_EFF_FREQ = {
-    'u': 8.468e14 * u.Hz,
-    'g': 6.289e14 * u.Hz,
-    'r': 4.832e14 * u.Hz,
-    'i': 3.948e14 * u.Hz,
-    'z': 3.343e14 * u.Hz,
-    'y': 3.043e14 * u.Hz,
-    'U': 8.468e14 * u.Hz,
-    'B': 6.810e14 * u.Hz,
-    'V': 5.483e14 * u.Hz,
-    'R': 4.610e14 * u.Hz,
-    'I': 3.807e14 * u.Hz,
-    'c': 5.4e14 * u.Hz, # ATLAS cyan
-    'o': 4.8e14 * u.Hz, # ATLAS orange
-    'G': 5.5e14 * u.Hz, # Gaia G-band
-    'w': 5.208e14 * u.Hz, # Pan-STARRS w (wide)
-    'F070W': 4.310e14 * u.Hz, # JWST
-    'F090W': 3.362e14 * u.Hz,
-    'F115W': 2.629e14 * u.Hz,
-    'F150W': 2.019e14 * u.Hz,
-    'F182M': 1.631e14 * u.Hz,
-    'F200W': 1.526e14 * u.Hz,
-    'F250M': 1.199e14 * u.Hz,
-    'F277W': 1.101e14 * u.Hz,
-    'F300M': 1.006e14 * u.Hz,
-    'F335M': 0.894e14 * u.Hz,
-    'F356W': 0.850e14 * u.Hz,
-    'F360M': 0.829e14 * u.Hz,
-    'F444W': 0.690e14 * u.Hz,
-    'F560W': 0.537e14 * u.Hz,
-    'F770W': 0.399e14 * u.Hz,
-    'F1000W': 0.303e14 * u.Hz,
-    'F1130W': 0.265e14 * u.Hz,
-    'F1280W': 0.236e14 * u.Hz,
-    'F1500W': 0.201e14 * u.Hz,
-    'F1800W': 0.168e14 * u.Hz,
-    'F2100W': 0.146e14 * u.Hz,
-    'F2550W': 0.119e14 * u.Hz,
-    'F062': 4.962e14 * u.Hz, # Roman
-    'F087': 3.494e14 * u.Hz,
-    'F106': 2.876e14 * u.Hz,
-    'F129': 2.355e14 * u.Hz,
-    'F146': 2.355e14 * u.Hz,
-    'F158': 1.929e14 * u.Hz,
-    'F213': 1.421e14 * u.Hz,
-}
 
 def _mag_to_flux(mag, magerr=None):
     """
@@ -382,6 +473,7 @@ def _mag_to_flux(mag, magerr=None):
         dflux = np.abs(flux * magerr * np.log(10) / 2.5)
         return flux, dflux
     return flux
+
 
 def compute_peak_lum(
     mag: Iterable[float],
@@ -413,12 +505,16 @@ def compute_peak_lum(
     -------
     The peak luminosity (nu L_nu) in erg/s
     """
-    mag = np.asarray(mag)
-    magerr = np.asarray(magerr)
-    
+    mag = np.asarray(mag, dtype=float)
+    magerr = np.asarray(magerr, dtype=float)
+    filters = np.asarray(filters)
+
+    _valid = np.isfinite(mag) & np.isfinite(magerr)
+    mag, magerr, filters = mag[_valid], magerr[_valid], filters[_valid]
+
     if len(mag) == 0:
         return None
-    
+
     flux, dflux = _mag_to_flux(mag, magerr)
     
     fluxmax_idx = np.argmax(flux)
@@ -539,15 +635,6 @@ def find_public_phot(
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
 
-    # `SKIP_ATLAS_FORCED_PHOT` is an opt-out for development databases, where a
-    # Vet All over a few hundred candidates would otherwise enqueue a forced
-    # photometry query per target against the real ATLAS service.
-    #
-    # The setting already existed in settings_local.py but NOTHING read it, so
-    # it protected nothing -- vetting still queued every request. It is honoured
-    # here, at the enqueue, rather than inside `async_atlas_query`: a task that
-    # is never created cannot be run later by a worker that happens to pick up
-    # the atlas_fphot queue.
     if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
         logger.info(
             "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
@@ -616,8 +703,13 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # then we can only do the next stuff if there is more than one photometry point
     # at this filter
-    # has to be at least 2 points before max_decay_fit_time, to fit the powerlaw
-    if len(phot[phot.dt < param_ranges["max_decay_fit_time"]]) > 1:
+    # has to be at least 2 distinct EPOCHS before max_decay_fit_time to fit the
+    # powerlaw. Counting rows instead let a measurement ingested twice satisfy
+    # this and hand `estimate_max_find_decay_rate` a rank-deficient problem;
+    # that function now refuses such data as well, so this is the cheap guard
+    # and that one is the authoritative check.
+    _in_window = phot.dt[phot.dt < param_ranges["max_decay_fit_time"]]
+    if _in_window.nunique() > 1:
         # find the maximum and decay rate
         try:
             _model, _best_fit_params, max_time, decay_rate = (
@@ -626,11 +718,14 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                     phot.mag,
                     phot.magerr,
                     max_decay_fit_time=param_ranges["max_decay_fit_time"],
+                    min_time_separation=param_ranges["min_time_separation"],
                 )
             )
-        except RuntimeError:
+        except RuntimeError as exc:
             logger.warning(
-                "Could not fit a power law or broken power law --> not setting peak_time or decay_rate"
+                "Not setting peak_time or decay_rate for target %s: %s",
+                target.id,
+                exc,
             )
             return phot_score, lum, None, None, None, None
 

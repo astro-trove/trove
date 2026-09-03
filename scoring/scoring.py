@@ -6,6 +6,7 @@ from candidate_vetting.vet import GALAXY_CATALOGS
 
 import io
 import logging
+from datetime import timezone
 
 import numpy as np
 import pandas as pd
@@ -82,7 +83,7 @@ def host_distance_match(
     host_df: pd.DataFrame,
     target_id: int,
     nonlocalized_event_name: str,
-    max_time: Time = Time.now(),
+    max_time: Time = None,
 ):
     """
     Compute the hybrid distance score of putative host galaxies' distance
@@ -221,7 +222,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
 def skymap_association(
     nonlocalized_event_name: str,
     target_id: int,
-    max_time=Time.now(),
+    max_time=None,
     prob: float = 0.95,
 ) -> float:
 
@@ -356,7 +357,7 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     return to_ret.Dist, to_ret.DistErr
 
 
-def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()):
+def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
     """Computes the GW distance at the target_id healpix location"""
 
     localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
@@ -374,26 +375,19 @@ def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=Time.now()
     return dist, dist_err
 
 
-def _localization_from_name(nonlocalized_event_name, max_time=Time.now()):
-    """Find the most recenet LocalizationEvent object from the nonlocalized event name"""
-    # first find the localization to use
-    localization_queryset = NonLocalizedEvent.objects.filter(
-        event_id=nonlocalized_event_name
-    )[0]
+def _localization_from_name(nonlocalized_event_name, max_time=None):
+    """Most recent EventLocalization for this event, dated at or before max_time."""
+    if max_time is None:
+        max_time = Time.now()
 
     all_localizations = EventLocalization.objects.filter(
-        nonlocalizedevent_id=localization_queryset.id
+        nonlocalizedevent__event_id=nonlocalized_event_name
     )
-
-    all_localizations_sorted = sorted(all_localizations, key=lambda x: x.date)
-
-    # now choose the most recent localization
-    localization = all_localizations_sorted[0]
-    if len(all_localizations_sorted) > 1:
-        for loc in all_localizations_sorted[1:]:
-            curr_loc_time = Time(localization.date, format="datetime")
-            test_loc_time = Time(loc.date, format="datetime")
-            if test_loc_time > curr_loc_time and test_loc_time <= max_time:
-                localization = loc
-
-    return localization
+    localization = (
+        all_localizations
+        .filter(date__lte=max_time.to_datetime(timezone=timezone.utc))
+        .order_by("-date")
+        .first()
+    )
+    # nothing at or before max_time: fall back to the earliest
+    return localization or all_localizations.order_by("date").first()

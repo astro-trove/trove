@@ -1,0 +1,34 @@
+{% extends 'tom_common/base.html' %}
+{% load bootstrap4 %}
+{% block title %}Sign up{% endblock %}
+{% block content %}
+<h2>Sign up</h2>
+<form action="{% url 'registration:register' %}" method="POST">
+{% csrf_token %}
+{% bootstrap_form form %}
+{% bootstrap_formset form.user_profile_formset %}
+<div class="form-check mb-3">
+  <input
+    class="form-check-input"
+    type="checkbox"
+    id="terms_agreed"
+    name="terms_agreed"
+    value="1"
+    required
+  >
+  <label class="form-check-label" for="terms_agreed">
+    <b>I have read and agree to the 
+    <a href="https://astro-trove.github.io/rules/TROVE_Rules.pdf" target="_blank" rel="noopener">TROVE Rules</a>. 
+    I understand it applies to the TROVE website, API, comments, GitHub, meetings, and Slack. I will not share my password or API token.</b>
+
+  </label>
+</div>
+{% buttons %}
+  <button type="submit" class="btn btn-primary">
+    Register
+  </button>
+{% endbuttons %}
+</form>
+<hr/>
+<p><em>Built off of <a target="_blank" href="https://github.com/TOMToolkit/tom_registration">TOM Registration</a> version {{ version }}</em></p>
+{% endblock %}
