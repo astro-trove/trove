@@ -41,7 +41,7 @@ Merger-Induced AGN Flaring" and Section 4.1. What *is* new relative to that pape
    -- spectroscopy (asymmetric broadening of emission lines) is the actual
    literature-endorsed discriminant, which is out of scope for TROVE's automated
    pipeline.
-4. `flare_shape_score` (opt-in, NOT model-agnostic): goes one step past "is there an
+4. `flare_shape_score` (NOT model-agnostic, excluded from the default score): goes one step past "is there an
    excursion" (`agn_flare_score`) to "is its *timing* consistent with a real
    BBH-flare mechanism". Positional offset from the nucleus turned out not to be a
    usable photometric-independent discriminant (point 2 above) since the true offset
@@ -63,11 +63,13 @@ Merger-Induced AGN Flaring" and Section 4.1. What *is* new relative to that pape
    methodologically close to this module's MAD-based `agn_flare_score`, followed by
    model-specific timing checks -- so "adopt Darc+2025's method" and "stay
    model-agnostic" are in tension, not the same thing.) Because of that, this factor
-   is gated behind `param_ranges["use_flare_shape_model"]` (default False) rather
-   than folded unconditionally into every user's score: `agn_flare_score` (and
-   everything else in this module) stays on and model-agnostic by default, and a
-   user who wants the extra, model-dependent timing check opts in explicitly. See
-   `flare_shape_score`'s docstring for the exact bounds and their provenance.
+   is always computed and stored (it's cheap -- no external calls), but kept out of
+   the default score product: `scoring/util.get_event_candidate_scores`'
+   `flare_shape_toggle` (default False) decides at *read* time whether it's
+   included, exactly the way `agn_toggle` decides whether `agn_score` is -- not a
+   vet-time flag here, so a user can flip it live from the BBH scoring-adjustments
+   panel without triggering a re-vet. See `flare_shape_score`'s docstring for the
+   exact bounds and their provenance.
 
    Caveat found by validating against realistic TROVE-grade photometry (sparse
    ATLAS-forced-photometry-like cadence/depth, not ZTF-partnership-grade data --
@@ -179,12 +181,6 @@ PARAM_RANGES = dict(
     # convention elsewhere in vet_phot.py
     flare_score_center_frac=0.5,  # sigmoid midpoint, as a fraction of flare_sigma_thresh
     flare_score_width_frac=0.25,  # sigmoid transition width, as a fraction of flare_sigma_thresh
-    use_flare_shape_model=False,  # opt-in: also gate on flare_shape_score, i.e.
-    # whether the flare's timing matches a specific published emission model
-    # (FLARE_SHAPE_MODELS). Off by default -- unlike agn_flare_score, this is *not*
-    # model-agnostic (see module docstring point 4), so it shouldn't be silently
-    # folded into the default score for every user. Flip to True to opt into the
-    # model-based check on top of the always-on model-agnostic excursion score.
     nuclear_offset_scale=2.0 * u.arcsec,  # half-credit offset in nuclear_offset_score;
     # matches agn_score's own Milliquas match radius (Vieira et al. 2026 Section 4.1,
     # ~1 kpc at their ~93 Mpc event) -- see module docstring for why this is *not*
@@ -594,17 +590,17 @@ def vet_bbh(
         )
         update_score_factor(event_candidate, "agn_flare_score", agn_flare_score)
 
-        # opt-in, model-based layer: is the flare's timing consistent with a
-        # *specific* published emission model's envelope? Not model-agnostic (see
-        # module docstring point 4 and the use_flare_shape_model comment in
-        # PARAM_RANGES), so only computed when a user has explicitly asked for it.
-        if param_ranges.get("use_flare_shape_model", False):
-            delay_days, duration_days = estimate_flare_extent(postphot, baseline)
-            if delay_days is not None:
-                shape_score = flare_shape_score(delay_days, duration_days)
-                update_score_factor(event_candidate, "flare_shape_score", shape_score)
-            else:
-                delete_score_factor(event_candidate, "flare_shape_score")
+        # model-based layer: is the flare's timing consistent with a *specific*
+        # published emission model's envelope? Not model-agnostic (see module
+        # docstring point 4), so it is always computed and stored here but kept out
+        # of the default score product -- scoring/util.get_event_candidate_scores'
+        # flare_shape_toggle decides whether it's included, at read time, the same
+        # way agn_toggle decides whether agn_score is. That -- not a vet-time
+        # PARAM_RANGES flag -- is what lets a user flip it live without a re-vet.
+        delay_days, duration_days = estimate_flare_extent(postphot, baseline)
+        if delay_days is not None:
+            shape_score = flare_shape_score(delay_days, duration_days)
+            update_score_factor(event_candidate, "flare_shape_score", shape_score)
         else:
             delete_score_factor(event_candidate, "flare_shape_score")
     else:

@@ -46,22 +46,24 @@ from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
 SCORE_CACHE_PERIOD = 60 * 5
 SCORE_CACHE_PERIOD_WHILE_VETTING = 60
 
-def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
+def scored_candidates_cache_key(query_params, agn_toggle, phot_method, flare_shape_toggle=False):
     """
     Cache key for the scored candidate list matching a set of filters.
 
     Everything that reads, writes or invalidates that cache goes through here,
-    so the three cannot drift apart and leave the page serving scores nothing
+    so the four cannot drift apart and leave the page serving scores nothing
     can clear.
 
     ``phot_method`` belongs in the key because it decides which stored factor
     each row displays: a list scored under the other method is stale, not merely
-    older. ``agn_toggle`` is in it for the same reason.
+    older. ``agn_toggle`` and ``flare_shape_toggle`` (the BBH analog of
+    ``agn_toggle`` -- see scoring/util.py's get_event_candidate_scores) are in it
+    for the same reason.
     """
     query_params = query_params.copy()
     query_params.pop("page", None)  # every page shares one scored list
     return (f"event_candidates_scored_{query_params.urlencode()}"
-            f"_{agn_toggle}_{phot_method}")
+            f"_{agn_toggle}_{phot_method}_{flare_shape_toggle}")
 
 
 class EventCandidateListView(FilterView):
@@ -115,6 +117,7 @@ class EventCandidateListView(FilterView):
         context = super().get_context_data(**kwargs)
 
         agn_toggle = cache.get("agn_toggle", True)
+        flare_shape_toggle = cache.get("flare_shape_toggle", False)
         nle_id = self.request.GET.get("nonlocalizedevent")
 
         phot_method = get_phot_method()
@@ -122,16 +125,17 @@ class EventCandidateListView(FilterView):
         vet_all_progress = get_vet_all_progress(nle_id)
 
         cache_key = scored_candidates_cache_key(self.request.GET, agn_toggle,
-                                                phot_method)
+                                                phot_method, flare_shape_toggle)
 
-        # Check cache first (ToggleAgnCacheView pre-warms this key for the
-        # current NLE when the AGN toggle is flipped)
+        # Check cache first (ToggleAgnCacheView/ToggleFlareShapeCacheView pre-warm
+        # this key for the current NLE when their toggle is flipped)
         scored_candidates = cache.get(cache_key)
         if scored_candidates is None:
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
             scored_candidates = get_event_candidate_scores(
-                all_candidates, agn_toggle=agn_toggle, phot_method=phot_method
+                all_candidates, agn_toggle=agn_toggle, phot_method=phot_method,
+                flare_shape_toggle=flare_shape_toggle,
             )
             # a run in progress rewrites these scores continuously, so hold them
             # for less time than usual to keep the page closer to the truth
@@ -151,6 +155,7 @@ class EventCandidateListView(FilterView):
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
+        context["flare_shape_toggle"] = flare_shape_toggle
 
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label()
@@ -400,6 +405,46 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
         return redirect(_return_to(request, reverse("custom_code:event-candidates")))
 
 
+class ToggleFlareShapeCacheView(LoginRequiredMixin, View):
+    """Flip whether flare_shape_score (BBH/AGN-flare's model-*dependent* timing
+    check -- see vet_bbh.py's module docstring point 4) is folded into the score.
+
+    The BBH analog of ToggleAgnCacheView, and works the same way: flare_shape_score
+    is always computed and stored by vet_bbh, so flipping this only changes which
+    stored factor scoring/util.get_event_candidate_scores excludes from the product
+    -- no rescoring is queued, just the cheap in-memory recompute from what's
+    already stored.
+    """
+
+    def get(self, request, *args, **kwargs):
+        new_val = not cache.get("flare_shape_toggle", False)
+        cache.set("flare_shape_toggle", new_val)
+
+        nle_id = request.GET.get("nonlocalizedevent")
+        if nle_id:
+            candidates = EventCandidate.objects.filter(
+                nonlocalizedevent_id=nle_id
+            ).select_related("target", "nonlocalizedevent")
+            agn_toggle = cache.get("agn_toggle", True)
+            phot_method = get_phot_method()
+            scored_candidates = get_event_candidate_scores(
+                candidates, agn_toggle=agn_toggle, phot_method=phot_method,
+                flare_shape_toggle=new_val,
+            )
+
+            cache_key = scored_candidates_cache_key(
+                QueryDict(f"nonlocalizedevent={nle_id}"), agn_toggle, phot_method,
+                new_val,
+            )
+            cache.set(cache_key, scored_candidates, SCORE_CACHE_PERIOD)
+            params = {"nonlocalizedevent": nle_id}
+            return redirect(_return_to(
+                request,
+                reverse("custom_code:event-candidates") + "?" + urlencode(params),
+            ))
+        return redirect(_return_to(request, reverse("custom_code:event-candidates")))
+
+
 class TogglePhotMethodCacheView(LoginRequiredMixin, View):
     """Flip the photometry scorer between TROVE and KilonovaSCORER.
 
@@ -458,14 +503,15 @@ class RefreshCandidateList(LoginRequiredMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-        # Both toggles are site-wide and either can be flipped by anyone, so
-        # clear every combination rather than only the one currently selected --
-        # otherwise a refresh leaves a stale list behind whichever toggle the
-        # next viewer happens to be on.
+        # All three toggles are site-wide and any of them can be flipped by
+        # anyone, so clear every combination rather than only the one currently
+        # selected -- otherwise a refresh leaves a stale list behind whichever
+        # toggle the next viewer happens to be on.
         for agn_toggle in (True, False):
             for phot_method in PHOT_METHOD_CHOICES:
-                cache.delete(scored_candidates_cache_key(
-                    request.GET, agn_toggle, phot_method))
+                for flare_shape_toggle in (True, False):
+                    cache.delete(scored_candidates_cache_key(
+                        request.GET, agn_toggle, phot_method, flare_shape_toggle))
 
         # send the user back to the list they were looking at, filters and all
         query_string = request.GET.urlencode()

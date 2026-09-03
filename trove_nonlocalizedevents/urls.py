@@ -3,6 +3,7 @@ from .views import (
     EventCandidateCreateFromNLEView,
     generate_report,
     ToggleAgnCacheView,
+    ToggleFlareShapeCacheView,
     TogglePhotMethodCacheView,
     RefreshCandidateList,
     SkymapPartialView,
@@ -28,6 +29,11 @@ urlpatterns = [
         "toggle-phot-method/",
         TogglePhotMethodCacheView.as_view(),
         name="toggle-phot-method",
+    ),
+    path(
+        "toggle-flare-shape-cache/",
+        ToggleFlareShapeCacheView.as_view(),
+        name="toggle-flare-shape-cache",
     ),
     path(
         "refresh-candidate-list",

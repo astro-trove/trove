@@ -18,9 +18,12 @@ from scoring.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
+    most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
+    KN_STYLE_CLASSES,
     TARGETEXTRA_KEYS,
 )
+from tom_nonlocalizedevents.models import NonLocalizedEvent
 from scoring.phot_method import (
     get_phot_method as _get_phot_method,
     phot_method_label as _phot_method_label,
@@ -86,9 +89,34 @@ def vet_all_is_allowed(context):
     cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
     return not cache.get(cooldown_cache_key)
 
+def _most_likely_class_from_request(context):
+    """Classification of whichever event is in scope for the current request
+    (``?nonlocalizedevent=<pk>``), or None if there isn't one / it can't be
+    determined. Shared by scoring_toggles and bbh_scoring_toggles so the two
+    scoring-adjustments panels can't disagree about which one applies.
+    """
+    nle_id = context["request"].GET.get("nonlocalizedevent")
+    if not nle_id:
+        return None
+    nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
+    if nle is None:
+        return None
+    return most_likely_class_for_event(nle.event_id)
+
+
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+
+    # KN-style scoring adjustments (AGN sub-score is disqualifying for KNe, and
+    # only the "KN" transient type can use KilonovaSCORER) don't mean anything for
+    # a BBH/AGN-flare event -- that one gets its own panel, bbh_scoring_toggles.
+    # Fails open (shows the panel) when the event can't be classified at all,
+    # e.g. no ?nonlocalizedevent= in scope, rather than hiding functionality
+    # somewhere we simply don't know the event type.
+    most_likely_class = _most_likely_class_from_request(context)
+    if most_likely_class is not None and most_likely_class not in KN_STYLE_CLASSES:
+        return {"show": False}
 
     # switching to KilonovaSCORER only changes anything if this candidate has a
     # score to switch TO. With no target_id (e.g. the candidate list page,
@@ -99,9 +127,28 @@ def scoring_toggles(context, target_id=None):
         event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
     ).exists()
     return {
+        "show": True,
         "agn_toggle": cache.get("agn_toggle", True),
         "is_kilonova": is_kilonova,
         "has_kilonova_score": has_kilonova_score,
+        "next": context["request"].get_full_path(),
+    }
+
+
+@register.inclusion_tag("scoring/partials/bbh_scoring_toggles.html", takes_context=True)
+def bbh_scoring_toggles(context, target_id=None):
+    """The BBH/AGN-flare analog of scoring_toggles. No "exclude AGN sub-score"
+    option here -- AGN association is core to AGN-flare scoring (it's what makes a
+    candidate an AGN-flare candidate at all), not an optional disqualifier the way
+    it is for KNe. Only offers flare_shape_toggle (see vet_bbh.py's module
+    docstring point 4 and scoring/util.get_event_candidate_scores).
+    """
+    if _most_likely_class_from_request(context) != "BBH":
+        return {"show": False}
+
+    return {
+        "show": True,
+        "flare_shape_toggle": cache.get("flare_shape_toggle", False),
         "next": context["request"].get_full_path(),
     }
 

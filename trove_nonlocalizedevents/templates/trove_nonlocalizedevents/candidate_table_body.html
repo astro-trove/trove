@@ -5,6 +5,7 @@
   {% if request.user.is_authenticated %}
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; width:100%">
         {% scoring_toggles %}
+        {% bbh_scoring_toggles %}
         <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
            class="btn btn-outline-secondary mb-2"
            title="Discard the cached scores and reload this list">

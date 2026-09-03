@@ -108,14 +108,28 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
-def get_no_score_message(nonlocalizedevent_name):
+# event classes that get KN / KN-in-SN / super-KN scoring (i.e. everything the
+# most_likely_class if/elif chain in get_event_candidate_scores below routes to a
+# transients list containing "KN"). Shared with the KN-vs-BBH scoring-adjustments
+# panel picker in custom_code.templatetags.event_candidate_extras, so the UI and
+# the scoring logic can't drift apart on which classes are "KN-style".
+KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
+
+
+def most_likely_class_for_event(nonlocalizedevent_name):
+    """Best-guess EM-transient classification for an NLE (event_id string), or
+    None if it can't be determined (e.g. no localization sequence yet)."""
     try:
         nle_eventseq = localization_sequence_from_name(nonlocalizedevent_name)
-        most_likely_class = get_most_likely_class(nle_eventseq.details)
+        return get_most_likely_class(nle_eventseq.details)
     except IndexError:
         return None
 
-    if most_likely_class in {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT", "BBH"}:
+
+def get_no_score_message(nonlocalizedevent_name):
+    most_likely_class = most_likely_class_for_event(nonlocalizedevent_name)
+
+    if most_likely_class in KN_STYLE_CLASSES | {"BBH"}:
         return None
 
     return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
@@ -128,12 +142,17 @@ def get_event_candidate_scores(
         agn_toggle=True,
         include_subscores=False,
         phot_method=None,
+        flare_shape_toggle=False,
 ):
     """Get the event candidate scores for all subscores in subscore_names.
 
     event_candidates should be a django queryset of EventCandidate objects.
     `phot_method` selects which photometry factor the score uses (`None`
-    reads the site-wide toggle.)
+    reads the site-wide toggle.) `flare_shape_toggle` is the BBH-scoring analog of
+    `agn_toggle`: whether flare_shape_score (a model-*dependent* check -- see
+    vet_bbh.py's module docstring point 4) is folded into the AGN-flare score
+    product. Off by default, same reasoning as agn_flare_score being on by default:
+    the model-agnostic factors should describe every user's score unless they opt in.
     """
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
@@ -144,9 +163,12 @@ def get_event_candidate_scores(
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = (set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
                     | {KILONOVA_SCORE_KEY})
-    
+
     if not agn_toggle:
         exclude_keys.add('agn_score')
+
+    if not flare_shape_toggle:
+        exclude_keys.add('flare_shape_score')
 
     # only evaluate this once since it is time consuming
     event_candidates_list = list(event_candidates)
