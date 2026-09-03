@@ -32,7 +32,6 @@ VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
         ],
     "BBH":
         [("basic", "Basic Vetting"),
-         ("KN", "Transient: Kilonova"), ## TODO: remove this
          ("AGN-flare", "Transient: BBH-induced AGN Flare"),
         ]
     }

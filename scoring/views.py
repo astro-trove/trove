@@ -61,7 +61,20 @@ def _phot_method_field(form):
     The values the template needs to keep the two selects in step ride along as
     data attributes rather than being repeated in the JavaScript, so the vetting
     mode and the scorer names are still defined in exactly one place.
+
+    Only meaningful when "KN" is an available vetting_method choice: `phot_method`
+    is only ever forwarded to a vetting run when `vetting_mode == "KN"` (see
+    scoring/tasks.py) -- vet_bbh and friends never see it at all. So for an
+    event whose vetting choices don't include "KN" (e.g. BBH), the field is
+    dropped entirely rather than shown with no effect.
     """
+    kn_available = any(
+        value == "KN" for value, _ in form.fields["vetting_method"].choices
+    )
+    if not kn_available:
+        del form.fields["phot_method"]
+        return form
+
     form.fields["phot_method"].choices = [
         (m, PHOT_METHOD_LABELS[m]) for m in PHOT_METHOD_CHOICES
     ]
