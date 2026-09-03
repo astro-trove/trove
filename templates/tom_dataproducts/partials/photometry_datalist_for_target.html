@@ -155,6 +155,8 @@
 
     const initialTraceStyles = {};
 
+    let extraTraces = [];
+
     function captureInitialTraceStyles() {
         const plotDiv = document.querySelector('.plotly-graph-div');
         if (!plotDiv || !plotDiv.data) return;
@@ -166,6 +168,7 @@
                 };
             }
         });
+        extraTraces = plotDiv.data.filter(trace => trace.mode === 'lines' || trace.yaxis === 'y2');
     }
 
     captureInitialTraceStyles();
@@ -208,14 +211,13 @@
         submit_btn.disabled = true;
     }
 
-    function getRowValue(tr, colIndex) {
-        return tr.children[colIndex]?.innerText.trim() || '';
+    function errorToSNR(error) {
+        return 2.5 / (Math.log(10) * error);
     }
 
-    function parseSNR(text) {
-        text = text.trim();
-        if (!text || text === '< 3') return 0;
-        return parseFloat(text) || 0;
+    function datumSNR(datum) {
+        if (datum.limit || !datum.error) return 0;
+        return errorToSNR(Number(datum.error));
     }
 
     function getAllPhotometryRows() {
@@ -245,41 +247,39 @@
         return MARKER_MAP[base] || 0;
     }
 
-    function applyFilters() {
+    function computeFilteredData() {
         const band = document.getElementById('bandFilter').value;
         const source = document.getElementById('sourceFilter').value;
         const minSNR = parseFloat(document.getElementById('snrFilter').value) || 0;
 
-        getAllPhotometryRows().forEach(tr => {
-            const rowBand = getRowValue(tr, 2);
-            const rowSource = getRowValue(tr, 5);
-            const rowSNR = parseSNR(getRowValue(tr, 4));
+        return data.filter(datum => {
+            const bandMatches = !band || datum.filter === band;
+            const sourceMatches = !source || datum.source === source;
+            const snrMatches = datumSNR(datum) >= minSNR;
+            return bandMatches && sourceMatches && snrMatches;
+        });
+    }
 
-            const bandMatches = !band || rowBand === band;
-            const snrMatches = rowSNR >= minSNR;
-            const sourceMatches = !source || rowSource === source;
-            tr.dataset.filterVisible = bandMatches && snrMatches && sourceMatches ? 'true' : 'false';
+    function applyFilters() {
+        const filteredData = computeFilteredData();
+        const visibleIds = new Set(filteredData.map(datum => String(datum.id)));
+
+        getAllPhotometryRows().forEach(tr => {
+            const id = tr.querySelector('input[type="checkbox"]').value;
+            tr.dataset.filterVisible = visibleIds.has(String(id)) ? 'true' : 'false';
         });
 
         currentPhotometryPage = 1;
 
         renderPagination();
-        updatePlotFromTable();
+        updatePlotFromTable(filteredData);
     }
 
     function resetFilters() {
-        // Resetting inputs
         document.getElementById('bandFilter').value = '';
         document.getElementById('sourceFilter').value = '';
         document.getElementById('snrFilter').value = '';
-
-        getAllPhotometryRows().forEach(tr => {
-            tr.dataset.filterVisible = 'true';
-        });
-        currentPhotometryPage = 1;
-
-        renderPagination();
-        updatePlotFromTable();
+        applyFilters();
     }
 
     function getCell(tr, id) {
@@ -349,17 +349,10 @@
         renderPagination();
     }
 
-    function buildPlotlyTracesFromTable() {
-        const rows = getFilteredPhotometryRows();
+    function buildPlotlyTraces(filteredData) {
         const groups = {}; // key: `${source}||${filter}||${type}`
 
-        rows.forEach(tr => {
-            if (tr.dataset.filterVisible === 'false') return;
-
-            const id = tr.querySelector('input[type="checkbox"]').value;
-            const cur_data = data.find(datum => String(datum.id) === String(id));
-            if (!cur_data) return;
-
+        filteredData.forEach(cur_data => {
             const filterVal = cur_data.filter || '';
             const sourceVal = cur_data.source || '';
             const isLimit = Boolean(cur_data.limit);
@@ -433,10 +426,10 @@
         return traces;
     }
 
-    function updatePlotFromTable() {
+    function updatePlotFromTable(filteredData) {
         const plotDiv = document.querySelector('.plotly-graph-div');
         if (!plotDiv || !window.Plotly) return;
-        const traces = buildPlotlyTracesFromTable();
+        const traces = buildPlotlyTraces(filteredData || computeFilteredData()).concat(extraTraces);
         // preserve layout if present
         const layout = plotDiv.layout || {};
         try {

@@ -37,3 +37,17 @@ class UserGalaxyQ3C(models.Model):
     class Meta:
         managed = True
         db_table = "usergalaxy_q3c"
+
+
+## Postgres' own write counters for the galaxy catalog tables, used to notice a
+## catalog re-ingestion. Backed by the pg_stat_all_tables system view.
+class CatalogWriteCounters(models.Model):
+    relid = models.BigIntegerField(primary_key=True)
+    relname = models.TextField()
+    n_tup_ins = models.BigIntegerField()  # cumulative, bumped on every write
+    n_tup_upd = models.BigIntegerField()
+    n_tup_del = models.BigIntegerField()
+
+    class Meta:
+        managed = False
+        db_table = "pg_stat_all_tables"

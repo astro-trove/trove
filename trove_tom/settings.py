@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "trove_targets",
     "trove_nonlocalizedevents",
     "scoring",
+    "scoring.kilonova_scorer_helpers",
     "sphinx_docs",
     "dal",
     "dal_select2",
@@ -499,6 +500,10 @@ TOM_REGISTRATION = {
     "SEND_APPROVAL_EMAILS": True,
     "APPROVAL_SUBJECT": f"Congratulations!! Welcome to {TOM_NAME}!",
 }
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_USE_TLS = True  # this is needed for gmail, other services may vary
+EMAIL_USE_SSL = False  # this is needed for gmail, other services may vary
+
 
 # for ZTF forced photometry, we need to save the logs to a temporary directory
 ZTFTMPDIR = os.path.join(os.getcwd(), "ztf-forced-phot-logs")

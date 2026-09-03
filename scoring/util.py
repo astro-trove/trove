@@ -2,17 +2,18 @@
 Some common functions used in multiple places throughout the app
 """
 
-from collections import OrderedDict
+from datetime import timedelta
 import math
 import logging
 from astropy.units import Quantity
-from django.db.models import FloatField
+from django.db import DatabaseError
+from django.db.models import Count, FloatField, Max, Min, Q
 from django.db.models.functions import Cast
-from tom_nonlocalizedevents.models import (
-    EventCandidate,
-    EventLocalization,
-    NonLocalizedEvent,
-)
+from django.utils import timezone
+from django.utils.dateparse import parse_datetime
+from django_tasks import ResultStatus
+from django_tasks.backends.database.models import DBTaskResult
+from tom_nonlocalizedevents.models import NonLocalizedEvent
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
@@ -21,18 +22,23 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 from candidate_vetting.vet import localization_sequence_from_name
 
 from .vet_phot import PHOT_SCORE_MIN
-from .vet_bns import PARAM_RANGES as KN_PARAM_RANGES
+from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
 from .vet_bbh import PARAM_RANGES as AGN_FLARE_PARAM_RANGES
 from .models import ScoreFactor
+from .tasks import async_vet
 
 import time
 
 logger = logging.getLogger(__name__)
 
-# map imported parameter ranges to transients
-TRANSIENTS = ["KN", "KN-in-SN", "super-KN"]
+# map imported parameter ranges to transients. Also doubles as the priority order
+# used below to pick a single canonical sort key for a candidate list -- "AGN-flare"
+# has to be here too, or a BBH event (transients = ["AGN-flare"]) falls through the
+# loop below and its candidates come back unsorted.
+TRANSIENTS = ["KN", "KN-in-SN", "super-KN", "SN", "TDE", "AGN-flare"]
+
 DICT_TRANSIENTS_PARAM_RANGES = {
     "KN": KN_PARAM_RANGES,
     "KN-in-SN": KN_IN_SN_PARAM_RANGES,
@@ -41,8 +47,16 @@ DICT_TRANSIENTS_PARAM_RANGES = {
 }
 
 
+# ScoreFactor key holding KilonovaSCORER's photometry factor, written by
+# `vet_kn` when the site-wide `phot_method` toggle is on KilonovaSCORER
+KILONOVA_SCORE_KEY = "kilonova_score"
+
+# why KilonovaSCORER could not score a candidate, written by `vet_kn` in place of score
+KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
+
 # default subscore names
 SUBSCORE_NAMES = [
+    "kilonova_score",
     "skymap_score",
     "host_distance_score",
     "ps_score",
@@ -93,20 +107,42 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
+def get_no_score_message(nonlocalizedevent_name):
+    try:
+        nle_eventseq = localization_sequence_from_name(nonlocalizedevent_name)
+        most_likely_class = get_most_likely_class(nle_eventseq.details)
+    except IndexError:
+        return None
+
+    if most_likely_class in {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}:
+        return None
+
+    return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
+
+
 def get_event_candidate_scores(
         event_candidates,
         dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
         subscore_names=SUBSCORE_NAMES,
         agn_toggle=True,
-        include_subscores=False
+        include_subscores=False,
+        phot_method=None,
 ):
-    """Get the event candidate scores for everything in subscore_names
+    """Get the event candidate scores for all subscores in subscore_names.
 
-    event_candidates should be a django queryset of EventCandidate objects
+    event_candidates should be a django queryset of EventCandidate objects.
+    `phot_method` selects which photometry factor the score uses (`None`
+    reads the site-wide toggle.)
     """
+    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+
+    if phot_method is None:
+        phot_method = get_phot_method()
+    use_kilonova = phot_method == PHOT_METHOD_KILONOVA
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
-    exclude_keys = set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
+    exclude_keys = (set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
+                    | {KILONOVA_SCORE_KEY})
     
     if not agn_toggle:
         exclude_keys.add('agn_score')
@@ -115,7 +151,6 @@ def get_event_candidate_scores(
     event_candidates_list = list(event_candidates)
 
     # which transient types to consider?
-    ### TODO: Right now, just does KN unless SSM; change this for BBH events
     try:
         nle_eventseq = localization_sequence_from_name(
             event_candidates_list[0].nonlocalizedevent.event_id
@@ -124,8 +159,8 @@ def get_event_candidate_scores(
     except IndexError:
         return []
     
-    if most_likely_class == "SSM":
-        transients = TRANSIENTS
+    if most_likely_class in {"SSM", "Terrestrial"}:
+        transients = ["KN", "KN-in-SN", "super-KN"]
     elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
         transients = ["KN"]
     elif most_likely_class == "LGRB":
@@ -135,7 +170,7 @@ def get_event_candidate_scores(
     elif most_likely_class == "BBH":
         transients = ["AGN-flare"]
     else:
-        return []
+        transients = []
 
 
     # Batch load all related data at once
@@ -226,8 +261,40 @@ def get_event_candidate_scores(
 
             if include_subscores:
                 ec.subscores[transient] = phot_subscores
-            
-            phot_score = math.prod(list(phot_subscores.values()))
+
+            # ONLY "KN" may use KilonovaSCORER. The three transient types differ
+            # solely in the `param_ranges` above -- `subscore_no_phot` is shared
+            # -- so substituting the same `kn` into all of them made all three
+            # scores numerically identical and silently discarded the
+            # "KN-in-SN" / "super-KN" acceptance windows, which is the whole
+            # content of those two columns.
+            kn = sf_dict.get(KILONOVA_SCORE_KEY)
+            kn_available = kn is not None and math.isfinite(kn)
+            if use_kilonova and transient == "KN" and kn_available:
+                # KilonovaSCORER's factor stands in for the whole TROVE
+                # photometry product -- not multiplied with it, which would
+                # apply the photometry twice.
+                phot_score = kn
+                phot_source = "kilonova"
+            else:
+                phot_score = math.prod(list(phot_subscores.values()))
+                phot_source = "trove"
+
+            # Recorded from the "KN" pass only. This drives the yellow-row
+            # highlight, the "scored only" filter and the blue "no scores yet"
+            # notice, all of which are about the KilonovaSCORER column; taking
+            # it from whichever transient happened to be last would report
+            # "trove" for every candidate as soon as more than one type is
+            # scored.
+            if transient == "KN":
+                ec.phot_source = phot_source
+                # Recorded whether or not it is the factor feeding `ec.score`,
+                # because "was this candidate scored by KilonovaSCORER at all"
+                # is a different question from "is that score in use". The
+                # "no scores yet" notice asks the first one: keying it on
+                # `phot_source` meant a completed Vet All still reported
+                # nothing to anyone whose toggle sat on light curve metrics.
+                ec.kilonova_score = kn if kn_available else None
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object
@@ -236,14 +303,12 @@ def get_event_candidate_scores(
             )  # multiply the subscores
         ecs_out.append(ec)
 
-    print("Finished computing the scores, sorting and returning...", time.time())
+    logger.info(f"Finished computing the scores, sorting and returning... time.time = {time.time()}")
 
-    # sort by the best transient score this candidate has (each event only ever
-    # populates a subset of `transients`, e.g. just "AGN-flare" for BBH, so there's
-    # no single fixed key to sort by across all event types)
-    return sorted(
-        ecs_out, reverse=True, key=lambda x: max(x.score.values()) if x.score else 0
-    )
+    for key in TRANSIENTS:
+        if key in transients:
+            return sorted(ecs_out, reverse=True, key=lambda x: x.score.get(key, 0))
+    return ecs_out
 
 
 def get_target_score(target_id):
@@ -262,3 +327,196 @@ def get_target_score(target_id):
         out[nonlocalized_name] = event_candidate.priority
 
     return out
+
+
+def _latest_run(tasks, latest):
+    """
+    Get running vetting tasks for the most recent "Vet All" run for some event.
+    """
+    stamp = (latest.args_kwargs.get("kwargs") or {}).get("run_started")
+    if stamp:
+        return tasks.filter(args_kwargs__kwargs__run_started=stamp)
+    return tasks.filter(
+        enqueued_at__gte=latest.enqueued_at - timedelta(minutes=2))
+
+
+def get_vet_all_progress(nonlocalizedevent_id):
+    """
+    Get the progress for the most recent "Vet All" run.
+    """
+    if not nonlocalizedevent_id:
+        return None
+
+    try:
+        nle = NonLocalizedEvent.objects.get(id=nonlocalizedevent_id)
+    except (NonLocalizedEvent.DoesNotExist, ValueError):
+        return None
+
+    # get tasks for given NLE
+    tasks = DBTaskResult.objects.filter(
+        queue_name="vet_all",
+        task_path=async_vet.module_path,
+        args_kwargs__kwargs__nle_event_id=nle.event_id,
+    )
+    pending_statuses = [ResultStatus.NEW, ResultStatus.RUNNING]
+
+    try:
+        latest = tasks.order_by("-enqueued_at").first()
+        if latest is None:
+            return None
+
+        # ONE queryset behind every number below, scoped to the latest run.
+        # These used to be split: the running flag counted every pending task
+        # for the EVENT while the totals counted only the latest run, so a task
+        # left pending by some earlier run read as "still running" next to
+        # "88 of 88 scored".
+        #
+        # That is not hypothetical -- trove_test carries five S250206dm tasks
+        # stuck in RUNNING since 14 July, workers that died mid-task without
+        # releasing the row. They are not part of the current run and must not
+        # be counted as either its progress or its totals.
+        run = _latest_run(tasks, latest).aggregate(
+            total=Count("id"),
+            pending=Count("id", filter=Q(status__in=pending_statuses)),
+            failed=Count("id", filter=Q(status=ResultStatus.FAILED)),
+            last_finished=Max("finished_at"),
+            first_enqueued=Min("enqueued_at"),
+        )
+    except DatabaseError:
+        # the progress notice is never worth taking the candidate list down for
+        logger.exception("Could not read Vet All progress for %s", nle.event_id)
+        return None
+
+    pending = run["pending"]
+    if not run["total"]:
+        return None
+
+    last_finished = run["last_finished"]
+    run_kwargs = latest.args_kwargs.get("kwargs") or {}
+    started = (parse_datetime(run_kwargs["run_started"])
+               if run_kwargs.get("run_started") else run["first_enqueued"])
+
+    # a finished run is only news for as long as the button stays on cooldown;
+    # after that, stop reporting it
+    if not pending:
+        if last_finished is None:
+            return None
+        if timezone.now() - last_finished > timedelta(
+            seconds=3600 # 1 hour
+        ):
+            return None
+
+    total = run["total"]
+    done = max(total - run["pending"], 0)
+
+    return {
+        "running": bool(pending),
+        "pending": pending,
+        "done": done,
+        "total": total,
+        "failed": run["failed"],
+        "percent": int(round(100 * done / total)) if total else None,
+        "started": started,
+        "finished": last_finished if not pending else None,
+        "vetting_mode": run_kwargs.get("vetting_mode"),
+        "username": run_kwargs.get("started_by"),
+    }
+
+
+def get_last_vetting(target_id, nonlocalizedevent_id=None):
+    """When was this candidate last vetted?"""
+    if target_id is None:
+        return None
+
+    tasks = DBTaskResult.objects.filter(
+        queue_name="vet_all",
+        task_path=async_vet.module_path,
+        args_kwargs__kwargs__target_ids__0=int(target_id),
+    )
+    if nonlocalizedevent_id:
+        try:
+            nle = NonLocalizedEvent.objects.get(id=nonlocalizedevent_id)
+        except (NonLocalizedEvent.DoesNotExist, ValueError):
+            return None
+        tasks = tasks.filter(args_kwargs__kwargs__nle_event_id=nle.event_id)
+
+    try:
+        latest = tasks.order_by("-enqueued_at").first()
+        if latest is None:
+            return None
+        finished = (tasks.filter(finished_at__isnull=False)
+                    .order_by("-finished_at").first())
+    except DatabaseError:
+        logger.exception("Could not read last vetting for target %s", target_id)
+        return None
+
+    def describe(task):
+        if task is None:
+            return None
+        kwargs = task.args_kwargs.get("kwargs", {})
+        return {
+            "finished": task.finished_at,
+            "enqueued": task.enqueued_at,
+            "status": task.status,
+            "succeeded": task.status == ResultStatus.SUCCEEDED,
+            "vetting_mode": kwargs.get("vetting_mode"),
+            "event_id": kwargs.get("nle_event_id"),
+        }
+
+    return {
+        # a queued or running task means the score on screen is about to change
+        "in_progress": latest.status in (ResultStatus.NEW, ResultStatus.RUNNING),
+        "last": describe(finished),
+        "queued_at": latest.enqueued_at if latest.status == ResultStatus.NEW else None,
+    }
+
+
+def get_last_vet_all_run(nonlocalizedevent_id):
+    """
+    Summarize the most recent "Vet All" run. Distinct from
+    `get_vet_all_progress`, describes an ongoing run.
+    """
+    if not nonlocalizedevent_id:
+        return None
+
+    try:
+        nle = NonLocalizedEvent.objects.get(id=nonlocalizedevent_id)
+    except (NonLocalizedEvent.DoesNotExist, ValueError):
+        return None
+
+    tasks = DBTaskResult.objects.filter(
+        queue_name="vet_all",
+        task_path=async_vet.module_path,
+        args_kwargs__kwargs__nle_event_id=nle.event_id,
+    )
+    try:
+        latest = tasks.order_by("-enqueued_at").first()
+        if latest is None:
+            return None
+        counts = _latest_run(tasks, latest).aggregate(
+            total=Count("id"),
+            succeeded=Count("id", filter=Q(status=ResultStatus.SUCCEEDED)),
+            failed=Count("id", filter=Q(status=ResultStatus.FAILED)),
+            pending=Count(
+                "id",
+                filter=Q(status__in=[ResultStatus.NEW, ResultStatus.RUNNING]),
+            ),
+            finished=Max("finished_at"),
+            first_enqueued=Min("enqueued_at"),
+        )
+    except DatabaseError:
+        logger.exception("Could not read last Vet All run for %s", nle.event_id)
+        return None
+
+    run_kwargs = latest.args_kwargs.get("kwargs") or {}
+    return {
+        "finished": counts["finished"],
+        "started": (parse_datetime(run_kwargs["run_started"])
+                    if run_kwargs.get("run_started") else counts["first_enqueued"]),
+        "vetting_mode": run_kwargs.get("vetting_mode"),
+        "username": run_kwargs.get("started_by"),
+        "total": counts["total"],
+        "succeeded": counts["succeeded"],
+        "failed": counts["failed"],
+        "running": bool(counts["pending"]),
+    }
