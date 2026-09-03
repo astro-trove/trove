@@ -33,7 +33,7 @@ import time
 logger = logging.getLogger(__name__)
 
 # map imported parameter ranges to transients
-TRANSIENTS = ["KN", "KN-in-SN", "super-KN"]
+TRANSIENTS = ["KN", "KN-in-SN", "super-KN", "SN", "TDE"]
 
 DICT_TRANSIENTS_PARAM_RANGES = {
     "KN": KN_PARAM_RANGES,
@@ -110,7 +110,7 @@ def get_no_score_message(nonlocalizedevent_name):
     if most_likely_class in {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}:
         return None
 
-    return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}"
+    return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
 
 
 def get_event_candidate_scores(
@@ -153,7 +153,7 @@ def get_event_candidate_scores(
         return []
     
     if most_likely_class in {"SSM", "Terrestrial"}:
-        transients = TRANSIENTS
+        transients = ["KN", "KN-in-SN", "super-KN"]
     elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
         transients = ["KN"]
     elif most_likely_class == "LGRB":
@@ -294,7 +294,7 @@ def get_event_candidate_scores(
             )  # multiply the subscores
         ecs_out.append(ec)
 
-    print("Finished computing the scores, sorting and returning...", time.time())
+    logger.info(f"Finished computing the scores, sorting and returning... time.time = {time.time()}")
 
     for key in TRANSIENTS:
         if key in transients:
