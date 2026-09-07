@@ -98,6 +98,11 @@ class Command(BaseCommand):
                         OR tt.name=CONCAT('FRB', tns.name))
                    AND (q3c_dist(tt.ra, tt.dec, tns.ra, tns.declination) > 0
                         OR tt.name != CONCAT(tns.name_prefix, tns.name))
+                   AND NOT EXISTS (
+                        SELECT 1 FROM tom_targets_basetarget AS other
+                        WHERE other.id != tt.id
+                        AND other.name = CONCAT(tns.name_prefix, tns.name)
+                   )
                  RETURNING tt.id;
              """)
             updated_ids = [row[0] for row in cursor.fetchall()]
