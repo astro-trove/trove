@@ -32,21 +32,10 @@ from tom_nonlocalizedevents.models import (
 logger = logging.getLogger(__name__)
 
 PARAM_RANGES = dict(
-    t_pre=0,  # baseline = all photometry before the GW trigger (dt < 0)
-    t_post=400,  # flare window: 0-400 days after the GW trigger -- the upper edge
-    # of the "long-delay" flare population of Darc et al. 2025 (PhRvD 112, 063019),
-    # as reported in Vieira et al. 2026 (arXiv:2603.17009) Appendix A; see module
-    # docstring for the short-delay (<=~50 day) vs. long-delay (~50-400 day) split
-    min_baseline_pts=1,  # minimum pre-trigger points in a filter to compute a
-    # baseline at all. Deliberately not raised to demand a "robust" baseline (e.g.
-    # 5+): TROVE photometry is often sparse, and KN scoring already commits to
-    # giving a reasonable score off as little as 1-2 points rather than refusing
-    # to score at all -- see fit_agn_baseline's docstring for how the same
-    # median+MAD formula degrades gracefully down to n=1 without a separate
-    # code path for "not enough points."
-    flare_sigma_thresh=5.0,  # reference significance for "confident flare" in
-    # flare_confidence_score, matches PREDETECTION_SNR_THRESHOLD's 5-sigma
-    # convention elsewhere in vet_phot.py
+    t_pre=0, # consider using t_pre < 0
+    t_post=400, 
+    min_baseline_pts=1, 
+    flare_sigma_thresh=5.0, 
     flare_score_center_frac=0.5,  # sigmoid midpoint, as a fraction of flare_sigma_thresh
     flare_score_width_frac=0.25,  # sigmoid transition width, as a fraction of flare_sigma_thresh
     agn_boost_multiplier=5.0,
@@ -60,17 +49,7 @@ def flare_confidence_score(
     center_frac: float = 0.5,
     width_frac: float = 0.25,
 ) -> float:
-    """
-    Map a brightening significance (in sigma, as returned by `detect_flare`) onto a
-    continuous [floor, 1.0] confidence score via a normal-CDF sigmoid, instead of a
-    hard pass/fail cut at `thresh`.
-
-    The sigmoid is centered at `center_frac * thresh` with transition width
-    `width_frac * thresh`, so with the defaults a significance of 0 sits near
-    `floor`, `thresh` itself sits near (but not at) the ceiling, and significances
-    well above `thresh` saturate at 1.0 -- deliberately similar to the old hard-cut
-    behavior at exactly `thresh`, but without the discontinuity.
-    """
+    # Maps significance to score using normal CDF
     center = center_frac * thresh
     width = max(width_frac * thresh, 1e-6)
     raw = norm.cdf(significance, loc=center, scale=width)
@@ -79,44 +58,11 @@ def flare_confidence_score(
 
 def fit_agn_baseline(prephot: Optional[pd.DataFrame], min_baseline_pts: int = 1) -> dict:
     """
-    Characterize the pre-merger "typical variability envelope" of the candidate host
-    AGN, per filter, without assuming any particular variability model.
+    Per-filter pre-merger baseline: median mag + robust (MAD-based) scatter, floored
+    at measurement error. See BBH_SCORING.md for the full rationale.
 
-    Uses the robust median magnitude and 1.4826*MAD (a robust estimator of the
-    standard deviation) of the pre-merger photometry in each filter. This is
-    deliberately model-agnostic: it says nothing about *why* an AGN varies (DRW, PSD,
-    etc.), only how much it has historically varied, which is all that's needed to
-    flag a later excursion as unusual.
-
-    Degrades gracefully with sparse photometry rather than refusing to score, the
-    same choice TROVE's KN scoring already makes (a kilonova can be scored off a
-    single detection): with few points the MAD estimate itself shrinks toward 0
-    (at n=1 it's exactly 0, at n=2 both points are equidistant from their median so
-    it's still 0), but it's floored at the median measurement error a few lines
-    below, so the "baseline" for a thinly-sampled filter is effectively just its
-    most recent pre-merger point plus its own reported uncertainty -- a plain
-    two-point brightening comparison, not a claim of having characterized the AGN's
-    long-term variability. `min_baseline_pts` exists to cut this off entirely (0
-    points = no baseline for that filter at all), not to gate "how many points
-    until this is trustworthy" -- there's no such threshold built into the formula
-    itself, only progressively wider uncertainty as points get scarcer.
-
-    Parameters
-    ----------
-    prephot : pd.DataFrame or None
-        Pre-merger photometry, as returned by `vet_phot._get_pre_disc_phot`. Expected
-        columns: mag, magerr, filter, upperlimit.
-    min_baseline_pts : int
-        Minimum number of detections required in a filter before it gets a baseline
-        entry at all. Low by default (see module docstring) -- this is a floor
-        against zero data, not a robustness gate.
-
-    Returns
-    -------
-    dict mapping filter -> dict(mag=<median mag>, std=<robust scatter, floored at
-    measurement error>, n=<n points>)
-    Filters with fewer than `min_baseline_pts` points are simply absent from the
-    returned dict.
+    Returns dict mapping filter -> dict(mag, std, n); filters below
+    `min_baseline_pts` real detections are absent.
     """
     baseline = {}
     if prephot is None or not len(prephot):
@@ -129,9 +75,7 @@ def fit_agn_baseline(prephot: Optional[pd.DataFrame], min_baseline_pts: int = 1)
             continue
         median_mag = float(np.median(mags))
         robust_std = 1.4826 * float(np.median(np.abs(mags - median_mag)))
-        # floor the scatter at the median measurement error so a baseline that
-        # happens to be tightly time-sampled (MAD -> 0) doesn't make every later
-        # point look artificially significant
+        # If scatter is less than detector noise, then just use detector noise as the scatter
         median_err = float(np.median(group.magerr.to_numpy(dtype=float)))
         robust_std = max(robust_std, median_err)
         baseline[filt] = dict(mag=median_mag, std=robust_std, n=int(len(mags)))
@@ -142,10 +86,9 @@ def _flare_significance_series(
     postphot: Optional[pd.DataFrame], baseline: dict
 ) -> Optional[pd.DataFrame]:
     """
-    Shared helper for `detect_flare` and `estimate_flare_extent`: attach a
-    brightening-significance column (in sigma, baseline vs. observed mag) to every
-    detection in `postphot` whose filter has a fitted `baseline`. Returns None if
-    nothing qualifies.
+    Shared by `detect_flare`/`estimate_flare_extent`: attach a brightening-
+    significance column (sigma, baseline vs. observed mag) to every detection in
+    `postphot` whose filter has a fitted baseline. None if nothing qualifies.
     """
     if postphot is None or not len(postphot) or not baseline:
         return None
@@ -169,29 +112,10 @@ def detect_flare(
     sigma_thresh: float = 5.0,
 ):
     """
-    Look for a significant brightening excursion above the AGN baseline within the
-    post-merger photometry.
+    Largest brightening significance in `postphot` against `baseline`, and its row.
+    `sigma_thresh` isn't used to filter here; the caller compares against it.
 
-    Only brightening (flux excess relative to baseline) counts as a candidate flare,
-    matching the physical picture of an accretion-episode re-brightening; a dimming
-    excursion is not flagged.
-
-    Parameters
-    ----------
-    postphot : pd.DataFrame or None
-        Post-merger photometry in the scoring window, as returned by
-        `vet_phot._get_post_disc_phot`.
-    baseline : dict
-        Output of `fit_agn_baseline`.
-    sigma_thresh : float
-        Not used to filter here -- the caller compares the returned significance to
-        this threshold. Kept as an argument for symmetry / future use.
-
-    Returns
-    -------
-    (max_significance, best_row): the largest brightening significance found and its
-    corresponding photometry row (a pandas Series), or (np.nan, None) if nothing in
-    postphot has a filter with a fitted baseline.
+    Returns (max_significance, best_row), or (np.nan, None) if nothing qualifies.
     """
     phot = _flare_significance_series(postphot, baseline)
     if phot is None:
@@ -206,27 +130,13 @@ def estimate_flare_extent(
     extent_sigma_thresh: float = 3.0,
 ):
     """
-    Estimate a candidate flare's delay-from-merger and duration, for comparing
-    against the timing envelopes of published BBH-flare emission models
-    (`flare_shape_score`).
+    Delay-from-merger and duration of a candidate flare, for `flare_shape_score`.
+    `postphot` must carry a `dt` column (days since the GW trigger).
 
-    `postphot` must carry a `dt` column (days since the GW trigger), as produced by
-    `vet_phot._get_post_disc_phot`.
-
-    Returns
-    -------
-    (delay_days, duration_days) : delay_days is `dt` of the single most significant
-    brightening point (same point `detect_flare` would report). duration_days is the
-    span between the earliest and latest points *anywhere* in postphot with
-    significance >= `extent_sigma_thresh` -- deliberately looser than
-    `detect_flare`'s usual 5-sigma detection threshold, since this is meant to
-    bracket the whole elevated episode rather than find its single most significant
-    point. duration_days is None (rather than 0) when fewer than two such points
-    exist, since ground-based survey cadence is usually too sparse to trust a
-    duration estimate from a single point -- `flare_shape_score` treats that as
-    "unconstrained", not "instantaneous". Both are None if no flare is detectable at
-    all (mirrors `detect_flare`'s (nan, None) for "no data", but None here since
-    delay/duration aren't naturally NaN-typed floats read back out of ScoreFactor).
+    delay_days is `dt` of the most significant point (same as `detect_flare`).
+    duration_days spans the earliest-to-latest points anywhere in postphot at or
+    above the looser `extent_sigma_thresh`, or None if fewer than two such points
+    exist. Both None if no flare is detectable at all.
     """
     phot = _flare_significance_series(postphot, baseline)
     if phot is None:
@@ -242,24 +152,10 @@ def estimate_flare_extent(
     return delay_days, duration_days
 
 
-# (delay_lo, delay_hi, duration_lo, duration_hi) envelopes, in observed-frame days
-# since the GW trigger, for the three BBH-in-AGN-disk emission mechanisms Darc et al.
-# 2025 (PhRvD 112, 063019) fit against real long-term photometry of a GW/AGN-flare
-# candidate (S231206cc). Bounds are deliberately generous envelopes around each
-# paper's own quoted numbers, not sharp physical limits -- ground-based survey
-# cadence isn't good enough to trust more precision than "roughly consistent with
-# this channel":
-#   mck19  -- McKernan et al. 2019 (ApJL 884, L50): ram-pressure-stripped Hill
-#             sphere. Delay ranges from <3 days (kick velocity v_k >~ 500 km/s) to
-#             ~300 days (v_k <~ 100 km/s); duration ~1-100 days.
-#   jrr_i  -- Rodriguez-Ramirez et al. 2025 (PhRvD 111, 083020): jet-cocoon thermal
-#             diffusion. Needs v_k >~ 200 km/s to form an efficient jet at all; delay
-#             ~50-100+ days, duration ~20-100+ days (both open-ended upward, capped
-#             here at a generous but finite value).
-#   tgw24  -- Tagawa et al. 2024 (ApJ 966, 21): jet breakout + shock cooling. Delay
-#             favors <~50 days for close-in mergers (<0.005 pc, though those are
-#             usually too short to detect) out to 40-300 days for ~1 pc mergers;
-#             duration ~10-200+ days.
+# (delay_lo, delay_hi), (duration_lo, duration_hi) envelopes, observed-frame days
+# since the GW trigger, for three published BBH-in-AGN-disk emission mechanisms.
+# See BBH_SCORING.md ("How the three envelopes were derived") for how each box was
+# set and full references (McKernan+2019, Rodriguez-Ramirez+2025, Tagawa+2024).
 FLARE_SHAPE_MODELS = dict(
     mck19=dict(delay=(0.0, 300.0), duration=(1.0, 100.0)),
     jrr_i=dict(delay=(50.0, 150.0), duration=(20.0, 150.0)),
@@ -282,27 +178,13 @@ def flare_shape_scores_by_model(
     floor: float = PHOT_SCORE_MIN,
 ) -> dict:
     """
-    Score how consistent an observed flare's timing is with *each* published
-    BBH-in-AGN-disk emission model in `models` individually, rather than
-    collapsing straight to a single aggregate -- TROVE has no way to know a
-    priori which mechanism (if any) applies to a given candidate, since that
-    depends on kick velocity, SMBH mass, and merger location within the disk, so
-    the per-model breakdown is worth keeping around to see (e.g. on the
-    candidate page) which specific published picture, if any, a candidate
-    actually resembles.
+    Score `(delay_days, duration_days)` against each model in `models`
+    independently (see BBH_SCORING.md for why per-model, not a single aggregate).
+    Each score is `delay_score * duration_score`, 1.0 inside the model's envelope
+    and falling off smoothly outside it via `_box_edge_score`. `duration_days=None`
+    skips the duration check (delay-only).
 
-    Each model's fit is `delay_score * duration_score`, each of which is 1.0 inside
-    that model's envelope and falls off smoothly (not a hard cut) outside it, via
-    `_box_edge_score` with the box's own width as the falloff scale.
-
-    `duration_days` may be None (too little post-merger photometry above the
-    extent-detection threshold in `estimate_flare_extent` to bracket a span) -- in
-    that case only delay is checked, since a single data point can't rule a model's
-    duration range in or out.
-
-    Returns
-    -------
-    dict mapping model name (e.g. "mck19") -> score.
+    Returns dict mapping model name -> score.
     """
     scores = {}
     for name, model in models.items():
@@ -313,22 +195,6 @@ def flare_shape_scores_by_model(
             score *= _box_edge_score(duration_days, dur_lo, dur_hi, dur_hi - dur_lo, floor)
         scores[name] = score
     return scores
-
-
-def flare_shape_score(
-    delay_days: float,
-    duration_days: Optional[float],
-    models: dict = FLARE_SHAPE_MODELS,
-    floor: float = PHOT_SCORE_MIN,
-) -> float:
-    """
-    Score how consistent an observed flare's timing is with *any one* of the
-    published BBH-in-AGN-disk emission models in `models`, rather than a single
-    one-size-fits-all cut. Takes the best-fitting model's score (see
-    `flare_shape_scores_by_model`), not a penalized combination across all three.
-    """
-    scores = flare_shape_scores_by_model(delay_days, duration_days, models, floor)
-    return max(scores.values(), default=floor)
 
 
 def vet_bbh(
@@ -439,18 +305,9 @@ def vet_bbh(
         )
         update_score_factor(event_candidate, "agn_flare_score", agn_flare_score)
 
-        # model-based layer: is the flare's timing consistent with a *specific*
-        # published emission model's envelope? Not model-agnostic (see module
-        # docstring point 4), so it is always computed and stored here but kept out
-        # of the default score product -- scoring/util.get_event_candidate_scores'
-        # flare_shape_toggle decides whether it's included, at read time, the same
-        # way agn_toggle decides whether agn_score is. That -- not a vet-time
-        # PARAM_RANGES flag -- is what lets a user flip it live without a re-vet.
-        # Every individual model's score is stored too (flare_shape_score_<name>),
-        # not just the aggregate max -- these are display-only (not in
-        # scoring/util.SUBSCORE_NAMES, so they never enter the score product) and
-        # let the candidate page show which specific published picture, if any,
-        # a candidate resembles.
+        # model-dependent layer, always computed/stored; scoring/util.py's
+        # flare_shape_toggle decides at read time whether it joins the score
+        # product (see BBH_SCORING.md). Per-model scores are display-only.
         flare_shape_model_keys = [f"flare_shape_score_{name}" for name in FLARE_SHAPE_MODELS]
         delay_days, duration_days = estimate_flare_extent(postphot, baseline)
         if delay_days is not None:

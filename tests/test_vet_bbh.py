@@ -238,37 +238,6 @@ class TestBoxEdgeScore:
         assert scores == sorted(scores, reverse=True)
 
 
-class TestFlareShapeScore:
-    def test_delay_and_duration_inside_a_model_scores_high(self):
-        from scoring.vet_bbh import flare_shape_score
-
-        # inside jrr_i's (50-150, 20-150) box
-        assert flare_shape_score(80.0, 60.0) == pytest.approx(1.0)
-
-    def test_delay_only_still_checked_against_delay_range(self):
-        from scoring.vet_bbh import flare_shape_score
-
-        # duration unconstrained (None); delay=80 still inside multiple models'
-        # delay ranges, so shouldn't be penalized for the missing duration
-        assert flare_shape_score(80.0, None) == pytest.approx(1.0)
-
-    def test_delay_far_outside_all_models_floors(self):
-        from scoring.vet_bbh import flare_shape_score
-        from scoring.vet_phot import PHOT_SCORE_MIN
-
-        score = flare_shape_score(1e6, None)
-        assert score == pytest.approx(PHOT_SCORE_MIN, abs=1e-3)
-
-    def test_best_matching_model_wins(self):
-        from scoring.vet_bbh import flare_shape_score
-
-        # delay=10 is outside jrr_i's (50-150) range but inside mck19's and
-        # tgw24's (0-300) ranges -- should still score well via those, not be
-        # dragged down by jrr_i
-        score = flare_shape_score(10.0, None)
-        assert score == pytest.approx(1.0)
-
-
 class TestFlareShapeScoresByModel:
     def test_returns_one_score_per_model(self):
         from scoring.vet_bbh import flare_shape_scores_by_model, FLARE_SHAPE_MODELS
@@ -276,12 +245,36 @@ class TestFlareShapeScoresByModel:
         scores = flare_shape_scores_by_model(80.0, 60.0)
         assert set(scores.keys()) == set(FLARE_SHAPE_MODELS.keys())
 
-    def test_max_of_breakdown_matches_aggregate(self):
-        from scoring.vet_bbh import flare_shape_score, flare_shape_scores_by_model
+    def test_delay_and_duration_inside_a_model_scores_high(self):
+        from scoring.vet_bbh import flare_shape_scores_by_model
 
-        for delay, duration in [(80.0, 60.0), (10.0, None), (1e6, None)]:
-            scores = flare_shape_scores_by_model(delay, duration)
-            assert flare_shape_score(delay, duration) == pytest.approx(max(scores.values()))
+        # inside jrr_i's (50-150, 20-150) box
+        scores = flare_shape_scores_by_model(80.0, 60.0)
+        assert max(scores.values()) == pytest.approx(1.0)
+
+    def test_delay_only_still_checked_against_delay_range(self):
+        from scoring.vet_bbh import flare_shape_scores_by_model
+
+        # duration unconstrained (None); delay=80 still inside multiple models'
+        # delay ranges, so shouldn't be penalized for the missing duration
+        scores = flare_shape_scores_by_model(80.0, None)
+        assert max(scores.values()) == pytest.approx(1.0)
+
+    def test_delay_far_outside_all_models_floors(self):
+        from scoring.vet_bbh import flare_shape_scores_by_model
+        from scoring.vet_phot import PHOT_SCORE_MIN
+
+        scores = flare_shape_scores_by_model(1e6, None)
+        assert max(scores.values()) == pytest.approx(PHOT_SCORE_MIN, abs=1e-3)
+
+    def test_best_matching_model_wins(self):
+        from scoring.vet_bbh import flare_shape_scores_by_model
+
+        # delay=10 is outside jrr_i's (50-150) range but inside mck19's and
+        # tgw24's (0-300) ranges -- should still score well via those, not be
+        # dragged down by jrr_i
+        scores = flare_shape_scores_by_model(10.0, None)
+        assert max(scores.values()) == pytest.approx(1.0)
 
     def test_penalizes_model_whose_delay_range_is_missed(self):
         from scoring.vet_bbh import flare_shape_scores_by_model
