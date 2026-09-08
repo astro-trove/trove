@@ -34,7 +34,11 @@ logger = logging.getLogger(__name__)
 PARAM_RANGES = dict(
     t_pre=0, # consider using t_pre < 0
     t_post=400, 
-    min_baseline_pts=1, 
+    min_baseline_pts=2,  # smallest n whose MAD carries any scatter information:
+    # at n=1 the MAD is identically 0 and the "baseline" collapses to a single
+    # point plus its own reported error, which inflates flare significance for
+    # sparsely sampled filters. Kept low (not 5+) because TROVE photometry is
+    # often sparse and KN scoring likewise scores off very few points.
     flare_sigma_thresh=5.0, 
     flare_score_center_frac=0.5,  # sigmoid midpoint, as a fraction of flare_sigma_thresh
     flare_score_width_frac=0.25,  # sigmoid transition width, as a fraction of flare_sigma_thresh
@@ -56,10 +60,15 @@ def flare_confidence_score(
     return float(np.clip(floor + (1.0 - floor) * raw, floor, 1.0))
 
 
-def fit_agn_baseline(prephot: Optional[pd.DataFrame], min_baseline_pts: int = 1) -> dict:
+def fit_agn_baseline(prephot: Optional[pd.DataFrame], min_baseline_pts: int = 2) -> dict:
     """
     Per-filter pre-merger baseline: median mag + robust (MAD-based) scatter, floored
-    at measurement error. See BBH_SCORING.md for the full rationale.
+    at measurement error.
+
+    Deliberately model-agnostic -- no AGN variability model (DRW, CARMA, PSD) is fit,
+    since this only needs to know how much the source has historically varied, not
+    why. The MAD is floored at the median measurement error so a tightly sampled
+    filter can't make every later point look significant.
 
     Returns dict mapping filter -> dict(mag, std, n); filters below
     `min_baseline_pts` real detections are absent.
@@ -154,8 +163,16 @@ def estimate_flare_extent(
 
 # (delay_lo, delay_hi), (duration_lo, duration_hi) envelopes, observed-frame days
 # since the GW trigger, for three published BBH-in-AGN-disk emission mechanisms.
-# See BBH_SCORING.md ("How the three envelopes were derived") for how each box was
-# set and full references (McKernan+2019, Rodriguez-Ramirez+2025, Tagawa+2024).
+# Each box is a generous envelope around that paper's own quoted numbers, not a sharp
+# physical limit -- survey cadence can't justify more precision than "roughly
+# consistent with this channel":
+#   mck19 -- McKernan et al. 2019 (ApJL 884, L50), ram-pressure-stripped Hill sphere:
+#            delay <3 d (kick >~500 km/s) to ~300 d (<~100 km/s), duration ~1-100 d.
+#   jrr_i -- Rodriguez-Ramirez et al. 2025 (PhRvD 111, 083020), jet-cocoon thermal
+#            diffusion: needs kick >~200 km/s, delay ~50-100+ d, duration ~20-100+ d
+#            (both open-ended upward, capped here at a generous finite value).
+#   tgw24 -- Tagawa et al. 2024 (ApJ 966, 21), jet breakout + shock cooling: delay
+#            <~50 d for close-in mergers out to 40-300 d at ~1 pc, duration ~10-200+ d.
 FLARE_SHAPE_MODELS = dict(
     mck19=dict(delay=(0.0, 300.0), duration=(1.0, 100.0)),
     jrr_i=dict(delay=(50.0, 150.0), duration=(20.0, 150.0)),
@@ -179,7 +196,9 @@ def flare_shape_scores_by_model(
 ) -> dict:
     """
     Score `(delay_days, duration_days)` against each model in `models`
-    independently (see BBH_SCORING.md for why per-model, not a single aggregate).
+    independently rather than collapsing straight to one aggregate: TROVE can't know
+    a priori which mechanism (if any) applies to a candidate, so the breakdown of
+    which published picture it resembles is worth showing on the candidate page.
     Each score is `delay_score * duration_score`, 1.0 inside the model's envelope
     and falling off smoothly outside it via `_box_edge_score`. `duration_days=None`
     skips the duration check (delay-only).
@@ -307,7 +326,9 @@ def vet_bbh(
 
         # model-dependent layer, always computed/stored; scoring/util.py's
         # flare_shape_toggle decides at read time whether it joins the score
-        # product (see BBH_SCORING.md). Per-model scores are display-only.
+        # product, the same way agn_toggle does for agn_score -- that's what lets
+        # a user flip it live without a re-vet. Per-model scores are display-only
+        # (not in SUBSCORE_NAMES), so they never enter the score product.
         flare_shape_model_keys = [f"flare_shape_score_{name}" for name in FLARE_SHAPE_MODELS]
         delay_days, duration_days = estimate_flare_extent(postphot, baseline)
         if delay_days is not None:

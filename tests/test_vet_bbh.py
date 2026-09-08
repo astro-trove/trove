@@ -35,9 +35,28 @@ class TestFitAgnBaseline:
     def test_too_few_points_dropped(self):
         from scoring.vet_bbh import fit_agn_baseline
 
-        # only 3 points in 'r', below the default min_baseline_pts=5
+        # only 3 points in 'r', below the min_baseline_pts=5 asked for here
         phot = _phot_df([18.0, 18.1, 17.9], [0.05, 0.05, 0.05], ["r"] * 3)
         assert fit_agn_baseline(phot, min_baseline_pts=5) == {}
+
+    def test_single_point_rejected_at_default(self):
+        from scoring.vet_bbh import PARAM_RANGES, fit_agn_baseline
+
+        # at n=1 the MAD is identically 0, so the baseline would collapse to one
+        # point plus its own error -- PARAM_RANGES' min_baseline_pts=2 excludes it
+        assert PARAM_RANGES["min_baseline_pts"] == 2
+        phot = _phot_df([18.0], [0.05], ["r"])
+        assert fit_agn_baseline(phot) == {}
+
+    def test_two_points_give_nonzero_scatter(self):
+        from scoring.vet_bbh import fit_agn_baseline
+
+        # n=2 is the smallest n whose MAD carries scatter information: the two
+        # deviations are equal and nonzero, so robust_std exceeds the 0.01 error floor
+        phot = _phot_df([18.0, 18.4], [0.01, 0.01], ["r"] * 2)
+        baseline = fit_agn_baseline(phot)
+        assert baseline["r"]["n"] == 2
+        assert baseline["r"]["std"] == pytest.approx(1.4826 * 0.2)
 
     def test_enough_points_computes_robust_stats(self):
         from scoring.vet_bbh import fit_agn_baseline
@@ -57,7 +76,7 @@ class TestFitAgnBaseline:
         mags = [18.0, 18.2, 17.8, 18.1, 17.9]
         upperlimit = [False, False, False, False, True]
         phot = _phot_df(mags, [0.05] * len(mags), ["r"] * len(mags), upperlimit)
-        # only 4 real detections, below min_baseline_pts=5
+        # only 4 real detections, below the min_baseline_pts=5 asked for here
         assert fit_agn_baseline(phot, min_baseline_pts=5) == {}
 
     def test_filters_are_independent(self):
