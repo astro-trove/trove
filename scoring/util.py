@@ -67,6 +67,11 @@ SUBSCORE_NAMES = [
     "phot_decay_rate",
     "agn_flare_score",
     "flare_shape_score",
+    # BBH/AGN-flare: the combined competing-explanation penalty. Its components
+    # (contaminant_tns/offset/quiescent/color/shape_score) are stored for display
+    # but deliberately kept out of this list -- vet_bbh combines them with min()
+    # rather than letting them compound into the product.
+    "contaminant_score",
 ]
 
 # some of the keys in ScoreFactor are really just calculated values
