@@ -48,3 +48,4 @@ ZTF_INFO = { # Login info for sending requests to the ZTF forced photometry serv
     "user_address":"",
     "user_password":""
 }
+DUSTMAPS_DIR=None # set to the local path for SFD dustmaps, or leave as 'None' to download from dataverse

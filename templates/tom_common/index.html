@@ -1,3 +1,8 @@
+{% extends 'tom_common/base.html' %}
+{% load static targets_extras observation_extras dataproduct_extras tom_common_extras custom_code_extras nonlocalizedevent_extras skymap_extras %}
+{% block title %}Home{% endblock %}
+
+{% block content %}
 <style>
   .select2-container {
     width: 100% !important;
@@ -22,10 +27,7 @@
   to { transform: rotate(360deg); }
 }
 </style>
-{% extends 'tom_common/base.html' %}
-{% load static targets_extras observation_extras dataproduct_extras custom_code_extras tom_common_extras nonlocalizedevent_extras skymap_extras %}
-{% block title %}Home{% endblock %}
-{% block content %}
+
 <div class="row">
   <!-- LEFT SIDE OF PAGE -->
   <div class="col-md-6">
@@ -35,7 +37,7 @@
             <img src="{% static 'img/trove_logo_small.jpeg' %}" style="flex:0 0 auto">
             <div style="flex:1 1 auto;">
                 <h1 style="text-align:justify flex: 1 1 auto"><b>Welcome to the TROVE!</b></h1>
-                <h4 style="text-align:justify flex: 1 1 auto"><b>[alpha version]</b></h4>
+                <h4 style="text-align:justify flex: 1 1 auto"><b>[beta version]</b></h4>
             </div>
         </div>
     </div>
@@ -48,7 +50,7 @@
     <h5 style="text-align:justify">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
     <br>
     {% endcomment %}
-    <h5 style="text-align:justify">TROVE is currently in <b>alpha</b> development. If you encounter an issue, please <a href="https://github.com/astro-trove/trove/issues/new" target="_blank">open an issue</a> on our Github.</h5>
+    <h5 style="text-align:justify">TROVE is currently in <b>beta testing</b>. If you encounter an issue, please <a href="https://github.com/astro-trove/trove/issues/new" target="_blank">open an issue</a> on our Github.</h5>
     <br>
     <h5 style="text-align:justify"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
     <br>
@@ -124,14 +126,14 @@
       <div class="card-header">
         <b>Latest Targets</b>
       </div>
-      {% recent_targets 5 %}
+      {% recent_targets 5 %}arg
     </div>
     {% endcomment %}
 
     <!-- Latest comments on targets -->
     <div class="card">
       <div class="card-header">
-        <b>Latest Target Comments</b>
+        <b>Latest Candidate Comments</b>
       </div>
       {% recent_comments %}
     </div>

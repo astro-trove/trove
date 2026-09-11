@@ -21,7 +21,7 @@ An example curl command is:
        -u '<username>:<password>'
 
 where you replace <username> with your username and <password> with your password. If you are doing this in python,
-see the `Example Jupyter Notebooks <apiexample>`_.
+see the `Example Jupyter Notebooks <nbs/basic_usage.html>`_.
 
 .. toctree::
    :maxdepth: 2

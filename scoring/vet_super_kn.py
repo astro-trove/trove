@@ -12,9 +12,11 @@ import numpy as np
 from .scoring import (
     update_score_factor,
     delete_score_factor,
+    clean_host_df,
     host_distance_match,
     get_distance_score,
     skymap_association,
+    _localization_from_name,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -44,6 +46,7 @@ PARAM_RANGES = dict(
     t_post=np.inf,
     max_decay_fit_time=100,
     phot_score_snr_min=5,
+    min_time_separation=1/24,
 )
 
 
@@ -77,17 +80,19 @@ def vet_super_kn(
         nonlocalized_event_name, target_id, max_time=max_time
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
-    if skymap_score < 1e-2:
-        return
+
+    # the skymap and distance scores are only valid for one localization, so
+    # record which one produced them
+    localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
+    update_score_factor(event_candidate, "localization_id", localization.id)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    if not keep_vetting:
+        # same as vet_kn.py
+        return
     # some cleanup
-    if len(host_df): ### TODO: these are filler values, should just change them to nulls in our database
-        host_df = host_df[host_df.z != -99.0] # LS DR9 North
-        host_df = host_df[host_df.z != -999.0] # PS1-STRM
-        host_df = host_df[host_df.z != -9999.0] # SDSS DR12 photo-z
-        host_df = host_df[~np.isnan(host_df.z)]
+    host_df = clean_host_df(host_df)
 
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
@@ -102,11 +107,12 @@ def vet_super_kn(
         host_df = host_distance_match(host_df, target_id, nonlocalized_event_name)
 
         # choose the maximum score
-        host_score, host_name = get_distance_score(
+        host_score, host_name, host_catalog = get_distance_score(
             host_df, target_id, nonlocalized_event_name
         )
         update_score_factor(event_candidate, "host_distance_score", host_score)
         update_score_factor(event_candidate, "host_name", host_name)
+        update_score_factor(event_candidate, "host_catalog", host_catalog)
 
     else:
         # if no target redshift is known and no hosts are found, we don't want
@@ -116,10 +122,11 @@ def vet_super_kn(
         # and we should also clear out any existing scores / host names for it
         delete_score_factor(event_candidate, "host_distance_score")
         delete_score_factor(event_candidate, "host_name")
+        delete_score_factor(event_candidate, "host_catalog")
 
     ## AGN scoring
     if len(agn_df) != 0:
-        agn_assoc_score = 0  # association with an AGN is bad
+        agn_assoc_score = 0.1  # association with an AGN is bad
     else:
         agn_assoc_score = 1
     agn_score = agn_assoc_score  # don't bother with 3D AGN scoring, for now

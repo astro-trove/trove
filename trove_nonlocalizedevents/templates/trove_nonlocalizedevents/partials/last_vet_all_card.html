@@ -1,0 +1,52 @@
+{% comment %}
+Standing record of when this event's scores were last refreshed in bulk.
+
+Distinct from the progress notice above, which only appears while a run is
+happening or has just finished. This stays put, so "are these scores current?"
+has an answer at any time.
+{% endcomment %}
+{% if last_vet_all %}
+<div class="row">
+  {% if request.user.is_superuser %}
+  <div class="col-md-10">
+    <div class="card mb-3">
+      <div class="card-header"><h5 class="mb-0">Most Recent <em>Vet All</em> run (superuser-viewable only)</h5></div>
+      <div class="card-body">
+        <dl class="row mb-0">
+          {% if last_vet_all.running %}
+          <dt class="col-sm-3">Status</dt>
+          <dd class="col-sm-9"><span class="badge badge-warning">running now</span></dd>
+          {% endif %}
+          <dt class="col-sm-3">Last completed</dt>
+          <dd class="col-sm-9">
+            {% if last_vet_all.finished %}
+            {{ last_vet_all.finished|date:"Y-m-d H:i" }} UTC
+            <span class="text-muted">({{ last_vet_all.finished|timesince }} ago)</span>
+            {% else %}
+            <span class="text-muted">nothing has finished yet</span>
+            {% endif %}
+          </dd>
+          <dt class="col-sm-3">Vetting mode</dt>
+          <dd class="col-sm-9">{{ last_vet_all.vetting_mode|default:"unknown" }}</dd>
+          {% if last_vet_all.username %}
+          <dt class="col-sm-3">Started by</dt>
+          <dd class="col-sm-9">{{ last_vet_all.username }}{% if last_vet_all.started %}
+            at {{ last_vet_all.started|date:"Y-m-d H:i" }} UTC{% endif %}</dd>
+          {% endif %}
+          {% if last_vet_all.total %}
+          <dt class="col-sm-3">Candidates</dt>
+          <dd class="col-sm-9">
+            {{ last_vet_all.succeeded }} of {{ last_vet_all.total }} scored
+            {% if last_vet_all.failed %}
+            &mdash; <strong>{{ last_vet_all.failed }} failed</strong> and still
+            show their previous score
+            {% endif %}
+          </dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endif %}

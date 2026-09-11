@@ -10,6 +10,7 @@ Welcome to the Treasure TROVE: a Tool for Rapid Object Vetting and Examination!
 
   * https://github.com/astro-trove/candidate_vetting
   * https://github.com/astro-trove/trove-mpc
+  * https://github.com/phelipedarc/KilonovaSCORER
   * https://github.com/SAGUARO-MMA/saguaro_tom
 
 ## Installation (for development)

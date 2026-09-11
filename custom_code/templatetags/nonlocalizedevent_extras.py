@@ -78,12 +78,25 @@ def format_area(area):
 def get_most_likely_class(details):
     if not details:
         return
-    elif details["search"] == "SSM":
+    elif "search" in details and details["search"] == "SSM":
         return details["search"]
-    elif details["group"] == "CBC":
+    elif "group" in details and details["group"] == "CBC":
         classification = details["classification"]
         return max(classification, key=classification.get)
-    else:  # burst
+    elif "group" not in details:
+        # Noah -- This feels somewhat dangerous of an elif statement
+        # BUT, I think these are only ever EP or IceCube events, unless we start
+        # listening to something else.
+        # I checked the Hermes schemas for GW events, GRBs, and Neutrinos and
+        # as far as I can tell only EP and neutrino events don't have this "group"
+        # and we can distinguish between them as follows
+        if "instrument" in details and details["instrument"] == "WXT":
+            return "FXT"
+        elif "messenger" in details and details["messenger"] == "Neutrino":
+            return "neutrino"
+        else:
+            return ""
+    else:  # then this is a gamma-ray burst
         return details["group"]
 
 

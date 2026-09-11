@@ -10,7 +10,7 @@ from tom_nonlocalizedevents.models import (
 from astropy.coordinates import SkyCoord
 
 from dataclasses import dataclass
-from scoring.vet_bns import vet_bns
+from scoring.vet_kn import vet_kn
 
 
 @dataclass
@@ -25,7 +25,7 @@ class Command(BaseCommand):
         target_id = 843837402
         nonlocalized_event_name = "S241109bn"
 
-        vet_bns(target_id, nonlocalized_event_name)
+        vet_kn(target_id, nonlocalized_event_name)
 
         # a harder test case
         # t = TestTarget(11.7132006873, -25.4275854797)

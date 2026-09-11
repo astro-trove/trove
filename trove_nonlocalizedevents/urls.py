@@ -3,8 +3,11 @@ from .views import (
     EventCandidateCreateFromNLEView,
     generate_report,
     ToggleAgnCacheView,
+    TogglePhotMethodCacheView,
     RefreshCandidateList,
     SkymapPartialView,
+    VetAllProgressPartialView,
+    vet_all_cooldown_notice
 )
 
 app_name = "trove_nonlocalizedevents"
@@ -22,6 +25,11 @@ urlpatterns = [
         name="toggle-agn-cache",
     ),
     path(
+        "toggle-phot-method/",
+        TogglePhotMethodCacheView.as_view(),
+        name="toggle-phot-method",
+    ),
+    path(
         "refresh-candidate-list",
         RefreshCandidateList.as_view(),
         name="refresh-candidate-list"
@@ -30,5 +38,15 @@ urlpatterns = [
         "skymap/",
         SkymapPartialView.as_view(),
         name="skymap"
+    ),
+    path(
+        "vet-all-progress/",
+        VetAllProgressPartialView.as_view(),
+        name="vet-all-progress"
+    ),
+    path(
+        'vet-all-cooldown/',
+        vet_all_cooldown_notice,
+        name='vet_all_cooldown_notice'
     ),
 ]

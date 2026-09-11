@@ -1,20 +1,26 @@
 import logging
 
+from smtplib import SMTPException
+
 from django.conf import settings
 from django.contrib import messages
+from django.core.mail import mail_managers
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import Group
 from django.urls import reverse, reverse_lazy
 from django.http import HttpResponseRedirect
 from django.views.generic.base import RedirectView
-from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView
+from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView, CreateView
 from django_filters.views import FilterView
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect
 from guardian.mixins import PermissionListMixin
+
 
 from trove_targets.models import Target
 from trove_nonlocalizedevents.permissions import nonlocalizedevents_for_user
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
+from tom_registration.registration_flows.approval_required.forms import RegistrationApprovalForm
 from .filters import GWFilter, NeutrinoFilter
 from .forms import TargetReportForm, TargetClassifyForm
 from .forms import GWFormHelper, NeutrinoFormHelper
@@ -358,3 +364,37 @@ class GWNonLocalizedEventOrTargetNameSearchView(RedirectView):
             return HttpResponseRedirect(reverse('custom_code:search', kwargs={"search_str":search_str}))
 
         return HttpResponseRedirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
+
+
+class ApprovalRegistrationView(CreateView):
+    """
+    Overriding the ApprovalRegistrationView in tom_registration, to use the
+    correct link and make the content of the email more informative.
+    """
+    template_name = 'tom_registration/register_user.html'
+    success_url = reverse_lazy(settings.TOM_REGISTRATION.get('REGISTRATION_REDIRECT_PATTERN', ''))
+    form_class = RegistrationApprovalForm
+
+    def form_valid(self, form):
+        super().form_valid(form)
+        group, _ = Group.objects.get_or_create(name='Public')
+        group.user_set.add(self.object)
+        group.save()
+
+        messages.info(self.request, 'Your request to register has been submitted to the administrators.')
+
+        if settings.TOM_REGISTRATION.get('SEND_APPROVAL_EMAILS'):
+            try:
+                link_to_user_list = "https://datatrove.as.arizona.edu/users/" # overriding construction of URL which doesn't behave as expected
+                mail_managers(
+                    subject=f'Registration Request from {self.object.first_name} {self.object.last_name} ({self.object.username})',
+                    message='',  # leave this blank in favor of html_message
+                    fail_silently=False,
+                    html_message=f'{self.object.first_name} {self.object.last_name} (username: {self.object.username})'
+                                 f'has requested to register in your TOM. Please approve or delete this user'
+                                 f' <a href="{link_to_user_list}">here</a>.',
+                )
+            except (SMTPException, ConnectionRefusedError) as error:
+                logger.error(f'Unable to send email: {error}')
+
+        return redirect(self.get_success_url())

@@ -1,6 +1,6 @@
 {% extends 'tom_targets/partials/base.html' %}
 {% load crispy_forms_tags comments bootstrap4 %}
-
+{% block title %}Vetting{% endblock %}
 {% block content %}
 <style>
     /* 1. Background styling - Using your blurred image logic from before */
@@ -87,6 +87,24 @@
         box-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
     }
 
+    /* Warnings shown before a "Vet All" run is started */
+    .vetting-warning {
+        background: rgba(255, 193, 7, 0.12);
+        border: 1px solid rgba(255, 193, 7, 0.6);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 20px;
+        color: #ffe6a1;
+        font-size: 0.85rem;
+        line-height: 1.45;
+    }
+
+    .vetting-warning-active {
+        background: rgba(220, 53, 69, 0.15);
+        border-color: rgba(220, 53, 69, 0.7);
+        color: #ffc9cf;
+    }
+
     /* Cancel Link */
     .cancel-link {
         display: block;
@@ -103,8 +121,27 @@
 
 <div class="container d-flex justify-content-center">
     <div class="vetting-card">
-        <h2>Target Vetting Submission Page</h2>
-        
+        <h2>Candidate Vetting Submission Page</h2>
+
+        {% if vet_all_candidate_count %}
+        <div class="vetting-warning">
+            <strong>This vets all {{ vet_all_candidate_count }} candidate{{ vet_all_candidate_count|pluralize }} of this event.</strong>
+            Each candidate is queued as its own task, run in parallel, taking a few seconds each.
+        </div>
+        {% endif %}
+
+        {% if vet_all_progress.running and vet_all_progress.percent < 100 %}
+        <div class="vetting-warning vetting-warning-active">
+            <strong>Vet All tasks are already in progress</strong>
+            {% if vet_all_progress.total %}
+            ({{ vet_all_progress.done }} of {{ vet_all_progress.total }} candidates done).
+            {% else %}
+            ({{ vet_all_progress.pending }} candidate{{ vet_all_progress.pending|pluralize }} still queued).
+            {% endif %}
+            Starting another one now will queue every candidate a second time.
+        </div>
+        {% endif %}
+
         <form action="" method="post">
             {% csrf_token %}
           
@@ -121,4 +158,34 @@
         </form>
     </div>
 </div>
+
+<script>
+// Keep the Photometry Scoring Method in step with the Vetting Method.
+// KilonovaSCORER's grid is a two-component kilonova population, so it can only
+// answer for kilonova vetting; the other modes fit the light curve instead.
+// The values come from the widgets' data attributes so they are not restated
+// here -- see `_phot_method_field` in scoring/views.py. The form re-applies
+// this rule server-side, because a disabled <option> is only a browser hint.
+(function () {
+    var vetting = document.getElementById("id_vetting_method");
+    var phot = document.getElementById("id_phot_method");
+    if (!vetting || !phot) { return; }
+
+    var knMode = vetting.dataset.knMode;
+    var knOnly = phot.dataset.knOnly;
+    var fallback = phot.dataset.fallback;
+    var knOption = phot.querySelector('option[value="' + knOnly + '"]');
+
+    function sync() {
+        var isKN = vetting.value === knMode;
+        if (knOption) { knOption.disabled = !isKN; }
+        if (!isKN && phot.value === knOnly) { phot.value = fallback; }
+        phot.title = isKN ? "" :
+            "KilonovaSCORER can only be applied to vetting for kilonovae!";
+    }
+
+    vetting.addEventListener("change", sync);
+    sync();  // the form can load with a non-KN mode already selected
+})();
+</script>
 {% endblock %}

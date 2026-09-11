@@ -66,7 +66,7 @@ def format_redshift_parts(z, z_err):
     if math.isnan(z):
         return {"empty": True}
 
-    if z_err is None or (isinstance(z_err, (float, np.floating)) and math.isnan(z_err)):
+    if z_err is None or z_err == [None, None] or (isinstance(z_err, (float, np.floating)) and math.isnan(z_err)):
         return {"z": _format_fixed(z, MIN_REDSHIFT_DECIMALS), "no_err": True}
 
     if isinstance(z_err, (list, tuple, np.ndarray)):

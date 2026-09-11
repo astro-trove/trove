@@ -5,7 +5,7 @@ from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_dataproducts.models import ReducedDatum
 
-from scoring.vet_bns import vet_bns
+from scoring.vet_kn import vet_kn
 from scoring.vet_kn_in_sn import vet_kn_in_sn
 from scoring.vet_super_kn import vet_super_kn
 from scoring.vet_basic import vet_basic
@@ -174,6 +174,11 @@ def target_post_save(
                 messages.append(f"MW E(B-V) set to {mwebv:.4f}")
 
         # do the "basic" vetting (PS, MPC, Host association)
+        # a new target needs its host / AGN tables for the target page even if
+        # its point source or MPC score has already zeroed it, same as a user
+        # vetting one target from the UI. setdefault rather than a keyword
+        # because callers forward arbitrary kwargs into this hook
+        kwargs.setdefault("stop_on_zero", False)
         vet_basic(target.id, **kwargs)
 
         # then check if this target is associated with any NLEs
@@ -188,7 +193,7 @@ def target_post_save(
         #       For now we are just always all types of vetting
         if len(new_candidates):
             for cand in new_candidates:
-                vet_bns(cand.target.id, cand.nonlocalizedevent.event_id)
+                vet_kn(cand.target.id, cand.nonlocalizedevent.event_id)
                 vet_kn_in_sn(cand.target.id, cand.nonlocalizedevent.event_id)
                 vet_super_kn(cand.target.id, cand.nonlocalizedevent.event_id)
         else:

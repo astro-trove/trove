@@ -6,12 +6,27 @@ import plotly.graph_objs as go
 from plotly import colors
 from tom_dataproducts.models import ReducedDatum
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
+import logging
 
 from tom_dataproducts.forms import DataShareForm
 
 register = template.Library()
+logger = logging.getLogger(__name__)
+
+DECAY_FIT_PARAM_RANGES = dict(
+    lum_max=[-np.inf, np.inf],
+    peak_time=[-np.inf, np.inf],
+    decay_rate=[-np.inf, np.inf],
+    t_pre=0,
+    t_post=np.inf,
+    max_decay_fit_time=100,
+    phot_score_snr_min=5,
+    min_time_separation=1 / 24,
+)
+DECAY_FIT_FILTERS = ["g", "r", "i", "z", "F129", "F158", "o", "c"]
+DISCOVERY_LINE_STYLE = dict(color='gray', dash='dot', width=1)
 
 # Filter color map for photometry plotting
 # Colors chosen to match standard astronomical conventions
@@ -84,6 +99,56 @@ OTHER_MARKERS.remove(6)  # do not use triangle-down, too close to arrow-bar-down
 OTHER_COLORS = colors.qualitative.Plotly  # default Plotly color sequence
 
 
+def _decay_fit_trace(target, nonlocalized_event, t0):
+    """Overlay of the powerlaw/broken-powerlaw decay fit for one event's
+    photometry, in the same (x, y) space as the detection points, or None if
+    there isn't enough data to fit
+    """
+
+    from scoring.vet_phot import _get_post_disc_phot, _score_phot
+
+    try:
+        allphot = _get_post_disc_phot(
+            target_id=target.id,
+            nonlocalized_event=nonlocalized_event,
+            t_post=DECAY_FIT_PARAM_RANGES["t_post"],
+            t_pre=DECAY_FIT_PARAM_RANGES["t_pre"],
+        )
+        _, _, _, _, fit_model, fit_params = _score_phot(
+            allphot=allphot,
+            target=target,
+            nonlocalized_event=nonlocalized_event,
+            param_ranges=DECAY_FIT_PARAM_RANGES,
+            filt=DECAY_FIT_FILTERS,
+        )
+    except Exception:
+        logger.exception(
+            "Could not compute the decay fit overlay for %s / %s",
+            target.name,
+            nonlocalized_event.event_id,
+        )
+        return None
+
+    if fit_model is None:
+        return None
+
+    dt_fittable = allphot.dt[allphot.dt > 0]
+    dt_max = min(float(dt_fittable.max()), DECAY_FIT_PARAM_RANGES["max_decay_fit_time"])
+    xtest_dt = np.linspace(float(dt_fittable.min()), dt_max, 200)
+    ytest_mag = fit_model(xtest_dt, *fit_params)
+    xtest_abs = [t0 + timedelta(days=float(dt)) for dt in xtest_dt]
+
+    shape = fit_model.__name__.strip("_").replace("_", " ")
+    return go.Scatter(
+        x=xtest_abs,
+        y=ytest_mag,
+        mode='lines',
+        line=dict(color='black', dash='dash', width=3),
+        name=f'{target.name} fit',
+        hovertemplate=f'{shape} fit<br>%{{x}}<br>%{{y:.2f}} mag<extra></extra>',
+    )
+
+
 def get_marker_for_photometry_point(label, marker_map, others):
     """
     Get marker properties (color or shape) from a dictionary `marker_map` after parsing the photometry `label`.
@@ -135,7 +200,7 @@ def recent_photometry(context, target, limit=1):
 
 
 @register.inclusion_tag('tom_dataproducts/partials/data_plot_for_target.html', takes_context=True)
-def photometry_for_target(context, target, width=700, height=600, background=None, label_color=None, grid=True):
+def photometry_for_target(context, target, width=900, height=600, background=None, label_color=None, grid=True):
     """
     Renders a photometric plot for a target.
 
@@ -304,7 +369,23 @@ def photometry_for_target(context, target, width=700, height=600, background=Non
             t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time']+"Z", '%Y-%m-%dT%H:%M:%S.%f%z')
         else:
             t0 = datetime.strptime(candidate.nonlocalizedevent.sequences.last().details['time'], '%Y-%m-%dT%H:%M:%S.%f%z')
-        fig.add_vline(t0.timestamp() * 1000., annotation_text=candidate.nonlocalizedevent.event_id)
+        # a real trace instead of add_vline's shape + a separate invisible
+        # legend-only trace: one object draws the line AND legends it,
+        # rather than two objects each doing half the job
+        fig.add_trace(go.Scatter(
+            x=[t0, t0],
+            y=[ymin_view, ymax_view],
+            mode='lines',
+            line=DISCOVERY_LINE_STYLE,
+            name=f'{candidate.nonlocalizedevent.event_id} discovery',
+        ))
+        fig.add_annotation(
+            x=t0, y=ymax_view, text=candidate.nonlocalizedevent.event_id, showarrow=False, yshift=10,
+        )
+
+        fit_trace = _decay_fit_trace(target, candidate.nonlocalizedevent, t0)
+        if fit_trace is not None:
+            fig.add_trace(fit_trace)
 
     return {
         'target': target,
@@ -325,15 +406,6 @@ def get_photometry_data(context, target, target_share=False):
             klass=photometry,
         )
     
-
-    # Possibilities for reduced_datums from ZTF/MARS:
-    # reduced_datum.value: {'error': 0.0929680392146111, 'filter': 'r', 'magnitude': 18.2364940643311}
-    # reduced_datum.value: {'limit': 20.1023998260498, 'filter': 'g'}
-
-    # for limit magnitudes, set the value of the limit key to True and
-    # the value of the magnitude key to the limit so the template and
-    # treat magnitudes as such and prepend a '>' to the limit magnitudes
-    # see recent_photometry.html
     data = []
     for reduced_datum in photometry:
         rd_data = {'id': reduced_datum.pk,

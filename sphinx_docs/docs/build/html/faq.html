@@ -52,7 +52,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="Citing TROVE" href="citations.html" />
-    <link rel="prev" title="Code of Conduct for Developers" href="codeofconductdevs.html" />
+    <link rel="prev" title="Developer Documentation" href="dev.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
   <meta name="docsearch:version" content="" />
@@ -151,6 +151,7 @@
         <p aria-level="2" class="caption" role="heading"><span class="caption-text">Home</span></p>
 <ul class="current nav bd-sidenav">
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Welcome to TROVE’s documentation!</a></li>
+<li class="toctree-l1"><a class="reference internal" href="rules.html">Rules for using TROVE</a></li>
 <li class="toctree-l1"><a class="reference internal" href="details.html">Web App Details</a></li>
 <li class="toctree-l1"><a class="reference internal" href="scoringexplained.html">How Scoring Works</a></li>
 <li class="toctree-l1"><a class="reference internal" href="updatingredshifts.html">Submitting Galaxy Spec-z’s</a></li>
@@ -159,10 +160,7 @@
 <li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/api/docs">API Reference</a></li>
 </ul>
 </details></li>
-<li class="toctree-l1 has-children"><a class="reference internal" href="dev.html">Developer Documentation</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
-<li class="toctree-l2"><a class="reference internal" href="codeofconductdevs.html">Code of Conduct for Developers</a></li>
-</ul>
-</details></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">FAQ &amp; Glossary</a></li>
 <li class="toctree-l1"><a class="reference internal" href="citations.html">Citing TROVE</a></li>
 </ul>
@@ -382,7 +380,7 @@
 </details><details class="sd-sphinx-override sd-dropdown sd-card sd-mb-3">
 <summary class="sd-summary-title sd-card-header">
 <span class="sd-summary-text">What does TROVE do which other tools do not?</span><span class="sd-summary-state-marker sd-summary-chevron-right"><svg version="1.1" width="1.5em" height="1.5em" class="sd-octicon sd-octicon-chevron-right" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.72 18.78a.75.75 0 0 1 0-1.06L14.44 12 8.72 6.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018l6.25 6.25a.75.75 0 0 1 0 1.06l-6.25 6.25a.75.75 0 0 1-1.06 0Z"></path></svg></span></summary><div class="sd-summary-content sd-card-body docutils">
-<p class="sd-card-text">…</p>
+<p class="sd-card-text">Coming soon!</p>
 </div>
 </details></section>
 <section id="glossary-of-frequently-used-terms">
@@ -397,10 +395,12 @@ We use ATLAS’ forced photometry server to augment the lightcurves of <em>targe
 <p class="sd-card-text"><strong>BBH</strong>: Binary black hole merger</p>
 <p class="sd-card-text"><strong>BNS</strong>: Binary neutron star merger</p>
 <p class="sd-card-text"><strong>candidate</strong>: Sometimes used as shorthand for event candidate.</p>
+<p class="sd-card-text"><strong>event</strong>: Sometimes used as shorthand for <em>nonlocalized (poorly localized) event</em>.</p>
 <p class="sd-card-text"><strong>event candidate</strong>: A <em>target</em> which has been associated with a <em>nonlocalized event (NLE)</em>.
 A candidate electromagnetic counterpart to said NLE.</p>
-<p class="sd-card-text"><strong>forced photometry</strong>:</p>
+<p class="sd-card-text"><strong>forced photometry</strong>: Count the flux coming from pixels within some circle at specified coordinates. One of the main ways astronomers measure how bright something is. Can be used to indicate that something is <em>not</em> detected to some significance.</p>
 <p class="sd-card-text"><strong>FXT</strong>: Fast X-ray transient</p>
+<p class="sd-card-text"><strong>GCN</strong>: General Coordinates Network. A server for sending out notices of interesting astrophysical phenomena, broadly used in the time-domain astronomy community.</p>
 <p class="sd-card-text"><strong>GRB</strong>: Gamma-ray burst</p>
 <p class="sd-card-text"><strong>GW</strong>: Gravitational wave</p>
 <p class="sd-card-text"><strong>kilonova (KN)</strong>: Ultraviolet/optical/infrared transient powered by the radioactive
@@ -409,13 +409,14 @@ counterpart to <em>BNS</em> and <em>NSBH</em> events.</p>
 <p class="sd-card-text"><strong>kilonova-in-supernova (KN-in-SN)</strong>: <em>Kilonova</em> embedded in a supernova.
 Hypothesized electromagnetic counterpart to <em>SSM</em> events. Sometimes used
 interchangably with <em>super-kilonova</em>.</p>
-<p class="sd-card-text"><strong>neutrino</strong>:</p>
+<p class="sd-card-text"><strong>neutrino</strong>: Elementary particle (lepton) with no charge, which interacts via the weak force. Produced in a variety of scenarios, such as a fusion in the core of the Sun or in supernovae. Thought to be a signal in some multi-messenger events.</p>
 <p class="sd-card-text"><strong>NLE</strong>: Nonlocalized event. A nonlocalized event (NLE)—sometimes more aptly termed a poorly
 localized event—is some astrophysical source with an uncertain position on the sky. These can be
 large uncertainties of tens to thousands of square degrees (e.g., gravitational waves) or tens of
 square arcminutes (e.g., fast X-ray transients.)</p>
 <p class="sd-card-text"><strong>NSBH</strong>: Neutron star + black hole merger</p>
 <p class="sd-card-text"><strong>SSM</strong>: Subsolar mass merger; merger involving at least one object subsolar in mass</p>
+<p class="sd-card-text"><strong>supernova</strong>: Explosive death of a star, either from thermonuclear detonation or the collapse of a massive star.</p>
 <p class="sd-card-text"><strong>super-kilonova (super-KN)</strong>: Longer-lasting, “scaled up” <em>kilonova</em>
 hypothesized to occur following the collapse of extremely massive (helium core in excess of 100 solar masses),
 rapidly-rotating stars. Sometimes used interchangably with <em>kilonova-in-supernova</em>.
@@ -444,12 +445,12 @@ server to augment the lightcurves of <em>targets</em>.</p>
                   
 <div class="prev-next-area">
     <a class="left-prev"
-       href="codeofconductdevs.html"
+       href="dev.html"
        title="previous page">
       <i class="fa-solid fa-angle-left"></i>
       <div class="prev-next-info">
         <p class="prev-next-subtitle">previous</p>
-        <p class="prev-next-title">Code of Conduct for Developers</p>
+        <p class="prev-next-title">Developer Documentation</p>
       </div>
     </a>
     <a class="right-next"

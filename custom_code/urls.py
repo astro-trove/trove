@@ -5,6 +5,7 @@ from .views import TargetNameSearchView
 from .views import GWListView, GRBListView, NeutrinoListView, UnknownListView
 from .views import EventCandidateCreateView
 from .views import GWNonLocalizedEventOrTargetNameSearchView
+from .views import ApprovalRegistrationView
 
 from tom_nonlocalizedevents.views import SupereventIdView
 from trove_nonlocalizedevents.views import EventCandidateListView
@@ -28,4 +29,5 @@ urlpatterns = [
     path('nonlocalizedevents/<str:event_id>/createcandidate/<int:target_id>/', EventCandidateCreateView.as_view(), name='create-candidate'),
     path('eventcandidates/', EventCandidateListView.as_view(), name='event-candidates'),
     path('search/', GWNonLocalizedEventOrTargetNameSearchView.as_view(), name='gwnle-or-target-search'),
+    path('accounts/register/', ApprovalRegistrationView.as_view(), name='register'),
 ]
