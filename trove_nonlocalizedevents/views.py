@@ -50,7 +50,7 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
     Cache key for the scored candidate list matching a set of filters.
 
     Everything that reads, writes or invalidates that cache goes through here,
-    so the four cannot drift apart and leave the page serving scores nothing
+    so the three cannot drift apart and leave the page serving scores nothing
     can clear.
 
     ``phot_method`` belongs in the key because it decides which stored factor

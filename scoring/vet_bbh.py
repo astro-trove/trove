@@ -106,11 +106,7 @@ def _flare_significance_series(
     return phot.assign(significance=significance)
 
 
-def detect_flare(
-    postphot: Optional[pd.DataFrame],
-    baseline: dict,
-    sigma_thresh: float = 5.0,
-):
+def detect_flare(postphot: Optional[pd.DataFrame], baseline: dict):
     phot = _flare_significance_series(postphot, baseline)
     if phot is None:
         return np.nan, None
@@ -203,7 +199,7 @@ def nuclear_offset_score(
 def flare_luminosity_erg_s(peak_mag: float, distance_mpc: float,
                            nu_eff_hz: float = 4.6e14) -> float:
     """nu*L_nu for a flare peak magnitude at a known distance, erg/s. No
-    K-correction is applied (see BBH_SCORING.md)."""
+    K-correction is applied."""
     d_cm = float(distance_mpc) * 3.0856775814913673e24
     f_nu = 10 ** (-0.4 * (float(peak_mag) + 48.60))  # erg/s/cm^2/Hz, AB
     return float(4.0 * np.pi * d_cm**2 * f_nu * nu_eff_hz)
@@ -239,7 +235,6 @@ def vet_bbh(
 
     # Store all required updates/deletes and then does all of them at once. 
     # Removes the latency of reaching the tunnel everytime
-    # Test whether this makes a difference if running on datatrove
     pending_updates: dict = {}
     pending_deletes: set = set()
 
@@ -333,10 +328,9 @@ def vet_bbh(
     for filt, entry in baseline.items():
         update_score_factor(event_candidate, f"baseline_mag_{filt}", entry["mag"])
         update_score_factor(event_candidate, f"baseline_std_{filt}", entry["std"])
-    max_significance, flare_row = detect_flare(
-        postphot, baseline, sigma_thresh=param_ranges["flare_sigma_thresh"]
-    )
+    max_significance, flare_row = detect_flare(postphot, baseline)
 
+    agn_flare_score = None
     if baseline and postphot is not None and len(postphot) and np.isfinite(max_significance):
         agn_flare_score = flare_confidence_score(
             max_significance,
@@ -377,5 +371,5 @@ def vet_bbh(
 
     logger.info(
         "BBH vetting: agn=%.2f flare=%s nuclear_offset=%s",
-        agn_score, locals().get("agn_flare_score"), offset_score,
+        agn_score, agn_flare_score, offset_score,
     )

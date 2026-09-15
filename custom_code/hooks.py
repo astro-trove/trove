@@ -9,7 +9,7 @@ from scoring.vet_kn import vet_kn
 from scoring.vet_kn_in_sn import vet_kn_in_sn
 from scoring.vet_super_kn import vet_super_kn
 from scoring.vet_basic import vet_basic
-from scoring.vet_bbh import AGN_FLARE_HORIZON_DAYS
+from scoring.vet_bbh import vet_bbh, AGN_FLARE_HORIZON_DAYS
 
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
@@ -95,6 +95,18 @@ def first_detection_window_days(nle_class, first_det_min, first_det_max):
     if nle_class == "BBH":
         return first_det_min, max(first_det_max, AGN_FLARE_HORIZON_DAYS)
     return first_det_min, first_det_max
+
+
+def vet_new_candidate(candidate):
+    """Vet a newly associated candidate for its event's class: an AGN flare for
+    a BBH event, every kilonova-style mode for anything else."""
+    target_id, event_id = candidate.target.id, candidate.nonlocalizedevent.event_id
+    if get_most_likely_class(candidate.nonlocalizedevent.sequences.last().details) == "BBH":
+        vet_bbh(target_id, event_id)
+    else:
+        vet_kn(target_id, event_id)
+        vet_kn_in_sn(target_id, event_id)
+        vet_super_kn(target_id, event_id)
 
 
 def associate_nle_with_target(
@@ -207,13 +219,9 @@ def target_post_save(
             first_det_max=first_det_max,
         )
 
-        # TODO: add a check for the type of non-localized event
-        #       For now we are just always all types of vetting
         if len(new_candidates):
             for cand in new_candidates:
-                vet_kn(cand.target.id, cand.nonlocalizedevent.event_id)
-                vet_kn_in_sn(cand.target.id, cand.nonlocalizedevent.event_id)
-                vet_super_kn(cand.target.id, cand.nonlocalizedevent.event_id)
+                vet_new_candidate(cand)
         else:
             messages.append(
                 "Did not run NLE vetting on this target because there are no NLEs associated with it!"

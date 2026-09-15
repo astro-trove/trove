@@ -369,3 +369,22 @@ class TestAtlasForcedPhotParsing:
 
         assert result is not None
         assert isinstance(result, list)
+
+
+class TestNewCandidateVetting:
+    """A newly associated candidate is vetted for its own event's class."""
+
+    @pytest.mark.parametrize("nle_class, bbh_runs", [("BBH", True), ("NSBH", False), (None, False)])
+    def test_bbh_candidates_get_agn_flare_vetting_only(self, nle_class, bbh_runs):
+        from custom_code import hooks
+
+        cand = MagicMock()
+        cand.target.id, cand.nonlocalizedevent.event_id = 1, "S250208ad"
+        with patch.object(hooks, "get_most_likely_class", return_value=nle_class), \
+                patch.object(hooks, "vet_bbh") as vet_bbh, patch.object(hooks, "vet_kn") as vet_kn, \
+                patch.object(hooks, "vet_kn_in_sn") as vet_kn_in_sn, \
+                patch.object(hooks, "vet_super_kn") as vet_super_kn:
+            hooks.vet_new_candidate(cand)
+        assert vet_bbh.called is bbh_runs
+        for kn_vetter in (vet_kn, vet_kn_in_sn, vet_super_kn):
+            assert kn_vetter.called is not bbh_runs
