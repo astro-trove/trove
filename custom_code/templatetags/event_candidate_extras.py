@@ -15,6 +15,7 @@ from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.models import ScoreFactor
 from scoring.util import (
+    agn_counts_toward,
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
@@ -56,6 +57,7 @@ def get_phot_method_label():
     """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
     return _phot_method_label()
 
+
 @register.simple_tag
 def get_event_candidate_scores(*args, **kwargs):
     """A wrapper on the imported _get_event_candidate_scores, but registered as a tag"""
@@ -89,19 +91,30 @@ def vet_all_is_allowed(context):
     cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
     return not cache.get(cooldown_cache_key)
 
-def _most_likely_class_from_request(context):
-    """Classification of whichever event is in scope for the current request
-    (``?nonlocalizedevent=<pk>``), or None if there isn't one / it can't be
-    determined. Shared by scoring_toggles and bbh_scoring_toggles so the two
-    scoring-adjustments panels can't disagree about which one applies.
+def _event_classes_in_scope(context, target_id=None):
+    """Classifications of the events the scoring-adjustments panel applies to:
+    every event `target_id` is a candidate for on a target's page, else the
+    ``?nonlocalizedevent=`` event on the candidate list. Empty when no event is
+    in scope.
+
+    ``?nonlocalizedevent=`` carries the numeric pk on the candidate-list page
+    but the string ``event_id`` on a target's own detail page, so both are
+    accepted.
     """
+    if target_id is not None:
+        event_ids = set(
+            NonLocalizedEvent.objects.filter(candidates__target_id=target_id)
+            .values_list("event_id", flat=True)
+        )
+        if event_ids:
+            return {most_likely_class_for_event(eid) for eid in event_ids}
+
     nle_id = context["request"].GET.get("nonlocalizedevent")
     if not nle_id:
-        return None
-    nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
-    if nle is None:
-        return None
-    return most_likely_class_for_event(nle.event_id)
+        return set()
+    lookup = {"id": nle_id} if str(nle_id).isdigit() else {"event_id": nle_id}
+    nle = NonLocalizedEvent.objects.filter(**lookup).first()
+    return {most_likely_class_for_event(nle.event_id)} if nle else set()
 
 
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
@@ -110,12 +123,11 @@ def scoring_toggles(context, target_id=None):
 
     # KN-style scoring adjustments (AGN sub-score is disqualifying for KNe, and
     # only the "KN" transient type can use KilonovaSCORER) don't mean anything for
-    # a BBH/AGN-flare event -- that one gets its own panel, bbh_scoring_toggles.
-    # Fails open (shows the panel) when the event can't be classified at all,
-    # e.g. no ?nonlocalizedevent= in scope, rather than hiding functionality
-    # somewhere we simply don't know the event type.
-    most_likely_class = _most_likely_class_from_request(context)
-    if most_likely_class is not None and most_likely_class not in KN_STYLE_CLASSES:
+    # a BBH/AGN-flare event. Shown when ANY event in scope is KN-style, so a
+    # candidate on both a BBH and a KN-style event keeps the panel whichever
+    # event is selected. Fails open when no event in scope can be classified.
+    classes = _event_classes_in_scope(context, target_id)
+    if classes and not any(c is None or c in KN_STYLE_CLASSES for c in classes):
         return {"show": False}
 
     # switching to KilonovaSCORER only changes anything if this candidate has a
@@ -131,24 +143,6 @@ def scoring_toggles(context, target_id=None):
         "agn_toggle": cache.get("agn_toggle", True),
         "is_kilonova": is_kilonova,
         "has_kilonova_score": has_kilonova_score,
-        "next": context["request"].get_full_path(),
-    }
-
-
-@register.inclusion_tag("scoring/partials/bbh_scoring_toggles.html", takes_context=True)
-def bbh_scoring_toggles(context, target_id=None):
-    """The BBH/AGN-flare analog of scoring_toggles. No "exclude AGN sub-score"
-    option here -- AGN association is core to AGN-flare scoring (it's what makes a
-    candidate an AGN-flare candidate at all), not an optional disqualifier the way
-    it is for KNe. Only offers flare_shape_toggle (see vet_bbh.py's module
-    docstring point 4 and scoring/util.get_event_candidate_scores).
-    """
-    if _most_likely_class_from_request(context) != "BBH":
-        return {"show": False}
-
-    return {
-        "show": True,
-        "flare_shape_toggle": cache.get("flare_shape_toggle", False),
         "next": context["request"].get_full_path(),
     }
 
@@ -179,24 +173,10 @@ def display_score_details(context, target_id):
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
-        agn_score=("AGN Association Score", partial(_float_format, precision=1)),
+        agn_score=(AGN_SCORE_LABEL, partial(_float_format, precision=1)),
         agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
-        flare_shape_score=("Flare Shape Score (best of the models below)", partial(_float_format, precision=2)),
-        flare_shape_score_mck19=("Flare Shape Score -- McKernan+2019 (Hill-sphere)", partial(_float_format, precision=2)),
-        flare_shape_score_jrr_i=("Flare Shape Score -- Rodriguez-Ramirez+2025 (jet-cocoon)", partial(_float_format, precision=2)),
-        flare_shape_score_tgw24=("Flare Shape Score -- Tagawa+2024 (jet breakout)", partial(_float_format, precision=2)),
-        agn_catalog_score=("AGN -- catalog association (Milliquas/RomaBzcat)", partial(_float_format, precision=1)),
-        agn_wise_score=("AGN -- WISE mid-IR colour (Stern+2012)", partial(_float_format, precision=1)),
-        agn_wise_w1w2=("AGN -- host W1-W2 colour", partial(_float_format, precision=2)),
-        agn_variability_score=("AGN -- pre-trigger variability (DRW)", partial(_float_format, precision=1)),
-        contaminant_score=("Competing explanation penalty (strongest single line)", partial(_float_format, precision=2)),
-        contaminant_tns_score=("Competing -- TNS spectroscopic class", partial(_float_format, precision=2)),
-        contaminant_offset_score=("Competing -- offset from host nucleus (physical)", partial(_float_format, precision=2)),
-        contaminant_quiescent_score=("Competing -- host quiescent before trigger", partial(_float_format, precision=2)),
-        contaminant_color_score=("Competing -- cooling colour evolution", partial(_float_format, precision=2)),
-        contaminant_shape_score=("Competing -- single-peak light curve", partial(_float_format, precision=2)),
+        nuclear_offset_score=("Nuclear Offset Score", partial(_float_format, precision=2)),
         flare_peak_lum=("Flare Peak Luminosity", partial(_sci_format, unit="erg/s")),
-        gw_kick_kms=("GW-inferred remnant kick", partial(_float_format, precision=0)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",
@@ -265,7 +245,7 @@ def display_score_details(context, target_id):
             if te.key in keymap:
                 label, fmter = keymap[te.key]
             else:
-                label = te.key
+                label = _label_for_key(te.key)
                 fmter = _float_format
             
             value = _safe_format(te.value, fmter)
@@ -301,7 +281,7 @@ def display_score_details(context, target_id):
             if score_factor.key in keymap:
                 label, fmter = keymap[score_factor.key]
             else:
-                label = score_factor.key
+                label = _label_for_key(score_factor.key)
                 fmter = _float_format
                 
             numeric = fmter not in (_str_format, _str_int_format)
@@ -468,12 +448,25 @@ _TROVE_FACTOR_LABELS = {
 }
 
 
-# switch rather than a choice: with the toggle off, `agn_score` is dropped
-# from the product, so the value still shown is not part of the score.
-_AGN_FACTOR_LABELS = {"AGN Score (0.1 or 1.0)"}
+# with the AGN toggle off, `agn_score` no longer feeds the kilonova-style scores,
+# so its row is greyed out there (never for AGN-flare, which always uses it)
+AGN_SCORE_LABEL = "AGN Association Score"
 
 
 # formatting
+def _label_for_key(key):
+    """Nicer labels for the per-filter baseline keys (`baseline_mag_g`,
+    `baseline_std_r`, ...), which vary by filter and so can't be fixed
+    entries in `keymap`. Falls back to the raw key for anything else."""
+    for prefix, template in (
+        ("baseline_mag_", "AGN baseline median mag ({filt}-band)"),
+        ("baseline_std_", "AGN baseline scatter, robust MAD ({filt}-band)"),
+    ):
+        if key.startswith(prefix):
+            return template.format(filt=key[len(prefix):])
+    return key
+
+
 def _safe_format(value, fmter):
     for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
         try:
@@ -488,8 +481,8 @@ def _factor_row_class(label, transient, kn_is_active, agn_toggle=True):
         live = kn_is_active and transient == "KN"
     elif label in _TROVE_FACTOR_LABELS:
         live = not (kn_is_active and transient == "KN")
-    elif label in _AGN_FACTOR_LABELS:
-        live = bool(agn_toggle)
+    elif label == AGN_SCORE_LABEL:
+        live = agn_counts_toward(transient, agn_toggle)
     else:
         return "detail-row"
     return "detail-row factor-active" if live else "detail-row factor-inactive"

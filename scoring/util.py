@@ -66,12 +66,8 @@ SUBSCORE_NAMES = [
     "phot_peak_time",
     "phot_decay_rate",
     "agn_flare_score",
-    "flare_shape_score",
-    # BBH/AGN-flare: the combined competing-explanation penalty. Its components
-    # (contaminant_tns/offset/quiescent/color/shape_score) are stored for display
-    # but deliberately kept out of this list -- vet_bbh combines them with min()
-    # rather than letting them compound into the product.
-    "contaminant_score",
+    # BBH/AGN-flare: how close the flare sits to its host's nucleus
+    "nuclear_offset_score",
 ]
 
 # some of the keys in ScoreFactor are really just calculated values
@@ -96,6 +92,16 @@ MPC_KEYS = [
     "mpc_match_sep",
     "mpc_match_date",
 ]
+
+
+# the site-wide AGN toggle governs only these; BBH AGN-flare scoring always uses
+# its AGN association
+AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
+
+
+def agn_counts_toward(transient, agn_toggle):
+    """Whether agn_score enters `transient`'s score."""
+    return bool(agn_toggle) or transient not in AGN_TOGGLE_TRANSIENTS
 
 
 def _check_phot_val(val, param_ranges, param_range_key):
@@ -146,17 +152,13 @@ def get_event_candidate_scores(
         agn_toggle=True,
         include_subscores=False,
         phot_method=None,
-        flare_shape_toggle=False,
 ):
     """Get the event candidate scores for all subscores in subscore_names.
 
     event_candidates should be a django queryset of EventCandidate objects.
     `phot_method` selects which photometry factor the score uses (`None`
-    reads the site-wide toggle.) `flare_shape_toggle` is the BBH-scoring analog of
-    `agn_toggle`: whether flare_shape_score (a model-*dependent* check -- see
-    vet_bbh.py's module docstring point 4) is folded into the AGN-flare score
-    product. Off by default, same reasoning as agn_flare_score being on by default:
-    the model-agnostic factors should describe every user's score unless they opt in.
+    reads the site-wide toggle.) `agn_toggle` drops agn_score from the
+    kilonova-style scores only (`AGN_TOGGLE_TRANSIENTS`).
     """
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
@@ -167,12 +169,6 @@ def get_event_candidate_scores(
     val_not_score_keys = VAL_NOT_SCORE_KEYS
     exclude_keys = (set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
                     | {KILONOVA_SCORE_KEY})
-
-    if not agn_toggle:
-        exclude_keys.add('agn_score')
-
-    if not flare_shape_toggle:
-        exclude_keys.add('flare_shape_score')
 
     # only evaluate this once since it is time consuming
     event_candidates_list = list(event_candidates)
@@ -185,7 +181,7 @@ def get_event_candidate_scores(
         most_likely_class = get_most_likely_class(nle_eventseq.details)
     except IndexError:
         return []
-    
+
     if most_likely_class in {"SSM", "Terrestrial"}:
         transients = ["KN", "KN-in-SN", "super-KN"]
     elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
@@ -199,7 +195,6 @@ def get_event_candidate_scores(
     else:
         transients = []
 
-
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
 
@@ -210,9 +205,10 @@ def get_event_candidate_scores(
             target_extras_by_id[te.target_id] = {}
         target_extras_by_id[te.target_id][te.key] = te.value
 
-    # Prefetch all ScoreFactor objects at once
+    # Prefetch all ScoreFactor objects at once.
     score_factors = ScoreFactor.objects.filter(
-        event_candidate__in=event_candidates_list, key__in=subscore_names
+        event_candidate__in=event_candidates_list,
+        key__in=list(subscore_names),
     ).annotate(value_float=Cast("value", FloatField()))
 
     # Group score factors by event candidate
@@ -253,14 +249,15 @@ def get_event_candidate_scores(
         if "mpc_match_name" in te:
             mpc_score = int(te["mpc_match_name"] == str(None))
 
-        # remove keys we don't want and calculate a base subscore
-        # need to add "agn" to exclude keys if button is selected
-        # AGN enabled should be a global state of the website
+        # remove keys we don't want and calculate a base subscore; agn_score is
+        # applied per transient below, since the AGN toggle only governs some
         subscore_no_phot = (
-            math.prod([sf_dict[key] for key in sf_dict if key not in exclude_keys])
+            math.prod([sf_dict[key] for key in sf_dict
+                       if key not in exclude_keys and key != "agn_score"])
             * ps_score
             * mpc_score
         )
+        agn_score = sf_dict.get("agn_score")
 
         # add things to the subscores dict, if requested by the user
         if include_subscores:
@@ -268,6 +265,8 @@ def get_event_candidate_scores(
             ec.subscores["mpc_score"] = mpc_score
             for key in sf_dict:
                 if key in exclude_keys: continue
+                if key == "agn_score" and not any(agn_counts_toward(t, agn_toggle) for t in transients):
+                    continue
                 ec.subscores[key] = sf_dict[key]
                 
         # now for EM transient/model specific scores
@@ -324,8 +323,10 @@ def get_event_candidate_scores(
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object
+            agn_factor = (agn_score if agn_score is not None
+                          and agn_counts_toward(transient, agn_toggle) else 1)
             ec.score[transient] = (
-                subscore_no_phot * phot_score
+                subscore_no_phot * agn_factor * phot_score
             )  # multiply the subscores
         ecs_out.append(ec)
 

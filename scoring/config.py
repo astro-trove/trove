@@ -5,7 +5,7 @@ from .vet_basic import vet_basic
 from .vet_kn import vet_kn
 from .vet_kn_in_sn import vet_kn_in_sn
 from .vet_super_kn import vet_super_kn
-from .vet_bbh import vet_bbh
+from .vet_bbh import vet_bbh, AGN_FLARE_HORIZON_DAYS
 
 VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
     "": # if NLE most likely class not known, everything goes
@@ -58,5 +58,5 @@ DETECTION_HORIZON_DEFAULTS = { # time horizon (min, max) for first detections, d
     "BNS": (0, 10),
     "NSBH": (0, 10),
     "SSM": (-1, 10),
-    "BBH":(0,10)
+    "BBH": (0, AGN_FLARE_HORIZON_DAYS),
 }
