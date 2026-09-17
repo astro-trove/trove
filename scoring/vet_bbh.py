@@ -39,11 +39,15 @@ PARAM_RANGES = dict(
     t_post=AGN_FLARE_HORIZON_DAYS,
     min_baseline_pts=2,  # n=1 gives MAD=0, which inflates flare significance
     flare_sigma_thresh=5.0,
+    # Half-width, in days, of the window an epoch must be corroborated within.
+    flare_corroboration_window_days=0.5,
     flare_score_center_frac=1.0,  # sigmoid midpoint, as a fraction of flare_sigma_thresh
     flare_score_width_frac=0.25,  # sigmoid width, as a fraction of flare_sigma_thresh
     agn_boost_multiplier=10.0,
 )
 
+
+SN_LIKE_PREFIXES = ("SN",)
 
 KPC_PER_ARCSEC_PER_MPC = 4.84813681e-3  # kpc per arcsec at 1 Mpc
 NUCLEAR_SCALE_KPC = 0.5
@@ -84,10 +88,34 @@ def fit_agn_baseline(
     return baseline
 
 
+def _corroborated_significance(
+    phot: pd.DataFrame, window_days: float
+) -> np.ndarray:
+    sig = phot.significance.to_numpy(dtype=float)
+
+    times = None
+    for col in ("mjd", "dt"):
+        if col in phot.columns:
+            times = phot[col].to_numpy(dtype=float)
+            break
+    if times is None:
+        # No time column: every epoch stands alone, which is the old behaviour. Only
+        # hand-built frames reach this; real photometry always carries mjd.
+        return sig
+
+    filters = phot["filter"].to_numpy()
+    out = np.empty(sig.size, dtype=float)
+    for i in range(sig.size):
+        near = (filters == filters[i]) & (np.abs(times - times[i]) <= window_days)
+        out[i] = np.median(sig[near])
+    return out
+
+
 def _flare_significance_series(
-    postphot: Optional[pd.DataFrame], baseline: dict
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
 ) -> Optional[pd.DataFrame]:
-    # postphot is photometric data after GW merger
     if postphot is None or not len(postphot) or not baseline:
         return None
 
@@ -97,21 +125,30 @@ def _flare_significance_series(
         return None
 
     # Adding photometry error with baseline's error in quadrature
-    # significance is just a z-score 
+    # significance is just a z-score
     significance = [
         (baseline[row["filter"]]["mag"] - row.mag)
         / np.sqrt(baseline[row["filter"]]["std"] ** 2 + row.magerr**2)
         for _, row in phot.iterrows()
     ]
-    return phot.assign(significance=significance)
+    phot = phot.assign(significance=significance)
+    return phot.assign(
+        significance_corroborated=_corroborated_significance(
+            phot, corroboration_window_days
+        )
+    )
 
 
-def detect_flare(postphot: Optional[pd.DataFrame], baseline: dict):
-    phot = _flare_significance_series(postphot, baseline)
+def detect_flare(
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
+):
+    phot = _flare_significance_series(postphot, baseline, corroboration_window_days)
     if phot is None:
         return np.nan, None
-    idx = phot.significance.idxmax()
-    return float(phot.significance.loc[idx]), phot.loc[idx]
+    idx = phot.significance_corroborated.idxmax()
+    return float(phot.significance_corroborated.loc[idx]), phot.loc[idx]
 
 
 def flare_confidence_score(
@@ -127,10 +164,14 @@ def flare_confidence_score(
     raw = norm.cdf(significance, loc=center, scale=width)
     return float(np.clip(floor + (1.0 - floor) * raw, floor, 1.0))
 
+# Rules out candidates that TNS have already classified as supernovae
+def classification_score(classification: Optional[str]) -> float:
+    c = (classification or "").strip().upper()
+    return 0.0 if any(c.startswith(pre) for pre in SN_LIKE_PREFIXES) else 1.0
+
 
 def agn_association_score(agn_df, agn_boost: float = 10.0) -> float:
-    """agn_boost when agn_association_2d matched the candidate, else a neutral 1.0."""
-    return float(agn_boost) if agn_df is not None and len(agn_df) else 1.0
+    return float(agn_boost) if agn_df is not None and len(agn_df) else 0.0
 
 
 def projected_offset_kpc(offset_arcsec: float, angular_diameter_distance_mpc: float) -> float:
@@ -196,15 +237,6 @@ def nuclear_offset_score(
     return None, {}
 
 
-def flare_luminosity_erg_s(peak_mag: float, distance_mpc: float,
-                           nu_eff_hz: float = 4.6e14) -> float:
-    """nu*L_nu for a flare peak magnitude at a known distance, erg/s. No
-    K-correction is applied."""
-    d_cm = float(distance_mpc) * 3.0856775814913673e24
-    f_nu = 10 ** (-0.4 * (float(peak_mag) + 48.60))  # erg/s/cm^2/Hz, AB
-    return float(4.0 * np.pi * d_cm**2 * f_nu * nu_eff_hz)
-
-
 def _host_rows(target) -> list:
     """The "Host Galaxies" TargetExtra as a list of dicts, best match first."""
     import json
@@ -261,6 +293,16 @@ def vet_bbh(
             )
             pending_updates.clear()
 
+    class_score = classification_score(getattr(target, "classification", None))
+    update_score_factor(event_candidate, "classification_score", class_score)
+    if class_score == 0:
+        _flush_score_factors()
+        logger.info(
+            "BBH vetting: %s is classified %r, a supernova; scores 0 and the rest of "
+            "the sub-scores are skipped", target.name, target.classification,
+        )
+        return
+
     ## check skymap association
     if np.isfinite(param_ranges["t_post"]):
         gw_disc_date = (
@@ -274,16 +316,29 @@ def vet_bbh(
     else:  # just use current time
         max_time = Time.now()
     skymap_score = skymap_association(
-        nonlocalized_event_name, target_id, max_time=max_time
+        nonlocalized_event_name, target_id, max_time=max_time # type: ignore
     )
     update_score_factor(event_candidate, "skymap_score", skymap_score)
 
     localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
     update_score_factor(event_candidate, "localization_id", localization.id)
 
-    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    # stop_on_zero=False: a point-source match shouldn't stop AGN-flare vetting
+    host_df, agn_df, keep_vetting = vet_basic(
+        event_candidate.target.id, stop_on_zero=False
+    )
     if not keep_vetting:
         _flush_score_factors()
+        return
+
+    agn_score = agn_association_score(agn_df, param_ranges["agn_boost_multiplier"])
+    update_score_factor(event_candidate, "agn_score", agn_score)
+    if agn_score == 0:
+        _flush_score_factors()
+        logger.info(
+            "BBH vetting: %s has no AGN association, scores 0; "
+            "remaining sub-scores skipped", target.name,
+        )
         return
 
     host_df = clean_host_df(host_df)
@@ -318,9 +373,6 @@ def vet_bbh(
         t_post=param_ranges["t_post"],
         t_pre=param_ranges["t_pre"],
     )
-    agn_score = agn_association_score(agn_df, param_ranges["agn_boost_multiplier"])
-    update_score_factor(event_candidate, "agn_score", agn_score)
-
     ## photometric flare scoring
     baseline = fit_agn_baseline(
         prephot, min_baseline_pts=param_ranges["min_baseline_pts"]
@@ -328,7 +380,10 @@ def vet_bbh(
     for filt, entry in baseline.items():
         update_score_factor(event_candidate, f"baseline_mag_{filt}", entry["mag"])
         update_score_factor(event_candidate, f"baseline_std_{filt}", entry["std"])
-    max_significance, flare_row = detect_flare(postphot, baseline)
+    max_significance, flare_row = detect_flare(
+        postphot, baseline,
+        corroboration_window_days=param_ranges["flare_corroboration_window_days"],
+    )
 
     agn_flare_score = None
     if baseline and postphot is not None and len(postphot) and np.isfinite(max_significance):
@@ -340,25 +395,9 @@ def vet_bbh(
             width_frac=param_ranges["flare_score_width_frac"],
         )
         update_score_factor(event_candidate, "agn_flare_score", agn_flare_score)
-
-        try:
-            from .scoring import get_eventcandidate_default_distance
-
-            dist_mpc, _ = get_eventcandidate_default_distance(
-                target_id, nonlocalized_event_name
-            )
-            if flare_row is not None and dist_mpc and np.isfinite(dist_mpc) and dist_mpc > 0:
-                lum = flare_luminosity_erg_s(float(flare_row.mag), float(dist_mpc))
-                update_score_factor(event_candidate, "flare_peak_lum", lum)
-            else:
-                delete_score_factor(event_candidate, "flare_peak_lum")
-        except Exception as exc:  # distance is optional context, never fatal
-            logger.info("flare luminosity not computed: %s", exc)
-            delete_score_factor(event_candidate, "flare_peak_lum")
     else:
         # not enough baseline and/or post-merger photometry
         delete_score_factor(event_candidate, "agn_flare_score")
-        delete_score_factor(event_candidate, "flare_peak_lum")
 
     offset_score, _ = nuclear_offset_score(_host_rows(target), floor=PHOT_SCORE_MIN)
 

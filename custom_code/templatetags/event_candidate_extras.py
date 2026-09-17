@@ -173,10 +173,10 @@ def display_score_details(context, target_id):
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
+        classification_score=("Spectroscopically a Supernova?", _bool_format_yesno),
         agn_score=(AGN_SCORE_LABEL, partial(_float_format, precision=1)),
         agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
         nuclear_offset_score=("Nuclear Offset Score", partial(_float_format, precision=2)),
-        flare_peak_lum=("Flare Peak Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",

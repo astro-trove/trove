@@ -57,6 +57,7 @@ KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
 # default subscore names
 SUBSCORE_NAMES = [
     "kilonova_score",
+    "classification_score",
     "skymap_score",
     "host_distance_score",
     "ps_score",
@@ -66,7 +67,6 @@ SUBSCORE_NAMES = [
     "phot_peak_time",
     "phot_decay_rate",
     "agn_flare_score",
-    # BBH/AGN-flare: how close the flare sits to its host's nucleus
     "nuclear_offset_score",
 ]
 
@@ -97,6 +97,19 @@ MPC_KEYS = [
 # the site-wide AGN toggle governs only these; BBH AGN-flare scoring always uses
 # its AGN association
 AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
+
+PS_WAIVED_TRANSIENTS = {"AGN-flare"}
+
+def ps_counts_toward(transient, agn_score):
+    """Whether ps_score enters `transient`'s score.
+
+    Waived only for AGN-flare scoring, and only when agn_association_2d actually
+    matched. With no AGN association the point-source match still stands.
+    """
+    if transient not in PS_WAIVED_TRANSIENTS:
+        return True
+    boost = AGN_FLARE_PARAM_RANGES["agn_boost_multiplier"]
+    return not (agn_score is not None and agn_score >= boost)
 
 
 def agn_counts_toward(transient, agn_toggle):
@@ -249,12 +262,11 @@ def get_event_candidate_scores(
         if "mpc_match_name" in te:
             mpc_score = int(te["mpc_match_name"] == str(None))
 
-        # remove keys we don't want and calculate a base subscore; agn_score is
-        # applied per transient below, since the AGN toggle only governs some
+        # removed ps_score because if it is a vet_bbh() call, then ps_score of 0
+        # might just be because AGN is in the point source catalogue
         subscore_no_phot = (
             math.prod([sf_dict[key] for key in sf_dict
                        if key not in exclude_keys and key != "agn_score"])
-            * ps_score
             * mpc_score
         )
         agn_score = sf_dict.get("agn_score")
@@ -325,9 +337,12 @@ def get_event_candidate_scores(
             # EventCandidate object
             agn_factor = (agn_score if agn_score is not None
                           and agn_counts_toward(transient, agn_toggle) else 1)
-            ec.score[transient] = (
-                subscore_no_phot * agn_factor * phot_score
-            )  # multiply the subscores
+            ps_factor = ps_score if ps_counts_toward(transient, agn_score) else 1
+            # clipped to [0, 1]: agn_score is a x10 gate, so the raw product exceeds 1
+            ec.score[transient] = min(
+                1.0, max(0.0,
+                         subscore_no_phot * agn_factor * ps_factor * phot_score)
+            )
         ecs_out.append(ec)
 
     logger.info(f"Finished computing the scores, sorting and returning... time.time = {time.time()}")
