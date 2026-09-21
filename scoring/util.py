@@ -108,8 +108,8 @@ def ps_counts_toward(transient, agn_score):
     """
     if transient not in PS_WAIVED_TRANSIENTS:
         return True
-    boost = AGN_FLARE_PARAM_RANGES["agn_boost_multiplier"]
-    return not (agn_score is not None and agn_score >= boost)
+    matched = AGN_FLARE_PARAM_RANGES["agn_match_score"]
+    return not (agn_score is not None and agn_score >= matched)
 
 
 def agn_counts_toward(transient, agn_toggle):
@@ -131,11 +131,7 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
-# event classes that get KN / KN-in-SN / super-KN scoring (i.e. everything the
-# most_likely_class if/elif chain in get_event_candidate_scores below routes to a
-# transients list containing "KN"). Shared with the KN-vs-BBH scoring-adjustments
-# panel picker in custom_code.templatetags.event_candidate_extras, so the UI and
-# the scoring logic can't drift apart on which classes are "KN-style".
+# event classes that get KN / KN-in-SN / super-KN scoring
 KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
 
 
@@ -166,9 +162,7 @@ def get_event_candidate_scores(
         include_subscores=False,
         phot_method=None,
 ):
-    """Get the event candidate scores for all subscores in subscore_names.
-
-    event_candidates should be a django queryset of EventCandidate objects.
+    """
     `phot_method` selects which photometry factor the score uses (`None`
     reads the site-wide toggle.) `agn_toggle` drops agn_score from the
     kilonova-style scores only (`AGN_TOGGLE_TRANSIENTS`).
@@ -299,12 +293,7 @@ def get_event_candidate_scores(
             if include_subscores:
                 ec.subscores[transient] = phot_subscores
 
-            # ONLY "KN" may use KilonovaSCORER. The three transient types differ
-            # solely in the `param_ranges` above -- `subscore_no_phot` is shared
-            # -- so substituting the same `kn` into all of them made all three
-            # scores numerically identical and silently discarded the
-            # "KN-in-SN" / "super-KN" acceptance windows, which is the whole
-            # content of those two columns.
+            # ONLY "KN" can use KilonovaSCORER
             kn = sf_dict.get(KILONOVA_SCORE_KEY)
             kn_available = kn is not None and math.isfinite(kn)
             if use_kilonova and transient == "KN" and kn_available:
@@ -317,20 +306,8 @@ def get_event_candidate_scores(
                 phot_score = math.prod(list(phot_subscores.values()))
                 phot_source = "trove"
 
-            # Recorded from the "KN" pass only. This drives the yellow-row
-            # highlight, the "scored only" filter and the blue "no scores yet"
-            # notice, all of which are about the KilonovaSCORER column; taking
-            # it from whichever transient happened to be last would report
-            # "trove" for every candidate as soon as more than one type is
-            # scored.
             if transient == "KN":
                 ec.phot_source = phot_source
-                # Recorded whether or not it is the factor feeding `ec.score`,
-                # because "was this candidate scored by KilonovaSCORER at all"
-                # is a different question from "is that score in use". The
-                # "no scores yet" notice asks the first one: keying it on
-                # `phot_source` meant a completed Vet All still reported
-                # nothing to anyone whose toggle sat on light curve metrics.
                 ec.kilonova_score = kn if kn_available else None
 
             # save the score to a temporary field (dictionary) in the
@@ -338,7 +315,6 @@ def get_event_candidate_scores(
             agn_factor = (agn_score if agn_score is not None
                           and agn_counts_toward(transient, agn_toggle) else 1)
             ps_factor = ps_score if ps_counts_toward(transient, agn_score) else 1
-            # clipped to [0, 1]: agn_score is a x10 gate, so the raw product exceeds 1
             ec.score[transient] = min(
                 1.0, max(0.0,
                          subscore_no_phot * agn_factor * ps_factor * phot_score)
@@ -412,11 +388,6 @@ def get_vet_all_progress(nonlocalizedevent_id):
         # for the EVENT while the totals counted only the latest run, so a task
         # left pending by some earlier run read as "still running" next to
         # "88 of 88 scored".
-        #
-        # That is not hypothetical -- trove_test carries five S250206dm tasks
-        # stuck in RUNNING since 14 July, workers that died mid-task without
-        # releasing the row. They are not part of the current run and must not
-        # be counted as either its progress or its totals.
         run = _latest_run(tasks, latest).aggregate(
             total=Count("id"),
             pending=Count("id", filter=Q(status__in=pending_statuses)),

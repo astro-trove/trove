@@ -38,12 +38,13 @@ PARAM_RANGES = dict(
     t_pre=0,
     t_post=AGN_FLARE_HORIZON_DAYS,
     min_baseline_pts=2,  # n=1 gives MAD=0, which inflates flare significance
-    flare_sigma_thresh=5.0,
-    # Half-width, in days, of the window an epoch must be corroborated within.
-    flare_corroboration_window_days=0.5,
+    flare_sigma_thresh=3.25,
+    flare_consecutive_nights=2, # the flare must hold on this many consecutive observed nights
+    flare_corroboration_window_days=0.5, # Half-width, in days, of the window an epoch must be corroborated within.
     flare_score_center_frac=1.0,  # sigmoid midpoint, as a fraction of flare_sigma_thresh
     flare_score_width_frac=0.25,  # sigmoid width, as a fraction of flare_sigma_thresh
-    agn_boost_multiplier=10.0,
+    agn_match_score=1.0,
+    agn_miss_score=0.1,
 )
 
 
@@ -99,8 +100,7 @@ def _corroborated_significance(
             times = phot[col].to_numpy(dtype=float)
             break
     if times is None:
-        # No time column: every epoch stands alone, which is the old behaviour. Only
-        # hand-built frames reach this; real photometry always carries mjd.
+        # Only hand-built frames reach this; real photometry always carries mjd.
         return sig
 
     filters = phot["filter"].to_numpy()
@@ -116,6 +116,7 @@ def _flare_significance_series(
     baseline: dict,
     corroboration_window_days: float = 0.5,
 ) -> Optional[pd.DataFrame]:
+    # Returns list of photometry points --> z-scores compared to pre-merger baseline
     if postphot is None or not len(postphot) or not baseline:
         return None
 
@@ -143,12 +144,21 @@ def detect_flare(
     postphot: Optional[pd.DataFrame],
     baseline: dict,
     corroboration_window_days: float = 0.5,
+    consecutive_nights: int = 1,
 ):
+    # highest level that `consecutive_nights` observed nights all reach
     phot = _flare_significance_series(postphot, baseline, corroboration_window_days)
     if phot is None:
         return np.nan, None
-    idx = phot.significance_corroborated.idxmax()
-    return float(phot.significance_corroborated.loc[idx]), phot.loc[idx]
+    night = np.floor(phot.mjd.to_numpy(dtype=float)) if "mjd" in phot.columns else np.arange(len(phot))
+    peaks = phot.significance_corroborated.groupby(night).idxmax()  # sorted by night
+    nightly = phot.significance_corroborated.loc[peaks].to_numpy()
+    # with fewer observed nights than that, score the nights there are
+    k = min(consecutive_nights, len(nightly))
+    run_min = [nightly[i:i + k].min() for i in range(len(nightly) - k + 1)]
+    start = int(np.argmax(run_min))
+    idx = peaks.iloc[start + int(np.argmin(nightly[start:start + k]))]
+    return float(run_min[start]), phot.loc[idx]
 
 
 def flare_confidence_score(
@@ -158,7 +168,7 @@ def flare_confidence_score(
     center_frac: float = 1.0,
     width_frac: float = 0.25,
 ) -> float:
-    # normal-CDF sigmoid; at center_frac=1.0 a 5-sigma scores ~0.55
+    # normal-CDF sigmoid; a significance at center_frac * thresh scores ~0.55
     center = center_frac * thresh
     width = max(width_frac * thresh, 1e-6)
     raw = norm.cdf(significance, loc=center, scale=width)
@@ -170,8 +180,8 @@ def classification_score(classification: Optional[str]) -> float:
     return 0.0 if any(c.startswith(pre) for pre in SN_LIKE_PREFIXES) else 1.0
 
 
-def agn_association_score(agn_df, agn_boost: float = 10.0) -> float:
-    return float(agn_boost) if agn_df is not None and len(agn_df) else 0.0
+def agn_association_score(agn_df, match: float = 1.0, miss: float = 0.1) -> float:
+    return float(match) if agn_df is not None and len(agn_df) else float(miss)
 
 
 def projected_offset_kpc(offset_arcsec: float, angular_diameter_distance_mpc: float) -> float:
@@ -179,7 +189,6 @@ def projected_offset_kpc(offset_arcsec: float, angular_diameter_distance_mpc: fl
 
 
 def _host_redshift(row: dict, luminosity_distance_mpc: float) -> float:
-    """The host row's redshift, else the one its luminosity distance implies."""
     try:
         z = float(row.get("z"))
         if np.isfinite(z) and z >= 0:
@@ -191,7 +200,7 @@ def _host_redshift(row: dict, luminosity_distance_mpc: float) -> float:
 
     try:
         return float(z_at_value(settings.COSMO.luminosity_distance, luminosity_distance_mpc * u.Mpc))
-    except Exception:  # below the root-finder's range, i.e. effectively local
+    except Exception:  # below the root-finder's range
         return 0.0
 
 
@@ -238,7 +247,6 @@ def nuclear_offset_score(
 
 
 def _host_rows(target) -> list:
-    """The "Host Galaxies" TargetExtra as a list of dicts, best match first."""
     import json
     from tom_targets.models import TargetExtra
 
@@ -331,15 +339,10 @@ def vet_bbh(
         _flush_score_factors()
         return
 
-    agn_score = agn_association_score(agn_df, param_ranges["agn_boost_multiplier"])
+    agn_score = agn_association_score(
+        agn_df, param_ranges["agn_match_score"], param_ranges["agn_miss_score"]
+    )
     update_score_factor(event_candidate, "agn_score", agn_score)
-    if agn_score == 0:
-        _flush_score_factors()
-        logger.info(
-            "BBH vetting: %s has no AGN association, scores 0; "
-            "remaining sub-scores skipped", target.name,
-        )
-        return
 
     host_df = clean_host_df(host_df)
     if target.redshift is not None and not np.isnan(target.redshift):
@@ -383,9 +386,11 @@ def vet_bbh(
     max_significance, flare_row = detect_flare(
         postphot, baseline,
         corroboration_window_days=param_ranges["flare_corroboration_window_days"],
+        consecutive_nights=param_ranges["flare_consecutive_nights"],
     )
 
     agn_flare_score = None
+    # NaN means no usable photometry, so no verdict
     if baseline and postphot is not None and len(postphot) and np.isfinite(max_significance):
         agn_flare_score = flare_confidence_score(
             max_significance,
@@ -396,7 +401,7 @@ def vet_bbh(
         )
         update_score_factor(event_candidate, "agn_flare_score", agn_flare_score)
     else:
-        # not enough baseline and/or post-merger photometry
+        # not enough baseline, post-merger photometry, or post-merger nights
         delete_score_factor(event_candidate, "agn_flare_score")
 
     offset_score, _ = nuclear_offset_score(_host_rows(target), floor=PHOT_SCORE_MIN)
