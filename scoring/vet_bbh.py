@@ -273,7 +273,7 @@ def vet_bbh(
     )
     target = Target.objects.get(id=target_id)
 
-    # Store all required updates/deletes and then does all of them at once. 
+    # Store all required updates/deletes and then does all of them at once.
     # Removes the latency of reaching the tunnel everytime
     pending_updates: dict = {}
     pending_deletes: set = set()

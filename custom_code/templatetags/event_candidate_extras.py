@@ -458,12 +458,12 @@ def _label_for_key(key):
     """Nicer labels for the per-filter baseline keys (`baseline_mag_g`,
     `baseline_std_r`, ...), which vary by filter and so can't be fixed
     entries in `keymap`. Falls back to the raw key for anything else."""
-    for prefix, template in (
+    for prefix, label in (
         ("baseline_mag_", "AGN baseline median mag ({filt}-band)"),
         ("baseline_std_", "AGN baseline scatter, robust MAD ({filt}-band)"),
     ):
         if key.startswith(prefix):
-            return template.format(filt=key[len(prefix):])
+            return label.format(filt=key[len(prefix):])
     return key
 
 

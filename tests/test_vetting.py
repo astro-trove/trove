@@ -6,19 +6,7 @@ These test the pure logic functions in candidate_vetting/ and scoring/.
 
 import pytest
 import numpy as np
-import pandas as pd
 from unittest.mock import MagicMock, patch
-
-
-def _phot_df(mag, magerr, filt, upperlimit=None, dt=None):
-    n = len(mag)
-    d = dict(
-        mag=mag, magerr=magerr, filter=filt,
-        upperlimit=[False] * n if upperlimit is None else upperlimit,
-    )
-    if dt is not None:
-        d["dt"] = dt
-    return pd.DataFrame(d)
 
 
 class TestPcc:
