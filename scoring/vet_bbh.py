@@ -378,8 +378,12 @@ def vet_bbh(
             host_df, target_id, nonlocalized_event_name
         )
         update_score_factor(event_candidate, "host_distance_score", host_score)
-        update_score_factor(event_candidate, "host_name", host_name)
-        update_score_factor(event_candidate, "host_catalog", host_catalog)
+        # a catalog row can be missing either, and ScoreFactor.value is not nullable
+        for key, value in (("host_name", host_name), ("host_catalog", host_catalog)):
+            if value is None or (isinstance(value, float) and np.isnan(value)):
+                delete_score_factor(event_candidate, key)
+            else:
+                update_score_factor(event_candidate, key, value)
     else:
 
         delete_score_factor(event_candidate, "host_distance_score")
