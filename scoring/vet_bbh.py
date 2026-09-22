@@ -265,6 +265,22 @@ def _host_rows(target) -> list:
     return rows if isinstance(rows, list) else []
 
 
+def _agn_nucleus_row(target, agn_df) -> Optional[dict]:
+    # the nearest matched AGN marks the nucleus; Dist is None when the match has no distance
+    if agn_df is None or not len(agn_df) or not {"ra", "dec"} <= set(agn_df.columns):
+        return None
+    from astropy.coordinates import SkyCoord
+
+    sep = SkyCoord(target.ra * u.deg, target.dec * u.deg).separation(
+        SkyCoord(agn_df.ra.to_numpy(float) * u.deg, agn_df.dec.to_numpy(float) * u.deg)
+    ).arcsec
+    agn = agn_df.iloc[int(np.nanargmin(sep))]
+    dist = agn.get("lumdist")
+    has_dist = dist is not None and np.isfinite(float(dist)) and float(dist) > 0
+    return dict(ID=agn.get("name"), Offset=float(np.nanmin(sep)),
+                Dist=float(dist) if has_dist else None, z=agn.get("z"))
+
+
 def vet_bbh(
     target_id: int,
     nonlocalized_event_name: Optional[str] = None,
@@ -409,7 +425,17 @@ def vet_bbh(
         # not enough baseline, post-merger photometry, or post-merger nights
         delete_score_factor(event_candidate, "agn_flare_score")
 
-    offset_score, _ = nuclear_offset_score(_host_rows(target), floor=PHOT_SCORE_MIN)
+    # measured from the matched AGN when there is one, else from the host galaxy
+    host_rows = _host_rows(target)
+    agn_row = _agn_nucleus_row(target, agn_df)
+    if agn_row is not None and agn_row["Dist"] is None:
+        # no AGN distance, so only the astrometric precision can judge the offset
+        precision = ASTROMETRIC_PRECISION_ARCSEC
+        offset_score = float(np.clip(precision / (precision + agn_row["Offset"]), PHOT_SCORE_MIN, 1.0))
+    else:
+        offset_score, _ = nuclear_offset_score(
+            ([agn_row] if agn_row else []) + host_rows, floor=PHOT_SCORE_MIN
+        )
 
     if offset_score is None:
         delete_score_factor(event_candidate, "nuclear_offset_score")
