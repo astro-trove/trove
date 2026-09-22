@@ -39,7 +39,7 @@ PARAM_RANGES = dict(
     t_post=AGN_FLARE_HORIZON_DAYS,
     min_baseline_pts=2,  # n=1 gives MAD=0, which inflates flare significance
     flare_sigma_thresh=3.25,
-    flare_consecutive_nights=2, # the flare must hold on this many consecutive observed nights
+    flare_pair_max_gap_days=5.0, # an adjacent observed night this close must confirm the flare
     flare_corroboration_window_days=0.5, # Half-width, in days, of the window an epoch must be corroborated within.
     flare_score_center_frac=1.0,  # sigmoid midpoint, as a fraction of flare_sigma_thresh
     flare_score_width_frac=0.25,  # sigmoid width, as a fraction of flare_sigma_thresh
@@ -144,21 +144,26 @@ def detect_flare(
     postphot: Optional[pd.DataFrame],
     baseline: dict,
     corroboration_window_days: float = 0.5,
-    consecutive_nights: int = 1,
+    pair_max_gap_days: float = 0.0,
 ):
-    # highest level that `consecutive_nights` observed nights all reach
+    # each night's peak corroborated significance, capped by its better adjacent observed
+    # night when one lies within pair_max_gap_days, and an isolated night counts as it is.
     phot = _flare_significance_series(postphot, baseline, corroboration_window_days)
     if phot is None:
         return np.nan, None
     night = np.floor(phot.mjd.to_numpy(dtype=float)) if "mjd" in phot.columns else np.arange(len(phot))
     peaks = phot.significance_corroborated.groupby(night).idxmax()  # sorted by night
+    nights = peaks.index.to_numpy(dtype=float)
     nightly = phot.significance_corroborated.loc[peaks].to_numpy()
-    # with fewer observed nights than that, score the nights there are
-    k = min(consecutive_nights, len(nightly))
-    run_min = [nightly[i:i + k].min() for i in range(len(nightly) - k + 1)]
-    start = int(np.argmax(run_min))
-    idx = peaks.iloc[start + int(np.argmin(nightly[start:start + k]))]
-    return float(run_min[start]), phot.loc[idx]
+    best, limiting = -np.inf, 0
+    for i in range(len(nightly)):
+        near = [j for j in (i - 1, i + 1)
+                if 0 <= j < len(nightly) and abs(nights[j] - nights[i]) <= pair_max_gap_days]
+        j = max(near, key=lambda n: nightly[n]) if near else i
+        weaker = i if nightly[i] <= nightly[j] else j
+        if nightly[weaker] > best:
+            best, limiting = nightly[weaker], weaker
+    return float(best), phot.loc[peaks.iloc[limiting]]
 
 
 def flare_confidence_score(
@@ -386,7 +391,7 @@ def vet_bbh(
     max_significance, flare_row = detect_flare(
         postphot, baseline,
         corroboration_window_days=param_ranges["flare_corroboration_window_days"],
-        consecutive_nights=param_ranges["flare_consecutive_nights"],
+        pair_max_gap_days=param_ranges["flare_pair_max_gap_days"],
     )
 
     agn_flare_score = None
