@@ -1,3 +1,4 @@
+from django.core.exceptions import ValidationError
 from django.forms import (
     Form,
     ChoiceField,
@@ -7,6 +8,7 @@ from django.forms import (
     Select
 )
 
+from .dynamic_catalogs import find_galaxy
 from .phot_method import KILONOVA_VETTING_MODE, PHOT_METHOD_TROVE
 
 class VettingChoiceForm(Form):
@@ -53,6 +55,25 @@ class RedshiftUpdateForm(Form):
     )
     
     submitter = CharField(label="Submitter")
+
+    def clean(self):
+        """The ID and the source are picked from two independent dropdowns, so
+        they can name a pair that isn't in the host galaxy table. IDs repeat
+        across catalogs, so a mismatched pair would otherwise store some other
+        galaxy's position and magnitude.
+        """
+        cleaned = super().clean()
+        galaxies = getattr(self, "galaxies", None)
+        host_galaxy_id = cleaned.get("host_galaxy_id")
+        host_galaxy_source = cleaned.get("host_galaxy_source")
+        if galaxies and host_galaxy_id and host_galaxy_source:
+            if find_galaxy(galaxies, host_galaxy_id, host_galaxy_source) is None:
+                raise ValidationError(
+                    f"{host_galaxy_id} is not listed under {host_galaxy_source}. "
+                    "Pick the source this galaxy appears under in the host "
+                    "galaxy table above."
+                )
+        return cleaned
 
 class NonLocalizedEventAssociateTargetsForm(Form):
     first_det_tmin = FloatField(label=r"Minimum time [days]")

@@ -24,7 +24,11 @@ from tom_nonlocalizedevents.models import (
     EventLocalization,
 )
 
-from candidate_vetting.vet import host_association, localization_sequence_from_name
+from candidate_vetting.vet import (
+    GALAXY_CATALOGS,
+    host_association,
+    localization_sequence_from_name,
+)
 from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
 
 from .forms import (VettingChoiceForm,
@@ -251,7 +255,9 @@ class TargetRedshiftUpdateFormView(FormView):
         # get target, potential host galaxies, their IDs, and provenance (source)
         target = Target.objects.get(id=self.kwargs["pk"])
         form.target = target
-        galaxies = galaxy_table(target)["galaxies"]
+        # a target that has never been vetted has no host galaxy table at all
+        galaxies = galaxy_table(target)["galaxies"] or []
+        form.galaxies = galaxies
         galaxy_choices_ids = [(g["ID"], g["ID"]) for g in galaxies]
         galaxy_choices_sources = [
             (gs, gs) for gs in np.unique([g["Source"] for g in galaxies])
@@ -281,16 +287,24 @@ class TargetRedshiftUpdateFormView(FormView):
         print(f"z_err = {z_err}")
         pk = self.kwargs["pk"]
         target = Target.objects.get(id=pk)
-        galaxies = galaxy_table(target)["galaxies"]
         UserGalaxy()._add_galaxy(
-            target, galaxies, z, z_err, host_galaxy_id, host_galaxy_source, submitter
+            target,
+            form.galaxies,
+            z,
+            z_err,
+            host_galaxy_id,
+            host_galaxy_source,
+            submitter,
         )
 
-        # re-run host association
-        host_association(target_id=pk)
+        # re-run host association, including the galaxy we just added
+        host_association(target_id=pk, galaxy_catalogs=[UserGalaxy] + GALAXY_CATALOGS)
 
         # re-run vetting if NLE was provided by referer
-        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+        # the session key is missing when the form was opened without a referer
+        nle_name_or_id = (
+            self.request.session.get("nle_id", "").split("=")[-1].split("/")[0]
+        )
         if nle_name_or_id.isdigit():
             nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
         else:
