@@ -65,9 +65,17 @@ class UserGalaxy(StaticCatalog):
     def to_standardized_catalog(self, df):
         df = self._standardize_df(df)
         df["lumdist"] = cosmo.luminosity_distance(df.z).to(u.Mpc).value
-        df["lumdist_err"] = cosmo.luminosity_distance(df.z_err).to(u.Mpc).value
-        df["lumdist_neg_err"] = cosmo.luminosity_distance(df.z_neg_err).to(u.Mpc).value
-        df["lumdist_pos_err"] = cosmo.luminosity_distance(df.z_pos_err).to(u.Mpc).value
+        # propagate the redshift error through the cosmology. Taking the
+        # luminosity distance *of* z_err is a different quantity: at z = 0.34
+        # +/- 0.05 it gives +/- 224 Mpc where the real spread is +315/-304.
+        df["lumdist_pos_err"] = (
+            cosmo.luminosity_distance(df.z + df.z_pos_err).to(u.Mpc).value
+            - df["lumdist"]
+        )
+        df["lumdist_neg_err"] = df["lumdist"] - cosmo.luminosity_distance(
+            (df.z - df.z_neg_err).clip(lower=0)
+        ).to(u.Mpc).value
+        df["lumdist_err"] = (df["lumdist_pos_err"] + df["lumdist_neg_err"]) / 2
         df["z_type"] = "user spec-z"
         return df
 

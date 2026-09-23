@@ -258,7 +258,9 @@ class TargetRedshiftUpdateFormView(FormView):
         # a target that has never been vetted has no host galaxy table at all
         galaxies = galaxy_table(target)["galaxies"] or []
         form.galaxies = galaxies
-        galaxy_choices_ids = [(g["ID"], g["ID"]) for g in galaxies]
+        galaxy_choices_ids = [
+            (gid, gid) for gid in dict.fromkeys(str(g["ID"]) for g in galaxies)
+        ]
         galaxy_choices_sources = [
             (gs, gs) for gs in np.unique([g["Source"] for g in galaxies])
         ]
@@ -266,11 +268,27 @@ class TargetRedshiftUpdateFormView(FormView):
         form.fields["host_galaxy_source"].choices = galaxy_choices_sources
         return form
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sources_by_galaxy = {}
+        for galaxy in getattr(context["form"], "galaxies", []):
+            sources = sources_by_galaxy.setdefault(str(galaxy["ID"]), [])
+            if str(galaxy["Source"]) not in sources:
+                sources.append(str(galaxy["Source"]))
+        context["sources_by_galaxy"] = sources_by_galaxy
+        return context
+
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
         if referer:
             self.request.session["nle_id"] = urlparse(referer).query
         return super().get(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        # TROVE surfaces these through bootstrap_messages in the base template
+        for error in form.non_field_errors():
+            messages.error(self.request, error)
+        return super().form_invalid(form)
 
     def form_valid(self, form):
         host_galaxy_id = form.cleaned_data["host_galaxy_id"]

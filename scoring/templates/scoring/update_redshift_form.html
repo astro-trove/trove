@@ -45,8 +45,8 @@
         margin: 0 auto;
     }
 
-    /* 4. Form-wide errors go to the modal, not inline above the fields.
-          Field-level errors still render next to the field they belong to. */
+    /* 4. Form-wide errors are raised as Django messages by the view, so keep
+          them out of the form. Field-level errors still render by their field. */
     .update-redshift-card .errorlist.nonfield {
         display: none;
     }
@@ -127,6 +127,7 @@
             <form action="" method="post">  
                 {% csrf_token %}  
                 {{ form }}
+                {{ sources_by_galaxy|json_script:"sources-by-galaxy" }}
                 <button type="submit" class="btn btn-primary btn-redshift">
                     Update Selected Galaxy Redshift
                 </button>
@@ -138,40 +139,40 @@
     </div>
 </div>
 
-{% if form.non_field_errors %}
-<div class="modal fade" id="redshift-error-modal" tabindex="-1" role="dialog"
-     aria-labelledby="redshift-error-title" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered" role="document">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title text-danger" id="redshift-error-title">
-          Check the galaxy and source
-        </h5>
-        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-          <span aria-hidden="true">&times;</span>
-        </button>
-      </div>
-      <div class="modal-body">
-        {% for error in form.non_field_errors %}
-          <p class="mb-0">{{ error }}</p>
-        {% endfor %}
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">OK</button>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
 {% endblock %}
 
 {% block extra_javascript %}
 {{ block.super }}
-{% if form.non_field_errors %}
 <script>
-    $(function () {
-        $('#redshift-error-modal').modal('show');
-    });
+    // The same galaxy can be listed under several catalogs and the two
+    // dropdowns are independent, so offer only the sources the picked galaxy
+    // actually has. The form still validates the pair server side.
+    (function () {
+        var data = document.getElementById('sources-by-galaxy');
+        var name = document.getElementById('id_host_galaxy_id');
+        var source = document.getElementById('id_host_galaxy_source');
+        if (!data || !name || !source) {
+            return;
+        }
+        var sourcesByGalaxy = JSON.parse(data.textContent);
+
+        function syncSources() {
+            var allowed = sourcesByGalaxy[name.value] || [];
+            var chosen = source.value;
+            source.innerHTML = '';
+            allowed.forEach(function (option) {
+                var el = document.createElement('option');
+                el.value = option;
+                el.textContent = option;
+                source.appendChild(el);
+            });
+            if (allowed.indexOf(chosen) !== -1) {
+                source.value = chosen;
+            }
+        }
+
+        name.addEventListener('change', syncSources);
+        syncSources();
+    })();
 </script>
-{% endif %}
 {% endblock %}
