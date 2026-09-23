@@ -6,12 +6,7 @@
 <style>
     /* 1. Background styling - Using your blurred image logic from before */
     body {
-        background-color: white; 
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0;
+        background-color: white;
         font-family: sans-serif;
     }
 
@@ -27,7 +22,7 @@
         border-radius: 12px;
         padding: 40px;
         width: 100%;
-        max-width: 850px;
+        max-width: 100%;
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
         color: black; /* Pure white text for headers */
     }
@@ -39,7 +34,24 @@
         color: black;
     }
 
-    /* 3. Form Labels */
+    /* 3. The host galaxy table: full card width, scroll rather than clip */
+    .update-redshift-card details {
+        width: 100%;
+        overflow-x: auto;
+    }
+
+    .update-redshift-card form {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    /* 4. Form-wide errors go to the modal, not inline above the fields.
+          Field-level errors still render next to the field they belong to. */
+    .update-redshift-card .errorlist.nonfield {
+        display: none;
+    }
+
+    /* 5. Form Labels */
     .update-redshift-card label {
         color: black !important; 
         font-weight: 600;
@@ -48,7 +60,7 @@
         display: block;
     }
 
-    /* 4. Inputs: Pure white background with black text and bright borders */
+    /* 6. Inputs: Pure white background with black text and bright borders */
     .update-redshift-card input, 
     .update-redshift-card select, 
     .update-redshift-card textarea {
@@ -67,7 +79,7 @@
         outline: none;
     }
 
-    /* 5. The "Submit" Button: Vivid Pink */
+    /* 7. The "Submit" Button: Vivid Pink */
     .btn-redshift {
         background: pink !important; 
         color: black !important;
@@ -102,16 +114,14 @@
     }
 </style>
 
-<div class="container d-flex justify-content-center">
+<div class="container-fluid d-flex justify-content-center">
 
     <div class="update-redshift-card">
         <h2>Update a Potential Host Galaxy Redshift</h2>
-        <div class="col-md-8">
-          <details>
-            <summary><h4 style="display:inline-block">Host Galaxies</h4></summary>
-            {% galaxy_table form.target %}
-          </details>
-        </div>
+        <details>
+          <summary><h5 style="display:inline-block">Host Galaxies</h5></summary>
+          {% galaxy_table form.target %}
+        </details>
         <br>
         <div class="d-grid">
             <form action="" method="post">  
@@ -127,4 +137,41 @@
         </div>
     </div>
 </div>
+
+{% if form.non_field_errors %}
+<div class="modal fade" id="redshift-error-modal" tabindex="-1" role="dialog"
+     aria-labelledby="redshift-error-title" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger" id="redshift-error-title">
+          Check the galaxy and source
+        </h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        {% for error in form.non_field_errors %}
+          <p class="mb-0">{{ error }}</p>
+        {% endfor %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">OK</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_javascript %}
+{{ block.super }}
+{% if form.non_field_errors %}
+<script>
+    $(function () {
+        $('#redshift-error-modal').modal('show');
+    });
+</script>
+{% endif %}
 {% endblock %}
