@@ -84,7 +84,7 @@ def vet_kn(
     nle_type = get_most_likely_class(nle_eventseq.details)
 
     # discount things that are classified as supernova or TDEs and give them a score of 0
-    class_score = classification_score(getattr(target, "classification", None))
+    class_score = classification_score(target.id, expected_em_transient="KN")
     update_score_factor(event_candidate, "classification_score", class_score)
     
     ## check skymap association

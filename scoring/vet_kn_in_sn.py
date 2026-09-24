@@ -64,6 +64,10 @@ def vet_kn_in_sn(
     )
     target = Target.objects.get(id=target_id)
 
+    # discount things that are classified as supernova or TDEs and give them a score of 0
+    class_score = classification_score(target.id, expected_em_transient="KN-in-SN")
+    update_score_factor(event_candidate, "classification_score", class_score)
+    
     ## check skymap association
     if np.isfinite(param_ranges["t_post"]):
         gw_disc_date = (

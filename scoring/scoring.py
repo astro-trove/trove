@@ -41,8 +41,6 @@ GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate([UserGalaxy] + GAL
 # LS DR9 North / DELVE DR3, PS1-STRM, SDSS DR12 photo-z / DELVE DR3
 Z_BAD_VALUES = (-99.0, -999.0, -9999.0)
 
-CLASSIFIED_TRANSIENT_PREFIXES = ("SN","TDE")
-
 def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
     """Drop host galaxy rows with bad values."""
     if not len(host_df):
@@ -394,10 +392,37 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
     return localization or all_localizations.order_by("date").first()
 
 def classification_score(
-        classification:str,
-        prefixes:list[str]=CLASSIFIED_TRANSIENT_PREFIXES
+        target_id:int,
+        expected_em_transient:str=None
 ) -> float:
-    """Rules out candidates that TNS have already classified as supernovae
+    """Rules out candidates that TNS have already classified
+
+    Follows this general psuedocode logic
+    if classification==SN Ia and any GW event: score=0
+    elif classification==TDE and any GW event: score=0
+    elif classification.startswith("SN") and (GW event == BNS,NSBH,orBBH): score=0
+    else: score=1
     """
-    c = (classification or "").strip().upper()
-    return 0.0 if any(c.startswith(pre) for pre in prefixes) else 1.0
+    # get the target from the target ID passed in
+    target = Target.objects.get(target_id)
+
+    # get the classification, default to an empty string if key not present,
+    # strip any extraneous chars
+    classification = getattr(target, "classification", "")
+    clean_class = classification.strip()
+
+    # calculate the classification score
+    if clean_class in {"TDE", "SN Ia"}:
+        # if the transient is classified as a TDE or SN Ia then the score is 0
+        # because these are not expected to be GW counterparts
+        # TODO: When implementing neutrino vetting we should be more careful about
+        #       removing TDEs here!!
+        return 0
+    
+    elif clean_class.startswith("SN") and expected_em_transient not in {"KN-in-SN", "superKN"}:
+        # for KN and AGN flares we don't want to include SN, for KN-in-SN or
+        # superKN they could *maybe* be a counterpart 
+        return 0
+
+    # if neither of those cases are matched we can just return 1
+    return 1
