@@ -12,12 +12,16 @@
         </a>
       </div>
    {% endif %}
-   {% if is_kilonova and kilonova_scores_missing %}
-     <div class="alert alert-info mb-2" role="alert">
-     <i class="fa fa-info-circle"></i>
-       <strong>No KilonovaSCORER scores yet.</strong> 
-       Vet all candidates or vet those of interest using KilonovaSCORER for photometry scoring.
-      </div>
+   {% if kilonova_scores_missing %}
+     <div class="alert alert-warning mb-2" role="alert">
+       <i class="fa fa-exclamation-triangle"></i>
+       <strong>No KilonovaSCORER scores for this event.</strong>
+       All scores shown use light curve metrics and <strong>do not include KilonovaSCORER</strong>.
+       To add them, click <strong>Vet All</strong>, set <em>Vetting Method</em> to
+       <em>Transient: Kilonova</em> and <em>Photometry Scoring Method</em> to
+       <em>KilonovaSCORER</em>. When the run finishes, switch the photometry toggle
+       to KilonovaSCORER.
+     </div>
    {% endif %}
    {% if request.GET.nonlocalizedevent %}
     <div id="vet-all-progress"

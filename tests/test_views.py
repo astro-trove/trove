@@ -263,3 +263,32 @@ class TestModelValidation:
         for key in valid_keys:
             assert isinstance(key, str)
             assert '_' in key or key.islower()
+
+
+class TestApplyRequestedChoices:
+    """Tests for preselecting the vetting form from the query string."""
+
+    def _form(self):
+        from scoring.forms import VettingChoiceForm
+        form = VettingChoiceForm()
+        form.fields["vetting_method"].choices = [("basic", "Basic"), ("KN", "Kilonova")]
+        form.fields["phot_method"].choices = [("trove", "LCM"), ("kilonova", "KN")]
+        return form
+
+    def test_preselects_offered_values(self):
+        from scoring.views import _apply_requested_choices
+        form = _apply_requested_choices(
+            self._form(), {"vetting_method": "KN", "phot_method": "kilonova"}
+        )
+        assert form.fields["vetting_method"].initial == "KN"
+        assert form.fields["phot_method"].initial == "kilonova"
+
+    def test_ignores_values_not_offered(self):
+        from scoring.views import _apply_requested_choices
+        form = self._form()
+        form.fields["phot_method"].initial = "trove"
+        form = _apply_requested_choices(
+            form, {"vetting_method": "super-KN", "phot_method": "bogus"}
+        )
+        assert form.fields["vetting_method"].initial is None
+        assert form.fields["phot_method"].initial == "trove"

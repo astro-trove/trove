@@ -74,6 +74,19 @@ def _phot_method_field(form):
     return form
 
 
+def _apply_requested_choices(form, params):
+    """Preselect the vetting and photometry methods named in the query string.
+
+    Lets the "no KilonovaSCORER scores" notices link straight to a form set up
+    for a KilonovaSCORER run. Values that aren't offered are ignored.
+    """
+    for name in ("vetting_method", "phot_method"):
+        value = params.get(name)
+        if value in {choice for choice, _ in form.fields[name].choices}:
+            form.fields[name].initial = value
+    return form
+
+
 def _clean_phot_method(value):
     """A submitted scorer name, or None to leave the decision to the callee."""
     return value if value in PHOT_METHOD_CHOICES else None
@@ -128,7 +141,7 @@ class TargetVettingFormView(FormView):
                 ] # set initial to basic if most likely class not recognized
         else:
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
-        return _phot_method_field(form)
+        return _apply_requested_choices(_phot_method_field(form), self.request.GET)
 
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
@@ -373,7 +386,7 @@ class TargetVettingAllFormView(FormView):
             form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
                 ""
             ] # set initial to basic if most likely class not recognized
-        return _phot_method_field(form)
+        return _apply_requested_choices(_phot_method_field(form), self.request.GET)
 
     # overriding the get_context_data function
     def get_context_data(self, **kwargs):

@@ -22,10 +22,10 @@ from scoring.util import (
     get_last_vet_all_run,
     get_no_score_message,
     get_vet_all_progress,
+    kilonova_scores_exist,
 )
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
-    PHOT_METHOD_KILONOVA,
     get_phot_method,
     phot_method_label,
     toggle_phot_method,
@@ -141,8 +141,6 @@ class EventCandidateListView(FilterView):
                 cache_timeout = SCORE_CACHE_PERIOD
             cache.set(cache_key, scored_candidates, cache_timeout)
 
-        is_kilonova = phot_method == PHOT_METHOD_KILONOVA
-
         # Paginate the cached scored list
         paginator = Paginator(scored_candidates, self.paginate_by)
         page_number = self.request.GET.get("page", 1)
@@ -155,10 +153,6 @@ class EventCandidateListView(FilterView):
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label()
 
-        context["kilonova_scores_missing"] = is_kilonova and bool(scored_candidates) and not any(
-            getattr(ec, "kilonova_score", None) is not None for ec in scored_candidates
-        )
-        context["is_kilonova"] = is_kilonova
         context["vet_all_progress"] = vet_all_progress
         # standing record of when these scores were last refreshed in bulk,
         # which outlives the transient progress notice above
@@ -172,6 +166,14 @@ class EventCandidateListView(FilterView):
             nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
             if nle:
                 context["no_score_message"] = get_no_score_message(nle.event_id)
+
+        # shown whichever way the toggle is set: the toggle stays locked on light
+        # curve metrics until the event has KilonovaSCORER scores
+        context["kilonova_scores_missing"] = (
+            nle_id is not None and nle_id.isdigit() and bool(scored_candidates)
+            and not context["no_score_message"]
+            and not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
+        )
 
         return context
 

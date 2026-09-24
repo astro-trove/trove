@@ -23,6 +23,8 @@ where a rescore-on-toggle would cost minutes of compute per press.
 """
 from __future__ import annotations
 
+from urllib.parse import urlencode
+
 from django.core.cache import cache
 
 # cache key. Site-wide and unscoped by event, matching ``agn_toggle``.
@@ -41,6 +43,11 @@ PHOT_METHOD_CHOICES = (PHOT_METHOD_TROVE, PHOT_METHOD_KILONOVA)
 # kilonova population, so the choice is meaningless for the other modes, which
 # fit the light curve and have no second scorer to pick between
 KILONOVA_VETTING_MODE = "KN"
+
+# query string that opens a vetting form with KilonovaSCORER already selected
+KILONOVA_VET_QUERY = urlencode(
+    {"vetting_method": KILONOVA_VETTING_MODE, "phot_method": PHOT_METHOD_KILONOVA}
+)
 
 # what the toggle shows for each value
 PHOT_METHOD_LABELS = {

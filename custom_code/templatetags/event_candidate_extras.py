@@ -11,14 +11,14 @@ from django.template.defaultfilters import linebreaks
 from django.conf import settings
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+from django.urls import reverse
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
-from scoring.models import ScoreFactor
 from scoring.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
-    KILONOVA_SCORE_KEY,
+    kilonova_scores_exist,
     TARGETEXTRA_KEYS,
 )
 from scoring.phot_method import (
@@ -88,21 +88,41 @@ def vet_all_is_allowed(context):
 
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
-    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+    from scoring.phot_method import (
+        KILONOVA_VET_QUERY,
+        PHOT_METHOD_KILONOVA,
+        get_phot_method,
+    )
 
-    # switching to KilonovaSCORER only changes anything if this candidate has a
-    # score to switch TO. With no target_id (e.g. the candidate list page,
-    # which isn't scoped to one candidate) there's nothing to gate on, so the
-    # toggle is always available.
-    is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
-    has_kilonova_score = not target_id or ScoreFactor.objects.filter(
-        event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
-    ).exists()
+    # Locked on light curve metrics until there is a KilonovaSCORER score to
+    # switch to: per candidate on the target page, per event on the list. The
+    # list with no event in scope has nothing to gate on, so stays unlocked.
+    request = context["request"]
+    nle_id = request.GET.get("nonlocalizedevent", "")
+    vet_url = None
+    vet_all_on_cooldown = False
+    if target_id:
+        kilonova_locked = not kilonova_scores_exist(target_id=target_id)
+        vet_url = reverse("scoring:vet_form", args=[target_id])
+    elif nle_id.isdigit():
+        kilonova_locked = not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
+        if vet_all_is_allowed(context) or request.user.is_superuser:
+            vet_url = reverse("scoring:vet_all_form", args=[int(nle_id)])
+        else:
+            vet_all_on_cooldown = True
+    else:
+        kilonova_locked = False
+    if vet_url:
+        vet_url += "?" + KILONOVA_VET_QUERY
+
     return {
         "agn_toggle": cache.get("agn_toggle", True),
-        "is_kilonova": is_kilonova,
-        "has_kilonova_score": has_kilonova_score,
-        "next": context["request"].get_full_path(),
+        "is_kilonova": get_phot_method() == PHOT_METHOD_KILONOVA and not kilonova_locked,
+        "kilonova_locked": kilonova_locked,
+        "on_target_page": bool(target_id),
+        "vet_url": vet_url,
+        "vet_all_on_cooldown": vet_all_on_cooldown,
+        "next": request.get_full_path(),
     }
 
 

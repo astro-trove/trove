@@ -4,43 +4,124 @@
      title="Whether the AGN factor contributes to the overall score.">
     {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} Include AGN sub-score
   </a>
-  <div class="phot-method-slider {% if is_kilonova %}phot-method-slider--right{% endif %}" role="group" aria-label="Photometry scoring method">
-    <span class="phot-method-slider-thumb" aria-hidden="true"></span>
-    {% if is_kilonova %}
-    <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
-       class="phot-method-slider-option"
-       title="Score photometry according to light curve metrics">
-      Photometry: Light curve metrics
-    </a>
-    <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
-      Photometry: KilonovaSCORER
+  {% with lcm_tip="Light curve metrics: fits the light curve and checks its peak luminosity, time of peak and decay rate against the ranges expected for each transient type." kn_tip="KilonovaSCORER: compares the light curve with a simulated kilonova population. Applies to the KN score only; other transient types keep light curve metrics." %}
+  <div class="phot-method-control">
+    <span class="phot-method-label"
+          title="Which method sets the photometry part of each candidate's score. This setting is site-wide: switching it changes the scores every user sees. It does not re-run vetting.">
+      Photometry score determined by:
     </span>
-    {% else %}
-    <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
-      Photometry: Light curve metrics
-    </span>
-    {% if has_kilonova_score %}
-    <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
-       class="phot-method-slider-option"
-       title="Score photometry according to KilonovaSCORER">
-      Photometry: KilonovaSCORER
-    </a>
-    {% else %}
-    <span class="phot-method-slider-option phot-method-slider-option--disabled" aria-disabled="true"
-          title="This candidate has no KilonovaSCORER score. Vet it with KilonovaSCORER first.">
-      Photometry: KilonovaSCORER
-    </span>
-    {% endif %}
-    {% endif %}
+    <div class="phot-method-slider {% if is_kilonova %}phot-method-slider--right{% endif %}" role="group" aria-label="Photometry score determined by">
+      <span class="phot-method-slider-thumb" aria-hidden="true"></span>
+      {% if is_kilonova %}
+      <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
+         class="phot-method-slider-option" title="{{ lcm_tip }}">
+        Light curve metrics
+      </a>
+      <span class="phot-method-slider-option phot-method-slider-option--active" aria-current="true" title="{{ kn_tip }}">
+        KilonovaSCORER
+      </span>
+      {% else %}
+      <span class="phot-method-slider-option phot-method-slider-option--active" aria-current="true" title="{{ lcm_tip }}">
+        Light curve metrics
+      </span>
+      {% if kilonova_locked %}
+      <button type="button" class="phot-method-slider-option phot-method-slider-option--locked"
+              data-toggle="modal" data-target="#kilonova-missing-modal"
+              title="No KilonovaSCORER scores yet. Click to see how to add them.">
+        <i class="fa fa-lock" aria-hidden="true"></i>&nbsp;KilonovaSCORER
+      </button>
+      {% else %}
+      <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
+         class="phot-method-slider-option" title="{{ kn_tip }}">
+        KilonovaSCORER
+      </a>
+      {% endif %}
+      {% endif %}
+    </div>
   </div>
+  {% endwith %}
 </div>
 
+{% if kilonova_locked %}
+<div class="modal fade" id="kilonova-missing-modal" tabindex="-1" role="dialog" aria-labelledby="kilonova-missing-modal-title" aria-hidden="true">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="kilonova-missing-modal-title">
+          <i class="fa fa-lock" aria-hidden="true"></i> No KilonovaSCORER scores yet
+        </h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        {% if on_target_page %}
+        <p>This candidate has no KilonovaSCORER score, so its score uses light curve
+          metrics and <strong>does not include KilonovaSCORER</strong>.</p>
+        <p class="mb-1">To score it with KilonovaSCORER:</p>
+        <ol>
+          <li>Click <strong>Vet</strong> on this page.</li>
+          <li>Set <em>Vetting Method</em> to <em>Transient: Kilonova</em>.</li>
+          <li>Set <em>Photometry Scoring Method</em> to <em>KilonovaSCORER</em>.</li>
+          <li>When vetting finishes, switch this toggle to KilonovaSCORER.</li>
+        </ol>
+        <p class="mb-0 small text-muted">To score every candidate of the event, use
+          <strong>Vet All</strong> on the event's candidate page.</p>
+        {% else %}
+        <p>No candidate of this event has a KilonovaSCORER score, so all scores shown
+          use light curve metrics and <strong>do not include KilonovaSCORER</strong>.</p>
+        <p class="mb-1">To add KilonovaSCORER scores:</p>
+        <ol>
+          <li>Click <strong>Vet All</strong>.</li>
+          <li>Set <em>Vetting Method</em> to <em>Transient: Kilonova</em>.</li>
+          <li>Set <em>Photometry Scoring Method</em> to <em>KilonovaSCORER</em>.</li>
+          <li>When the run finishes, switch this toggle to KilonovaSCORER.</li>
+        </ol>
+        <p class="mb-0 small text-muted">
+          {% if vet_all_on_cooldown %}
+          Vet All was run for this event within the last hour and is on cooldown.
+          Try again later, or vet individual candidates with the <strong>Vet</strong>
+          button on their target pages.
+          {% else %}
+          A Vet All run can take a while for events with many candidates. You can
+          also vet individual candidates with the <strong>Vet</strong> button on
+          their target pages.
+          {% endif %}
+        </p>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        {% if vet_url %}
+        <a href="{{ vet_url }}" class="btn btn-primary">
+          {% if on_target_page %}Vet{% else %}Vet All{% endif %} with KilonovaSCORER
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <style>
+  .phot-method-control {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .phot-method-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #495057;
+    cursor: help;
+    border-bottom: 1px dotted #6c757d;
+  }
   .phot-method-slider {
     position: relative;
     display: inline-grid;
     grid-template-columns: 1fr 1fr;
-    min-width: 380px;
+    min-width: 320px;
     border-radius: 20px;
     background: #e9ecef;
     border: 1px solid #ced4da;
@@ -74,11 +155,14 @@
     color: #fff;
     font-weight: 600;
   }
-  .phot-method-slider-option--disabled {
-    opacity: 0.5;
-    pointer-events: none;
+  .phot-method-slider-option--locked {
+    border: 0;
+    background: none;
+    font-family: inherit;
+    color: #6c757d;
+    cursor: pointer;
   }
-  .phot-method-slider-option:not(.phot-method-slider-option--active):not(.phot-method-slider-option--disabled):hover {
+  .phot-method-slider-option:not(.phot-method-slider-option--active):hover {
     color: #212529;
   }
   .btn.agn-toggle {
