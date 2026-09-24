@@ -192,7 +192,7 @@ def build_data_obs(phot: pd.DataFrame, dist_mpc: float, dist_err_mpc: float) -> 
     from KilonovaScorer.utils import compute_abs_mag_samples
 
     det = phot[~phot["upperlimit"].astype(bool)].copy()
-    det = det[(det["dt"] >= DT_MIN) & (det["dt"] <= DT_MAX)]
+    det = det[det["dt"] >= DT_MIN]
     if det.empty:
         return det.assign(filter_mapped=None, time_after_gw=None,
                           absolute_magnitude=None, absolute_magnitude_error=None)
@@ -270,6 +270,7 @@ def score_candidate(
     target_id: int,
     nonlocalized_event,
     candidate_name: Optional[str] = None,
+    t_post: Optional[float] = DT_MAX,
 ) -> float:
 
     from scoring.scoring import get_eventcandidate_default_distance
@@ -283,12 +284,18 @@ def score_candidate(
         raise KilonovaScoreUnavailable(f"no usable distance for target {target_id}")
     dist_err_mpc = _scalar_dist_err(dist_err_mpc)
 
-    # Checked before any photometry is read: the read is the expensive part and
+    # checked before any photometry is read: distance and time
+    # the read is the expensive part and
     # the answer cannot change once the distance is known.
+    if t_post > DT_MAX:
+        raise KilonovaScoreUnavailable(
+            f"Maximum time {t_post:g} days is greater than {DT_MAX:g} days, "
+            "which is the limit of the simulation grid"
+    )
     if dist_mpc > MAX_DISTANCE_MPC:
         raise KilonovaScoreUnavailable(
             f"Distance {dist_mpc:,.0f} Mpc is beyond the {MAX_DISTANCE_MPC:,.0f} Mpc "
-            f"limit of the simulation grid"
+            "limit of the simulation grid"
         )
 
     grid = grid_for_distance(dist_mpc)
@@ -296,23 +303,24 @@ def score_candidate(
 
     phot = _get_post_disc_phot(target_id=target_id,
                                nonlocalized_event=nonlocalized_event,
-                               t_post=DT_MAX)
+                               t_post=t_post
+    )
     if phot is None or not len(phot):
-        raise KilonovaScoreUnavailable(f"no photometry for target {target_id}")
+        raise KilonovaScoreUnavailable(f"No photometry for target {target_id}")
 
     data_obs = build_data_obs(phot, dist_mpc, dist_err_mpc)
     if not len(data_obs):
         raise KilonovaScoreUnavailable(
-            f"no detections in {DT_MIN:g}-{DT_MAX:g} d for target {target_id}")
+            f"No detections within {DT_MIN:g}-{t_post:g} days for target {target_id}")
 
     bands = tuple(sorted(set(data_obs["filter_mapped"])))
-    grid_df = _load_grid_cached(grid, bands, DT_MIN, DT_MAX)
+    grid_df = _load_grid_cached(grid, bands, DT_MIN, t_post)
     # Only the bands this candidate actually has; a band with no simulations
     # would make the package iterate over an empty frame.
     usable = tuple(b for b in bands if (grid_df["filter_mapped"] == b).any())
     if not usable:
         raise KilonovaScoreUnavailable(
-            f"none of the candidate's bands {bands} are in grid {grid}")
+            f"None of the candidate's bands {bands} are in grid {grid}")
 
     results, _summary = kilonovascorer_v3(
         data_obs[data_obs["filter_mapped"].isin(usable)],
