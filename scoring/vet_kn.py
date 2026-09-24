@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 from scoring.kilonova_scorer_helpers.util import (
     KilonovaScoreUnavailable,
     score_candidate as kilonova_score_candidate,
+    DT_MAX,
 )
 from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
@@ -184,6 +185,7 @@ def vet_kn(
                 target_id=target_id,
                 nonlocalized_event=nonlocalized_event,
                 candidate_name=target.name,
+                t_post=np.nanmin([param_ranges["t_post"], DT_MAX]),
             )
             update_score_factor(event_candidate, "kilonova_score", phot_score)
             delete_score_factor(event_candidate, "kilonova_skip_reason")
