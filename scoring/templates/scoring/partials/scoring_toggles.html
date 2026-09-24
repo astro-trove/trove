@@ -1,46 +1,63 @@
-<div style="display:flex; flex-direction:row; align-items:center; flex-wrap:wrap; gap:0.75rem" class="mb-2">
+<div style="display:flex; flex-direction:row; align-items:center; flex-wrap:wrap; gap:0.75rem; flex:1 1 auto; min-width:0" class="mb-2">
   <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?next={{ next|urlencode }}"
      class="btn agn-toggle {% if agn_toggle %}btn-success{% else %}btn-light{% endif %}"
      title="Whether the AGN factor contributes to the overall score.">
     {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} Include AGN sub-score
   </a>
-  <div class="phot-method-slider {% if is_kilonova %}phot-method-slider--right{% endif %}" role="group" aria-label="Photometry scoring method">
-    <span class="phot-method-slider-thumb" aria-hidden="true"></span>
-    {% if is_kilonova %}
-    <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
-       class="phot-method-slider-option"
-       title="Score photometry according to light curve metrics">
-      Photometry: Light curve metrics
-    </a>
-    <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
-      Photometry: KilonovaSCORER
+  {% with lcm_tip="Light curve metrics: fits the light curve and checks its peak luminosity, time of peak and decay rate against the ranges expected for each transient type." kn_tip="KilonovaSCORER: compares the light curve with a simulated kilonova population. Applies to the KN score only; other transient types keep light curve metrics." %}
+  <div class="phot-method-control">
+    <span class="phot-method-label"
+          title="Which method sets the photometry part of each candidate's score. This setting is site-wide: switching it changes the scores every user sees. It does not re-run vetting.">
+      Photometry score:
     </span>
-    {% else %}
-    <span class="phot-method-slider-option phot-method-slider-option--active" aria-disabled="true">
-      Photometry: Light curve metrics
-    </span>
-    {% if has_kilonova_score %}
-    <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
-       class="phot-method-slider-option"
-       title="Score photometry according to KilonovaSCORER">
-      Photometry: KilonovaSCORER
-    </a>
-    {% else %}
-    <span class="phot-method-slider-option phot-method-slider-option--disabled" aria-disabled="true"
-          title="This candidate has no KilonovaSCORER score. Vet it with KilonovaSCORER first.">
-      Photometry: KilonovaSCORER
-    </span>
-    {% endif %}
-    {% endif %}
+    <div class="phot-method-slider {% if is_kilonova %}phot-method-slider--right{% endif %}" role="group" aria-label="Photometry score">
+      <span class="phot-method-slider-thumb" aria-hidden="true"></span>
+      {% if is_kilonova %}
+      <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
+         class="phot-method-slider-option" title="{{ lcm_tip }}">
+        Light curve metrics
+      </a>
+      <span class="phot-method-slider-option phot-method-slider-option--active" aria-current="true" title="{{ kn_tip }}">
+        KilonovaSCORER
+      </span>
+      {% else %}
+      <span class="phot-method-slider-option phot-method-slider-option--active" aria-current="true" title="{{ lcm_tip }}">
+        Light curve metrics
+      </span>
+      {% if kilonova_locked %}
+      <span class="phot-method-slider-option phot-method-slider-option--locked" aria-disabled="true"
+            title="No KilonovaSCORER scores yet. Run vetting with KilonovaSCORER to enable this.">
+        <i class="fa fa-lock" aria-hidden="true"></i>&nbsp;KilonovaSCORER
+      </span>
+      {% else %}
+      <a href="{% url 'trove_nonlocalizedevents:toggle-phot-method' %}?next={{ next|urlencode }}"
+         class="phot-method-slider-option" title="{{ kn_tip }}">
+        KilonovaSCORER
+      </a>
+      {% endif %}
+      {% endif %}
+    </div>
   </div>
+  {% endwith %}
 </div>
 
 <style>
+  .phot-method-control {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .phot-method-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #495057;
+    border-bottom: 1px dotted #6c757d;
+  }
   .phot-method-slider {
     position: relative;
     display: inline-grid;
     grid-template-columns: 1fr 1fr;
-    min-width: 380px;
     border-radius: 20px;
     background: #e9ecef;
     border: 1px solid #ced4da;
@@ -74,11 +91,11 @@
     color: #fff;
     font-weight: 600;
   }
-  .phot-method-slider-option--disabled {
-    opacity: 0.5;
-    pointer-events: none;
+  .phot-method-slider-option--locked {
+    color: #adb5bd;
+    cursor: not-allowed;
   }
-  .phot-method-slider-option:not(.phot-method-slider-option--active):not(.phot-method-slider-option--disabled):hover {
+  .phot-method-slider-option:not(.phot-method-slider-option--active):not(.phot-method-slider-option--locked):hover {
     color: #212529;
   }
   .btn.agn-toggle {

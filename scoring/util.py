@@ -100,6 +100,16 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
+def kilonova_scores_exist(nonlocalizedevent_id=None, target_id=None):
+    """Whether any KilonovaSCORER score is stored for this event and/or target."""
+    qs = ScoreFactor.objects.filter(key=KILONOVA_SCORE_KEY)
+    if nonlocalizedevent_id is not None:
+        qs = qs.filter(event_candidate__nonlocalizedevent_id=nonlocalizedevent_id)
+    if target_id is not None:
+        qs = qs.filter(event_candidate__target_id=target_id)
+    return qs.exists()
+
+
 def get_no_score_message(nonlocalizedevent_name):
     try:
         nle_eventseq = localization_sequence_from_name(nonlocalizedevent_name)
