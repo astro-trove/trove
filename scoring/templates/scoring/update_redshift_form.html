@@ -34,15 +34,16 @@
         color: black;
     }
 
-    /* 3. The host galaxy table: full card width, scroll rather than clip */
-    .update-redshift-card details {
-        width: 100%;
-        overflow-x: auto;
-    }
-
+    /* 3. The host galaxy table lines up with the form below it. The table is
+          wider than that, so it scrolls sideways rather than being clipped. */
+    .update-redshift-card details,
     .update-redshift-card form {
         max-width: 700px;
         margin: 0 auto;
+    }
+
+    .update-redshift-card details {
+        overflow-x: auto;
     }
 
     /* 4. Form-wide errors are raised as Django messages by the view, so keep
