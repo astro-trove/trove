@@ -34,12 +34,18 @@
         color: black;
     }
 
-    /* 3. The host galaxy table lines up with the form below it. The table is
+    /* 3. The intro, host galaxy table and form all line up. The table is
           wider than that, so it scrolls sideways rather than being clipped. */
+    .update-redshift-card .update-redshift-intro,
     .update-redshift-card details,
     .update-redshift-card form {
         max-width: 700px;
         margin: 0 auto;
+    }
+
+    .update-redshift-card .update-redshift-intro {
+        margin-bottom: 20px;
+        font-size: 0.95rem;
     }
 
     .update-redshift-card details {
@@ -119,6 +125,11 @@
 
     <div class="update-redshift-card">
         <h2>Update a Potential Host Galaxy Redshift</h2>
+        <p class="update-redshift-intro">
+            Select the galaxy for which you measured a spectroscopic redshift,
+            and report the redshift. This will create a &ldquo;new&rdquo; galaxy
+            in our database: a copy with this new reported redshift.
+        </p>
         <details>
           <summary><h5 style="display:inline-block">Host Galaxies</h5></summary>
           {% galaxy_table form.target %}
