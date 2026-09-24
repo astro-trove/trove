@@ -264,7 +264,19 @@ VETTING_COOLDOWN_PERIOD = 3600  # 1 hour in seconds
 # TOM Specific configuration
 TARGET_TYPE = "SIDEREAL"
 
-FACILITIES = {}
+FACILITIES = {
+    'MMT': {
+        'programs': {
+            'Binospec': [],
+            'MMIRS': [],
+            'MMTCam': [],
+        },
+    },
+}
+
+TOM_FACILITY_CLASSES = [
+    'custom_code.facilities.mmt.CustomMMTFacility',
+]
 
 SINGLE_TARGET_DATA_SERVICES = {
     "ATLAS": {
