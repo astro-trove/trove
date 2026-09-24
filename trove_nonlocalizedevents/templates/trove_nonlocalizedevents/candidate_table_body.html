@@ -3,10 +3,10 @@
 <div class="row">
   <div class="col-md-10">
   {% if request.user.is_authenticated %}
-      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; width:100%">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; width:100%">
         {% scoring_toggles %}
         <a href="{% url 'trove_nonlocalizedevents:refresh-candidate-list' %}{% if request.GET.urlencode %}?{{ request.GET.urlencode }}{% endif %}"
-           class="btn btn-outline-secondary mb-2"
+           class="btn btn-outline-secondary mb-2" style="flex-shrink:0"
            title="Discard the cached scores and reload this list">
           <i class="fa fa-refresh"></i> Refresh
         </a>
@@ -15,12 +15,9 @@
    {% if kilonova_scores_missing %}
      <div class="alert alert-warning mb-2" role="alert">
        <i class="fa fa-exclamation-triangle"></i>
-       <strong>No KilonovaSCORER scores for this event.</strong>
-       All scores shown use light curve metrics and <strong>do not include KilonovaSCORER</strong>.
-       To add them, click <strong>Vet All</strong>, set <em>Vetting Method</em> to
-       <em>Transient: Kilonova</em> and <em>Photometry Scoring Method</em> to
-       <em>KilonovaSCORER</em>. When the run finishes, switch the photometry toggle
-       to KilonovaSCORER.
+       <strong>No KilonovaSCORER scores for this event</strong>, so scores use light curve metrics only.
+       To add them, run <strong>Vet All</strong> with <em>Transient: Kilonova</em> and
+       <em>KilonovaSCORER</em> selected.
      </div>
    {% endif %}
    {% if request.GET.nonlocalizedevent %}

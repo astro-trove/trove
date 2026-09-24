@@ -11,7 +11,6 @@ from django.template.defaultfilters import linebreaks
 from django.conf import settings
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
-from django.urls import reverse
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.util import (
@@ -88,40 +87,24 @@ def vet_all_is_allowed(context):
 
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
-    from scoring.phot_method import (
-        KILONOVA_VET_QUERY,
-        PHOT_METHOD_KILONOVA,
-        get_phot_method,
-    )
+    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
     # Locked on light curve metrics until there is a KilonovaSCORER score to
     # switch to: per candidate on the target page, per event on the list. The
     # list with no event in scope has nothing to gate on, so stays unlocked.
     request = context["request"]
     nle_id = request.GET.get("nonlocalizedevent", "")
-    vet_url = None
-    vet_all_on_cooldown = False
     if target_id:
         kilonova_locked = not kilonova_scores_exist(target_id=target_id)
-        vet_url = reverse("scoring:vet_form", args=[target_id])
     elif nle_id.isdigit():
         kilonova_locked = not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
-        if vet_all_is_allowed(context) or request.user.is_superuser:
-            vet_url = reverse("scoring:vet_all_form", args=[int(nle_id)])
-        else:
-            vet_all_on_cooldown = True
     else:
         kilonova_locked = False
-    if vet_url:
-        vet_url += "?" + KILONOVA_VET_QUERY
 
     return {
         "agn_toggle": cache.get("agn_toggle", True),
         "is_kilonova": get_phot_method() == PHOT_METHOD_KILONOVA and not kilonova_locked,
         "kilonova_locked": kilonova_locked,
-        "on_target_page": bool(target_id),
-        "vet_url": vet_url,
-        "vet_all_on_cooldown": vet_all_on_cooldown,
         "next": request.get_full_path(),
     }
 
