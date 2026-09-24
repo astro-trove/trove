@@ -41,6 +41,7 @@ GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate([UserGalaxy] + GAL
 # LS DR9 North / DELVE DR3, PS1-STRM, SDSS DR12 photo-z / DELVE DR3
 Z_BAD_VALUES = (-99.0, -999.0, -9999.0)
 
+CLASSIFIED_TRANSIENT_PREFIXES = ("SN","TDE")
 
 def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
     """Drop host galaxy rows with bad values."""
@@ -391,3 +392,12 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
     )
     # nothing at or before max_time: fall back to the earliest
     return localization or all_localizations.order_by("date").first()
+
+def classification_score(
+        classification:str,
+        prefixes:list[str]=CLASSIFIED_TRANSIENT_PREFIXES
+) -> float:
+    """Rules out candidates that TNS have already classified as supernovae
+    """
+    c = (classification or "").strip().upper()
+    return 0.0 if any(c.startswith(pre) for pre in prefixes) else 1.0

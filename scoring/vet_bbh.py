@@ -12,6 +12,7 @@ from .scoring import (
     skymap_association,
     clean_host_df,
     _localization_from_name,
+    classification_score
 )
 from .models import ScoreFactor
 from .vet_basic import vet_basic
@@ -47,8 +48,6 @@ PARAM_RANGES = dict(
     agn_miss_score=0.1,
 )
 
-
-SN_LIKE_PREFIXES = ("SN",)
 
 KPC_PER_ARCSEC_PER_MPC = 4.84813681e-3  # kpc per arcsec at 1 Mpc
 NUCLEAR_SCALE_KPC = 0.5
@@ -178,12 +177,6 @@ def flare_confidence_score(
     width = max(width_frac * thresh, 1e-6)
     raw = norm.cdf(significance, loc=center, scale=width)
     return float(np.clip(floor + (1.0 - floor) * raw, floor, 1.0))
-
-# Rules out candidates that TNS have already classified as supernovae
-def classification_score(classification: Optional[str]) -> float:
-    c = (classification or "").strip().upper()
-    return 0.0 if any(c.startswith(pre) for pre in SN_LIKE_PREFIXES) else 1.0
-
 
 def agn_association_score(agn_df, match: float = 1.0, miss: float = 0.1) -> float:
     return float(match) if agn_df is not None and len(agn_df) else float(miss)
