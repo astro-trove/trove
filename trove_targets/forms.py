@@ -11,6 +11,9 @@ from dal import autocomplete
 
 
 class TargetNLEForm(forms.Form):
+    # django-bootstrap4 adds this to the form-group of every required field
+    required_css_class = "field-required"
+
     nle_select = forms.ModelChoiceField(
         queryset=NonLocalizedEvent.objects.all(),
         label="Choose a poorly localized event",
@@ -26,10 +29,14 @@ class TargetNLEForm(forms.Form):
 
 
 class CustomSiderealTargetCreateForm(SiderealTargetCreateForm):
+    required_css_class = "field-required"
+
     def __init__(self, *args, **kwargs):
         super(TargetForm, self).__init__(*args, **kwargs)
         for field in REQUIRED_SIDEREAL_FIELDS:
             self.fields[field].required = True
+
+        self.fields["epoch"].initial = 2000
 
     class Meta(SiderealTargetCreateForm.Meta):
         fields = [

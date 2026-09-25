@@ -17,6 +17,7 @@ from .scoring import (
     get_distance_score,
     skymap_association,
     _localization_from_name,
+    classification_score
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
