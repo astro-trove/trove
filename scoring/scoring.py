@@ -418,8 +418,11 @@ def classification_score(
         #       removing TDEs here!!
         return 0
     
-    elif clean_class.startswith("SN") and expected_em_transient not in {"KN-in-SN", "super-KN"}:
-        # for KN and AGN flares we don't want to include SN, for KN-in-SN or
+    elif (
+            (clean_class.startswith("SN") or clean_class.startswith("SLSN")) and
+            expected_em_transient not in {"KN-in-SN", "super-KN"}
+    ):
+        # for KN and AGN flares we don't want to include SN or SLSN, for KN-in-SN or
         # superKN they could *maybe* be a counterpart 
         return 0
 
