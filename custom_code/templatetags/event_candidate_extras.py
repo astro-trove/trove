@@ -194,7 +194,7 @@ def display_score_details(context, target_id):
             "Score from Light Curve Slope",
             partial(_float_format, precision=1),
         ),
-        classification_score = ("Classification Score", _str_int_format),
+        classification_score=("Classification Score", _str_int_format),
         kilonova_score=(
             "KilonovaSCORER Photometry Score",
             partial(_float_format, precision=2),
@@ -262,7 +262,7 @@ def display_score_details(context, target_id):
     for queryset in score_details:
         event_name = None
         event_card = None
-        
+        import pdb; pdb.set_trace()
         for score_factor in queryset:
             ec = score_factor.event_candidate
             nle = ec.nonlocalizedevent
@@ -406,7 +406,7 @@ def display_score_details(context, target_id):
                 # has no keymap entry, is a missing label -- not a reason to 500
                 # the page and lose every other score on it.
                 for key, subscore in ec_subscores.get(em_transient_type, {}).items():
-                    label, fmter = keymap.get(key + "_score", (key, _float_format))
+                    label, fmter = keymap.get(key, (key, _float_format))
                     row_class = _factor_row_class(
                         label, em_transient_type, kn_is_active, agn_toggle
                     )

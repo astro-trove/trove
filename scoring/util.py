@@ -247,7 +247,7 @@ def get_event_candidate_scores(
 
         # Extract values that need special handling
         val_dict = {
-            subscore_key: sf_dict[subscore_key]
+            subscore_key+"_score": sf_dict[subscore_key]
             for subscore_key, param_range_key in val_not_score_keys.items()
             if subscore_key in sf_dict
         }
