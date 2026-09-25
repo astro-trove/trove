@@ -6,12 +6,7 @@
 <style>
     /* 1. Background styling - Using your blurred image logic from before */
     body {
-        background-color: white; 
-        min-height: 100vh;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0;
+        background-color: white;
         font-family: sans-serif;
     }
 
@@ -27,7 +22,7 @@
         border-radius: 12px;
         padding: 40px;
         width: 100%;
-        max-width: 850px;
+        max-width: 100%;
         box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
         color: black; /* Pure white text for headers */
     }
@@ -39,7 +34,31 @@
         color: black;
     }
 
-    /* 3. Form Labels */
+    /* 3. The intro, host galaxy table and form all line up. The table is
+          wider than that, so it scrolls sideways rather than being clipped. */
+    .update-redshift-card .update-redshift-intro,
+    .update-redshift-card details,
+    .update-redshift-card form {
+        max-width: 700px;
+        margin: 0 auto;
+    }
+
+    .update-redshift-card .update-redshift-intro {
+        margin-bottom: 20px;
+        font-size: 0.95rem;
+    }
+
+    .update-redshift-card details {
+        overflow-x: auto;
+    }
+
+    /* 4. Form-wide errors are raised as Django messages by the view, so keep
+          them out of the form. Field-level errors still render by their field. */
+    .update-redshift-card .errorlist.nonfield {
+        display: none;
+    }
+
+    /* 5. Form Labels */
     .update-redshift-card label {
         color: black !important; 
         font-weight: 600;
@@ -48,7 +67,7 @@
         display: block;
     }
 
-    /* 4. Inputs: Pure white background with black text and bright borders */
+    /* 6. Inputs: Pure white background with black text and bright borders */
     .update-redshift-card input, 
     .update-redshift-card select, 
     .update-redshift-card textarea {
@@ -67,7 +86,7 @@
         outline: none;
     }
 
-    /* 5. The "Submit" Button: Vivid Pink */
+    /* 7. The "Submit" Button: Vivid Pink */
     .btn-redshift {
         background: pink !important; 
         color: black !important;
@@ -102,21 +121,25 @@
     }
 </style>
 
-<div class="container d-flex justify-content-center">
+<div class="container-fluid d-flex justify-content-center">
 
     <div class="update-redshift-card">
         <h2>Update a Potential Host Galaxy Redshift</h2>
-        <div class="col-md-8">
-          <details>
-            <summary><h4 style="display:inline-block">Host Galaxies</h4></summary>
-            {% galaxy_table form.target %}
-          </details>
-        </div>
+        <p class="update-redshift-intro">
+            Select the galaxy for which you measured a spectroscopic redshift,
+            and report the redshift. This will create a &ldquo;new&rdquo; galaxy
+            in our database: a copy with this new reported redshift.
+        </p>
+        <details>
+          <summary><h5 style="display:inline-block">Host Galaxies</h5></summary>
+          {% galaxy_table form.target %}
+        </details>
         <br>
         <div class="d-grid">
             <form action="" method="post">  
                 {% csrf_token %}  
                 {{ form }}
+                {{ sources_by_galaxy|json_script:"sources-by-galaxy" }}
                 <button type="submit" class="btn btn-primary btn-redshift">
                     Update Selected Galaxy Redshift
                 </button>
@@ -127,4 +150,41 @@
         </div>
     </div>
 </div>
+
+{% endblock %}
+
+{% block extra_javascript %}
+{{ block.super }}
+<script>
+    // The same galaxy can be listed under several catalogs and the two
+    // dropdowns are independent, so offer only the sources the picked galaxy
+    // actually has. The form still validates the pair server side.
+    (function () {
+        var data = document.getElementById('sources-by-galaxy');
+        var name = document.getElementById('id_host_galaxy_id');
+        var source = document.getElementById('id_host_galaxy_source');
+        if (!data || !name || !source) {
+            return;
+        }
+        var sourcesByGalaxy = JSON.parse(data.textContent);
+
+        function syncSources() {
+            var allowed = sourcesByGalaxy[name.value] || [];
+            var chosen = source.value;
+            source.innerHTML = '';
+            allowed.forEach(function (option) {
+                var el = document.createElement('option');
+                el.value = option;
+                el.textContent = option;
+                source.appendChild(el);
+            });
+            if (allowed.indexOf(chosen) !== -1) {
+                source.value = chosen;
+            }
+        }
+
+        name.addEventListener('change', syncSources);
+        syncSources();
+    })();
+</script>
 {% endblock %}
