@@ -48,6 +48,11 @@ class TargetAutocompleteView(autocomplete.Select2QuerySetView):
         if self.q:
             qs = qs.filter(name__icontains=self.q)
 
+        # Filter list to remove any events that are already associated with event
+        nle_id = self.forwarded.get("nonlocalizedevent")
+        if nle_id:
+            qs = qs.exclude(eventcandidate__nonlocalizedevent_id=nle_id)
+
         return qs
 
 

@@ -64,6 +64,19 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
             f"_{agn_toggle}_{phot_method}")
 
 
+def invalidate_scored_candidates_cache(query_params):
+    """
+    Drop the cached scored candidate lists for a set of filters.
+    """
+    if not hasattr(query_params, "copy"):  # an NLE id: build the unfiltered key
+        query_params = QueryDict(urlencode({"nonlocalizedevent": query_params}))
+
+    for agn_toggle in (True, False):
+        for phot_method in PHOT_METHOD_CHOICES:
+            cache.delete(scored_candidates_cache_key(
+                query_params, agn_toggle, phot_method))
+
+
 class EventCandidateListView(FilterView):
     """
     View for listing candidates in the TOM.
@@ -165,7 +178,7 @@ class EventCandidateListView(FilterView):
         context["last_vet_all"] = get_last_vet_all_run(nle_id)
 
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
-        context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
+        context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm(nle_id=nle_id)
 
         context["no_score_message"] = None
         if nle_id:
@@ -202,14 +215,15 @@ class EventCandidateCreateFromNLEView(LoginRequiredMixin, View):
         form = CreateEventCandidateFromNLEForm(request.POST)
 
         if form.is_valid():
-            target_id = (
-                Target.objects.filter(name=form.cleaned_data["target_name_to_link"])
-                .first()
-                .id
-            )
-            event_id = NonLocalizedEvent.objects.get(
-                id=request.GET.get("nonlocalizedevent")
-            ).event_id
+            target_id = form.cleaned_data["target_name_to_link"].id
+
+            try:
+                event_id = NonLocalizedEvent.objects.get(
+                    id=request.GET.get("nonlocalizedevent")
+                ).event_id
+            except (NonLocalizedEvent.DoesNotExist, ValueError):
+                messages.error(request, "Could not tell which event to link that target to.")
+                return redirect(request.META.get("HTTP_REFERER", "/"))
 
             # Redirect to the create-candidate view
             return redirect(
@@ -455,14 +469,7 @@ class RefreshCandidateList(LoginRequiredMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-        # Both toggles are site-wide and either can be flipped by anyone, so
-        # clear every combination rather than only the one currently selected --
-        # otherwise a refresh leaves a stale list behind whichever toggle the
-        # next viewer happens to be on.
-        for agn_toggle in (True, False):
-            for phot_method in PHOT_METHOD_CHOICES:
-                cache.delete(scored_candidates_cache_key(
-                    request.GET, agn_toggle, phot_method))
+        invalidate_scored_candidates_cache(request.GET)
 
         # send the user back to the list they were looking at, filters and all
         query_string = request.GET.urlencode()

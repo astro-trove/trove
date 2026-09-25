@@ -37,9 +37,19 @@ class CreateEventCandidateFromNLEForm(forms.Form):
         required=True,
         widget=autocomplete.ModelSelect2(
             url="trove_targets:target-autocomplete",
+            forward=["nonlocalizedevent"],
             attrs={
                 "data-placeholder": "Start typing to search...",
                 "data-minimum-input-length": 1,
             },
         ),
     )
+
+    def __init__(self, *args, nle_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Carries the event to the autocomplete so targets already linked to it are not offered
+        if nle_id:
+            self.fields["nonlocalizedevent"] = forms.CharField(
+                widget=forms.HiddenInput(), initial=nle_id, required=False
+            )

@@ -495,7 +495,8 @@ def handle_einstein_probe_alert(message, metadata):
     ep_dec = alert.get("dec")
     ep_name = alert["id"][0]
     t_ep = Target.objects.create(name=ep_name, type="SIDEREAL", ra=ep_ra, dec=ep_dec, permissions="PUBLIC")
-    EventCandidate.objects.create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
+    # Get or create is safer and prevents the 500 crash here
+    EventCandidate.objects.get_or_create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
     vet_or_post_error(t_ep)
     query = {"localization_event": nonlocalizedevent.event_id, "localization_prob": 95, "localization_dt": 3}
     survey_obs_link = (
