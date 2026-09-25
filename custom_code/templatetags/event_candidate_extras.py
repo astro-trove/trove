@@ -185,6 +185,10 @@ def display_score_details(context, target_id):
             "Light Curve Slope (positive is brightening)",
             partial(_float_format, unit="mag/day"),
         ),
+        predetection_score=(
+            "Score from Pre-Detections",
+            partial(_float_format, precision=1),
+        ),
         phot_peak_lum_score=("Score from Maximum Luminosity", partial(_float_format, precision=1)),
         phot_peak_time_score=(
             "Score from Time of Maximum Light Curve",
@@ -222,8 +226,8 @@ def display_score_details(context, target_id):
     for event_candidate in target.eventcandidate_set.all():
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
-            # exclude keys in TargetExtra + exclude mpc_score, predetection_score
-            + ["mpc_score", "predetection_score", "localization_id"]
+            # exclude keys in TargetExtra + exclude mpc_score
+            + ["mpc_score", "localization_id"]
         ).all()
 
         sf_set = sorted(
@@ -299,6 +303,13 @@ def display_score_details(context, target_id):
                     "text": not numeric,
                     "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
+            if score_factor.key == "predetection_score":
+                event_card["details"].append({
+                    "label": "Pre-detected?",
+                    "value": _safe_format(score_factor.value, _predetected_yesno),
+                    "text": False,
+                    "only": None,
+                })
         
         if event_card:
             cards.append(event_card)
@@ -501,6 +512,10 @@ def _bool_format(flt):
 
 def _bool_format_yesno(flt):
     return "No" if bool(flt) else "Yes"
+
+def _predetected_yesno(flt):
+    # predetection_score is below 1 only when the predetection penalty applied
+    return "Yes" if flt < 1 else "No"
   
 def _str_int_format(s):
     try:

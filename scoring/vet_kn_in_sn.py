@@ -191,6 +191,4 @@ def vet_kn_in_sn(
             ]  # this ValueError only happens when there aren't any predets
         if any(v >= param_ranges["max_predets"] for v in n_predets):
             predet_score = PHOT_SCORE_MIN
-            update_score_factor(event_candidate, "predetection_score", predet_score)
-        else:
-            delete_score_factor(event_candidate, "predetection_score")
+    update_score_factor(event_candidate, "predetection_score", predet_score)
