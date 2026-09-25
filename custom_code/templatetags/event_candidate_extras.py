@@ -14,6 +14,7 @@ from django.utils.safestring import mark_safe
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.models import ScoreFactor
+from scoring.scoring import mpc_score_from_match
 from scoring.util import (
     agn_counts_toward,
     get_event_candidate_scores as _get_event_candidate_scores,
@@ -22,6 +23,7 @@ from scoring.util import (
     most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
     KN_STYLE_CLASSES,
+    MPC_KEYS,
     TARGETEXTRA_KEYS,
 )
 from tom_nonlocalizedevents.models import NonLocalizedEvent
@@ -211,22 +213,31 @@ def display_score_details(context, target_id):
     
     order = list(keymap.keys())
 
+    def label_and_format(key):
+        return keymap.get(key) or (_label_for_key(key), _float_format)
+
     # basic scores/details
-    basic_score_details = []
-    te = TargetExtra.objects.filter(target_id=target_id)
-    basic_score_details.append(te.filter(key="ps_score"))
-    for event_candidate in target.eventcandidate_set.all():
-        sf_set = event_candidate.scorefactor_set.filter(key="mpc_score")
-        basic_score_details.append(sf_set)
-    te_set = te.filter(key__in=TARGETEXTRA_KEYS).exclude(key__in=["ps_score"])
-    basic_score_details.append(te_set)
+    te = dict(
+        TargetExtra.objects.filter(target_id=target_id, key__in=TARGETEXTRA_KEYS)
+        .values_list("key", "value")
+    )
+    basic_score_details = [(key, te[key]) for key in ("ps_score",) if key in te]
+    # derived the way scoring derives it, from the MPC match vet_basic stored;
+    # a ScoreFactor copy would be one row per event and could be stale
+    if "mpc_match_name" in te:
+        mpc_score = mpc_score_from_match(te["mpc_match_name"])
+        basic_score_details.append(("mpc_score", mpc_score))
+        # match details only for a match; with none, a sep or date can only
+        # be left over from an earlier check
+        if mpc_score == 0:
+            basic_score_details += [(key, te[key]) for key in MPC_KEYS if key in te]
 
     # NLE-specific scores/details
     score_details = []
     for event_candidate in target.eventcandidate_set.all():
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
-            # exclude keys in TargetExtra + exclude mpc_score
+            # exclude keys in TargetExtra + mpc_score
             + ["mpc_score", "localization_id"]
         ).all()
 
@@ -245,20 +256,12 @@ def display_score_details(context, target_id):
         "title": "Basic Scores (Not Event-Specific)",
         "details": []
     }
-    for queryset in basic_score_details:
-        for te in queryset:
-            if te.key in keymap:
-                label, fmter = keymap[te.key]
-            else:
-                label = _label_for_key(te.key)
-                fmter = _float_format
-            
-            value = _safe_format(te.value, fmter)
-            
-            basic_card["details"].append({
-                "label": label,
-                "value": value
-            })
+    for key, raw_value in basic_score_details:
+        label, fmter = label_and_format(key)
+        basic_card["details"].append({
+            "label": label,
+            "value": _safe_format(raw_value, fmter),
+        })
     
     cards.append(basic_card)
 
@@ -282,12 +285,7 @@ def display_score_details(context, target_id):
                     "details": []
                 }
             
-            if score_factor.key in keymap:
-                label, fmter = keymap[score_factor.key]
-            #else:
-            #    label = _label_for_key(score_factor.key)
-            #    fmter = _float_format
-                
+            label, fmter = label_and_format(score_factor.key)
             numeric = fmter not in (_str_format, _str_int_format)
             value = _safe_format(score_factor.value, fmter)
             
@@ -295,6 +293,7 @@ def display_score_details(context, target_id):
             # "could not score" reason belong in the KN subtab alone
             event_card["details"].append(
                 {
+                    "key": score_factor.key,
                     "label": label,
                     "value": value,
                     # a sentence, not a number: the value column is nowrap so
@@ -305,6 +304,7 @@ def display_score_details(context, target_id):
             })
             if score_factor.key == "predetection_score":
                 event_card["details"].append({
+                    "key": "predetected",
                     "label": "Pre-detected?",
                     "value": _safe_format(score_factor.value, _predetected_yesno),
                     "text": False,
@@ -397,10 +397,20 @@ def display_score_details(context, target_id):
                 # then add the content with the score details
                 # first the more general scores (2D, Distance, AGN, etc.) that don't change
                 # per transient model 
+                # one row per key so if any sub-score is computed on the fly (classification_score), it will not 
+                # be duplicated with a previous version of it.
+                rows = {
+                    detail["key"]: detail for detail in score_details
+                    if not detail.get("only") or detail["only"] == em_transient_type
+                }
+                for key, subscore in ec_subscores.get(em_transient_type, {}).items():
+                    label, fmter = label_and_format(key)
+                    rows[key] = {"key": key, "label": label,
+                                 "value": _safe_format(subscore, fmter), "score": True}
+
                 html += f'              <div class="score-card-content-filled">\n'
-                for detail in score_details:
-                    if "Score" not in detail["label"]: continue
-                    if detail.get("only") and detail["only"] != em_transient_type:
+                for detail in rows.values():
+                    if not _is_score_row(detail): 
                         continue
                     row_class = _factor_row_class(
                         detail["label"], em_transient_type, kn_is_active, agn_toggle
@@ -410,27 +420,12 @@ def display_score_details(context, target_id):
                     html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
                     html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
                     html += f'                </div>\n'
-
-                # then the photometry scores too. Both lookups are guarded:
-                # a transient with no subscores, or a subscore whose "<key>_score"
-                # has no keymap entry, is a missing label -- not a reason to 500
-                # the page and lose every other score on it.
-                for key, subscore in ec_subscores.get(em_transient_type, {}).items():
-                    label, fmter = keymap.get(key, (key, _float_format))
-                    row_class = _factor_row_class(
-                        label, em_transient_type, kn_is_active, agn_toggle
-                    )
-                    html += f'                <div class="{row_class}">\n'
-                    html += f'                  <span class="detail-label">{label}</span>\n'
-                    html += f'                  <span class="detail-value">{fmter(subscore)}</span>\n'
-                    html += f'                </div>\n'
                 html += f'              </div>\n'
                 
                 # then the score details (max lum., etc.)
                 html += f'              <div class="score-card-content">\n'
-                for detail in score_details:
-                    if "Score" in detail["label"]: continue
-                    if detail.get("only") and detail["only"] != em_transient_type:
+                for detail in rows.values():
+                    if _is_score_row(detail): 
                         continue
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
                     html += f'                <div class="detail-row">\n'
@@ -458,9 +453,12 @@ _TROVE_FACTOR_LABELS = {
 }
 
 
-# with the AGN toggle off, `agn_score` no longer feeds the kilonova-style scores,
-# so its row is greyed out there (never for AGN-flare, which always uses it)
 AGN_SCORE_LABEL = "AGN Association Score"
+
+
+def _is_score_row(detail):
+    # computed subscores are always scores, whatever their label says
+    return detail.get("score") or "Score" in detail["label"]
 
 
 # formatting
@@ -470,7 +468,7 @@ def _label_for_key(key):
     entries in `keymap`. Falls back to the raw key for anything else."""
     for prefix, label in (
         ("baseline_mag_", "AGN baseline median mag ({filt}-band)"),
-        ("baseline_std_", "AGN baseline scatter, robust MAD ({filt}-band)"),
+        ("baseline_std_", "AGN baseline scatter ({filt}-band)"),
     ):
         if key.startswith(prefix):
             return label.format(filt=key[len(prefix):])
@@ -478,6 +476,9 @@ def _label_for_key(key):
 
 
 def _safe_format(value, fmter):
+    # a name is text even when it looks numeric; float() would round a long ID
+    if fmter is _str_format:
+        return str(value)
     for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
         try:
             return candidate()

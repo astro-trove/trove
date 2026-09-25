@@ -391,6 +391,12 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
     # nothing at or before max_time: fall back to the earliest
     return localization or all_localizations.order_by("date").first()
 
+def mpc_score_from_match(mpc_match_name) -> int:
+    """0 if there is a Minor Planet Center match, else 1. run_mpc stores the
+    string "None" when nothing matched; None means the check hasn't run."""
+    return int(mpc_match_name in (None, "None"))
+
+
 def classification_score(
         target,
         expected_em_transient:str=None

@@ -21,7 +21,7 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 from candidate_vetting.vet import localization_sequence_from_name
 
-from .scoring import classification_score
+from .scoring import classification_score, mpc_score_from_match
 from .vet_phot import PHOT_SCORE_MIN
 from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
@@ -258,9 +258,7 @@ def get_event_candidate_scores(
         if "ps_score" in te:
             ps_score = float(te["ps_score"])
 
-        mpc_score = 1
-        if "mpc_match_name" in te:
-            mpc_score = int(te["mpc_match_name"] == str(None))
+        mpc_score = mpc_score_from_match(te.get("mpc_match_name"))
 
         # removed ps_score because if it is a vet_bbh() call, then ps_score of 0
         # might just be because AGN is in the point source catalogue
