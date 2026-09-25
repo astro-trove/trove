@@ -262,7 +262,6 @@ def display_score_details(context, target_id):
     for queryset in score_details:
         event_name = None
         event_card = None
-        import pdb; pdb.set_trace()
         for score_factor in queryset:
             ec = score_factor.event_candidate
             nle = ec.nonlocalizedevent

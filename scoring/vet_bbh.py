@@ -315,6 +315,16 @@ def vet_bbh(
             )
             pending_updates.clear()
 
+    # always run vet basic
+    # stop_on_zero=False: a point-source match shouldn't stop AGN-flare vetting
+    host_df, agn_df, keep_vetting = vet_basic(
+        event_candidate.target.id, stop_on_zero=False
+    )
+    if not keep_vetting:
+        _flush_score_factors()
+        return
+
+    # then run the classification score and return if it is 0        
     class_score = classification_score(target.id, "AGN-flare")
     if class_score == 0:
         _flush_score_factors()
@@ -343,14 +353,6 @@ def vet_bbh(
 
     localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
     update_score_factor(event_candidate, "localization_id", localization.id)
-
-    # stop_on_zero=False: a point-source match shouldn't stop AGN-flare vetting
-    host_df, agn_df, keep_vetting = vet_basic(
-        event_candidate.target.id, stop_on_zero=False
-    )
-    if not keep_vetting:
-        _flush_score_factors()
-        return
 
     agn_score = agn_association_score(
         agn_df, param_ranges["agn_match_score"], param_ranges["agn_miss_score"]
