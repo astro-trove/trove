@@ -173,7 +173,6 @@ def display_score_details(context, target_id):
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
-        classification_score=("Spectroscopically a SN/TDE?", _bool_format_yesno),
         agn_score=(AGN_SCORE_LABEL, partial(_float_format, precision=1)),
         agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
         nuclear_offset_score=("Nuclear Offset Score", partial(_float_format, precision=2)),
@@ -195,6 +194,7 @@ def display_score_details(context, target_id):
             "Score from Light Curve Slope",
             partial(_float_format, precision=1),
         ),
+        classification_score = ("Classification Score", _str_int_format),
         kilonova_score=(
             "KilonovaSCORER Photometry Score",
             partial(_float_format, precision=2),
@@ -204,6 +204,7 @@ def display_score_details(context, target_id):
             _str_format,
         ),
     )
+    
     order = list(keymap.keys())
 
     # basic scores/details
@@ -280,9 +281,9 @@ def display_score_details(context, target_id):
             
             if score_factor.key in keymap:
                 label, fmter = keymap[score_factor.key]
-            else:
-                label = _label_for_key(score_factor.key)
-                fmter = _float_format
+            #else:
+            #    label = _label_for_key(score_factor.key)
+            #    fmter = _float_format
                 
             numeric = fmter not in (_str_format, _str_int_format)
             value = _safe_format(score_factor.value, fmter)
@@ -304,7 +305,6 @@ def display_score_details(context, target_id):
             cards.append(event_card)
 
     # Render cards as HTML
-
     # Separate basic card from event cards
     basic_card = cards[0]  # First card is always "Basic Score Details"
     event_cards = cards[1:]  # Rest are event cards
@@ -378,7 +378,7 @@ def display_score_details(context, target_id):
             html += '          <div class="event-cards">\n'
             for kdx, (em_transient_score_label, idxlabel) in enumerate(label_idx_map.items()): 
                 em_transient_type = em_transient_score_label.split(" ")[0]
-
+                
                 active_subclass = ""
                 if not kdx:
                     active_subclass = "active"

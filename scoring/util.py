@@ -21,6 +21,7 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 from candidate_vetting.vet import localization_sequence_from_name
 
+from .scoring import classification_score
 from .vet_phot import PHOT_SCORE_MIN
 from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
@@ -57,7 +58,6 @@ KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
 # default subscore names
 SUBSCORE_NAMES = [
     "kilonova_score",
-    "classification_score",
     "skymap_score",
     "host_distance_score",
     "ps_score",
@@ -116,7 +116,6 @@ def agn_counts_toward(transient, agn_toggle):
     """Whether agn_score enters `transient`'s score."""
     return bool(agn_toggle) or transient not in AGN_TOGGLE_TRANSIENTS
 
-
 def _check_phot_val(val, param_ranges, param_range_key):
     val_max = max(param_ranges[param_range_key])
     val_min = min(param_ranges[param_range_key])
@@ -174,8 +173,15 @@ def get_event_candidate_scores(
     use_kilonova = phot_method == PHOT_METHOD_KILONOVA
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
+
+    # exclude keys thathave special cases like
+    # 1. keys that describe a derived metric rather than a score directly
+    # 2. keys that are in the target extra instead of scorefactor table
+    # 3. the KilonovaScorer key, since it only gets applied to KN
+    # 4. the agn and classification scores, which change behavior based on the EM
+    #    transient type that is expected
     exclude_keys = (set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
-                    | {KILONOVA_SCORE_KEY})
+                    | {KILONOVA_SCORE_KEY} | {"agn_score", "classification_score"})
 
     # only evaluate this once since it is time consuming
     event_candidates_list = list(event_candidates)
@@ -260,7 +266,7 @@ def get_event_candidate_scores(
         # might just be because AGN is in the point source catalogue
         subscore_no_phot = (
             math.prod([sf_dict[key] for key in sf_dict
-                       if key not in exclude_keys and key != "agn_score"])
+                       if key not in exclude_keys])
             * mpc_score
         )
         agn_score = sf_dict.get("agn_score")
@@ -282,6 +288,16 @@ def get_event_candidate_scores(
                 continue # this is fine, some transient scoring algorithms aren't implemented yet
             param_ranges = dict_transients_param_ranges[transient]
 
+            # handle the agn and PS scores, whose behaviour changes based on the
+            # expected transient type
+            agn_factor = (agn_score if agn_score is not None
+                          and agn_counts_toward(transient, agn_toggle) else 1)
+            ps_factor = ps_score if ps_counts_toward(transient, agn_score) else 1
+            
+            # handle the classification score, which changes based on the expected
+            # EM transient
+            class_score = classification_score(ec.target, transient)
+            
             phot_subscores = {
                 subscore_key: _check_phot_val(
                     val_dict[subscore_key], param_ranges, param_range_key
@@ -290,8 +306,12 @@ def get_event_candidate_scores(
                 if subscore_key in val_dict and param_range_key in param_ranges
             }
 
+            other_subscores = dict(
+                classification_score = class_score
+            )
+            
             if include_subscores:
-                ec.subscores[transient] = phot_subscores
+                ec.subscores[transient] = phot_subscores | other_subscores
 
             # ONLY "KN" can use KilonovaSCORER
             kn = sf_dict.get(KILONOVA_SCORE_KEY)
@@ -312,12 +332,9 @@ def get_event_candidate_scores(
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object
-            agn_factor = (agn_score if agn_score is not None
-                          and agn_counts_toward(transient, agn_toggle) else 1)
-            ps_factor = ps_score if ps_counts_toward(transient, agn_score) else 1
             ec.score[transient] = min(
                 1.0, max(0.0,
-                         subscore_no_phot * agn_factor * ps_factor * phot_score)
+                         subscore_no_phot * agn_factor * ps_factor * class_score * phot_score)
             )
         ecs_out.append(ec)
 

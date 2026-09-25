@@ -17,6 +17,7 @@ from .scoring import (
     get_distance_score,
     skymap_association,
     _localization_from_name,
+    classification_score,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -63,10 +64,6 @@ def vet_kn_in_sn(
         nonlocalizedevent_id=nonlocalized_event.id, target_id=target_id
     )
     target = Target.objects.get(id=target_id)
-
-    # discount things that are classified as supernova or TDEs and give them a score of 0
-    class_score = classification_score(target.id, expected_em_transient="KN-in-SN")
-    update_score_factor(event_candidate, "classification_score", class_score)
     
     ## check skymap association
     if np.isfinite(param_ranges["t_post"]):

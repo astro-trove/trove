@@ -392,7 +392,7 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
     return localization or all_localizations.order_by("date").first()
 
 def classification_score(
-        target_id:int,
+        target,
         expected_em_transient:str=None
 ) -> float:
     """Rules out candidates that TNS have already classified
@@ -403,12 +403,11 @@ def classification_score(
     elif classification.startswith("SN") and (GW event == BNS,NSBH,orBBH): score=0
     else: score=1
     """
-    # get the target from the target ID passed in
-    target = Target.objects.get(target_id)
-
     # get the classification, default to an empty string if key not present,
     # strip any extraneous chars
     classification = getattr(target, "classification", "")
+    if classification is None:
+        classification = ""
     clean_class = classification.strip()
 
     # calculate the classification score
@@ -419,7 +418,7 @@ def classification_score(
         #       removing TDEs here!!
         return 0
     
-    elif clean_class.startswith("SN") and expected_em_transient not in {"KN-in-SN", "superKN"}:
+    elif clean_class.startswith("SN") and expected_em_transient not in {"KN-in-SN", "super-KN"}:
         # for KN and AGN flares we don't want to include SN, for KN-in-SN or
         # superKN they could *maybe* be a counterpart 
         return 0

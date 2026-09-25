@@ -316,7 +316,6 @@ def vet_bbh(
             pending_updates.clear()
 
     class_score = classification_score(target.id, "AGN-flare")
-    update_score_factor(event_candidate, "classification_score", class_score)
     if class_score == 0:
         _flush_score_factors()
         logger.info(
