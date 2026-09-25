@@ -126,7 +126,7 @@ class TestNleIngestionHelpers:
     def test_build_hop_message_wraps_alert_in_list(self, gw170817_alert):
         message = build_hop_message(gw170817_alert)
         assert isinstance(message, JSONBlob)
-        assert message.content[0]["superevent_id"] == "GW170817"
+        assert message.content["superevent_id"] == "GW170817"
 
     def test_load_skymap_bytes_decompresses_gzip(self):
         if not GW170817_SKYMAP.is_file():
@@ -201,7 +201,7 @@ class TestUploadLocalNle:
         mock_handle.assert_called_once()
         message = mock_handle.call_args.args[0]
         assert isinstance(message, JSONBlob)
-        alert = message.content[0]
+        alert = message.content
         assert alert["superevent_id"] == "GW170817"
         assert alert["event"]["skymap"] == tiny_multiorder_skymap_bytes
         assert mock_handle.call_args.args[1] is None
