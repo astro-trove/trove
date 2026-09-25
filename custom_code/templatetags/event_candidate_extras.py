@@ -214,7 +214,7 @@ def display_score_details(context, target_id):
     order = list(keymap.keys())
 
     def label_and_format(key):
-        return keymap.get(key) or (_label_for_key(key), _float_format)
+        return keymap.get(key) or (key, _float_format)
 
     # basic scores/details
     te = dict(
@@ -269,6 +269,7 @@ def display_score_details(context, target_id):
     for queryset in score_details:
         event_name = None
         event_card = None
+        values = {sf.key: sf.value for sf in queryset}
         for score_factor in queryset:
             ec = score_factor.event_candidate
             nle = ec.nonlocalizedevent
@@ -284,7 +285,23 @@ def display_score_details(context, target_id):
                     "ec": ec,
                     "details": []
                 }
-            
+
+            # one "median ± scatter" row per band
+            if score_factor.key.startswith("baseline_std_"):
+                continue
+            if score_factor.key.startswith("baseline_mag_"):
+                filt = score_factor.key[len("baseline_mag_"):]
+                event_card["details"].append({
+                    "key": score_factor.key,
+                    "label": f"AGN baseline ({filt}-band)",
+                    "value": _baseline_format(
+                        score_factor.value, values.get(f"baseline_std_{filt}")
+                    ),
+                    "text": False,
+                    "only": None,
+                })
+                continue
+
             label, fmter = label_and_format(score_factor.key)
             numeric = fmter not in (_str_format, _str_int_format)
             value = _safe_format(score_factor.value, fmter)
@@ -462,17 +479,14 @@ def _is_score_row(detail):
 
 
 # formatting
-def _label_for_key(key):
-    """Nicer labels for the per-filter baseline keys (`baseline_mag_g`,
-    `baseline_std_r`, ...), which vary by filter and so can't be fixed
-    entries in `keymap`. Falls back to the raw key for anything else."""
-    for prefix, label in (
-        ("baseline_mag_", "AGN baseline median mag ({filt}-band)"),
-        ("baseline_std_", "AGN baseline scatter ({filt}-band)"),
-    ):
-        if key.startswith(prefix):
-            return label.format(filt=key[len(prefix):])
-    return key
+def _baseline_format(mag, std):
+    """`vet_bbh`'s AGN baseline for one band: median mag ± its scatter,
+    max(1.4826 * MAD, median photometric error)."""
+    try:
+        text = f"{float(mag):.2f}"
+        return text if std is None else f"{text} ± {float(std):.2f}"
+    except (TypeError, ValueError):
+        return str(mag)
 
 
 def _safe_format(value, fmter):
