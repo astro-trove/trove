@@ -49,7 +49,6 @@ PARAM_RANGES = dict(
 )
 
 
-KPC_PER_ARCSEC_PER_MPC = 4.84813681e-3  # kpc per arcsec at 1 Mpc
 NUCLEAR_SCALE_KPC = 0.5
 ASTROMETRIC_PRECISION_ARCSEC = 2.0
 
@@ -183,7 +182,11 @@ def agn_association_score(agn_df, match: float = 1.0, miss: float = 0.1) -> floa
 
 
 def projected_offset_kpc(offset_arcsec: float, angular_diameter_distance_mpc: float) -> float:
-    return float(offset_arcsec) * float(angular_diameter_distance_mpc) * KPC_PER_ARCSEC_PER_MPC
+    return (
+        float(offset_arcsec)*u.arcsec * float(angular_diameter_distance_mpc)*u.Mpc
+    ).to(
+        u.radian*u.kpc
+    ).value
 
 
 def _host_redshift(row: dict, luminosity_distance_mpc: float) -> float:
