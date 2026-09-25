@@ -30,6 +30,7 @@ from scoring.phot_method import (
     phot_method_label,
     toggle_phot_method,
 )
+from scoring.view_prefs import get_agn_toggle, set_agn_toggle
 
 logger = logging.getLogger(__name__)
 from tom_dataproducts.models import ReducedDatum
@@ -46,7 +47,7 @@ from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
 SCORE_CACHE_PERIOD = 60 * 5
 SCORE_CACHE_PERIOD_WHILE_VETTING = 60
 
-def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
+def scored_candidates_cache_key(query_params, agn_toggle, phot_method, user=None):
     """
     Cache key for the scored candidate list matching a set of filters.
 
@@ -57,11 +58,18 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
     ``phot_method`` belongs in the key because it decides which stored factor
     each row displays: a list scored under the other method is stale, not merely
     older. ``agn_toggle`` is in it for the same reason.
+
+    ``user`` belongs in it because the list is filtered by what that user may
+    view. Without it, whoever loaded the page first decided what everyone saw
+    for the next five minutes: an anonymous visitor's empty list was served to
+    logged-in users, and -- worse -- a logged-in user's list was served to
+    anonymous ones.
     """
     query_params = query_params.copy()
     query_params.pop("page", None)  # every page shares one scored list
+    viewer = getattr(user, "pk", None) or "anon"
     return (f"event_candidates_scored_{query_params.urlencode()}"
-            f"_{agn_toggle}_{phot_method}")
+            f"_{agn_toggle}_{phot_method}_{viewer}")
 
 
 class EventCandidateListView(FilterView):
@@ -114,15 +122,15 @@ class EventCandidateListView(FilterView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        agn_toggle = cache.get("agn_toggle", True)
+        agn_toggle = get_agn_toggle(self.request)
         nle_id = self.request.GET.get("nonlocalizedevent")
 
-        phot_method = get_phot_method()
+        phot_method = get_phot_method(self.request)
 
         vet_all_progress = get_vet_all_progress(nle_id)
 
         cache_key = scored_candidates_cache_key(self.request.GET, agn_toggle,
-                                                phot_method)
+                                                phot_method, self.request.user)
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
         # current NLE when the AGN toggle is flipped)
@@ -153,7 +161,7 @@ class EventCandidateListView(FilterView):
         context["agn_toggle"] = agn_toggle
 
         context["phot_method"] = phot_method
-        context["phot_method_label"] = phot_method_label()
+        context["phot_method_label"] = phot_method_label(request=self.request)
 
         context["kilonova_scores_missing"] = is_kilonova and bool(scored_candidates) and not any(
             getattr(ec, "kilonova_score", None) is not None for ec in scored_candidates
@@ -368,15 +376,19 @@ def _return_to(request, fallback):
 
 class ToggleAgnCacheView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
-        new_val = not cache.get("agn_toggle", True)
-        cache.set("agn_toggle", new_val)
+        new_val = set_agn_toggle(request, not get_agn_toggle(request))
 
         nle_id = request.GET.get("nonlocalizedevent")
         if nle_id:
+            # the same permission filter the list view applies -- pre-warming
+            # from an unfiltered queryset would cache rows this user may not see
             candidates = EventCandidate.objects.filter(
-                nonlocalizedevent_id=nle_id
+                nonlocalizedevent_id=nle_id,
+                target__in=targets_for_user(
+                    request.user, Target.objects.all(), "view_target"
+                ),
             ).select_related("target", "nonlocalizedevent")
-            phot_method = get_phot_method()
+            phot_method = get_phot_method(request)
             scored_candidates = get_event_candidate_scores(
                 candidates, agn_toggle=new_val, phot_method=phot_method
             )
@@ -386,7 +398,8 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             # method included -- otherwise this pre-warm writes a key nothing
             # reads and the list re-scores anyway.
             cache_key = scored_candidates_cache_key(
-                QueryDict(f"nonlocalizedevent={nle_id}"), new_val, phot_method
+                QueryDict(f"nonlocalizedevent={nle_id}"), new_val, phot_method,
+                request.user,
             )
             cache.set(cache_key, scored_candidates, SCORE_CACHE_PERIOD)
             params = {"nonlocalizedevent": nle_id}
@@ -413,7 +426,7 @@ class TogglePhotMethodCacheView(LoginRequiredMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-        new_val = toggle_phot_method()
+        new_val = toggle_phot_method(request)
         logger.info("Photometry scoring method switched to %r", new_val)
 
         nle_id = request.GET.get("nonlocalizedevent")
@@ -462,7 +475,7 @@ class RefreshCandidateList(LoginRequiredMixin, View):
         for agn_toggle in (True, False):
             for phot_method in PHOT_METHOD_CHOICES:
                 cache.delete(scored_candidates_cache_key(
-                    request.GET, agn_toggle, phot_method))
+                    request.GET, agn_toggle, phot_method, request.user))
 
         # send the user back to the list they were looking at, filters and all
         query_string = request.GET.urlencode()

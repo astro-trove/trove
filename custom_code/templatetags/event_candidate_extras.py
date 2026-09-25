@@ -25,33 +25,36 @@ from scoring.phot_method import (
     get_phot_method as _get_phot_method,
     phot_method_label as _phot_method_label,
 )
+from scoring.view_prefs import (
+    get_agn_toggle as _get_agn_toggle,
+)
 
 register = template.Library()
 
 
-@register.simple_tag
-def get_agn_toggle():
-    """Current value of the site-wide, cache-backed agn_toggle flag."""
-    return cache.get("agn_toggle", True)
+@register.simple_tag(takes_context=True)
+def get_agn_toggle(context):
+    """This viewer's agn_toggle flag, from their session."""
+    return _get_agn_toggle(context.get("request"))
 
 
-@register.simple_tag
-def get_phot_method():
+@register.simple_tag(takes_context=True)
+def get_phot_method(context):
     """Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
 
-    Site-wide and cache-backed, exactly like ``agn_toggle``. Unlike the AGN
+    Per viewer and session-backed, exactly like ``agn_toggle``. Unlike the AGN
     flag, flipping this does NOT rescore anything -- the stored factors are not
     recomputed and no vetting is triggered. It only changes which scorer the
     NEXT Vet All run uses, so the button is cheap to press and cannot cost a
     user a long re-vet by accident.
     """
-    return _get_phot_method()
+    return _get_phot_method(context.get("request"))
 
 
-@register.simple_tag
-def get_phot_method_label():
+@register.simple_tag(takes_context=True)
+def get_phot_method_label(context):
     """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
-    return _phot_method_label()
+    return _phot_method_label(request=context.get("request"))
 
 @register.simple_tag
 def get_event_candidate_scores(*args, **kwargs):
@@ -94,12 +97,13 @@ def scoring_toggles(context, target_id=None):
     # score to switch TO. With no target_id (e.g. the candidate list page,
     # which isn't scoped to one candidate) there's nothing to gate on, so the
     # toggle is always available.
-    is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
+    request = context["request"]
+    is_kilonova = _get_phot_method(request) == PHOT_METHOD_KILONOVA
     has_kilonova_score = not target_id or ScoreFactor.objects.filter(
         event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
     ).exists()
     return {
-        "agn_toggle": cache.get("agn_toggle", True),
+        "agn_toggle": _get_agn_toggle(request),
         "is_kilonova": is_kilonova,
         "has_kilonova_score": has_kilonova_score,
         "next": context["request"].get_full_path(),
@@ -310,7 +314,7 @@ def display_score_details(context, target_id):
             # always on while the candidate list scored with the toggle -- one
             # candidate, two numbers. Also lets the AGN row say truthfully
             # whether it fed the score.
-            agn_toggle = get_agn_toggle()
+            agn_toggle = _get_agn_toggle(context.get("request"))
             ec_score_details = _get_event_candidate_scores(
                 [ec],
                 include_subscores=True,
