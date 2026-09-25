@@ -398,10 +398,11 @@ def classification_score(
     """Rules out candidates that TNS have already classified
 
     Follows this general psuedocode logic
-    if classification==SN Ia and any GW event: score=0
-    elif classification==TDE and any GW event: score=0
-    elif classification.startswith("SN") and (GW event == BNS,NSBH,orBBH): score=0
-    else: score=1
+    if classification==SN Ia and any GW event: score = 0
+    elif classification==TDE and any GW event: score = 0
+    elif classification.startswith("SN") and (GW event == BNS, NSBH, or BBH): score = 0
+    elif classification.startswith("SN") and (GW event == SSM) and (expected_em_transient == KN): score = 0
+    else: score = 1
     """
     # get the classification, default to an empty string if key not present,
     # strip any extraneous chars
