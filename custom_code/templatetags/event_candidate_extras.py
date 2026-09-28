@@ -15,6 +15,7 @@ from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.models import ScoreFactor
 from scoring.util import (
+    get_agn_toggle as _get_agn_toggle,
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
@@ -24,9 +25,6 @@ from scoring.util import (
 from scoring.phot_method import (
     get_phot_method as _get_phot_method,
     phot_method_label as _phot_method_label,
-)
-from scoring.view_prefs import (
-    get_agn_toggle as _get_agn_toggle,
 )
 
 register = template.Library()
@@ -40,13 +38,8 @@ def get_agn_toggle(context):
 
 @register.simple_tag(takes_context=True)
 def get_phot_method(context):
-    """Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
-
-    Per viewer and session-backed, exactly like ``agn_toggle``. Unlike the AGN
-    flag, flipping this does NOT rescore anything -- the stored factors are not
-    recomputed and no vetting is triggered. It only changes which scorer the
-    NEXT Vet All run uses, so the button is cheap to press and cannot cost a
-    user a long re-vet by accident.
+    """
+    Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
     """
     return _get_phot_method(context.get("request"))
 

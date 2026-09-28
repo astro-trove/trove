@@ -1,30 +1,6 @@
-"""Which photometry scorer TROVE uses — a site-wide, cache-backed user choice.
-
-TROVE can judge a candidate's photometry two ways:
-
-``trove``
-    ``vet_phot._score_phot``: fit the light curve, then range-check peak
-    luminosity, peak time and decay rate against ``vet_kn.PARAM_RANGES``. The
-    factor is 1 if every fitted value is in range and 0.1 per violation.
-
-``kilonova``
-    KilonovaSCORER's cumulative ``P_tail``: compare the light curve against a
-    simulated kilonova population and report where the observations fall in it.
-    Needs a simulation grid (see :mod:`scoring.kilonova_scorer_helpers`).
-
-The choice lives in the viewer's session because it is a display preference,
-not per-candidate data — the same reasoning as ``agn_toggle``, which this
-deliberately mirrors. It used to live in the global cache, where one viewer's
-choice changed the page for everyone.
-
-**Flipping it does not rescore anything.** No stored ``ScoreFactor`` row is
-touched and no vetting is queued; the next Vet All run simply reads the value
-and scores accordingly. That keeps the button cheap: a mis-click costs nothing,
-where a rescore-on-toggle would cost minutes of compute per press.
-"""
 from __future__ import annotations
 
-# session key. Per viewer and unscoped by event, matching ``agn_toggle``.
+# session key. Per viewer, matching `agn_toggle` in scoring.util.
 PHOT_METHOD_KEY = "phot_method"
 
 PHOT_METHOD_TROVE = "trove"
@@ -49,17 +25,7 @@ PHOT_METHOD_LABELS = {
 
 
 def get_phot_method(request=None) -> str:
-    """The viewer's selected method, always one of :data:`PHOT_METHOD_CHOICES`.
-
-    ``request`` is optional because background workers call this with nothing
-    to read: a queued task has no session. Those callers get the default, which
-    is what they already got in practice -- Vet All resolves the method in the
-    request process and threads it into the task.
-
-    An unrecognised stored value falls back to the default rather than
-    propagating: a stale or hand-set session value must not be able to send an
-    unknown method into the scorer.
-    """
+    """The viewer's selected method, always one of :data:`PHOT_METHOD_CHOICES`."""
     if request is None or not hasattr(request, "session"):
         return PHOT_METHOD_DEFAULT
     value = request.session.get(PHOT_METHOD_KEY, PHOT_METHOD_DEFAULT)

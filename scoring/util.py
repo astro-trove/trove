@@ -49,6 +49,11 @@ KILONOVA_SCORE_KEY = "kilonova_score"
 # why KilonovaSCORER could not score a candidate, written by `vet_kn` in place of score
 KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
 
+# session key for the AGN toggle, which decides whether `agn_score` counts
+# towards the total in `get_event_candidate_scores` below. Per viewer.
+AGN_TOGGLE_KEY = "agn_toggle"
+AGN_TOGGLE_DEFAULT = True
+
 # default subscore names
 SUBSCORE_NAMES = [
     "kilonova_score",
@@ -111,6 +116,20 @@ def get_no_score_message(nonlocalizedevent_name):
         return None
 
     return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
+
+
+def get_agn_toggle(request=None) -> bool:
+    """Whether this viewer wants AGN scores counted. No session, no request:
+    a queued task gets the default."""
+    if request is None or not hasattr(request, "session"):
+        return AGN_TOGGLE_DEFAULT
+    return bool(request.session.get(AGN_TOGGLE_KEY, AGN_TOGGLE_DEFAULT))
+
+
+def set_agn_toggle(request, value: bool) -> bool:
+    """Set this viewer's AGN toggle. Returns what was stored."""
+    request.session[AGN_TOGGLE_KEY] = bool(value)
+    return bool(value)
 
 
 def get_event_candidate_scores(

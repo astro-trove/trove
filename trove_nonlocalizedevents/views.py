@@ -18,10 +18,12 @@ import logging
 
 from scoring.models import ScoreFactor
 from scoring.util import (
+    get_agn_toggle,
     get_event_candidate_scores,
     get_last_vet_all_run,
     get_no_score_message,
     get_vet_all_progress,
+    set_agn_toggle,
 )
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
@@ -30,7 +32,6 @@ from scoring.phot_method import (
     phot_method_label,
     toggle_phot_method,
 )
-from scoring.view_prefs import get_agn_toggle, set_agn_toggle
 
 logger = logging.getLogger(__name__)
 from tom_dataproducts.models import ReducedDatum
@@ -47,23 +48,9 @@ from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
 SCORE_CACHE_PERIOD = 60 * 5
 SCORE_CACHE_PERIOD_WHILE_VETTING = 60
 
-def scored_candidates_cache_key(query_params, agn_toggle, phot_method, user=None):
+def scored_candidates_cache_key(query_params, agn_toggle, phot_method, user):
     """
     Cache key for the scored candidate list matching a set of filters.
-
-    Everything that reads, writes or invalidates that cache goes through here,
-    so the three cannot drift apart and leave the page serving scores nothing
-    can clear.
-
-    ``phot_method`` belongs in the key because it decides which stored factor
-    each row displays: a list scored under the other method is stale, not merely
-    older. ``agn_toggle`` is in it for the same reason.
-
-    ``user`` belongs in it because the list is filtered by what that user may
-    view. Without it, whoever loaded the page first decided what everyone saw
-    for the next five minutes: an anonymous visitor's empty list was served to
-    logged-in users, and -- worse -- a logged-in user's list was served to
-    anonymous ones.
     """
     query_params = query_params.copy()
     query_params.pop("page", None)  # every page shares one scored list
@@ -72,7 +59,7 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method, user=None
             f"_{agn_toggle}_{phot_method}_{viewer}")
 
 
-class EventCandidateListView(FilterView):
+class EventCandidateListView(LoginRequiredMixin, FilterView):
     """
     View for listing candidates in the TOM.
     """
@@ -82,6 +69,12 @@ class EventCandidateListView(FilterView):
     # We need to skip pagination for ordering, if we ever have more
     # candidates than this we have an issue...
     paginate_by = 20
+
+    def handle_no_permission(self):
+        # without this an anonymous visitor just saw an empty table, with no
+        # hint that logging in was the missing piece
+        messages.warning(self.request, "You must be logged in to view candidates.")
+        return super().handle_no_permission()
 
     def get_queryset(self):
         """
