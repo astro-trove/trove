@@ -33,7 +33,7 @@ register = template.Library()
 @register.simple_tag(takes_context=True)
 def get_agn_toggle(context):
     """This viewer's agn_toggle flag, from their session."""
-    return _get_agn_toggle(context.get("request"))
+    return _get_agn_toggle(context["request"])
 
 
 @register.simple_tag(takes_context=True)
@@ -41,13 +41,13 @@ def get_phot_method(context):
     """
     Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
     """
-    return _get_phot_method(context.get("request"))
+    return _get_phot_method(context["request"])
 
 
 @register.simple_tag(takes_context=True)
 def get_phot_method_label(context):
     """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
-    return _phot_method_label(request=context.get("request"))
+    return _phot_method_label(request=context["request"])
 
 @register.simple_tag
 def get_event_candidate_scores(*args, **kwargs):
@@ -84,7 +84,7 @@ def vet_all_is_allowed(context):
 
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
-    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+    from scoring.phot_method import PHOT_METHOD_KILONOVA
 
     # switching to KilonovaSCORER only changes anything if this candidate has a
     # score to switch TO. With no target_id (e.g. the candidate list page,
@@ -307,7 +307,7 @@ def display_score_details(context, target_id):
             # always on while the candidate list scored with the toggle -- one
             # candidate, two numbers. Also lets the AGN row say truthfully
             # whether it fed the score.
-            agn_toggle = _get_agn_toggle(context.get("request"))
+            agn_toggle = _get_agn_toggle(context["request"])
             ec_score_details = _get_event_candidate_scores(
                 [ec],
                 include_subscores=True,

@@ -55,7 +55,7 @@ from custom_code.templatetags.target_list_extras import galaxy_table
 
 
 
-def _phot_method_field(form, request=None):
+def _phot_method_field(form, request):
     """Offer the scorer choice, defaulting to whatever this viewer's toggle shows.
 
     The values the template needs to keep the two selects in step ride along as
