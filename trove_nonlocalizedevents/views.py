@@ -446,18 +446,8 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
 
 
 class TogglePhotMethodCacheView(LoginRequiredMixin, View):
-    """Flip the photometry scorer between TROVE and KilonovaSCORER.
-
-    Deliberately lighter than :class:`ToggleAgnCacheView`, which rescores the
-    whole candidate list on every press. This one only writes the cache key --
-    no rescoring, no vetting queued, no stored ``ScoreFactor`` row touched.
-    The next Vet All reads the value and uses it.
-
-    That difference is the point. The AGN flag changes an arithmetic factor
-    already held in memory, so recomputing is cheap. Switching photometry
-    scorer would mean re-running KilonovaSCORER against the simulation grid for
-    every candidate -- minutes of compute, triggered by a single click, on a
-    page a user may only be browsing.
+    """
+    Flip the photometry scorer between TROVE and KilonovaSCORER.
     """
 
     def get(self, request, *args, **kwargs):
@@ -465,11 +455,9 @@ class TogglePhotMethodCacheView(LoginRequiredMixin, View):
         logger.info("Photometry scoring method switched to %r", new_val)
 
         nle_id = request.GET.get("nonlocalizedevent")
-        # No rescoring -- but the cached scored list was built displaying the
-        # OTHER method's factor, so it has to go or the page keeps showing the
-        # old numbers under the new label. The method is part of the cache key,
-        # so the entry for the new method is simply absent and gets rebuilt from
-        # stored ScoreFactor rows: a read, not a re-vet.
+        # the cached scored list was built displaying the other method's factor, 
+        # so it has to go or the page keeps showing the
+        # old numbers under the new label
         url = reverse("custom_code:event-candidates")
         params = {}
         if nle_id:
@@ -495,11 +483,6 @@ class SkymapPartialView(View):
 class RefreshCandidateList(LoginRequiredMixin, View):
     """
     Throw away the cached scores for the current candidate list and reload it.
-
-    The reload on its own was not a refresh: it sent the user back to a page
-    that served its scores straight out of the cache for up to five minutes,
-    which is precisely the wrong answer while a "Vet All" run is rewriting
-    those scores underneath.
     """
 
     def get(self, request, *args, **kwargs):
