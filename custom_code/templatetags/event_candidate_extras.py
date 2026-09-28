@@ -145,14 +145,6 @@ def scoring_toggles(context, target_id=None):
     if classes and not any(c is None or c in KN_STYLE_CLASSES for c in classes):
         return {"show": False}
 
-    # switching to KilonovaSCORER only changes anything if this candidate has a
-    # score to switch TO. With no target_id (e.g. the candidate list page,
-    # which isn't scoped to one candidate) there's nothing to gate on, so the
-    # toggle is always available.
-    is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
-    has_kilonova_score = not target_id or ScoreFactor.objects.filter(
-        event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
-    ).exists()
     return {
         "show": True,
         "agn_toggle": cache.get("agn_toggle", True),
