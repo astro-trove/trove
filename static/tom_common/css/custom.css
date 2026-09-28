@@ -11,3 +11,21 @@ textarea {
     overflow-y: auto;
     overflow-x: hidden;
 }
+
+/* Mark required fields with a red asterisk. */
+.field-required > label::after {
+    content: " *";
+    color: #dc3545;
+}
+
+.select2-container {
+    width: 100% !important;
+}
+.select2-selection {
+    height: auto !important;
+    min-height: 38px;
+    padding: 4px 8px;
+}
+.select2-selection__rendered {
+    line-height: 28px !important;
+}
