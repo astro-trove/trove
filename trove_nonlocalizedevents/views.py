@@ -49,20 +49,19 @@ from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
 SCORE_CACHE_PERIOD = 60 * 5
 SCORE_CACHE_PERIOD_WHILE_VETTING = 60
 
-def scored_candidates_cache_key(query_params, agn_toggle, phot_method, user):
+def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
     """
     Cache key for the scored candidate list matching a set of filters.
     """
     query_params = query_params.copy()
     query_params.pop("page", None)  # every page shares one scored list
-    viewer = getattr(user, "pk", None) or "anon"
     return (f"event_candidates_scored_{query_params.urlencode()}"
-            f"_{agn_toggle}_{phot_method}_{viewer}")
+            f"_{agn_toggle}_{phot_method}")
 
 
-def invalidate_scored_candidates_cache(query_params, user):
+def invalidate_scored_candidates_cache(query_params):
     """
-    Drop this user's cached scored candidate lists for a set of filters.
+    Drop the cached scored candidate lists for a set of filters.
     """
     if not hasattr(query_params, "copy"):  # an NLE id: build the unfiltered key
         query_params = QueryDict(urlencode({"nonlocalizedevent": query_params}))
@@ -70,7 +69,30 @@ def invalidate_scored_candidates_cache(query_params, user):
     for agn_toggle in (True, False):
         for phot_method in PHOT_METHOD_CHOICES:
             cache.delete(scored_candidates_cache_key(
-                query_params, agn_toggle, phot_method, user))
+                query_params, agn_toggle, phot_method))
+
+
+def visible_candidates(candidates, user):
+    """
+    Drop candidates whose target this user may not view.
+    """
+    if user.is_superuser:
+        return candidates
+    target_ids = {c.target_id for c in candidates}
+    # Fast path for the common case: an authenticated user can view anything
+    # that is not PRIVATE, so with nothing restricted here there is no work to
+    # do. Anonymous users are excluded because they may only see OPEN targets.
+    if user.is_authenticated and not Target.objects.filter(
+        id__in=target_ids, permissions=Target.Permissions.PRIVATE
+    ).exists():
+        return candidates
+    # otherwise defer to the permission layer rather than restate its rules
+    allowed = set(
+        targets_for_user(
+            user, Target.objects.filter(id__in=target_ids), "view_target"
+        ).values_list("id", flat=True)
+    )
+    return [c for c in candidates if c.target_id in allowed]
 
 
 class EventCandidateListView(LoginRequiredMixin, FilterView):
@@ -92,8 +114,10 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
 
     def get_queryset(self):
         """
-        Gets the set of ``Candidate`` objects associated with ``Target`` objects that
-        the user has permission to view.
+        Gets the set of ``Candidate`` objects for this event.
+
+        Not filtered by permission: the scored list built from this is cached
+        and shared, so `visible_candidates` applies the filter on the way out.
 
         :returns: Set of ``Candidate`` objects
         :rtype: QuerySet
@@ -101,11 +125,6 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         qs = (
             super()
             .get_queryset()
-            .filter(
-                target__in=targets_for_user(
-                    self.request.user, Target.objects.all(), "view_target"
-                )
-            )
             .select_related("target", "nonlocalizedevent")
         )
 
@@ -137,7 +156,7 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         vet_all_progress = get_vet_all_progress(nle_id)
 
         cache_key = scored_candidates_cache_key(self.request.GET, agn_toggle,
-                                                phot_method, self.request.user)
+                                                phot_method)
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
         # current NLE when the toggle is flipped)
@@ -156,11 +175,16 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
                 cache_timeout = SCORE_CACHE_PERIOD
             cache.set(cache_key, scored_candidates, cache_timeout)
 
+        # the cached list is everyone's; this viewer sees their share of it
+        scored_candidates = visible_candidates(scored_candidates, self.request.user)
+
         # Paginate the cached scored list
         paginator = Paginator(scored_candidates, self.paginate_by)
         page_number = self.request.GET.get("page", 1)
         page_obj = paginator.get_page(page_number)
 
+        context["paginator"] = paginator
+        context["is_paginated"] = page_obj.has_other_pages()
         context["page_obj"] = page_obj
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
@@ -395,13 +419,10 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
 
         nle_id = request.GET.get("nonlocalizedevent")
         if nle_id:
-            # the same permission filter the list view applies -- pre-warming
-            # from an unfiltered queryset would cache rows this user may not see
+            # unfiltered, matching what the list view caches and then
+            # filters on the way out
             candidates = EventCandidate.objects.filter(
-                nonlocalizedevent_id=nle_id,
-                target__in=targets_for_user(
-                    request.user, Target.objects.all(), "view_target"
-                ),
+                nonlocalizedevent_id=nle_id
             ).select_related("target", "nonlocalizedevent")
             phot_method = get_phot_method(request)
             scored_candidates = get_event_candidate_scores(
@@ -413,8 +434,7 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             # other toggle's *current* value included -- otherwise this
             # pre-warm writes a key nothing reads and the list re-scores anyway.
             cache_key = scored_candidates_cache_key(
-                QueryDict(f"nonlocalizedevent={nle_id}"), new_val, phot_method,
-                request.user,
+                QueryDict(f"nonlocalizedevent={nle_id}"), new_val, phot_method
             )
             cache.set(cache_key, scored_candidates, SCORE_CACHE_PERIOD)
             params = {"nonlocalizedevent": nle_id}
@@ -483,7 +503,7 @@ class RefreshCandidateList(LoginRequiredMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-        invalidate_scored_candidates_cache(request.GET, request.user)
+        invalidate_scored_candidates_cache(request.GET)
 
         # send the user back to the list they were looking at, filters and all
         query_string = request.GET.urlencode()

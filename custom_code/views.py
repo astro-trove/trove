@@ -344,12 +344,12 @@ class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
             # imported here to keep custom_code.views out of an import cycle
             from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
 
-            invalidate_scored_candidates_cache(nonlocalizedevent.id, request.user)
+            invalidate_scored_candidates_cache(nonlocalizedevent.id)
             # the page they came from may have had filters on, which is a
             # cache key of its own and would otherwise still be stale
             referer_query = urlparse(self.get_redirect_url()).query
             if referer_query:
-                invalidate_scored_candidates_cache(QueryDict(referer_query), request.user)
+                invalidate_scored_candidates_cache(QueryDict(referer_query))
             messages.success(request, f'Linked {target.name} to {nonlocalizedevent.event_id}.')
         else:
             messages.info(request, f'{target.name} is already a candidate of '
