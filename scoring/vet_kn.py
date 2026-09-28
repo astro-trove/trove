@@ -17,6 +17,7 @@ from .scoring import (
     get_distance_score,
     skymap_association,
     _localization_from_name,
+    classification_score
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -67,9 +68,9 @@ def vet_kn(
 ):
     """
     `phot_method` names the photometry scorer to use. None means "read the
-    site-wide toggle", which is right for the single-target path -- that runs in
-    the web process, where the toggle is. `async_vet` passes it explicitly
-    instead, because a worker in its own container cannot see that cache.
+    viewer's toggle", which is right for the single-target path -- that runs in
+    the web process, where the session is. `async_vet` passes it explicitly
+    instead, because a worker has no session to read.
     """
     logger.info("Running BNS vetting (KN vetting)")
 
@@ -174,7 +175,7 @@ def vet_kn(
             "c",
         ],  # common optical filters + some Roman filters + ATLAS o,c
     )
-    # The photometry factor can come from either scorer -- the site-wide
+    # The photometry factor can come from either scorer -- the viewer's
     # `phot_method` toggle picks. The TROVE fit above always runs regardless,
     # because its `lum` / `max_time` / `decay_rate` are displayed on the
     # candidate page in their own right, not only as inputs to the factor.

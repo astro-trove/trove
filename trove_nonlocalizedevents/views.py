@@ -23,16 +23,17 @@ from scoring.util import (
     get_last_vet_all_run,
     get_no_score_message,
     get_vet_all_progress,
+    kilonova_scores_exist,
+    most_likely_class_for_event,
     set_agn_toggle,
+    KN_STYLE_CLASSES,
 )
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
-    PHOT_METHOD_KILONOVA,
     get_phot_method,
     phot_method_label,
     toggle_phot_method,
 )
-
 logger = logging.getLogger(__name__)
 from tom_dataproducts.models import ReducedDatum
 from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
@@ -57,6 +58,19 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method, user):
     viewer = getattr(user, "pk", None) or "anon"
     return (f"event_candidates_scored_{query_params.urlencode()}"
             f"_{agn_toggle}_{phot_method}_{viewer}")
+
+
+def invalidate_scored_candidates_cache(query_params, user):
+    """
+    Drop this user's cached scored candidate lists for a set of filters.
+    """
+    if not hasattr(query_params, "copy"):  # an NLE id: build the unfiltered key
+        query_params = QueryDict(urlencode({"nonlocalizedevent": query_params}))
+
+    for agn_toggle in (True, False):
+        for phot_method in PHOT_METHOD_CHOICES:
+            cache.delete(scored_candidates_cache_key(
+                query_params, agn_toggle, phot_method, user))
 
 
 class EventCandidateListView(LoginRequiredMixin, FilterView):
@@ -126,13 +140,13 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
                                                 phot_method, self.request.user)
 
         # Check cache first (ToggleAgnCacheView pre-warms this key for the
-        # current NLE when the AGN toggle is flipped)
+        # current NLE when the toggle is flipped)
         scored_candidates = cache.get(cache_key)
         if scored_candidates is None:
             # Not in cache—score all candidates
             all_candidates = self.filterset.qs
             scored_candidates = get_event_candidate_scores(
-                all_candidates, agn_toggle=agn_toggle, phot_method=phot_method
+                all_candidates, agn_toggle=agn_toggle, phot_method=phot_method,
             )
             # a run in progress rewrites these scores continuously, so hold them
             # for less time than usual to keep the page closer to the truth
@@ -141,8 +155,6 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
             else:
                 cache_timeout = SCORE_CACHE_PERIOD
             cache.set(cache_key, scored_candidates, cache_timeout)
-
-        is_kilonova = phot_method == PHOT_METHOD_KILONOVA
 
         # Paginate the cached scored list
         paginator = Paginator(scored_candidates, self.paginate_by)
@@ -156,23 +168,29 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label(request=self.request)
 
-        context["kilonova_scores_missing"] = is_kilonova and bool(scored_candidates) and not any(
-            getattr(ec, "kilonova_score", None) is not None for ec in scored_candidates
-        )
-        context["is_kilonova"] = is_kilonova
         context["vet_all_progress"] = vet_all_progress
         # standing record of when these scores were last refreshed in bulk,
         # which outlives the transient progress notice above
         context["last_vet_all"] = get_last_vet_all_run(nle_id)
 
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
-        context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm()
+        context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm(nle_id=nle_id)
 
         context["no_score_message"] = None
+        event_class = None
         if nle_id:
             nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
             if nle:
-                context["no_score_message"] = get_no_score_message(nle.event_id)
+                event_class = most_likely_class_for_event(nle.event_id)
+                context["no_score_message"] = get_no_score_message(event_class)
+
+        # shown whichever way the toggle is set: the toggle stays locked on light
+        # curve metrics until the event has KilonovaSCORER scores. KN-style events
+        # only, since KilonovaSCORER means nothing for BBH/AGN-flare scoring
+        context["kilonova_scores_missing"] = (
+            event_class in KN_STYLE_CLASSES and bool(scored_candidates)
+            and not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
+        )
 
         return context
 
@@ -203,14 +221,15 @@ class EventCandidateCreateFromNLEView(LoginRequiredMixin, View):
         form = CreateEventCandidateFromNLEForm(request.POST)
 
         if form.is_valid():
-            target_id = (
-                Target.objects.filter(name=form.cleaned_data["target_name_to_link"])
-                .first()
-                .id
-            )
-            event_id = NonLocalizedEvent.objects.get(
-                id=request.GET.get("nonlocalizedevent")
-            ).event_id
+            target_id = form.cleaned_data["target_name_to_link"].id
+
+            try:
+                event_id = NonLocalizedEvent.objects.get(
+                    id=request.GET.get("nonlocalizedevent")
+                ).event_id
+            except (NonLocalizedEvent.DoesNotExist, ValueError):
+                messages.error(request, "Could not tell which event to link that target to.")
+                return redirect(request.META.get("HTTP_REFERER", "/"))
 
             # Redirect to the create-candidate view
             return redirect(
@@ -243,7 +262,7 @@ We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational w
 
 Below, we report the top {ncands} candidates that remain viable after running our vetting procedure using publicly available information on all publicly reported sources, to date, on the Transient Name Server (TNS).  We include their TNS identifier, instrument with earliest detection, coordinates, cumulative probability at the coordinate location in the latest LVK map, most likely host redshift, joint GW luminosity distance and candidate redshift probability, most recent magnitude, epoch of that most recent magnitude, TROVE KN score. Candidates are ranked using a scoring procedure designed to identify kilonova counterparts to GW events (N. Franz, et al., 2025, arXiv:2510.17104). The reported candidates are not clearly identified as kilonovae.
 
-| Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most Likely Host-z | Joint Distance Probability | Most Recent Mag | Most Recent Mag Time [MJD] | TROVE KN Score |
+| Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most Likely Host-z | Joint Distance Probability | Most Recent Mag | Most Recent Mag Time [MJD] | TROVE Score |
 | :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
 
     subscore_keys_to_report = ["skymap_score", "host_distance_score"]
@@ -344,10 +363,13 @@ Below, we report the top {ncands} candidates that remain viable after running ou
         else:
             phot_str_latest = None
             epoch_str_latest = None
-        # TODO: Currently we are defaulting to reporting the KN score, this should
-        #       probably be fixed once we support BBH vetting!
+        # report whichever transient type this candidate scored best as -- for KN
+        # events that's (typically) "KN", but a BBH event's ec.score only ever has
+        # an "AGN-flare" key (see scoring/util.py's most_likely_class branching), so
+        # a hardcoded ec.score["KN"] would KeyError for every BBH candidate
+        best_score = max(ec.score.values()) if ec.score else float("nan")
         lines.append(
-            f"| {t.name} | {src_str_first} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest} | {epoch_str_latest} | {float(ec.score['KN']):.2f} |"
+            f"| {t.name} | {src_str_first} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest} | {epoch_str_latest} | {best_score:.2f} |"
         )
 
     lines.append(
@@ -383,13 +405,13 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             ).select_related("target", "nonlocalizedevent")
             phot_method = get_phot_method(request)
             scored_candidates = get_event_candidate_scores(
-                candidates, agn_toggle=new_val, phot_method=phot_method
+                candidates, agn_toggle=new_val, phot_method=phot_method,
             )
 
             # Re-scores all candidates after AGN-toggle change and saves to
-            # cache. The key must match the one the list view builds, photometry
-            # method included -- otherwise this pre-warm writes a key nothing
-            # reads and the list re-scores anyway.
+            # cache. The key must match the one the list view builds -- every
+            # other toggle's *current* value included -- otherwise this
+            # pre-warm writes a key nothing reads and the list re-scores anyway.
             cache_key = scored_candidates_cache_key(
                 QueryDict(f"nonlocalizedevent={nle_id}"), new_val, phot_method,
                 request.user,
@@ -461,14 +483,7 @@ class RefreshCandidateList(LoginRequiredMixin, View):
     """
 
     def get(self, request, *args, **kwargs):
-        # Both toggles are site-wide and either can be flipped by anyone, so
-        # clear every combination rather than only the one currently selected --
-        # otherwise a refresh leaves a stale list behind whichever toggle the
-        # next viewer happens to be on.
-        for agn_toggle in (True, False):
-            for phot_method in PHOT_METHOD_CHOICES:
-                cache.delete(scored_candidates_cache_key(
-                    request.GET, agn_toggle, phot_method, request.user))
+        invalidate_scored_candidates_cache(request.GET, request.user)
 
         # send the user back to the list they were looking at, filters and all
         query_string = request.GET.urlencode()
