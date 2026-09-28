@@ -317,8 +317,6 @@ def score_candidate(
         phot = allphot
     if phot is None or not len(phot):
         raise KilonovaScoreUnavailable(f"No photometry for target {target_id}")
-    # a passed-in allphot can run past t_post so this filters to t_post
-    phot = phot[phot["dt"] <= t_post]
 
     data_obs = build_data_obs(phot, dist_mpc, dist_err_mpc)
     if not len(data_obs):
