@@ -23,6 +23,8 @@ from scoring.util import (
     get_no_score_message,
     get_vet_all_progress,
     kilonova_scores_exist,
+    most_likely_class_for_event,
+    KN_STYLE_CLASSES,
 )
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
@@ -173,16 +175,18 @@ class EventCandidateListView(FilterView):
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm(nle_id=nle_id)
 
         context["no_score_message"] = None
+        event_class = None
         if nle_id:
             nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
             if nle:
-                context["no_score_message"] = get_no_score_message(nle.event_id)
+                event_class = most_likely_class_for_event(nle.event_id)
+                context["no_score_message"] = get_no_score_message(event_class)
 
         # shown whichever way the toggle is set: the toggle stays locked on light
-        # curve metrics until the event has KilonovaSCORER scores
+        # curve metrics until the event has KilonovaSCORER scores. KN-style events
+        # only, since KilonovaSCORER means nothing for BBH/AGN-flare scoring
         context["kilonova_scores_missing"] = (
-            nle_id is not None and nle_id.isdigit() and bool(scored_candidates)
-            and not context["no_score_message"]
+            event_class in KN_STYLE_CLASSES and bool(scored_candidates)
             and not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
         )
 

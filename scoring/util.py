@@ -152,9 +152,9 @@ def most_likely_class_for_event(nonlocalizedevent_name):
         return None
 
 
-def get_no_score_message(nonlocalizedevent_name):
-    most_likely_class = most_likely_class_for_event(nonlocalizedevent_name)
-
+def get_no_score_message(most_likely_class):
+    """Message for event classes with no scoring yet, else None. Takes the
+    class from most_likely_class_for_event."""
     if most_likely_class in KN_STYLE_CLASSES | {"BBH"}:
         return None
 
