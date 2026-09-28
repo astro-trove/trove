@@ -29,6 +29,9 @@ DEFAULT_MAGERR = 2.5 / (3.0 * np.log(10.0))
 
 DEFAULT_OVERLAP_K = 3.0
 
+# the scorer's time-bin width (d); also how far past t_post the grid is loaded
+TIME_BIN_WIDTH = 0.2
+
 _GRID_CACHE: "OrderedDict[tuple, Optional[pd.DataFrame]]" = OrderedDict()
 GRID_CACHE_MAX_BYTES = int(os.environ.get("TROVE_GRID_CACHE_BYTES") or 1_500_000_000)
 _GRID_CACHE_BYTES = 0
@@ -314,6 +317,8 @@ def score_candidate(
         phot = allphot
     if phot is None or not len(phot):
         raise KilonovaScoreUnavailable(f"No photometry for target {target_id}")
+    # a passed-in allphot can run past t_post so this filters to t_post
+    phot = phot[phot["dt"] <= t_post]
 
     data_obs = build_data_obs(phot, dist_mpc, dist_err_mpc)
     if not len(data_obs):
@@ -321,7 +326,8 @@ def score_candidate(
             f"No detections within {DT_MIN:g}-{t_post:g} days for target {target_id}")
 
     bands = tuple(sorted(set(data_obs["filter_mapped"])))
-    grid_df = _load_grid_cached(grid, bands, DT_MIN, t_post)
+
+    grid_df = _load_grid_cached(grid, bands, DT_MIN, t_post + TIME_BIN_WIDTH)
     # Only the bands this candidate actually has; a band with no simulations
     # would make the package iterate over an empty frame.
     usable = tuple(b for b in bands if (grid_df["filter_mapped"] == b).any())
@@ -334,6 +340,7 @@ def score_candidate(
         grid_df,
         candidate_name=candidate_name or str(target_id),
         band_list=usable,
+        time_bin_width=TIME_BIN_WIDTH,
         overlap_k=overlap_k,
     )
     return _cumulative_factor(results)
