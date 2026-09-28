@@ -79,7 +79,7 @@ def _clean_phot_method(value):
     return value if value in PHOT_METHOD_CHOICES else None
 
 
-class TargetVettingFormView(FormView):
+class TargetVettingFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
@@ -240,7 +240,7 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
         return referer
 
 
-class TargetRedshiftUpdateFormView(FormView):
+class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/update_redshift_form.html"
     form_class = RedshiftUpdateForm
 
@@ -342,7 +342,7 @@ class TargetRedshiftUpdateFormView(FormView):
         return redirect(base_url)
 
 
-class TargetVettingAllFormView(FormView):
+class TargetVettingAllFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
@@ -483,7 +483,7 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
 
 
 
-class NonLocalizedEventAssociateTargetsFormView(FormView):
+class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/nle_associate_targets_form.html"
     form_class = NonLocalizedEventAssociateTargetsForm
 
