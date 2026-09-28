@@ -50,7 +50,7 @@
         <td> </td>
         <td> </td>
       {% endif %}
-      <td><i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{{ galaxy.Mags|floatformat:1 }}</td>
+      <td>{% if galaxy.Filter %}<i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{% endif %}{{ galaxy.Mags|floatformat:1 }}</td>
       <!-- <td>{{ galaxy.Source }}</td> -->
       <td>{{ galaxy.Submitter }}</td>
     </tr>
