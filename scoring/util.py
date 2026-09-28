@@ -100,6 +100,8 @@ AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
 
 PS_WAIVED_TRANSIENTS = {"AGN-flare"}
 
+KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
+
 def ps_counts_toward(transient, agn_score):
     """Whether ps_score enters `transient`'s score.
 
@@ -130,8 +132,14 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
-# event classes that get KN / KN-in-SN / super-KN scoring
-KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
+def kilonova_scores_exist(nonlocalizedevent_id=None, target_id=None):
+    """Whether any KilonovaSCORER score is stored for this event and/or target."""
+    qs = ScoreFactor.objects.filter(key=KILONOVA_SCORE_KEY)
+    if nonlocalizedevent_id is not None:
+        qs = qs.filter(event_candidate__nonlocalizedevent_id=nonlocalizedevent_id)
+    if target_id is not None:
+        qs = qs.filter(event_candidate__target_id=target_id)
+    return qs.exists()
 
 
 def most_likely_class_for_event(nonlocalizedevent_name):
@@ -144,9 +152,9 @@ def most_likely_class_for_event(nonlocalizedevent_name):
         return None
 
 
-def get_no_score_message(nonlocalizedevent_name):
-    most_likely_class = most_likely_class_for_event(nonlocalizedevent_name)
-
+def get_no_score_message(most_likely_class):
+    """Message for event classes with no scoring yet, else None. Takes the
+    class from most_likely_class_for_event."""
     if most_likely_class in KN_STYLE_CLASSES | {"BBH"}:
         return None
 
