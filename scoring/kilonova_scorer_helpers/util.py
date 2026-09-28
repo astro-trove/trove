@@ -270,6 +270,7 @@ def score_candidate(
     target_id: int,
     nonlocalized_event,
     candidate_name: Optional[str] = None,
+    allphot = None,
     t_post: Optional[float] = DT_MAX,
 ) -> float:
 
@@ -301,10 +302,13 @@ def score_candidate(
     grid = grid_for_distance(dist_mpc)
     logger.debug("target %s at %.0f Mpc -> grid %s", target_id, dist_mpc, grid)
 
-    phot = _get_post_disc_phot(target_id=target_id,
-                               nonlocalized_event=nonlocalized_event,
-                               t_post=t_post
-    )
+    if allphot is None:
+        phot = _get_post_disc_phot(target_id=target_id,
+                                   nonlocalized_event=nonlocalized_event,
+                                   t_post=t_post
+        )
+    else:
+        phot = allphot
     if phot is None or not len(phot):
         raise KilonovaScoreUnavailable(f"No photometry for target {target_id}")
 

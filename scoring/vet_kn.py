@@ -186,6 +186,7 @@ def vet_kn(
                 target_id=target_id,
                 nonlocalized_event=nonlocalized_event,
                 candidate_name=target.name,
+                allphot=allphot,
                 t_post=np.nanmin([param_ranges["t_post"], DT_MAX]),
             )
             update_score_factor(event_candidate, "kilonova_score", phot_score)
