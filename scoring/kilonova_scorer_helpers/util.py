@@ -27,6 +27,8 @@ DT_MIN, DT_MAX = 0.0, 30.0
 
 DEFAULT_MAGERR = 2.5 / (3.0 * np.log(10.0))
 
+DEFAULT_OVERLAP_K = 3.0
+
 _GRID_CACHE: "OrderedDict[tuple, Optional[pd.DataFrame]]" = OrderedDict()
 GRID_CACHE_MAX_BYTES = int(os.environ.get("TROVE_GRID_CACHE_BYTES") or 1_500_000_000)
 _GRID_CACHE_BYTES = 0
@@ -272,6 +274,7 @@ def score_candidate(
     candidate_name: Optional[str] = None,
     allphot = None,
     t_post: Optional[float] = DT_MAX,
+    overlap_k: Optional[float] = DEFAULT_OVERLAP_K,
 ) -> float:
 
     from scoring.scoring import get_eventcandidate_default_distance
@@ -331,5 +334,6 @@ def score_candidate(
         grid_df,
         candidate_name=candidate_name or str(target_id),
         band_list=usable,
+        overlap_k=overlap_k,
     )
     return _cumulative_factor(results)

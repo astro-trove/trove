@@ -188,6 +188,7 @@ def vet_kn(
                 candidate_name=target.name,
                 allphot=allphot,
                 t_post=np.nanmin([param_ranges["t_post"], DT_MAX]),
+                overlap_k=3.0,
             )
             update_score_factor(event_candidate, "kilonova_score", phot_score)
             delete_score_factor(event_candidate, "kilonova_skip_reason")
