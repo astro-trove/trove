@@ -1,8 +1,8 @@
 <div style="display:flex; flex-direction:row; align-items:center; flex-wrap:wrap; gap:0.75rem; flex:1 1 auto; min-width:0" class="mb-2">
   <a href="{% url 'trove_nonlocalizedevents:toggle-agn-cache' %}?next={{ next|urlencode }}"
      class="btn agn-toggle {% if agn_toggle %}btn-success{% else %}btn-light{% endif %}"
-     title="Whether the AGN factor contributes to the overall score.">
-    {% if agn_toggle %}&#9745;{% else %}&#9744;{% endif %} Include AGN sub-score
+     title="Whether the AGN association score counts toward kilonova scores (KN, KN-in-SN, super-KN). BBH AGN-flare scores always include it.">
+    <span class="agn-toggle-box" aria-hidden="true">{% if agn_toggle %}&#9745;&#xFE0E;{% else %}&#9744;&#xFE0E;{% endif %}</span>Include AGN sub-score
   </a>
   {% with lcm_tip="Light curve metrics: fits the light curve and checks its peak luminosity, time of peak and decay rate against the ranges expected for each transient type." kn_tip="KilonovaSCORER: compares the light curve with a simulated kilonova population. Applies to the KN score only; other transient types keep light curve metrics." %}
   <div class="phot-method-control">
@@ -40,6 +40,7 @@
   </div>
   {% endwith %}
 </div>
+{% endif %}
 
 <style>
   .phot-method-control {
@@ -101,9 +102,19 @@
   .btn.agn-toggle {
     display: inline-flex;
     align-items: center;
+    gap: 0.4rem;
+    white-space: nowrap;
     padding: 0.6rem 1rem;
     font-size: 0.95rem;
     font-weight: 600;
     border-radius: 20px;
+  }
+  /* text presentation and a fixed box, so the checked glyph can't render as a
+     wider emoji and resize the button */
+  .agn-toggle-box {
+    display: inline-block;
+    width: 1em;
+    text-align: center;
+    font-family: "DejaVu Sans", "Segoe UI Symbol", "Arial Unicode MS", sans-serif;
   }
 </style>

@@ -8,7 +8,8 @@ from django.core.mail import mail_managers
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import Group
 from django.urls import reverse, reverse_lazy
-from django.http import HttpResponseRedirect
+from django.db import IntegrityError
+from django.http import HttpResponseRedirect, QueryDict
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView, CreateView
 from django_filters.views import FilterView
@@ -31,6 +32,8 @@ from .templatetags.target_extras import split_name
 import json
 import requests
 import time
+
+from urllib.parse import urlparse
 
 from tom_catalogs.harvesters.tns import TNS_URL
 TNS = settings.BROKERS['TNS']  # includes the API credentials
@@ -327,8 +330,31 @@ class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
         nonlocalizedevent = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
         target = Target.objects.get(id=self.kwargs['target_id'])
         viability_reason = f'added from candidates list by {self.request.user.first_name}'
-        EventCandidate.objects.create(nonlocalizedevent=nonlocalizedevent, target=target,
-                                      viability_reason=viability_reason)
+
+        # (target, nonlocalizedevent) is unique, so linking a target that is
+        # already a candidate used to raise IntegrityError and return a 500.
+        try:
+            _, created = EventCandidate.objects.get_or_create(
+                nonlocalizedevent=nonlocalizedevent, target=target,
+                defaults={'viability_reason': viability_reason})
+        except IntegrityError:
+            created = False  # two submits raced; the other one made the link
+
+        if created:
+            # imported here to keep custom_code.views out of an import cycle
+            from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
+
+            invalidate_scored_candidates_cache(nonlocalizedevent.id)
+            # the page they came from may have had filters on, which is a
+            # cache key of its own and would otherwise still be stale
+            referer_query = urlparse(self.get_redirect_url()).query
+            if referer_query:
+                invalidate_scored_candidates_cache(QueryDict(referer_query))
+            messages.success(request, f'Linked {target.name} to {nonlocalizedevent.event_id}.')
+        else:
+            messages.info(request, f'{target.name} is already a candidate of '
+                                   f'{nonlocalizedevent.event_id}.')
+
         return HttpResponseRedirect(self.get_redirect_url())
 
     def get_redirect_url(self):
