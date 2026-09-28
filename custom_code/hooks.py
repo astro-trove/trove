@@ -9,8 +9,10 @@ from scoring.vet_kn import vet_kn
 from scoring.vet_kn_in_sn import vet_kn_in_sn
 from scoring.vet_super_kn import vet_super_kn
 from scoring.vet_basic import vet_basic
+from scoring.vet_bbh import vet_bbh, AGN_FLARE_HORIZON_DAYS
 
 from custom_code.healpix_utils import create_candidates_from_targets
+from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from trove_targets.models import Target
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
@@ -86,34 +88,62 @@ def get_active_nonlocalizedevents(t0=None, lookback_days=3.0, test=False):
     return active_nles.distinct()
 
 
+def first_detection_window_days(nle_class, first_det_min, first_det_max):
+    """(min, max) days after an event that a target's first detection may fall.
+    A BBH merger's AGN flare can appear long after it, so BBH events stay open
+    to AGN_FLARE_HORIZON_DAYS."""
+    if nle_class == "BBH":
+        return first_det_min, max(first_det_max, AGN_FLARE_HORIZON_DAYS)
+    return first_det_min, first_det_max
+
+
+def vet_new_candidate(candidate):
+    """Vet a newly associated candidate for its event's class: an AGN flare for
+    a BBH event, every kilonova-style mode for anything else."""
+    target_id, event_id = candidate.target.id, candidate.nonlocalizedevent.event_id
+    if get_most_likely_class(candidate.nonlocalizedevent.sequences.last().details) == "BBH":
+        vet_bbh(target_id, event_id)
+    else:
+        vet_kn(target_id, event_id)
+        vet_kn_in_sn(target_id, event_id)
+        vet_super_kn(target_id, event_id)
+
+
 def associate_nle_with_target(
     target: Target, lookback_days_nle, first_det_min, first_det_max
 ):
     # automatically associate with nonlocalized events
     new_candidates = []
-    for nle in get_active_nonlocalizedevents(lookback_days=lookback_days_nle):
+    first_det = (
+        target.reduceddatum_set.filter(
+            data_type="photometry", value__magnitude__isnull=False
+        )
+        .order_by("timestamp")
+        .first()
+    )
+    if first_det is None:
+        return new_candidates
+
+    # BBH events stay open for the AGN-flare horizon, every other class for lookback_days_nle
+    recent_nle_ids = set(
+        get_active_nonlocalizedevents(lookback_days=lookback_days_nle).values_list("id", flat=True)
+    )
+    lookback_days = max(lookback_days_nle, AGN_FLARE_HORIZON_DAYS)
+    for nle in get_active_nonlocalizedevents(lookback_days=lookback_days):
         seq = nle.sequences.last()
+        nle_class = get_most_likely_class(seq.details)
+        if nle.id not in recent_nle_ids and nle_class != "BBH":
+            continue
         try:
             nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
         except ValueError:
             nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
-        target_ids = []
-        first_det = (
-            target.reduceddatum_set.filter(
-                data_type="photometry", value__magnitude__isnull=False
-            )
-            .order_by("timestamp")
-            .first()
-        )
-
+        det_min, det_max = first_detection_window_days(nle_class, first_det_min, first_det_max)
         if (
-            first_det
-            and nle_time + timedelta(days=first_det_min) < first_det.timestamp
-            and first_det.timestamp < nle_time + timedelta(days=first_det_max)
+            nle_time + timedelta(days=det_min) < first_det.timestamp
+            and first_det.timestamp < nle_time + timedelta(days=det_max)
         ):
-            target_ids.append(target.id)
-
-        new_candidates += create_candidates_from_targets(seq, target_ids=target_ids)
+            new_candidates += create_candidates_from_targets(seq, target_ids=[target.id])
 
     return new_candidates
 
@@ -189,13 +219,9 @@ def target_post_save(
             first_det_max=first_det_max,
         )
 
-        # TODO: add a check for the type of non-localized event
-        #       For now we are just always all types of vetting
         if len(new_candidates):
             for cand in new_candidates:
-                vet_kn(cand.target.id, cand.nonlocalizedevent.event_id)
-                vet_kn_in_sn(cand.target.id, cand.nonlocalizedevent.event_id)
-                vet_super_kn(cand.target.id, cand.nonlocalizedevent.event_id)
+                vet_new_candidate(cand)
         else:
             messages.append(
                 "Did not run NLE vetting on this target because there are no NLEs associated with it!"

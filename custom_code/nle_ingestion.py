@@ -382,7 +382,7 @@ def ensure_multiorder_skymap_bytes(skymap_bytes: bytes) -> bytes:
 
 def build_hop_message(alert: dict[str, Any]) -> JSONBlob:
     """Wrap an IGWN alert dict in a HOP ``JSONBlob`` (``content[0]`` is the alert)."""
-    return JSONBlob(content=[alert])
+    return JSONBlob(content=alert)
 
 
 def ingest_local_igwn_alert(

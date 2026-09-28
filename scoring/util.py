@@ -21,10 +21,12 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 from candidate_vetting.vet import localization_sequence_from_name
 
+from .scoring import classification_score, mpc_score_from_match
 from .vet_phot import PHOT_SCORE_MIN
 from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
+from .vet_bbh import PARAM_RANGES as AGN_FLARE_PARAM_RANGES
 from .models import ScoreFactor
 from .tasks import async_vet
 
@@ -32,13 +34,17 @@ import time
 
 logger = logging.getLogger(__name__)
 
-# map imported parameter ranges to transients
-TRANSIENTS = ["KN", "KN-in-SN", "super-KN", "SN", "TDE"]
+# map imported parameter ranges to transients. Also doubles as the priority order
+# used below to pick a single canonical sort key for a candidate list -- "AGN-flare"
+# has to be here too, or a BBH event (transients = ["AGN-flare"]) falls through the
+# loop below and its candidates come back unsorted.
+TRANSIENTS = ["KN", "KN-in-SN", "super-KN", "SN", "TDE", "AGN-flare"]
 
 DICT_TRANSIENTS_PARAM_RANGES = {
     "KN": KN_PARAM_RANGES,
     "KN-in-SN": KN_IN_SN_PARAM_RANGES,
     "super-KN": SUPER_KN_PARAM_RANGES,
+    "AGN-flare": AGN_FLARE_PARAM_RANGES,
 }
 
 
@@ -60,6 +66,8 @@ SUBSCORE_NAMES = [
     "phot_peak_lum",
     "phot_peak_time",
     "phot_decay_rate",
+    "agn_flare_score",
+    "nuclear_offset_score",
 ]
 
 # some of the keys in ScoreFactor are really just calculated values
@@ -86,6 +94,28 @@ MPC_KEYS = [
 ]
 
 
+# the site-wide AGN toggle governs only these; BBH AGN-flare scoring always uses
+# its AGN association
+AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
+
+PS_WAIVED_TRANSIENTS = {"AGN-flare"}
+
+def ps_counts_toward(transient, agn_score):
+    """Whether ps_score enters `transient`'s score.
+
+    Waived only for AGN-flare scoring, and only when agn_association_2d actually
+    matched. With no AGN association the point-source match still stands.
+    """
+    if transient not in PS_WAIVED_TRANSIENTS:
+        return True
+    matched = AGN_FLARE_PARAM_RANGES["agn_match_score"]
+    return not (agn_score is not None and agn_score >= matched)
+
+
+def agn_counts_toward(transient, agn_toggle):
+    """Whether agn_score enters `transient`'s score."""
+    return bool(agn_toggle) or transient not in AGN_TOGGLE_TRANSIENTS
+
 def _check_phot_val(val, param_ranges, param_range_key):
     val_max = max(param_ranges[param_range_key])
     val_min = min(param_ranges[param_range_key])
@@ -100,14 +130,24 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
-def get_no_score_message(nonlocalizedevent_name):
+# event classes that get KN / KN-in-SN / super-KN scoring
+KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
+
+
+def most_likely_class_for_event(nonlocalizedevent_name):
+    """Best-guess EM-transient classification for an NLE (event_id string), or
+    None if it can't be determined (e.g. no localization sequence yet)."""
     try:
         nle_eventseq = localization_sequence_from_name(nonlocalizedevent_name)
-        most_likely_class = get_most_likely_class(nle_eventseq.details)
+        return get_most_likely_class(nle_eventseq.details)
     except IndexError:
         return None
 
-    if most_likely_class in {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}:
+
+def get_no_score_message(nonlocalizedevent_name):
+    most_likely_class = most_likely_class_for_event(nonlocalizedevent_name)
+
+    if most_likely_class in KN_STYLE_CLASSES | {"BBH"}:
         return None
 
     return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
@@ -121,11 +161,10 @@ def get_event_candidate_scores(
         include_subscores=False,
         phot_method=None,
 ):
-    """Get the event candidate scores for all subscores in subscore_names.
-
-    event_candidates should be a django queryset of EventCandidate objects.
+    """
     `phot_method` selects which photometry factor the score uses (`None`
-    reads the site-wide toggle.)
+    reads the site-wide toggle.) `agn_toggle` drops agn_score from the
+    kilonova-style scores only (`AGN_TOGGLE_TRANSIENTS`).
     """
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
 
@@ -134,11 +173,15 @@ def get_event_candidate_scores(
     use_kilonova = phot_method == PHOT_METHOD_KILONOVA
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
+
+    # exclude keys thathave special cases like
+    # 1. keys that describe a derived metric rather than a score directly
+    # 2. keys that are in the target extra instead of scorefactor table
+    # 3. the KilonovaScorer key, since it only gets applied to KN
+    # 4. the agn and classification scores, which change behavior based on the EM
+    #    transient type that is expected
     exclude_keys = (set(val_not_score_keys.keys()) | set(TARGETEXTRA_KEYS)
-                    | {KILONOVA_SCORE_KEY})
-    
-    if not agn_toggle:
-        exclude_keys.add('agn_score')
+                    | {KILONOVA_SCORE_KEY} | {"agn_score", "classification_score"})
 
     # only evaluate this once since it is time consuming
     event_candidates_list = list(event_candidates)
@@ -151,7 +194,7 @@ def get_event_candidate_scores(
         most_likely_class = get_most_likely_class(nle_eventseq.details)
     except IndexError:
         return []
-    
+
     if most_likely_class in {"SSM", "Terrestrial"}:
         transients = ["KN", "KN-in-SN", "super-KN"]
     elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
@@ -160,9 +203,10 @@ def get_event_candidate_scores(
         transients = ["KN", "SN"] # SN is not yet implemented as a vetting mode
     elif most_likely_class == "FXT":
         transients = ["KN", "SN", "TDE"] # SN and TDE are not yet implemented as a vetting mode
+    elif most_likely_class == "BBH":
+        transients = ["AGN-flare"]
     else:
         transients = []
-
 
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
@@ -174,9 +218,10 @@ def get_event_candidate_scores(
             target_extras_by_id[te.target_id] = {}
         target_extras_by_id[te.target_id][te.key] = te.value
 
-    # Prefetch all ScoreFactor objects at once
+    # Prefetch all ScoreFactor objects at once.
     score_factors = ScoreFactor.objects.filter(
-        event_candidate__in=event_candidates_list, key__in=subscore_names
+        event_candidate__in=event_candidates_list,
+        key__in=list(subscore_names),
     ).annotate(value_float=Cast("value", FloatField()))
 
     # Group score factors by event candidate
@@ -202,7 +247,7 @@ def get_event_candidate_scores(
 
         # Extract values that need special handling
         val_dict = {
-            subscore_key: sf_dict[subscore_key]
+            subscore_key+"_score": sf_dict[subscore_key]
             for subscore_key, param_range_key in val_not_score_keys.items()
             if subscore_key in sf_dict
         }
@@ -213,18 +258,16 @@ def get_event_candidate_scores(
         if "ps_score" in te:
             ps_score = float(te["ps_score"])
 
-        mpc_score = 1
-        if "mpc_match_name" in te:
-            mpc_score = int(te["mpc_match_name"] == str(None))
+        mpc_score = mpc_score_from_match(te.get("mpc_match_name"))
 
-        # remove keys we don't want and calculate a base subscore
-        # need to add "agn" to exclude keys if button is selected
-        # AGN enabled should be a global state of the website
+        # removed ps_score because if it is a vet_bbh() call, then ps_score of 0
+        # might just be because AGN is in the point source catalogue
         subscore_no_phot = (
-            math.prod([sf_dict[key] for key in sf_dict if key not in exclude_keys])
-            * ps_score
+            math.prod([sf_dict[key] for key in sf_dict
+                       if key not in exclude_keys])
             * mpc_score
         )
+        agn_score = sf_dict.get("agn_score")
 
         # add things to the subscores dict, if requested by the user
         if include_subscores:
@@ -232,6 +275,8 @@ def get_event_candidate_scores(
             ec.subscores["mpc_score"] = mpc_score
             for key in sf_dict:
                 if key in exclude_keys: continue
+                if key == "agn_score" and not any(agn_counts_toward(t, agn_toggle) for t in transients):
+                    continue
                 ec.subscores[key] = sf_dict[key]
                 
         # now for EM transient/model specific scores
@@ -241,24 +286,32 @@ def get_event_candidate_scores(
                 continue # this is fine, some transient scoring algorithms aren't implemented yet
             param_ranges = dict_transients_param_ranges[transient]
 
-            # compute the photometry score
+            # handle the agn and PS scores, whose behaviour changes based on the
+            # expected transient type
+            agn_factor = (agn_score if agn_score is not None
+                          and agn_counts_toward(transient, agn_toggle) else 1)
+            ps_factor = ps_score if ps_counts_toward(transient, agn_score) else 1
+            
+            # handle the classification score, which changes based on the expected
+            # EM transient
+            class_score = classification_score(ec.target, transient)
+            
             phot_subscores = {
                 subscore_key: _check_phot_val(
                     val_dict[subscore_key], param_ranges, param_range_key
                 )
                 for subscore_key, param_range_key in val_not_score_keys.items()
-                if subscore_key in val_dict
+                if subscore_key in val_dict and param_range_key in param_ranges
             }
 
+            other_subscores = dict(
+                classification_score = class_score
+            )
+            
             if include_subscores:
-                ec.subscores[transient] = phot_subscores
+                ec.subscores[transient] = phot_subscores | other_subscores
 
-            # ONLY "KN" may use KilonovaSCORER. The three transient types differ
-            # solely in the `param_ranges` above -- `subscore_no_phot` is shared
-            # -- so substituting the same `kn` into all of them made all three
-            # scores numerically identical and silently discarded the
-            # "KN-in-SN" / "super-KN" acceptance windows, which is the whole
-            # content of those two columns.
+            # ONLY "KN" can use KilonovaSCORER
             kn = sf_dict.get(KILONOVA_SCORE_KEY)
             kn_available = kn is not None and math.isfinite(kn)
             if use_kilonova and transient == "KN" and kn_available:
@@ -271,27 +324,16 @@ def get_event_candidate_scores(
                 phot_score = math.prod(list(phot_subscores.values()))
                 phot_source = "trove"
 
-            # Recorded from the "KN" pass only. This drives the yellow-row
-            # highlight, the "scored only" filter and the blue "no scores yet"
-            # notice, all of which are about the KilonovaSCORER column; taking
-            # it from whichever transient happened to be last would report
-            # "trove" for every candidate as soon as more than one type is
-            # scored.
             if transient == "KN":
                 ec.phot_source = phot_source
-                # Recorded whether or not it is the factor feeding `ec.score`,
-                # because "was this candidate scored by KilonovaSCORER at all"
-                # is a different question from "is that score in use". The
-                # "no scores yet" notice asks the first one: keying it on
-                # `phot_source` meant a completed Vet All still reported
-                # nothing to anyone whose toggle sat on light curve metrics.
                 ec.kilonova_score = kn if kn_available else None
 
             # save the score to a temporary field (dictionary) in the
             # EventCandidate object
-            ec.score[transient] = (
-                subscore_no_phot * phot_score
-            )  # multiply the subscores
+            ec.score[transient] = min(
+                1.0, max(0.0,
+                         subscore_no_phot * agn_factor * ps_factor * class_score * phot_score)
+            )
         ecs_out.append(ec)
 
     logger.info(f"Finished computing the scores, sorting and returning... time.time = {time.time()}")
@@ -361,11 +403,6 @@ def get_vet_all_progress(nonlocalizedevent_id):
         # for the EVENT while the totals counted only the latest run, so a task
         # left pending by some earlier run read as "still running" next to
         # "88 of 88 scored".
-        #
-        # That is not hypothetical -- trove_test carries five S250206dm tasks
-        # stuck in RUNNING since 14 July, workers that died mid-task without
-        # releasing the row. They are not part of the current run and must not
-        # be counted as either its progress or its totals.
         run = _latest_run(tasks, latest).aggregate(
             total=Count("id"),
             pending=Count("id", filter=Q(status__in=pending_statuses)),

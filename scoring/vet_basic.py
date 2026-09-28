@@ -44,6 +44,7 @@ from .dynamic_catalogs import UserGalaxy
 from .models import CatalogWriteCounters, UserGalaxyQ3C
 from .vet_phot import find_public_phot
 from .tasks import async_mpc
+from .scoring import mpc_score_from_match
 
 logger = logging.getLogger(__name__)
 
@@ -201,11 +202,8 @@ def _minor_planet_score(
         # but possibly unnecessary
         logger.warning(f"MPC lookup failed for {target.name}, skipping it: {e}")
         return None
-    match = target_extras.filter(key="mpc_match_name")
-    if match.exists():
-        return int(match[0].value == str(None))
-    else:
-        return 1
+    match = target_extras.filter(key="mpc_match_name").first()
+    return mpc_score_from_match(match.value if match else None)
 
 
 def vet_basic(

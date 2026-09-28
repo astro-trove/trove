@@ -16,6 +16,9 @@
 {% endif %}
 </ul>
 {% bootstrap_form_errors form %}
+<p class="text-muted small mb-3">
+  Fields marked <span class="text-danger">*</span> are required
+</p>
 <form method="post" class="form">
 {% csrf_token %}
 {% bootstrap_field form.name %}
