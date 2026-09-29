@@ -38,8 +38,7 @@ function renderAladin() {
 }
 
 var aladinScript = document.createElement('script');
-// pinned: the shape fix above depends on this release's source-drawing path
-aladinScript.src = 'https://aladin.cds.unistra.fr/AladinLite/api/v3/3.8.2/aladin.js';
+aladinScript.src = 'https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js';
 aladinScript.charset = 'utf-8';
 aladinScript.onload = function() { A.init.then(renderAladin); };
 document.body.appendChild(aladinScript);
