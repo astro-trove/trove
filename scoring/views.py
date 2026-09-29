@@ -132,31 +132,23 @@ class TargetVettingFormView(FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
-    def _event_from_referer(self):
-        """
-        The event_id the page they came from named, if this target is
-        actually a candidate of it.
-        """
-        query = self.request.session.get("nle_id", "")
-        return event_for_target(query.split("=")[-1].split("/")[0], self.kwargs["pk"])
-
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
+        """Always ask which event to vet against.
+
+        This form's URL names only the target, so the event is genuinely the
+        user's to choose -- unlike Vet All, whose own URL carries it. Taking it
+        from the referer instead meant arriving from one event's candidate list
+        silently committed you to that event, with no way to pick another.
+        """
         form = super().get_form(*args, **kwargs)
-        event_id = self._event_from_referer()
-
-        if event_id:  # already known, no need to ask
-            del form.fields["nle"]
-            return _vetting_method_fields(form, event_id)
-
-        # No event in the URL. Offer the ones this candidate belongs to, so that
-        # anything beyond basic vetting is reachable from the target page.
+        target_pk = self.kwargs["pk"]
         events = list(dict.fromkeys(
-            EventCandidate.objects.filter(target_id=self.kwargs["pk"])
+            EventCandidate.objects.filter(target_id=target_pk)
             .select_related("nonlocalizedevent")
             .values_list("nonlocalizedevent__event_id", flat=True)
         ))
-        if not events:
+        if not events:  # nothing to choose between, so basic vetting only
             del form.fields["nle"]
             return _vetting_method_fields(form, None)
 
@@ -167,14 +159,7 @@ class TargetVettingFormView(FormView):
         # on POST, build the methods from the submitted event so validation sees
         # the same set the user was shown
         submitted = self.request.POST.get("nle") if self.request.method == "POST" else None
-        return _vetting_method_fields(form, event_for_target(submitted, self.kwargs["pk"]))
-
-    def get(self, request, *args, **kwargs):
-        # always overwrite: leaving a previous page's event in the session means
-        # a bookmark or a fresh tab silently vets against whatever was there last
-        referer = request.META.get("HTTP_REFERER", "")
-        self.request.session["nle_id"] = urlparse(referer).query if referer else ""
-        return super().get(request, *args, **kwargs)
+        return _vetting_method_fields(form, event_for_target(submitted, target_pk))
 
     def form_valid(self, form):
         # and now we can actually perform the vetting and redirect
@@ -184,8 +169,7 @@ class TargetVettingFormView(FormView):
         # generate the base url
         base_url = reverse("scoring:vet", kwargs=dict(pk=pk, vetting_mode=vetting_mode))
 
-        chosen = form.cleaned_data.get("nle") or self._event_from_referer()
-        self.request.session.pop("nle_id", None)
+        chosen = form.cleaned_data.get("nle")
         params = [f"nonlocalizedevent={chosen}"] if chosen else []
         phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
         if phot_method:
