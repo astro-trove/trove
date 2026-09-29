@@ -70,14 +70,11 @@ def resolve_event_id(value):
 
 
 def methods_for_event(event_id):
-    """The vetting methods that apply to an event, given its likely class."""
     cls = most_likely_class_for_event(event_id)
     return VETTING_FORM_CHOICES.get(cls, VETTING_FORM_CHOICES[""]), cls
 
 
 def event_for_target(value, target_pk):
-    """An identifier resolved to an event_id, but only if this target is a
-    candidate of it -- a stale session value must not decide what gets vetted."""
     event_id = resolve_event_id(value)
     if event_id and EventCandidate.objects.filter(
         target_id=target_pk, nonlocalizedevent__event_id=event_id
@@ -87,8 +84,6 @@ def event_for_target(value, target_pk):
 
 
 def _vetting_method_fields(form, event_id):
-    """Set the vetting methods for an event (None meaning no event chosen, so
-    basic only) and add the scorer field if any of them can use one."""
     if event_id is None:
         form.fields["vetting_method"].choices = [("basic", "Basic Vetting")]
     else:
@@ -134,13 +129,6 @@ class TargetVettingFormView(FormView):
 
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
-        """Always ask which event to vet against.
-
-        This form's URL names only the target, so the event is genuinely the
-        user's to choose -- unlike Vet All, whose own URL carries it. Taking it
-        from the referer instead meant arriving from one event's candidate list
-        silently committed you to that event, with no way to pick another.
-        """
         form = super().get_form(*args, **kwargs)
         target_pk = self.kwargs["pk"]
         events = list(dict.fromkeys(
@@ -180,10 +168,8 @@ class TargetVettingFormView(FormView):
 
 
 class VettingMethodsPartialView(LoginRequiredMixin, View):
-    """The vetting-method and scorer fields for the event the user just picked.
-
-    Rendered by Django rather than rebuilt in the browser, so the mapping from
-    event class to methods stays in `VETTING_FORM_CHOICES` alone.
+    """
+    The vetting-method and scorer fields for the event the user just picked.
     """
 
     def get(self, request, pk, *args, **kwargs):
@@ -234,9 +220,6 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
                      if extra else "")
             messages.info(request, f"Ran vetting in {vetting_mode} mode{label}.")
 
-        # No event in the redirect: it would be read back as "the event to vet
-        # against" the next time round, hiding the picker and forcing the user
-        # to edit the URL to vet the same candidate against its other events.
         toreverse = reverse("targets:detail", kwargs=dict(pk=target_pk))
 
         return redirect(toreverse)  # this redirects back to the original target page

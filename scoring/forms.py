@@ -46,10 +46,6 @@ class VettingChoiceForm(Form):
         ):
             cleaned["phot_method"] = PHOT_METHOD_TROVE
 
-        # With no event chosen the only method on offer is basic, so anything
-        # else fails the choice check with a message blaming the method. Say
-        # what is actually missing. A method that doesn't suit the chosen event
-        # is already rejected by that check, and the picker never offers one.
         if "nle" in self.fields and not cleaned.get("nle"):
             submitted = self.data.get("vetting_method")
             if submitted and submitted != "basic":
