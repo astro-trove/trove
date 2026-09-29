@@ -2,9 +2,8 @@
 <script type="text/javascript">
 (function() {
 function renderAladin() {
-    // realFullscreen uses the browser Fullscreen API, which paints in the top
-    // layer above the rest of the page and gives the native "Esc to exit" hint;
-    // Aladin's own fullscreen is just a position:fixed class with no z-index.
+    // realFullscreen uses the browser Fullscreen API, so the map paints above the
+    // page; Aladin's own fullscreen is position:fixed with no z-index.
     var aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false, realFullscreen: true});
     var moon_ra = {{ current_moon_ra }};
     var moon_dec = {{ current_moon_dec }};
