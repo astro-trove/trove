@@ -46,18 +46,15 @@ class VettingChoiceForm(Form):
         ):
             cleaned["phot_method"] = PHOT_METHOD_TROVE
 
-        # methods_by_event is set by the view when the event field is in use
-        allowed = getattr(self, "methods_by_event", None)
-        nle, method = cleaned.get("nle"), cleaned.get("vetting_method")
-        if allowed and method and method != "basic":
-            if not nle:
+        # With no event chosen the only method on offer is basic, so anything
+        # else fails the choice check with a message blaming the method. Say
+        # what is actually missing. A method that doesn't suit the chosen event
+        # is already rejected by that check, and the picker never offers one.
+        if "nle" in self.fields and not cleaned.get("nle"):
+            submitted = self.data.get("vetting_method")
+            if submitted and submitted != "basic":
                 raise ValidationError(
-                    f"Pick an event to run {method} vetting against."
-                )
-            if method not in allowed.get(nle, []):
-                raise ValidationError(
-                    f"{method} vetting does not apply to {nle}. "
-                    "Pick a method offered for that event."
+                    f"Pick an event to run {submitted} vetting against."
                 )
         return cleaned
     
