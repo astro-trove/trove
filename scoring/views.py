@@ -430,7 +430,12 @@ class TargetVettingAllFormView(FormView):
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
-        nle_id = self.request.session["nle_id"].split("=")[-1]
+        # Vet All is scoped to the event in its own URL, so there is nothing to
+        # pick -- the field belongs to the single-candidate form only
+        del form.fields["nle"]
+        # the event is in this view's own URL; reading it from the session
+        # raised KeyError once form_valid had popped the key
+        nle_id = self.kwargs["pk"]
         nle_eventseq = localization_sequence_from_name(
             NonLocalizedEvent.objects.get(id=nle_id)
         )
