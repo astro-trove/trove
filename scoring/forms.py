@@ -12,6 +12,15 @@ from .dynamic_catalogs import find_galaxy
 from .phot_method import KILONOVA_VETTING_MODE, PHOT_METHOD_TROVE
 
 class VettingChoiceForm(Form):
+    # Only shown when the page the user came from named no event. Choices and
+    # the per-event vetting methods are filled in by the view.
+    nle = ChoiceField(
+        choices=[],
+        widget=Select(),
+        label="Event",
+        required=False,
+    )
+
     vetting_method = ChoiceField(
         choices = [], # these are specified in the view
         widget = Select(),
@@ -22,19 +31,34 @@ class VettingChoiceForm(Form):
         choices = [], # these are specified in the view
         widget = Select(),
         label = "Photometry Scoring Method",
+        required = False,
     )
 
     def clean(self):
-        """Only KN vetting can use KilonovaSCORER.
-
-        The template disables the option for the other modes, but a disabled
-        <option> is a hint to the browser, not a constraint -- a hand-made POST
-        can still carry it. Forcing it here means the rule holds wherever the
-        request came from.
+        """
+        Only KN vetting can use KilonovaSCORER, and a vetting method has to
+        make sense for the event it will be run against.
         """
         cleaned = super().clean()
-        if cleaned.get("vetting_method") != KILONOVA_VETTING_MODE:
+        # the field is absent entirely when no available method can use a scorer
+        if "phot_method" in self.fields and (
+            cleaned.get("vetting_method") != KILONOVA_VETTING_MODE
+        ):
             cleaned["phot_method"] = PHOT_METHOD_TROVE
+
+        # methods_by_event is set by the view when the event field is in use
+        allowed = getattr(self, "methods_by_event", None)
+        nle, method = cleaned.get("nle"), cleaned.get("vetting_method")
+        if allowed and method and method != "basic":
+            if not nle:
+                raise ValidationError(
+                    f"Pick an event to run {method} vetting against."
+                )
+            if method not in allowed.get(nle, []):
+                raise ValidationError(
+                    f"{method} vetting does not apply to {nle}. "
+                    "Pick a method offered for that event."
+                )
         return cleaned
     
 class RedshiftUpdateForm(Form):

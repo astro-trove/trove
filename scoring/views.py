@@ -10,11 +10,12 @@ from django.core.cache import cache
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
 from django.http import HttpResponseRedirect, HttpResponseForbidden
 from django.urls import reverse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from dal import autocomplete
 
 from trove_targets.models import Target
@@ -49,7 +50,7 @@ from .phot_method import (
     PHOT_METHOD_TROVE,
     get_phot_method,
 )
-from .util import get_vet_all_progress
+from .util import get_vet_all_progress, most_likely_class_for_event
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .dynamic_catalogs import UserGalaxy
@@ -59,18 +60,49 @@ from custom_code.templatetags.target_list_extras import galaxy_table
 
 
 
+def resolve_event_id(value):
+    if not value:
+        return None
+    nle = NonLocalizedEvent.objects.filter(event_id=value).first()
+    if nle is None and str(value).isdigit():
+        nle = NonLocalizedEvent.objects.filter(id=int(value)).first()
+    return nle.event_id if nle else None
+
+
+def methods_for_event(event_id):
+    """The vetting methods that apply to an event, given its likely class."""
+    cls = most_likely_class_for_event(event_id)
+    return VETTING_FORM_CHOICES.get(cls, VETTING_FORM_CHOICES[""]), cls
+
+
+def event_for_target(value, target_pk):
+    """An identifier resolved to an event_id, but only if this target is a
+    candidate of it -- a stale session value must not decide what gets vetted."""
+    event_id = resolve_event_id(value)
+    if event_id and EventCandidate.objects.filter(
+        target_id=target_pk, nonlocalizedevent__event_id=event_id
+    ).exists():
+        return event_id
+    return None
+
+
+def _vetting_method_fields(form, event_id):
+    """Set the vetting methods for an event (None meaning no event chosen, so
+    basic only) and add the scorer field if any of them can use one."""
+    if event_id is None:
+        form.fields["vetting_method"].choices = [("basic", "Basic Vetting")]
+    else:
+        choices, cls = methods_for_event(event_id)
+        form.fields["vetting_method"].choices = choices
+        form.fields["vetting_method"].initial = VETTING_FORM_INITIALS.get(
+            cls, VETTING_FORM_INITIALS[""]
+        )
+    return _phot_method_field(form)
+
+
 def _phot_method_field(form):
-    """Offer the scorer choice, defaulting to whatever the site toggle shows.
-
-    The values the template needs to keep the two selects in step ride along as
-    data attributes rather than being repeated in the JavaScript, so the vetting
-    mode and the scorer names are still defined in exactly one place.
-
-    Only meaningful when "KN" is an available vetting_method choice: `phot_method`
-    is only ever forwarded to a vetting run when `vetting_mode == "KN"` (see
-    scoring/tasks.py) -- vet_bbh and friends never see it at all. So for an
-    event whose vetting choices don't include "KN" (e.g. BBH), the field is
-    dropped entirely rather than shown with no effect.
+    """
+    Offer the scorer choice, defaulting to whatever the site toggle shows.
     """
     kn_available = any(
         value == "KN" for value, _ in form.fields["vetting_method"].choices
@@ -100,57 +132,48 @@ class TargetVettingFormView(FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
-    # TODO: Only give the user the form if there is a non-localized event associated
-    #       with this target. If there isn't, this should just redirect to the basic
-    #       target vetting!
+    def _event_from_referer(self):
+        """
+        The event_id the page they came from named, if this target is
+        actually a candidate of it.
+        """
+        query = self.request.session.get("nle_id", "")
+        return event_for_target(query.split("=")[-1].split("/")[0], self.kwargs["pk"])
 
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
+        event_id = self._event_from_referer()
 
-        # if NLE was provided by referer, use it to choose what vetting is allowed
-        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
-        try:
-            # first try with a TROVE id in the URL
-            nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
-        except (NonLocalizedEvent.DoesNotExist, ValueError):
-            # if these errors are thrown then this might be an event_id instead of a TROVE id
-            try:
-                nle = NonLocalizedEvent.objects.get(event_id=nle_name_or_id)
-            except NonLocalizedEvent.DoesNotExist:
-                nle = None
+        if event_id:  # already known, no need to ask
+            del form.fields["nle"]
+            return _vetting_method_fields(form, event_id)
 
-        if nle:
-            nle_eventseq = localization_sequence_from_name(nle.event_id)
-            nle_most_likely_class = get_most_likely_class(
-                nle_eventseq.details
-            )  # most likely class for the NLE
-            # choices for vetting?
-            try:
-                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                    nle_most_likely_class
-                ]
-            except KeyError:
-                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                    ""
-                ]  # allow all types of vetting if most likely class not recognized
-            # initial option for vetting?
-            try:
-                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                    nle_most_likely_class
-                ]
-            except KeyError:
-                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                    ""
-                ] # set initial to basic if most likely class not recognized
-        else:
-            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
-        return _phot_method_field(form)
+        # No event in the URL. Offer the ones this candidate belongs to, so that
+        # anything beyond basic vetting is reachable from the target page.
+        events = list(dict.fromkeys(
+            EventCandidate.objects.filter(target_id=self.kwargs["pk"])
+            .select_related("nonlocalizedevent")
+            .values_list("nonlocalizedevent__event_id", flat=True)
+        ))
+        if not events:
+            del form.fields["nle"]
+            return _vetting_method_fields(form, None)
+
+        form.fields["nle"].choices = [("", "--- no event: basic vetting only ---")] + [
+            (eid, f"{eid} \u2014 {methods_for_event(eid)[1] or 'unknown class'}")
+            for eid in events
+        ]
+        # on POST, build the methods from the submitted event so validation sees
+        # the same set the user was shown
+        submitted = self.request.POST.get("nle") if self.request.method == "POST" else None
+        return _vetting_method_fields(form, event_for_target(submitted, self.kwargs["pk"]))
 
     def get(self, request, *args, **kwargs):
-        referer = request.META.get("HTTP_REFERER")
-        if referer:
-            self.request.session["nle_id"] = urlparse(referer).query
+        # always overwrite: leaving a previous page's event in the session means
+        # a bookmark or a fresh tab silently vets against whatever was there last
+        referer = request.META.get("HTTP_REFERER", "")
+        self.request.session["nle_id"] = urlparse(referer).query if referer else ""
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -161,15 +184,31 @@ class TargetVettingFormView(FormView):
         # generate the base url
         base_url = reverse("scoring:vet", kwargs=dict(pk=pk, vetting_mode=vetting_mode))
 
-        # then also preserve the query parameters
-        query_str = self.request.session.pop("nle_id", "")
-        params = [query_str] if query_str else []
+        chosen = form.cleaned_data.get("nle") or self._event_from_referer()
+        self.request.session.pop("nle_id", None)
+        params = [f"nonlocalizedevent={chosen}"] if chosen else []
         phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
         if phot_method:
             params.append(f"phot_method={phot_method}")
         if params:
             base_url += "?" + "&".join(params)
         return redirect(base_url)
+
+
+class VettingMethodsPartialView(LoginRequiredMixin, View):
+    """The vetting-method and scorer fields for the event the user just picked.
+
+    Rendered by Django rather than rebuilt in the browser, so the mapping from
+    event class to methods stays in `VETTING_FORM_CHOICES` alone.
+    """
+
+    def get(self, request, pk, *args, **kwargs):
+        form = VettingChoiceForm()
+        del form.fields["nle"]
+        form = _vetting_method_fields(form, event_for_target(request.GET.get("nle"), pk))
+        return render(
+            request, "scoring/partials/vetting_method_fields.html", {"form": form}
+        )
 
 
 class TargetVettingView(LoginRequiredMixin, RedirectView):
@@ -186,16 +225,18 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         target = Target.objects.get(pk=target_pk)
         vetting_mode = kwargs.get("vetting_mode", "basic")
 
-        # get the nonlocalized event name from the referer
-        nonlocalized_event_name = request.GET.get("nonlocalizedevent")
+        # the query parameter may carry either form of identifier
+        nonlocalized_event_name = resolve_event_id(
+            request.GET.get("nonlocalizedevent")
+        )
 
         # then run the vetting
         vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
-        if vetting_mode == "basic" or nonlocalized_event_name is None:
-            # a user asking for this one target wants the host / AGN tables
-            # even if its point source or MPC score has already zeroed it
+        if vetting_mode == "basic":
             vet_basic(target.id, stop_on_zero=False)
-            messages.info(
+            messages.info(request, "Ran basic vetting.")
+        elif nonlocalized_event_name is None:
+            messages.error(
                 request,
                 "Ran basic vetting. If you expected event-dependent "
                 + "vetting, ensure an event is specified in the URL.",
@@ -209,14 +250,10 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
                      if extra else "")
             messages.info(request, f"Ran vetting in {vetting_mode} mode{label}.")
 
-        if nonlocalized_event_name:
-            toreverse = (
-                reverse("targets:detail", kwargs=dict(pk=target_pk))
-                + f"?nonlocalizedevent={nonlocalized_event_name}"
-            )
-
-        else:
-            toreverse = reverse("targets:detail", kwargs=dict(pk=target_pk))
+        # No event in the redirect: it would be read back as "the event to vet
+        # against" the next time round, hiding the picker and forcing the user
+        # to edit the URL to vet the same candidate against its other events.
+        toreverse = reverse("targets:detail", kwargs=dict(pk=target_pk))
 
         return redirect(toreverse)  # this redirects back to the original target page
 
