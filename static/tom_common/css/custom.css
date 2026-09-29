@@ -29,3 +29,10 @@ textarea {
 .select2-selection__rendered {
     line-height: 28px !important;
 }
+
+/* Aladin toggles this class whether or not the Fullscreen API call succeeds, and
+   ships it with no z-index -- so the navbar (Bootstrap fixed-top, 1030) and any
+   page content after the map painted on top of a "fullscreen" skymap. */
+.aladin-fullscreen {
+    z-index: 2000 !important;
+}

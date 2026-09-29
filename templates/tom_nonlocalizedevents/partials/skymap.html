@@ -2,31 +2,36 @@
 <script type="text/javascript">
 (function() {
 function renderAladin() {
-    var aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false});
+    // realFullscreen uses the browser Fullscreen API, which paints in the top
+    // layer above the rest of the page and gives the native "Esc to exit" hint;
+    // Aladin's own fullscreen is just a position:fixed class with no z-index.
+    var aladin = A.aladin('#aladin-lite-div', {projection: 'MOL', target: '180 0', fov: 360, showReticle: false, realFullscreen: true});
     var moon_ra = {{ current_moon_ra }};
     var moon_dec = {{ current_moon_dec }};
     var moon_excl = {{ current_moon_exclusion }};
-    var moon_cat = A.catalog({color: '#d3d3d3', name: 'Moon'});
+    var moon_cat = A.catalog({color: '#d3d3d3', name: 'Moon', shape: 'circle', sourceSize: 12});
     aladin.addCatalog(moon_cat);
-    moon_cat.addSources([A.marker(moon_ra, moon_dec, {popupTitle: "Moon's Current Position"})]);
+    // useMarkerDefaultIcon:false so the source is drawn from the catalog's shape
+    // instead of the fixed pin bitmap, which is what makes "Shape" work
+    moon_cat.addSources([A.marker(moon_ra, moon_dec, {popupTitle: "Moon's Current Position", useMarkerDefaultIcon: false})]);
     var moon_overlay = A.graphicOverlay({color: '#d3d3d3', name: 'Moon Exclusion'});
     aladin.addOverlay(moon_overlay);
     moon_overlay.add(A.circle(moon_ra, moon_dec, moon_excl));
     var sun_ra = {{ current_sun_ra }};
     var sun_dec = {{ current_sun_dec }};
-    var sun_cat = A.catalog({color: '#ffd700', name: 'Sun'});
+    var sun_cat = A.catalog({color: '#ffd700', name: 'Sun', shape: 'circle', sourceSize: 12});
     aladin.addCatalog(sun_cat);
-    sun_cat.addSources([A.marker(sun_ra, sun_dec, {popupTitle: "Sun's Current Position"})]);
+    sun_cat.addSources([A.marker(sun_ra, sun_dec, {popupTitle: "Sun's Current Position", useMarkerDefaultIcon: false})]);
     var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun Exclusion'});
     aladin.addOverlay(sun_overlay);
     sun_overlay.add(A.circle(sun_ra, sun_dec, 15));
-    var candidates = A.catalog({color: '#84f', name: 'Linked Candidates'});
+    var candidates = A.catalog({color: '#84f', name: 'Linked Candidates', shape: 'circle', sourceSize: 10});
     aladin.addCatalog(candidates);
     {% for candidate in candidates %}
         var cat_ra = {{ candidate.target.ra }};
         var cat_dec = {{ candidate.target.dec }};
         var cat_name = '{{ candidate.target.name }}'
-        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name, useMarkerDefaultIcon: false})]);
     {% endfor %}
     var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
@@ -34,7 +39,8 @@ function renderAladin() {
 }
 
 var aladinScript = document.createElement('script');
-aladinScript.src = 'https://aladin.cds.unistra.fr/AladinLite/api/v3/latest/aladin.js';
+// pinned: the shape fix above depends on this release's source-drawing path
+aladinScript.src = 'https://aladin.cds.unistra.fr/AladinLite/api/v3/3.8.2/aladin.js';
 aladinScript.charset = 'utf-8';
 aladinScript.onload = function() { A.init.then(renderAladin); };
 document.body.appendChild(aladinScript);
