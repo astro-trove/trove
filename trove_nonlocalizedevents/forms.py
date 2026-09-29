@@ -8,6 +8,10 @@ from dal import autocomplete
 
 
 class EventCandidateSearchForm(forms.Form):
+    # bound to request.GET so the boxes keep what you filtered on. Without this,
+    # django-bootstrap4 marks every filled box is-valid and draws a green tick.
+    bound_css_class = ""
+
     target__name = forms.CharField(
         label="Filter table by target name:",
         required=False,
@@ -18,6 +22,51 @@ class EventCandidateSearchForm(forms.Form):
             }
         ),
     )
+
+    score_min = forms.FloatField(
+        label="Min. score:", required=False, min_value=0.0, max_value=1.0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01",
+                                        "placeholder": "e.g. 0.5"}),
+    )
+    first_det_after = forms.DateField(
+        label="Detected after:", required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    first_det_before = forms.DateField(
+        label="Detected before:", required=False,
+        widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
+    )
+    distance_max = forms.FloatField(
+        label="Max. distance (Mpc):", required=False, min_value=0.0,
+        widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "e.g. 200"}),
+    )
+    distance_type = forms.ChoiceField(
+        label="Distance method:", required=False,
+        choices=[("", "---------"), ("spec-z", "Spectroscopic redshift"),
+                 ("photo-z", "Photometric redshift"),
+                 ("z-ind", "Redshift-independent")],
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    cone_ra = forms.FloatField(
+        label="Cone RA (deg):", required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
+    )
+    cone_dec = forms.FloatField(
+        label="Cone Dec (deg):", required=False,
+        widget=forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
+    )
+    cone_radius = forms.FloatField(
+        label="Cone radius (\u2033):", required=False, min_value=0.0, initial=None,
+        widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "default 2"}),
+    )
+
+    def clean(self):
+        """A cone needs a centre: a radius on its own would silently do nothing."""
+        cleaned = super().clean()
+        ra, dec = cleaned.get("cone_ra"), cleaned.get("cone_dec")
+        if (ra is None) != (dec is None):
+            raise forms.ValidationError("Cone search needs both an RA and a Dec.")
+        return cleaned
 
     def __init__(self, *args, nle_id=None, **kwargs):
         super().__init__(*args, **kwargs)

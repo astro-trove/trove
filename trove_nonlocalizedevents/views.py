@@ -2,18 +2,21 @@ import json
 from django_filters.views import FilterView
 from django.core.cache import cache
 from django.core.paginator import Paginator
+from django.db.models import Min, Q
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponse, QueryDict
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.generic.base import View
 from django.contrib import messages
 
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
-from tom_targets.permissions import targets_for_user
+from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
+from trove_nonlocalizedevents.permissions import candidates_for_user
 import logging
 
 from scoring.models import ScoreFactor
@@ -61,8 +64,43 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
     """
     query_params = query_params.copy()
     query_params.pop("page", None)  # every page shares one scored list
+    # score_min is applied to the scored list rather than the queryset, so every
+    # threshold can share one scoring run instead of forcing a fresh one
+    query_params.pop("score_min", None)
     return (f"event_candidates_scored_{query_params.urlencode()}"
             f"_{agn_toggle}_{phot_method}")
+
+
+#: z_type strings that count as each kind of distance measurement, as stored in
+#: the "Host Galaxies" TargetExtra. "user spec-z" is a spectroscopic redshift too.
+DISTANCE_TYPE_PATTERNS = {
+    "spec-z": ["spec-z", "user spec-z"],
+    "photo-z": ["photo-z"],
+    "z-ind": ["z ind.", "z-ind."],
+}
+
+
+def _as_float(value):
+    """A query-string number, or None if it is absent or not a number."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_date(value):
+    """A query-string YYYY-MM-DD date, or None.
+
+    `parse_date` returns None for a malformed string but raises for a
+    well-formed impossible one like 2025-13-45; a half-typed date in the box
+    must not 500 the page either way.
+    """
+    if not value:
+        return None
+    try:
+        return parse_date(value)
+    except ValueError:
+        return None
 
 
 def invalidate_scored_candidates_cache(query_params):
@@ -97,15 +135,9 @@ class EventCandidateListView(FilterView):
         :returns: Set of ``Candidate`` objects
         :rtype: QuerySet
         """
-        qs = (
-            super()
-            .get_queryset()
-            .filter(
-                target__in=targets_for_user(
-                    self.request.user, Target.objects.all(), "view_target"
-                )
-            )
-            .select_related("target", "nonlocalizedevent")
+        # the skymap above the table draws the same set -- see `candidates_for_user`
+        qs = candidates_for_user(self.request.user, super().get_queryset()).select_related(
+            "target", "nonlocalizedevent"
         )
 
         # Filter by nonlocalizedevent if provided in URL
@@ -117,6 +149,61 @@ class EventCandidateListView(FilterView):
         target_name = self.request.GET.get("target__name")
         if target_name:
             qs = qs.filter(target__name__icontains=target_name)
+
+        return self.apply_candidate_filters(qs)
+
+    def apply_candidate_filters(self, qs):
+        """The filters that can be answered from the database.
+
+        Score is not one of them: scores are computed in Python, so that filter
+        is applied to the scored list in `get_context_data`.
+        """
+        get = self.request.GET
+
+        distance_max = _as_float(get.get("distance_max"))
+        if distance_max is not None:
+            qs = qs.filter(target__distance__lte=distance_max)
+
+        # first detection == earliest photometry point, as in
+        # custom_code.hooks.associate_targets_with_nle
+        after = _as_date(get.get("first_det_after"))
+        before = _as_date(get.get("first_det_before"))
+        if after or before:
+            first_det = (
+                ReducedDatum.objects.filter(
+                    data_type="photometry", value__magnitude__isnull=False
+                )
+                .values("target_id")
+                .annotate(min_timestamp=Min("timestamp"))
+            )
+            if after:
+                first_det = first_det.filter(min_timestamp__date__gte=after)
+            if before:
+                first_det = first_det.filter(min_timestamp__date__lte=before)
+            qs = qs.filter(target_id__in=first_det.values_list("target_id", flat=True))
+
+        # How the host galaxy's distance was measured. z_type lives inside the
+        # "Host Galaxies" TargetExtra JSON, so this matches the stored text
+        # (compact separators, no space after the colon). A target counts if any
+        # of its host galaxies was measured that way.
+        distance_type = get.get("distance_type")
+        if distance_type in DISTANCE_TYPE_PATTERNS:
+            match = Q()
+            for pattern in DISTANCE_TYPE_PATTERNS[distance_type]:
+                match |= Q(value__icontains=f'"z_type":"{pattern}')
+            host_targets = TargetExtra.objects.filter(
+                Q(key="Host Galaxies") & match
+            ).values_list("target_id", flat=True)
+            qs = qs.filter(target_id__in=host_targets)
+
+        ra, dec = _as_float(get.get("cone_ra")), _as_float(get.get("cone_dec"))
+        if ra is not None and dec is not None:
+            radius = _as_float(get.get("cone_radius")) or 2.0  # arcsec, as in scoring.api
+            targets = cone_search_filter(
+                Target.objects.filter(id__in=qs.values_list("target_id", flat=True)),
+                ra, dec, radius / 3600.0,
+            )
+            qs = qs.filter(target_id__in=targets.values_list("id", flat=True))
 
         return qs
 
@@ -154,6 +241,15 @@ class EventCandidateListView(FilterView):
                 cache_timeout = SCORE_CACHE_PERIOD
             cache.set(cache_key, scored_candidates, cache_timeout)
 
+        # Scores are computed in Python, so this filter cannot be a queryset
+        # filter; it runs on the scored list, after the cache.
+        score_min = _as_float(self.request.GET.get("score_min"))
+        if score_min is not None:
+            scored_candidates = [
+                candidate for candidate in scored_candidates
+                if max((candidate.score or {}).values(), default=0) >= score_min
+            ]
+
         # Paginate the cached scored list
         paginator = Paginator(scored_candidates, self.paginate_by)
         page_number = self.request.GET.get("page", 1)
@@ -163,6 +259,15 @@ class EventCandidateListView(FilterView):
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
 
+        # One column per transient type rather than every score stacked into a
+        # single cell. Events scored for one type only then say which it is.
+        score_columns = []
+        for candidate in page_obj.object_list:
+            for transient in (candidate.score or {}):
+                if transient not in score_columns:
+                    score_columns.append(transient)
+        context["score_columns"] = score_columns
+
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label()
 
@@ -171,7 +276,15 @@ class EventCandidateListView(FilterView):
         # which outlives the transient progress notice above
         context["last_vet_all"] = get_last_vet_all_run(nle_id)
 
-        context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
+        context["eventcandidate_filter_form"] = EventCandidateSearchForm(
+            self.request.GET or None, nle_id=nle_id)
+        # open the extra filters if any of them are in play, so an active filter
+        # is never hidden behind a collapsed panel
+        context["filters_active"] = any(
+            self.request.GET.get(f) for f in
+            ("score_min", "distance_max", "distance_type", "first_det_after",
+             "first_det_before", "cone_ra", "cone_dec", "cone_radius")
+        )
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm(nle_id=nle_id)
 
         context["no_score_message"] = None

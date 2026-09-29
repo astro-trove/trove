@@ -359,14 +359,20 @@ class TargetClassifyForm(forms.Form):
 
 class GWFormHelper(FormHelper):
     layout = Layout(
+            # event name first and on its own row: searching for a known event
+            # is the most common reason to touch this form
             Row(
-                Column('prefix'),
+                Column('event_id', css_class='col-md-6'),
+                Column('source_type', css_class='col-md-3'),
+                Column('prefix', css_class='col-md-3'),
+            ),
+            Row(
                 Column('state'),
                 Column(PrependedAppendedText('inv_far_min', '>', 'yr')),
-                # Column('classification'),
                 Column(PrependedAppendedText('distance_max', '<', 'Mpc')),
                 Column(PrependedAppendedText('has_ns_min', '>', '%')),
                 Column(PrependedAppendedText('has_remnant_min', '>', '%')),
+                Column(PrependedAppendedText('has_ssm_min', '>', '%')),
             ),
             Row(
                 Column(

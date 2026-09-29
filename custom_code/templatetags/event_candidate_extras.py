@@ -545,3 +545,11 @@ def _str_int_format(s):
 
 def _str_format(s):
     return str(s)
+
+
+@register.filter
+def score_for(scores, transient):
+    """One transient's score out of a candidate's score dict, for its column."""
+    if not scores:
+        return None
+    return scores.get(transient)

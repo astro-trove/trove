@@ -1,4 +1,4 @@
-<div id='aladin-lite-div' style='aspect-ratio: 2'></div>
+<div id='aladin-lite-div' style='aspect-ratio: 2; position: relative'></div>
 <script type="text/javascript">
 (function() {
 function renderAladin() {
@@ -26,11 +26,36 @@ function renderAladin() {
         var cat_ra = {{ candidate.target.ra }};
         var cat_dec = {{ candidate.target.dec }};
         var cat_name = '{{ candidate.target.name }}'
-        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+        // popupDesc is rendered as HTML, so the popup can link to the target page
+        var cat_link = '<a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" target="_blank">View target page</a>';
+        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name, popupDesc: cat_link})]);
     {% endfor %}
     var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
     aladin.addMOC(moc);
+
+    addHoverLabel(aladin);
+}
+
+// Show a source's name on hover. Clicking still opens Aladin's own popup, which
+// carries the link; this is just the quick look while moving across the map.
+function addHoverLabel(aladin) {
+    var div = document.getElementById('aladin-lite-div');
+    var label = document.createElement('div');
+    label.className = 'aladin-hover-label';
+    label.style.cssText = 'position:absolute; z-index:20; display:none; pointer-events:none;' +
+        'background:rgba(0,0,0,0.75); color:#fff; padding:2px 6px; border-radius:3px;' +
+        'font-size:12px; white-space:nowrap; transform:translate(-50%,-150%)';
+    div.appendChild(label);
+
+    aladin.on('objectHovered', function(object) {
+        if (!object || !object.popupTitle) { return; }
+        label.textContent = object.popupTitle;
+        label.style.left = object.x + 'px';
+        label.style.top = object.y + 'px';
+        label.style.display = 'block';
+    });
+    aladin.on('objectHoveredStop', function() { label.style.display = 'none'; });
 }
 
 var aladinScript = document.createElement('script');

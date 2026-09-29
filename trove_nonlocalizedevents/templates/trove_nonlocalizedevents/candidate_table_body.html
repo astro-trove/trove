@@ -44,7 +44,16 @@
           <th>Rank</th>
           <th>Target</th>
           <th>Event</th>
-          <th>Score</th>
+          {% if score_columns %}
+            {% for transient in score_columns %}
+            <th title="Score for the {{ transient }} transient type">
+              {{ transient }}
+              {% if score_columns|length == 1 %}<br><small class="text-muted">only score for this event class</small>{% endif %}
+            </th>
+            {% endfor %}
+          {% else %}
+            <th>Score</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
@@ -59,11 +68,9 @@
             {% endif %}
           </td>
           <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
-          <td>
-	    {% for transient, score in candidate.score.items %}
-            {{ transient }} {{score|floatformat:2}}<br>
-            {% endfor %}
-          </td>
+          {% for transient in score_columns %}
+          <td title="{{ transient }}">{{ candidate.score|score_for:transient|floatformat:2 }}</td>
+          {% endfor %}
         </tr>
         {% empty %}
         <tr>

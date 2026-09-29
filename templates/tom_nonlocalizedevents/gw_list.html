@@ -3,6 +3,10 @@
 {% block title %}Gravitational Waves{% endblock %}
 {% block content %}
 <h1>Gravitational Waves</h1>
+<p class="text-muted small mb-2">
+  <strong>Bold</strong> rows are significant alerts.
+  &#x2714; confirmed &middot; &#x274c; retracted.
+</p>
 <div class="row">
     <div class="col-md-12">
     <form action="" method="get" class="form">
@@ -20,6 +24,7 @@
         <th scope="col">GraceID</th>
         <th scope="col" title="Inverse False Alarm Rate">1/FAR</th>
         <th scope="col" title="Most Likely Classification">Class.</th>
+        <th scope="col" title="Number of candidate counterparts linked to this event">Cands.</th>
         <th scope="col" title="Distance">Distance</th>
         <th scope="col" title="Has Neutron Star?">NS?</th>
         <th scope="col" title="Has Remnant?">Bright?</th>
@@ -28,7 +33,8 @@
       </thead>
       <tbody>
       {% for event in object_list %}
-      {% if event.sequences.last.details.significant %}
+      {% with seq=event|last_sequence %}
+      {% if seq.details.significant %}
       <tr style="font-weight: bold">
       {% else %}
       <tr>
@@ -37,20 +43,26 @@
             <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a>
             {% if event.state == "RETRACTED" %}
                 <span title="retracted">&#x274c;</span> {# red X emoji #}
-            {% elif event.sequences.last.event_subtype != "PRELIMINARY" %}
+            {% elif seq.event_subtype != "PRELIMINARY" %}
                 <span title="confirmed">&#x2714;</span> {# heavy check mark emoji #}
             {% endif %}
         </td>
-        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far | format_inverse_far }}</td>
-        <td title="Most Likely Classification">{{ event.sequences.last.details | get_most_likely_class | truncate }}</td>
-        <td title="Distance">{{ event.sequences.last.localization | format_distance }}</td>
-        <td title="Has Neutron Star?">{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
-        <td title="Has Remnant?">{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
+        <td title="Inverse False Alarm Rate">{{ seq.details.far | format_inverse_far }}</td>
+        <td title="Most Likely Classification">{{ seq.details | get_most_likely_class | truncate }}</td>
+        <td title="Number of candidate counterparts linked to this event">
+          {% if event.candidate_count %}
+            <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.candidate_count }}</a>
+          {% else %}0{% endif %}
+        </td>
+        <td title="Distance">{{ seq.localization | format_distance }}</td>
+        <td title="Has Neutron Star?">{{ seq.details.properties.HasNS | percentformat }}</td>
+        <td title="Has Remnant?">{{ seq.details.properties.HasRemnant | percentformat }}</td>
         <td title="External Links">
           <a href="{{ event.gracedb_url }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
           <a href="{{ event.treasuremap_url }}" target="_blank"><img src="https://treasuremap.space/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" /></a>
         </td>
       </tr>
+      {% endwith %}
       {% endfor %}
       </tbody>
     </table>
