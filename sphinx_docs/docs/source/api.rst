@@ -18,10 +18,12 @@ An example curl command is:
 		
    curl -X 'GET' \
        'https://datatrove.as.arizona.edu/api/score/S251112cm' \
-       -u '<username>:<password>'
+       -H 'Authorization: Bearer <api_token>'
 
-where you replace <username> with your username and <password> with your password. If you are doing this in python,
-see the `Example Jupyter Notebooks <nbs/basic_usage.html>`_.
+where you replace <api_token> with the API token listed on your user profile page,
+https://datatrove.as.arizona.edu/users/profile/. If your token is ever exposed, you can
+click "Regenerate API Token" on that page; the old token stops working immediately.
+If you are doing this in python, see the `Example Jupyter Notebooks <nbs/basic_usage.html>`_.
 
 .. toctree::
    :maxdepth: 2
