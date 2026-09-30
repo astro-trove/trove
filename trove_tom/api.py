@@ -1,8 +1,8 @@
 from ninja import NinjaAPI
-from .auth import BasicAuth
+from .auth import BasicAuth, TokenAuth
 
 api = NinjaAPI()
-basic_auth = BasicAuth()
+auth = [TokenAuth(), BasicAuth()]
 
-api.add_router("/score/", "scoring.api.router", auth=basic_auth)
-api.add_router("/target/", "trove_targets.api.router", auth=basic_auth)
+api.add_router("/score/", "scoring.api.router", auth=auth)
+api.add_router("/target/", "trove_targets.api.router", auth=auth)
