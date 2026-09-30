@@ -8,7 +8,6 @@ from functools import partial
 from django import template
 from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
-from django.conf import settings
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from trove_targets.models import Target
@@ -70,29 +69,6 @@ def get_event_candidate_scores(*args, **kwargs):
 def get_target_score(*args, **kwargs):
     """A wrapper on the imported _get_target_score, but registered as a tag"""
     return _get_target_score(*args, **kwargs)
-
-@register.simple_tag(takes_context=True)
-def vet_all_is_allowed(context):
-    """Is the Vet All button enabled, or is this event within its cooldown?
-
-    True when nothing has run recently. ``VetAllView.form_valid`` sets
-    ``VETTING_COOLDOWN_KEY_<nle_id>`` for ``VETTING_COOLDOWN_PERIOD`` (1 hour)
-    when the button is used, so the presence of that key IS the cooldown.
-
-    This used to compute the key and then fall off the end of the function,
-    returning None. None is falsy, so the template took every event to be on
-    cooldown permanently and the button was greyed out for good -- with no
-    cooldown actually set anywhere.
-    """
-    request = context['request']
-    nle_id = request.GET.get('nonlocalizedevent')
-    if not nle_id:
-        # No event in scope, so nothing to rate-limit. Returning True also
-        # avoids `KEY + "_" + None`, which raises TypeError and would take the
-        # whole page down rather than just disabling a button.
-        return True
-    cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
-    return not cache.get(cooldown_cache_key)
 
 def _event_classes_in_scope(context, target_id=None):
     """Classifications of the events the scoring-adjustments panel applies to:
@@ -548,8 +524,17 @@ def _str_format(s):
 
 
 @register.filter
-def score_for(scores, transient):
-    """One transient's score out of a candidate's score dict, for its column."""
-    if not scores:
+def lookup(mapping, key):
+    """One value out of a dict, for templates that need a variable key."""
+    if not mapping:
         return None
-    return scores.get(transient)
+    return mapping.get(key)
+
+
+@register.simple_tag
+def query_replace(request, key, value):
+    """This page's query string with one parameter replaced."""
+    params = request.GET.copy()
+    params[key] = value
+    params.pop("page", None)
+    return params.urlencode()

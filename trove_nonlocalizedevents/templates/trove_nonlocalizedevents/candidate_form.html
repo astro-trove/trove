@@ -11,13 +11,22 @@
       {% endif %}
 
       {# the rest are used less often, so they start folded away #}
-      <a class="d-inline-block mb-2" data-toggle="collapse" href="#more-candidate-filters"
-         role="button" aria-expanded="false" aria-controls="more-candidate-filters">
-        More filters
-      </a>
-      <div class="collapse {% if filters_active %}show{% endif %}" id="more-candidate-filters">
+      <div class="d-flex align-items-center" style="gap:0.5rem">
+        <button class="btn {% if filters_active %}btn-secondary{% else %}btn-outline-secondary{% endif %}" type="button"
+                data-toggle="collapse" data-target="#more-candidate-filters"
+                aria-expanded="{% if filters_active %}true{% else %}false{% endif %}"
+                aria-controls="more-candidate-filters" id="more-filters-toggle">
+          <span id="more-filters-label">{% if filters_active %}Close filters{% else %}More filters{% endif %}</span>
+          <span id="more-filters-caret">{% if filters_active %}&#9650;{% else %}&#9660;{% endif %}</span>
+        </button>
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+           hx-get="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+           hx-target="#candidate-results" hx-push-url="true"
+           class="btn btn-secondary" title="Reset">Reset</a>
+      </div>
+      <div class="collapse {% if filters_active %}show{% endif %} mt-2" id="more-candidate-filters">
         <div class="form-row align-items-end">
-          <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.score_min %}</div>
           <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.distance_max %}</div>
           <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.distance_type %}</div>
         </div>
@@ -32,12 +41,6 @@
         </div>
       </div>
 
-      {% buttons %}
-      <button type="submit" class="btn btn-primary">
-	Filter
-      </button>
-      <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-get="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-target="#candidate-results" hx-push-url="true" class="btn btn-secondary" title="Reset">Reset</a>
-      {% endbuttons %}
     </form>
   </div>
   <div class="col" id="target-link-form-col">
@@ -56,3 +59,24 @@
 </div>
 
 <br>
+
+<script>
+// the button says what the next click does, so it reads as a real disclosure
+(function () {
+    var panel = document.getElementById('more-candidate-filters');
+    var label = document.getElementById('more-filters-label');
+    var caret = document.getElementById('more-filters-caret');
+    if (!panel || !label) { return; }
+    var toggle = document.getElementById('more-filters-toggle');
+    function sync(open) {
+        label.textContent = open ? 'Close filters' : 'More filters';
+        if (caret) { caret.innerHTML = open ? '&#9650;' : '&#9660;'; }
+        if (toggle) {
+            toggle.classList.toggle('btn-secondary', open);
+            toggle.classList.toggle('btn-outline-secondary', !open);
+        }
+    }
+    $(panel).on('shown.bs.collapse', function () { sync(true); });
+    $(panel).on('hidden.bs.collapse', function () { sync(false); });
+})();
+</script>

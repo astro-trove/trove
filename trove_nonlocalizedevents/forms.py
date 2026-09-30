@@ -23,11 +23,6 @@ class EventCandidateSearchForm(forms.Form):
         ),
     )
 
-    score_min = forms.FloatField(
-        label="Min. score:", required=False, min_value=0.0, max_value=1.0,
-        widget=forms.NumberInput(attrs={"class": "form-control", "step": "0.01",
-                                        "placeholder": "e.g. 0.5"}),
-    )
     first_det_after = forms.DateField(
         label="Detected after:", required=False,
         widget=forms.DateInput(attrs={"class": "form-control", "type": "date"}),
@@ -42,17 +37,17 @@ class EventCandidateSearchForm(forms.Form):
     )
     distance_type = forms.ChoiceField(
         label="Distance method:", required=False,
-        choices=[("", "---------"), ("spec-z", "Spectroscopic redshift"),
+        choices=[("", "Any"), ("spec-z", "Spectroscopic redshift"),
                  ("photo-z", "Photometric redshift"),
                  ("z-ind", "Redshift-independent")],
         widget=forms.Select(attrs={"class": "form-control"}),
     )
     cone_ra = forms.FloatField(
-        label="Cone RA (deg):", required=False,
+        label="Cone RA:", required=False,
         widget=forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
     )
     cone_dec = forms.FloatField(
-        label="Cone Dec (deg):", required=False,
+        label="Cone Dec:", required=False,
         widget=forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
     )
     cone_radius = forms.FloatField(

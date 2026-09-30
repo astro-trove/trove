@@ -3,22 +3,38 @@
 {% block title %}Gravitational Waves{% endblock %}
 {% block content %}
 <h1>Gravitational Waves</h1>
-<p class="text-muted small mb-2">
-  <strong>Bold</strong> rows are significant alerts.
-  &#x2714; confirmed &middot; &#x274c; retracted.
-</p>
+<div class="alert alert-warning" style="padding:14px 18px; line-height:1.7">
+  <strong>Key</strong>
+  <div class="mt-2">
+    <strong>Bold row</strong> &mdash; a <em>significant</em> alert: LVK judged it unlikely to be
+    a false alarm. For CBC searches that means an inverse false alarm rate above 0.5 yr.<br>
+    <span style="font-size:1.1em">&#x2714;</span> &mdash; confirmed: the alert has moved past
+    its preliminary notice.<br>
+    <span style="font-size:1.1em">&#x274c;</span> &mdash; retracted: LVK has withdrawn the alert.<br>
+    <strong>1/FAR</strong> &mdash; inverse false alarm rate; higher means rarer, so less likely
+    to be noise.
+  </div>
+</div>
 <div class="row">
     <div class="col-md-12">
-    <form action="" method="get" class="form">
+    <form action="" method="get" class="form" id="gw-filter-form">
       {% crispy filter.form %}
     </form>
     </div>
 </div>
 <div class="row">
     <div class="col-md-12">
-    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <style>.gw-pager-row .pagination { margin-bottom: 0; }</style>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gw-pager-row mb-3">
+      <div>
+        <button type="submit" form="gw-filter-form" class="btn btn-primary">Filter</button>
+        <a href="{{ request.path }}" class="btn btn-secondary ml-1" title="Reset">Reset</a>
+      </div>
+      {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+      <div style="min-width:8rem"></div>{# balances the buttons so the pager stays centred #}
+    </div>
     {% if object_list %}
-    <table class="table">
+    <table class="table table-hover align-middle text-center">
       <thead>
       <tr>
         <th scope="col">GraceID</th>
@@ -66,7 +82,9 @@
       {% endfor %}
       </tbody>
     </table>
-    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <div class="d-flex justify-content-center">
+      {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    </div>
     {% else %}
     <p>No events have been created. Create Superevents via the admin interface, the REST API,
         or the readstreams management command.</p>

@@ -1,4 +1,5 @@
 import django.forms
+from django.http import QueryDict
 import django_filters
 import json
 from django.conf import settings
@@ -89,6 +90,15 @@ SOURCE_TYPE_CHOICES = [(k, k) for k in CLASSIFICATION_KEYS] + [("SSM", "SSM")]
 
 
 class GWFilter(NonLocalizedEventFilter):
+    #: the stream people usually want; "All" submits an empty value, which
+    #: setdefault leaves alone
+    DEFAULT_PREFIX = 'S'
+
+    def __init__(self, data=None, *args, **kwargs):
+        data = QueryDict(mutable=True) if data is None else data.copy()
+        data.setdefault('prefix', self.DEFAULT_PREFIX)
+        super().__init__(data, *args, **kwargs)
+
     event_id = django_filters.CharFilter(field_name='event_id', lookup_expr='icontains',
                                          label='Event name')
     # "Real" read as though GWTC events were not; these name alert streams, not
@@ -98,8 +108,33 @@ class GWFilter(NonLocalizedEventFilter):
                                                   ('MS', 'Test')),
                                          empty_label='All',
                                          label='Alert Type', field_name='event_id', lookup_expr='startswith')
-    state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')))
+    state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')),
+                                        empty_label='All')
+    status = django_filters.ChoiceFilter(
+        choices=(('confirmed', 'Confirmed'), ('preliminary', 'Preliminary'),
+                 ('retracted', 'Retracted')),
+        empty_label='All', label='Status', method='status_filter')
+
+    @staticmethod
+    def status_filter(queryset, name, value):
+        """Confirmed / preliminary / retracted, as the table's marks show them.
+
+        Retraction is a field on the event; confirmed means its newest sequence
+        has moved past PRELIMINARY, which is what puts the tick in the table.
+        """
+        if not value:
+            return queryset
+        if value == 'retracted':
+            return queryset.filter(state='RETRACTED')
+        last_subtype = (EventSequence.objects
+                        .filter(nonlocalizedevent_id=OuterRef('id'))
+                        .order_by('-sequence_id').values('event_subtype')[:1])
+        qs = queryset.exclude(state='RETRACTED').annotate(_subtype=Subquery(last_subtype))
+        if value == 'confirmed':
+            return qs.exclude(_subtype='PRELIMINARY')
+        return qs.filter(_subtype='PRELIMINARY')
     source_type = django_filters.ChoiceFilter(choices=SOURCE_TYPE_CHOICES, label='Source Type',
+                                              empty_label='All',
                                               method='most_likely_class_filter')
     has_ssm_min = django_filters.NumberFilter('details__properties__HasSSM__gte',
                                               method='last_sequence_filter', label='HasSSM',
@@ -132,8 +167,8 @@ class GWFilter(NonLocalizedEventFilter):
                 qs = qs.filter(**{f'_p_{value}__gte': F(f'_p_{other}')})
         return qs
     inv_far_min = django_filters.NumberFilter('details__far__lte',
-                                              method='last_sequence_filter', label='1/FAR', min_value=sys.float_info.epsilon,
-                                              help_text='Significant CBC alerts have 1/FAR > 0.5 yr')
+                                              method='last_sequence_filter', label='1/FAR',
+                                              min_value=sys.float_info.epsilon)
     distance_max = django_filters.NumberFilter('localization__distance_mean__lte',
                                                method='last_sequence_filter', label='Distance', min_value=0.)
     has_ns_min = django_filters.NumberFilter('details__properties__HasNS__gte',

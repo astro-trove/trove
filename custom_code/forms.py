@@ -367,21 +367,17 @@ class GWFormHelper(FormHelper):
                 Column('prefix', css_class='col-md-3'),
             ),
             Row(
-                Column('state'),
+                Column('status'),
                 Column(PrependedAppendedText('inv_far_min', '>', 'yr')),
                 Column(PrependedAppendedText('distance_max', '<', 'Mpc')),
                 Column(PrependedAppendedText('has_ns_min', '>', '%')),
                 Column(PrependedAppendedText('has_remnant_min', '>', '%')),
                 Column(PrependedAppendedText('has_ssm_min', '>', '%')),
             ),
-            Row(
-                Column(
-                    Submit('submit', 'Filter'),
-                    HTML('<a href="{{ request.path }}" class="btn btn-secondary" title="Reset">Reset</a>'),
-                    css_class='text-right',
-                )
-            )
         )
+    # the Filter/Reset buttons are rendered by the template, on the same line as
+    # the paginator, so they are not repeated here
+    form_tag = False
 
 
 class NeutrinoFormHelper(FormHelper):

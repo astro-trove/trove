@@ -262,9 +262,8 @@ class GWListView(NonLocalizedEventListView):
     formhelper_class = GWFormHelper
 
     def get_queryset(self):
-        # Every row reads the newest sequence (and its localization) several times.
-        # Prefetching them, and reading the cache via the `last_sequence` filter,
-        # takes this page from ~795 queries to 2.
+        # each row reads the newest sequence several times; prefetching it and
+        # reading the cache via `last_sequence` takes this page from ~795 queries to 2
         qs = (NonLocalizedEvent.objects.filter(event_type='GW')
               .prefetch_related(Prefetch(
                   'sequences',
