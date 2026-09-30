@@ -118,6 +118,15 @@ def agn_counts_toward(transient, agn_toggle):
     """Whether agn_score enters `transient`'s score."""
     return bool(agn_toggle) or transient not in AGN_TOGGLE_TRANSIENTS
 
+def _phot_score_key(metric_key):
+    """The key a photometry metric's subscore is stored under.
+
+    Used where val_dict is written and where it is read, so the two cannot
+    drift apart -- they did once, and the lookup silently produced no subscores.
+    """
+    return f"{metric_key}_score"
+
+
 def _check_phot_val(val, param_ranges, param_range_key):
     val_max = max(param_ranges[param_range_key])
     val_min = min(param_ranges[param_range_key])
@@ -255,7 +264,7 @@ def get_event_candidate_scores(
 
         # Extract values that need special handling
         val_dict = {
-            subscore_key+"_score": sf_dict[subscore_key]
+            _phot_score_key(subscore_key): sf_dict[subscore_key]
             for subscore_key, param_range_key in val_not_score_keys.items()
             if subscore_key in sf_dict
         }
@@ -304,12 +313,15 @@ def get_event_candidate_scores(
             # EM transient
             class_score = classification_score(ec.target, transient)
             
+            # val_dict is keyed with the "_score" suffix the display labels use
+            # (see the keymap in event_candidate_extras)
             phot_subscores = {
-                subscore_key: _check_phot_val(
-                    val_dict[subscore_key], param_ranges, param_range_key
+                _phot_score_key(subscore_key): _check_phot_val(
+                    val_dict[_phot_score_key(subscore_key)], param_ranges, param_range_key
                 )
                 for subscore_key, param_range_key in val_not_score_keys.items()
-                if subscore_key in val_dict and param_range_key in param_ranges
+                if _phot_score_key(subscore_key) in val_dict
+                and param_range_key in param_ranges
             }
 
             other_subscores = dict(

@@ -9,6 +9,7 @@ import logging
 from datetime import timezone
 
 import numpy as np
+from collections import namedtuple
 import pandas as pd
 
 import sqlalchemy as sa
@@ -132,6 +133,19 @@ def host_distance_match(
     ]
     return host_df
 
+DistanceScore = namedtuple(
+    "DistanceScore",
+    "score host_name host_catalog distance distance_neg_err distance_pos_err",
+)
+
+
+def _best_scoring_host(hosts):
+    """The highest scoring row of a host subset, or None if none can be scored."""
+    hosts = hosts.reset_index()
+    if not hosts["hybrid_distance_score"].notna().any():
+        return None
+    return hosts.iloc[hosts["hybrid_distance_score"].idxmax()]
+
 
 def get_distance_score(host_df, target_id, nonlocalized_event_name):
     """
@@ -157,65 +171,51 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         # even if the real scores are very good
         if np.isnan(targ_score):
             targ_score = 1.0
-        return targ_score, None # None because there is no host name
+        # symmetric error from the redshift, so both bounds are the same
+        return DistanceScore(targ_score, None, None, targ_dist,
+                             targ_dist_err, targ_dist_err)
 
     # callers may pass an unfiltered host_df, so clean it here too
     host_df = clean_host_df(host_df)
 
-    # then use the redshift of user-uploaded host galaxies
-    userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
-    userz_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if userz_distance_hosts["hybrid_distance_score"].notna().any():
-        max_score = userz_distance_hosts.hybrid_distance_score.max()
-        max_score_host_name = userz_distance_hosts.iloc[
-            userz_distance_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = userz_distance_hosts.iloc[
-            userz_distance_hosts["hybrid_distance_score"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
-
-    # then use the redshift independent measurements of distances
-    ind_distance_hosts = host_df[host_df.z_type == "z ind."]
-    ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if ind_distance_hosts["hybrid_distance_score"].notna().any():
-        max_score = ind_distance_hosts.hybrid_distance_score.max()
-        max_score_host_name = ind_distance_hosts.iloc[
-            ind_distance_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = ind_distance_hosts.iloc[
-            ind_distance_hosts["hybrid_distance_score"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
-
-    # then use the specz hosts
-    specz_hosts = host_df[host_df.z_type.str.contains("spec-z")]
-    specz_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if specz_hosts["hybrid_distance_score"].notna().any():
-        max_score = specz_hosts.hybrid_distance_score.max()
-        max_score_host_name = specz_hosts.iloc[
-            specz_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = specz_hosts.iloc[
-            specz_hosts["hybrid_distance_score"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
-
-    # then if we don't know the spec-z or have an independent distance measure use the photo-z's
-    photoz_hosts = host_df[host_df.z_type == "photo-z"]
-    photoz_hosts.reset_index(inplace=True)  # avoid iloc exception
-    if photoz_hosts["hybrid_distance_score"].notna().any():
-        max_score = photoz_hosts.hybrid_distance_score.max()
-        max_score_host_name = photoz_hosts.iloc[
-            photoz_hosts["hybrid_distance_score"].idxmax()
-        ]["name"]
-        max_score_host_catalog = photoz_hosts.iloc[
-            photoz_hosts["hybrid_distance_score"].idxmax()
-        ]["catalog"]
-        return max_score, max_score_host_name, max_score_host_catalog
+    # in preference order: a redshift the user supplied, then a redshift
+    # independent measurement, then a spec-z, then a photo-z
+    for selector in (
+        lambda df: df[df.z_type == "user spec-z"],
+        lambda df: df[df.z_type == "z ind."],
+        lambda df: df[df.z_type.str.contains("spec-z")],
+        lambda df: df[df.z_type == "photo-z"],
+    ):
+        best = _best_scoring_host(selector(host_df))
+        if best is None:
+            continue
+        return DistanceScore(
+            best["hybrid_distance_score"],
+            best["name"],
+            best["catalog"],
+            best.get("lumdist"),
+            best.get("lumdist_neg_err"),
+            best.get("lumdist_pos_err"),
+        )
 
     # no potential host
-    return 1.0, None, None # Nones because there are no host names or host catalogs
+    return DistanceScore(1.0, None, None, None, None, None)
+
+
+def store_host_distance(event_candidate, distance):
+    """Record the distance the score was computed against."""
+    values = (("host_distance", distance.distance),
+              ("host_distance_neg_err", distance.distance_neg_err),
+              ("host_distance_pos_err", distance.distance_pos_err))
+    for key, value in values:
+        try:
+            value = float(value)
+        except (TypeError, ValueError):
+            value = None
+        if value is None or np.isnan(value):
+            delete_score_factor(event_candidate, key)
+        else:
+            update_score_factor(event_candidate, key, value)
 
 
 def skymap_association(
