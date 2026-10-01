@@ -2,9 +2,12 @@
 Some common functions used in multiple places throughout the app
 """
 
+from collections import namedtuple
 from datetime import timedelta
+import json
 import math
 import logging
+from astropy import units as u
 from astropy.units import Quantity
 from django.db import DatabaseError
 from django.db.models import Count, FloatField, Max, Min, Q
@@ -21,7 +24,7 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 from candidate_vetting.vet import localization_sequence_from_name
 
-from .scoring import classification_score, mpc_score_from_match
+from .scoring import classification_score, cosmo, mpc_score_from_match
 from .vet_phot import PHOT_SCORE_MIN
 from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
@@ -368,6 +371,148 @@ def get_target_score(target_id):
         out[nonlocalized_name] = event_candidate.priority
 
     return out
+
+
+#: the distance a candidate was scored against, and where it came from
+HostDistance = namedtuple("HostDistance", "distance neg_err pos_err source")
+
+
+def host_distances(event_candidates):
+    """The distance each candidate was scored against, in Mpc, by candidate id.
+
+    Three batched queries whatever the number of candidates, so a whole list
+    costs about what one row used to. Vetting records the galaxy it picked in
+    `host_name`/`host_catalog`, so the distance is read back out of that
+    galaxy's row rather than stored per candidate. Candidates scored off the
+    target's own redshift have no host, so theirs comes from that redshift.
+    """
+    candidates = list(event_candidates)
+    if not candidates:
+        return {}
+
+    recorded = {}
+    for score_factor in ScoreFactor.objects.filter(
+        event_candidate_id__in=[c.id for c in candidates],
+        key__in=("host_name", "host_catalog"),
+    ).only("event_candidate_id", "key", "value"):
+        recorded.setdefault(score_factor.event_candidate_id, {})[
+            score_factor.key] = score_factor.value
+
+    hosted = {c.id: recorded[c.id] for c in candidates
+              if _recorded_host_name(recorded.get(c.id))}
+
+    galaxies = {}
+    if hosted:
+        rows = TargetExtra.objects.filter(
+            target_id__in={c.target_id for c in candidates if c.id in hosted},
+            key="Host Galaxies",
+        ).values_list("target_id", "value")
+        for target_id, value in rows:
+            galaxies[target_id] = _host_galaxy_rows(value)
+
+    # the remainder were scored off the target's own redshift, if it has one
+    redshifts = dict(
+        Target.objects.filter(
+            id__in={c.target_id for c in candidates if c.id not in hosted}
+        ).values_list("id", "redshift")
+    )
+
+    distances = {}
+    for candidate in candidates:
+        if candidate.id in hosted:
+            found = _recorded_host_distance(
+                galaxies.get(candidate.target_id), hosted[candidate.id])
+        else:
+            found = _redshift_distance(redshifts.get(candidate.target_id))
+        if found is not None:
+            distances[candidate.id] = found
+    return distances
+
+
+def _recorded_host_name(recorded):
+    """The host id vetting recorded, or None where it recorded no host."""
+    if not recorded:
+        return None
+    name = recorded.get("host_name")
+    return None if name in (None, "", "None", "nan") else name
+
+
+def _host_galaxy_rows(value):
+    """The galaxy rows of a "Host Galaxies" TargetExtra, always as a list."""
+    try:
+        rows = json.loads(value)
+    except (TypeError, ValueError):
+        return []
+    return rows if isinstance(rows, list) else [rows]
+
+
+def _recorded_host_distance(galaxies, recorded):
+    """The distance of the galaxy vetting recorded, matched out of its table."""
+    if not galaxies:
+        return None
+    name = recorded.get("host_name")
+    matches = [g for g in galaxies if str(g.get("ID")) == str(name)]
+    if not matches:
+        # ids above 2**53 are recorded having been through a float, so the
+        # stored name can be a rounded copy of the one in this table
+        matches = [g for g in galaxies if _same_id_through_float(g.get("ID"), name)]
+    # ids repeat across catalogs, so the catalog breaks the tie where we have it
+    catalog = recorded.get("host_catalog")
+    if len(matches) > 1 and catalog:
+        matches = [g for g in matches if str(g.get("Source")) == str(catalog)]
+    # the same galaxy is sometimes ingested twice; rows that agree on the
+    # distance are not a real ambiguity, only conflicting ones are
+    found = {_finite(g.get("Dist")) for g in matches}
+    if len(found) != 1:
+        return None
+    distance = found.pop()
+    if distance is None:
+        return None
+    galaxy = matches[0]
+    neg_err, pos_err = _distance_bounds(galaxy.get("DistErr"))
+    return HostDistance(distance, neg_err, pos_err,
+                        f"{name} ({galaxy.get('Source')})")
+
+
+def _same_id_through_float(table_id, recorded):
+    """Whether two galaxy ids agree once both are put through a float."""
+    try:
+        return float(str(table_id).strip("'")) == float(str(recorded))
+    except (TypeError, ValueError):
+        return False
+
+
+def _distance_bounds(err):
+    """A galaxy's distance error, which the host table stores either as a
+    [low, high] pair or as one symmetric number."""
+    if isinstance(err, (list, tuple)) and len(err) == 2:
+        return _finite(err[0]), _finite(err[1])
+    symmetric = _finite(err)
+    return symmetric, symmetric
+
+
+def _finite(value):
+    """A float, or None where it is missing or not a finite number."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if math.isnan(value) or math.isinf(value) else value
+
+
+def _redshift_distance(redshift):
+    """The luminosity distance of a target's own redshift, as vetting takes it.
+
+    Redshifts are stored as NaN rather than NULL where unknown, and a
+    non-positive one is not a distance, so both come back as no distance.
+    """
+    redshift = _finite(redshift)
+    if redshift is None or redshift <= 0:
+        return None
+    err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
+    return HostDistance(
+        cosmo.luminosity_distance(redshift).to(u.Mpc).value,
+        err, err, "target redshift")
 
 
 def _latest_run(tasks, latest):

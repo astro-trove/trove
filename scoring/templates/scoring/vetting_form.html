@@ -87,7 +87,7 @@
         box-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
     }
 
-    /* Warnings shown before a "Vet All" run is started */
+    /* Warnings shown before vetting is started */
     .vetting-warning {
         background: rgba(255, 193, 7, 0.12);
         border: 1px solid rgba(255, 193, 7, 0.6);
@@ -123,28 +123,31 @@
     <div class="vetting-card">
         <h2>Candidate Vetting Submission Page</h2>
 
-        {% if vet_all_candidate_count %}
-        <div class="vetting-warning">
-            <strong>This vets all {{ vet_all_candidate_count }} candidate{{ vet_all_candidate_count|pluralize }} of this event.</strong>
-            Each candidate is queued as its own task, run in parallel, taking a few seconds each.
-        </div>
-        {% endif %}
-
         {% if vet_all_progress.running and vet_all_progress.percent < 100 %}
         <div class="vetting-warning vetting-warning-active">
-            <strong>Vet All tasks are already in progress</strong>
+            <strong>Vetting tasks are already in progress</strong>
             {% if vet_all_progress.total %}
             ({{ vet_all_progress.done }} of {{ vet_all_progress.total }} candidates done).
             {% else %}
             ({{ vet_all_progress.pending }} candidate{{ vet_all_progress.pending|pluralize }} still queued).
             {% endif %}
-            Starting another one now will queue every candidate a second time.
+            This candidate may be re-scored by that run, so vetting it now could be redundant.
         </div>
         {% endif %}
 
         <form action="" method="post">
             {% csrf_token %}
-          
+            {# the selection arrived with the table's POST, so it has to ride along #}
+            {% for candidate_id in selected_ids %}
+            <input type="hidden" name="candidates" value="{{ candidate_id }}">
+            {% endfor %}
+            {% if select_all_matching %}
+            <input type="hidden" name="select_all_matching" value="{{ select_all_matching }}">
+            {% endif %}
+            {% if filters %}
+            <input type="hidden" name="filters" value="{{ filters }}">
+            {% endif %}
+
             {{ form|crispy }}
             
             <div class="d-grid">

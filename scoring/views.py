@@ -424,6 +424,17 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
             return scoped
         return scoped.filter(id__in=self.selected_ids())
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # The table's POST carries the selection, not a vetting method, so it is
+        # not an attempt to submit this form. Binding it to that POST marked
+        # every field as missing before the user had chosen anything.
+        if (self.request.method == "POST"
+                and "vetting_method" not in self.request.POST):
+            kwargs.pop("data", None)
+            kwargs.pop("files", None)
+        return kwargs
+
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
         nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])

@@ -19,6 +19,7 @@ from scoring.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
+    host_distances,
     kilonova_scores_exist,
     most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
@@ -229,6 +230,10 @@ def display_score_details(context, target_id):
         )
         score_details.append(sf_set)
 
+    # the distance each of this target's candidates was scored against, read
+    # back out of the host galaxy vetting recorded -- one batch for every card
+    distances = host_distances(target.eventcandidate_set.all())
+
     # Build structured data instead of strings
     cards = []
 
@@ -300,6 +305,16 @@ def display_score_details(context, target_id):
                     "text": not numeric,
                     "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
+            if score_factor.key == "host_distance_score":
+                # host_distance_score is written whenever distance scoring ran, so
+                # it is the one row the distance can reliably sit beside
+                event_card["details"].append({
+                    "key": "host_distance",
+                    "label": "Distance",
+                    "value": host_distance_cell(distances.get(ec.id), unit=True),
+                    "text": False,
+                    "only": None,
+                })
             if score_factor.key == "predetection_score":
                 event_card["details"].append({
                     "key": "predetected",
@@ -521,6 +536,25 @@ def _str_int_format(s):
 
 def _str_format(s):
     return str(s)
+
+
+@register.filter
+def host_distance_cell(dist, unit=False):
+    """A host distance with its uncertainty, to one decimal place.
+
+    One place, and `+`/`-` for bounds that differ, is how the host galaxy table
+    beside it shows the same numbers.
+    """
+    if dist is None or dist.distance is None:
+        return "\u2014"
+    mpc = "&nbsp;Mpc" if unit else ""
+    neg, pos = dist.neg_err, dist.pos_err
+    shown = f"{dist.distance:.1f}"
+    if neg is None or pos is None:
+        return mark_safe(f"{shown}{mpc}")
+    if neg == pos:
+        return mark_safe(f"{shown} &plusmn; {pos:.1f}{mpc}")
+    return mark_safe(f"{shown} +{pos:.1f} &minus;{neg:.1f}{mpc}")
 
 
 @register.filter

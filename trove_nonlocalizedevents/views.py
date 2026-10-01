@@ -25,6 +25,7 @@ from scoring.util import (
     get_last_vet_all_run,
     get_no_score_message,
     get_vet_all_progress,
+    host_distances,
     kilonova_scores_exist,
     most_likely_class_for_event,
     KN_STYLE_CLASSES,
@@ -79,16 +80,19 @@ DISTANCE_TYPE_PATTERNS = {
 
 #: sub-score columns, chosen by how the event is scored. agn_score is left out
 #: because the AGN toggle can take it out of the total it would appear to explain.
-SUBSCORE_COLUMNS_BBH = ["skymap_score", "agn_flare_score", "flare_shape_score",
-                        "contaminant_score"]
-SUBSCORE_COLUMNS_KN = ["skymap_score", "host_distance_score"]
+#: The 2D and distance scores are left out as well: the table already carries the
+#: RA/Dec and the distance they are computed from, and a candidate's page has them.
+SUBSCORE_COLUMNS_BBH = ["agn_flare_score", "nuclear_offset_score"]
+SUBSCORE_COLUMNS_KN = []
 SUBSCORE_LABELS = {
-    "skymap_score": "2D Score",
-    "host_distance_score": "Dist. Score",
     "agn_flare_score": "Flare Score",
-    "flare_shape_score": "Shape Score",
-    "contaminant_score": "Contam. Score",
+    "nuclear_offset_score": "Nuclear Offset Score",
 }
+
+
+#: sort key for the distance column, which is a measurement rather than a score
+#: and so is not a ScoreFactor key like the columns above
+DISTANCE_SORT_KEY = "distance_estimate"
 
 
 def subscore_columns_for(event_class):
@@ -279,20 +283,30 @@ class EventCandidateListView(FilterView):
         # sub-scores for every scored candidate, so these columns can be sorted
         # on rather than only the ones on the current page
         subscores = {}
-        for sf in ScoreFactor.objects.filter(
-            event_candidate_id__in=[c.id for c in scored_candidates],
-            key__in=subscore_columns,
-        ).only("event_candidate_id", "key", "value"):
-            try:
-                subscores.setdefault(sf.event_candidate_id, {})[sf.key] = float(sf.value)
-            except (TypeError, ValueError):
-                pass
+        if subscore_columns:
+            for sf in ScoreFactor.objects.filter(
+                event_candidate_id__in=[c.id for c in scored_candidates],
+                key__in=subscore_columns,
+            ).only("event_candidate_id", "key", "value"):
+                try:
+                    subscores.setdefault(
+                        sf.event_candidate_id, {})[sf.key] = float(sf.value)
+                except (TypeError, ValueError):
+                    pass
         context["subscores"] = subscores
+        context["distance_sort_key"] = DISTANCE_SORT_KEY
 
-        sortable = all_transients + subscore_columns
+        sortable = all_transients + subscore_columns + [DISTANCE_SORT_KEY]
         sort_key = self.request.GET.get("sort")
         if sort_key not in sortable:
             sort_key = all_transients[0] if all_transients else None
+
+        # Reading a distance back costs that candidate's host galaxy table, so
+        # the whole list is only fetched when the column is sorted on; the rest
+        # of the time the page is all that gets shown.
+        distance_estimates = (
+            host_distances(scored_candidates) if sort_key == DISTANCE_SORT_KEY else {}
+        )
 
         def sort_value(candidate):
             """Whatever the chosen column shows for this candidate."""
@@ -304,7 +318,13 @@ class EventCandidateListView(FilterView):
         score_sort_key = sort_key if sort_key in all_transients else (
             all_transients[0] if all_transients else None)
 
-        if sort_key:
+        if sort_key == DISTANCE_SORT_KEY:
+            # nearest first, unlike the scores, and no distance known sorts last
+            scored_candidates = sorted(scored_candidates, key=lambda c: (
+                c.id not in distance_estimates,
+                getattr(distance_estimates.get(c.id), "distance", 0.0),
+            ))
+        elif sort_key:
             scored_candidates = sorted(scored_candidates, reverse=True, key=sort_value)
         context["sort_key"] = sort_key
         context["score_sort_key"] = score_sort_key
@@ -343,6 +363,10 @@ class EventCandidateListView(FilterView):
                       .only("target_id", "timestamp", "value")):
             latest_mag[datum.target_id] = dict(datum.value, is_limit=True)
         context["latest_mag"] = latest_mag
+
+        if sort_key != DISTANCE_SORT_KEY:
+            distance_estimates = host_distances(page_obj.object_list)
+        context["distance_estimates"] = distance_estimates
 
         context["subscore_columns"] = subscore_columns
         context["subscore_labels"] = SUBSCORE_LABELS
