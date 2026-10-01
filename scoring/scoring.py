@@ -4,7 +4,7 @@ from .healpix_utils import SaTarget
 
 from candidate_vetting.vet import GALAXY_CATALOGS
 
-import io
+import json
 import logging
 from datetime import timezone
 
@@ -40,6 +40,20 @@ GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate([UserGalaxy] + GAL
 ### TODO: these are filler values, should just change them to nulls in our database
 # LS DR9 North / DELVE DR3, PS1-STRM, SDSS DR12 photo-z / DELVE DR3
 Z_BAD_VALUES = (-99.0, -999.0, -9999.0)
+
+HOST_ID_COLUMNS = ("ID", "troveID")
+
+
+def read_host_galaxies_json(value: str) -> pd.DataFrame:
+    """The saved "Host Galaxies" JSON as a dataframe, with the ID columns exact."""
+    rows = json.loads(value)
+    host_df = pd.DataFrame(rows)
+    # pandas makes the whole column float64 if any ID is null, rounding IDs above 2**53
+    for col in HOST_ID_COLUMNS:
+        if col in host_df.columns:
+            host_df[col] = pd.Series([row.get(col) for row in rows], dtype=object)
+    return host_df
+
 
 def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
     """Drop host galaxy rows with bad values."""
@@ -307,9 +321,7 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
     if not hosts.count():
         return _distance_at_healpix(nonlocalized_event_name, target_id)
-    host_df = pd.read_json(
-        io.StringIO(hosts[0].value)
-    )  # since we store the host info as a json str in the db
+    host_df = read_host_galaxies_json(hosts[0].value)
 
     # clean up dataframe
     host_df = clean_host_df(host_df)

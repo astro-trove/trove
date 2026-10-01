@@ -4,6 +4,7 @@ Some functions for accessing the EventCandidate table inside a django template
 
 import numpy as np
 from collections import OrderedDict
+from decimal import Decimal, InvalidOperation
 from functools import partial
 from django import template
 from django.core.cache import cache
@@ -495,9 +496,9 @@ def _baseline_format(mag, std):
 
 
 def _safe_format(value, fmter):
-    # a name is text even when it looks numeric; float() would round a long ID
-    if fmter is _str_format:
-        return str(value)
+    # names/IDs are text even when they look numeric; float() would round a long ID
+    if fmter in (_str_format, _str_int_format):
+        return fmter(value)
     for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
         try:
             return candidate()
@@ -538,10 +539,14 @@ def _predetected_yesno(flt):
     return "Yes" if flt < 1 else "No"
   
 def _str_int_format(s):
+    # Decimal, not float: IDs above 2**53 must keep every digit
     try:
-        return str(int(s))
-    except ValueError:
+        d = Decimal(str(s).strip())
+    except InvalidOperation:
         return str(s)
+    if d.is_finite() and d == d.to_integral_value():
+        return str(int(d))
+    return str(s)
 
 def _str_format(s):
     return str(s)
