@@ -9,7 +9,6 @@ from scipy.stats import norm
 from .scoring import (
     host_distance_match,
     get_distance_score,
-    store_host_distance,
     skymap_association,
     clean_host_df,
     _localization_from_name,
@@ -365,22 +364,17 @@ def vet_bbh(
 
     host_df = clean_host_df(host_df)
     if target.redshift is not None and not np.isnan(target.redshift):
-        distance = get_distance_score(
+        host_score, host_name = get_distance_score(
             host_df, target_id, nonlocalized_event_name
         )
-        host_score = distance.score
         update_score_factor(event_candidate, "host_distance_score", host_score)
-        store_host_distance(event_candidate, distance)
     elif len(host_df) != 0:
         host_df = host_distance_match(host_df, target_id, nonlocalized_event_name)
 
-        distance = get_distance_score(
+        host_score, host_name, host_catalog = get_distance_score(
             host_df, target_id, nonlocalized_event_name
         )
-        host_score, host_name, host_catalog = (
-            distance.score, distance.host_name, distance.host_catalog)
         update_score_factor(event_candidate, "host_distance_score", host_score)
-        store_host_distance(event_candidate, distance)
         # a catalog row can be missing either, and ScoreFactor.value is not nullable
         for key, value in (("host_name", host_name), ("host_catalog", host_catalog)):
             if value is None or (isinstance(value, float) and np.isnan(value)):

@@ -15,7 +15,6 @@ from .scoring import (
     clean_host_df,
     host_distance_match,
     get_distance_score,
-    store_host_distance,
     skymap_association,
     _localization_from_name,
     classification_score,
@@ -99,25 +98,20 @@ def vet_super_kn(
     ## distance scoring
     if target.redshift is not None and not np.isnan(target.redshift):
         # use target redshift, so no need to compute distance scores for galaxies
-        distance = get_distance_score(
+        host_score, host_name = get_distance_score(
             host_df, target_id, nonlocalized_event_name
         )
-        host_score = distance.score
         update_score_factor(event_candidate, "host_distance_score", host_score)
-        store_host_distance(event_candidate, distance)
 
     elif len(host_df) != 0:
         # then run the distance comparison for each of these hosts
         host_df = host_distance_match(host_df, target_id, nonlocalized_event_name)
 
         # choose the maximum score
-        distance = get_distance_score(
+        host_score, host_name, host_catalog = get_distance_score(
             host_df, target_id, nonlocalized_event_name
         )
-        host_score, host_name, host_catalog = (
-            distance.score, distance.host_name, distance.host_catalog)
         update_score_factor(event_candidate, "host_distance_score", host_score)
-        store_host_distance(event_candidate, distance)
         update_score_factor(event_candidate, "host_name", host_name)
         update_score_factor(event_candidate, "host_catalog", host_catalog)
 

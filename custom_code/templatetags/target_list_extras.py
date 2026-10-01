@@ -133,56 +133,15 @@ def redshift_cell(z, z_err):
 
 
 @register.inclusion_tag("tom_targets/partials/galaxy_table.html")
-def galaxy_table(target, nonlocalizedevent=None):
+def galaxy_table(target):
     """
     Displays the most likely host galaxy matches.
-
-    `nonlocalizedevent` marks the galaxy whose distance scored that event; the
-    choice is per event, so with none given nothing is marked.
     """
     te = TargetExtra.objects.filter(target=target, key="Host Galaxies")
     if te.exists():
         galaxies = json.loads(te.first().value)
         for galaxy in galaxies:
             _apply_redshift_formatting(galaxy)
-        _mark_scored_host(galaxies, target, nonlocalizedevent)
     else:
         galaxies = None
     return {"galaxies": galaxies}
-
-
-def _mark_scored_host(galaxies, target, nonlocalizedevent):
-    """Flag the row vetting used, matching on the id and catalog it recorded."""
-    if not nonlocalizedevent:
-        return
-    from scoring.models import ScoreFactor
-
-    recorded = dict(
-        ScoreFactor.objects.filter(
-            event_candidate__target=target,
-            event_candidate__nonlocalizedevent__event_id=nonlocalizedevent,
-            key__in=["host_name", "host_catalog"],
-        ).values_list("key", "value")
-    )
-    name = recorded.get("host_name")
-    if not name or name == "None":
-        return
-    catalog = recorded.get("host_catalog")
-    matches = [g for g in galaxies if str(g.get("ID")) == str(name)]
-    if not matches:
-        # ids above 2**53 can come back having been through a float, so the
-        # recorded name is a rounded copy of the one in this table
-        matches = [g for g in galaxies if _same_id_through_float(g.get("ID"), name)]
-    # ids repeat across catalogs, so the catalog breaks the tie when we have it
-    if len(matches) > 1 and catalog:
-        matches = [g for g in matches if str(g.get("Source")) == str(catalog)]
-    if len(matches) == 1:
-        matches[0]["used_for_distance"] = True
-
-
-def _same_id_through_float(table_id, recorded):
-    """Whether two ids agree once both are put through a float."""
-    try:
-        return float(str(table_id).strip("'")) == float(str(recorded))
-    except (TypeError, ValueError):
-        return False

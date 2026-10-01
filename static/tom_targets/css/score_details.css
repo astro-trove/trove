@@ -219,16 +219,3 @@
   max-width: 60%;
   line-height: 1.4;
 }
-
-/* asymmetric uncertainty stacked beside the value, for the flex detail rows */
-.score-details-wrapper .detail-value .err-stack {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  vertical-align: middle;
-  font-size: 0.7em;
-  font-weight: 500;
-  line-height: 1.15;
-  position: relative;
-  top: -0.05em;
-}
