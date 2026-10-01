@@ -180,6 +180,7 @@ def display_score_details(context, target_id):
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
+        host_distance=("Distance to Host Galaxy", _float_format),
         agn_score=(AGN_SCORE_LABEL, partial(_float_format, precision=1)),
         agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
         nuclear_offset_score=("Nuclear Offset Score", partial(_float_format, precision=2)),
@@ -293,6 +294,21 @@ def display_score_details(context, target_id):
 
             # one "median ± scatter" row per band
             if score_factor.key.startswith("baseline_std_"):
+                continue
+            if score_factor.key in ("host_distance_neg_err", "host_distance_pos_err"):
+                continue
+            if score_factor.key == "host_distance":
+                event_card["details"].append({
+                    "key": score_factor.key,
+                    "label": "Distance to Host Galaxy",
+                    "value": _distance_format(
+                        score_factor.value,
+                        values.get("host_distance_neg_err"),
+                        values.get("host_distance_pos_err"),
+                    ),
+                    "text": False,
+                    "only": None,
+                })
                 continue
             if score_factor.key.startswith("baseline_mag_"):
                 filt = score_factor.key[len("baseline_mag_"):]
@@ -492,6 +508,26 @@ def _baseline_format(mag, std):
         return text if std is None else f"{text} ± {float(std):.2f}"
     except (TypeError, ValueError):
         return str(mag)
+
+
+def _distance_format(dist, neg, pos):
+    """Distance with its uncertainty, as the host galaxy table shows it: one
+    decimal place, asymmetric bounds as sub/superscripts, symmetric as +/-."""
+    try:
+        text = f"{float(dist):.1f}"
+    except (TypeError, ValueError):
+        return str(dist)
+    try:
+        neg, pos = float(neg), float(pos)
+    except (TypeError, ValueError):
+        return f"{text} Mpc (no err.)"
+    if abs(neg - pos) < 1e-9:
+        return f"{text} &plusmn; {pos:.1f} Mpc"
+    # supsubdist is tuned for a table cell; this row is a flex span, so stack
+    # the bounds with their own markup instead
+    return (f"{text}&nbsp;<span class=\"err-stack\">"
+            f"<span>+{pos:.1f}</span><span>&minus;{neg:.1f}</span>"
+            f"</span>&nbsp;Mpc")
 
 
 def _safe_format(value, fmter):

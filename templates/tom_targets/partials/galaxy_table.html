@@ -14,7 +14,7 @@
       <th scope="col">Submitter [Original Source]</th>
     </tr>
   {% for galaxy in galaxies %}
-    <tr>
+    <tr{% if galaxy.used_for_distance %} class="scored-host" title="This galaxy's distance was used to score this candidate"{% endif %}>
       <td>{{ forloop.counter }}</td>
       <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&in_csys=Equatorial&in_equinox=J2000&ra={{galaxy.RA}}d&dec={{galaxy.Dec}}d&radius=0.02" target="_blank">{{ galaxy.ID }}</a> ({{ galaxy.Source }})</td>
       <td>{{ galaxy.PCC|floatformat:3 }}</td>

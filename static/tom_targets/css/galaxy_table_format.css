@@ -111,3 +111,9 @@ details table.table.galaxies th {
   color: #333;
   font-weight: bold;
 }
+
+/* the galaxy whose distance scored the candidate in scope */
+table.table.galaxies tr.scored-host td {
+  background-color: #fff3cd !important;
+  font-weight: 600;
+}
