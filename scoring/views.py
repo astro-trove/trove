@@ -421,6 +421,16 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
             target_name = params.get("target__name")
             if target_name:
                 scoped = scoped.filter(target__name__icontains=target_name)
+            # the distance cut is not a queryset filter, so apply it the same way
+            # the table does or "select all" vets rows the table did not show
+            from trove_nonlocalizedevents.views import _as_float, within_max_distance
+            from scoring.util import host_distances
+
+            distance_max = _as_float(params.get("distance_max"))
+            if distance_max is not None:
+                scoped = list(scoped)
+                return within_max_distance(
+                    scoped, host_distances(scoped), distance_max)
             return scoped
         return scoped.filter(id__in=self.selected_ids())
 
@@ -454,7 +464,6 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         context["selected_ids"] = self.selected_ids()
         context["select_all_matching"] = self.request.POST.get("select_all_matching", "")
         context["filters"] = self.request.POST.get("filters", "")
-        context["vet_selected_count"] = self.candidates().count()
         return context
 
     def post(self, request, *args, **kwargs):

@@ -108,8 +108,6 @@ class GWFilter(NonLocalizedEventFilter):
                                                   ('MS', 'Test')),
                                          empty_label='All',
                                          label='Alert Type', field_name='event_id', lookup_expr='startswith')
-    state = django_filters.ChoiceFilter(choices=(('ACTIVE', 'Active'), ('RETRACTED', 'Retracted')),
-                                        empty_label='All')
     status = django_filters.ChoiceFilter(
         choices=(('confirmed', 'Confirmed'), ('preliminary', 'Preliminary'),
                  ('retracted', 'Retracted')),

@@ -50,8 +50,13 @@ class EventCandidateSearchForm(forms.Form):
         label="Cone Dec:", required=False,
         widget=forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
     )
+    #: one degree. The search is already scoped to this event's candidates, so a
+    #: bigger cone is not slow so much as meaningless -- it stops being a cone.
+    MAX_CONE_RADIUS = 3600.0
+
     cone_radius = forms.FloatField(
-        label="Cone radius (\u2033):", required=False, min_value=0.0, initial=None,
+        label="Cone radius (\u2033):", required=False,
+        min_value=0.0, max_value=MAX_CONE_RADIUS, initial=None,
         widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "default 2"}),
     )
 
@@ -61,16 +66,23 @@ class EventCandidateSearchForm(forms.Form):
         ra, dec = cleaned.get("cone_ra"), cleaned.get("cone_dec")
         if (ra is None) != (dec is None):
             raise forms.ValidationError("Cone search needs both an RA and a Dec.")
+        if cleaned.get("cone_radius") is not None and ra is None:
+            raise forms.ValidationError(
+                "Cone radius needs an RA and a Dec to search around."
+            )
         return cleaned
 
     def __init__(self, *args, nle_id=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.nle_id = nle_id
 
-        # Add hidden field for nonlocalizedevent if provided
+        # Add hidden field for nonlocalizedevent if provided. The create form on
+        # the same page has a field of this name too, so give this one its own id
+        # rather than letting both auto-generate "id_nonlocalizedevent".
         if nle_id:
             self.fields["nonlocalizedevent"] = forms.CharField(
-                widget=forms.HiddenInput(), initial=nle_id, required=False
+                widget=forms.HiddenInput(attrs={"id": "id_filter_nonlocalizedevent"}),
+                initial=nle_id, required=False
             )
 
 

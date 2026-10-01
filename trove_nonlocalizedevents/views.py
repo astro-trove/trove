@@ -136,17 +136,29 @@ def invalidate_scored_candidates_cache(query_params):
                 query_params, agn_toggle, phot_method))
 
 
+def within_max_distance(candidates, distances, distance_max):
+    """The candidates inside a distance cut, as the Distance column measures it.
+
+    Not a queryset filter: the distance is read back out of the host galaxy that
+    vetting recorded, so it is only known in Python. `target.distance` is a
+    different quantity -- the target's own redshift distance, which is set for a
+    small minority of candidates -- and filtering on it dropped rows the column
+    was showing as nearby.
+    """
+    if distance_max is None:
+        return candidates
+    # no known distance cannot be shown to be within the cut, so it does not pass
+    return [c for c in candidates
+            if c.id in distances and distances[c.id].distance <= distance_max]
+
+
 def filter_candidates(qs, get):
     """The filters that can be answered from the database.
 
     Shared by the candidate table and by "select all matching", so the rows you
-    are shown and the rows you vet are chosen the same way. Score is not here:
-    scores are computed in Python, so that filter runs on the scored list.
+    are shown and the rows you vet are chosen the same way. Score and distance
+    are not here: both are computed in Python, so they run on the scored list.
     """
-
-    distance_max = _as_float(get.get("distance_max"))
-    if distance_max is not None:
-        qs = qs.filter(target__distance__lte=distance_max)
 
     # first detection == earliest photometry point, as in
     # custom_code.hooks.associate_targets_with_nle
@@ -180,7 +192,10 @@ def filter_candidates(qs, get):
 
     ra, dec = _as_float(get.get("cone_ra")), _as_float(get.get("cone_dec"))
     if ra is not None and dec is not None:
-        radius = _as_float(get.get("cone_radius")) or 2.0  # arcsec, as in scoring.api
+        # `or` would turn an explicit 0 into the default; 0 means 0
+        radius = _as_float(get.get("cone_radius"))
+        if radius is None:
+            radius = 2.0  # arcsec, as in scoring.api
         targets = cone_search_filter(
             Target.objects.filter(id__in=qs.values_list("target_id", flat=True)),
             ra, dec, radius / 3600.0,
@@ -302,21 +317,19 @@ class EventCandidateListView(FilterView):
             sort_key = all_transients[0] if all_transients else None
 
         # Reading a distance back costs that candidate's host galaxy table, so
-        # the whole list is only fetched when the column is sorted on; the rest
-        # of the time the page is all that gets shown.
-        distance_estimates = (
-            host_distances(scored_candidates) if sort_key == DISTANCE_SORT_KEY else {}
-        )
+        # the whole list is only fetched when the column is sorted on or cut by;
+        # the rest of the time the page is all that gets shown.
+        distance_max = _as_float(self.request.GET.get("distance_max"))
+        needs_all = sort_key == DISTANCE_SORT_KEY or distance_max is not None
+        distance_estimates = host_distances(scored_candidates) if needs_all else {}
+        scored_candidates = within_max_distance(
+            scored_candidates, distance_estimates, distance_max)
 
         def sort_value(candidate):
             """Whatever the chosen column shows for this candidate."""
             if sort_key in subscore_columns:
                 return subscores.get(candidate.id, {}).get(sort_key, -1)
             return (candidate.score or {}).get(sort_key, 0)
-
-        # the score column the table is ordered by
-        score_sort_key = sort_key if sort_key in all_transients else (
-            all_transients[0] if all_transients else None)
 
         if sort_key == DISTANCE_SORT_KEY:
             # nearest first, unlike the scores, and no distance known sorts last
@@ -327,7 +340,6 @@ class EventCandidateListView(FilterView):
         elif sort_key:
             scored_candidates = sorted(scored_candidates, reverse=True, key=sort_value)
         context["sort_key"] = sort_key
-        context["score_sort_key"] = score_sort_key
 
         # Paginate the cached scored list
         paginator = Paginator(scored_candidates, self.paginate_by)
@@ -364,7 +376,7 @@ class EventCandidateListView(FilterView):
             latest_mag[datum.target_id] = dict(datum.value, is_limit=True)
         context["latest_mag"] = latest_mag
 
-        if sort_key != DISTANCE_SORT_KEY:
+        if not needs_all:
             distance_estimates = host_distances(page_obj.object_list)
         context["distance_estimates"] = distance_estimates
 

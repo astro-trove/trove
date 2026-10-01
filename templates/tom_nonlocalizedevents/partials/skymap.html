@@ -74,14 +74,26 @@ function addHoverLabel(aladin) {
         'font-size:12px; white-space:nowrap; transform:translate(-50%,-150%)';
     div.appendChild(label);
 
+    // a click opens Aladin's own popup over the same spot, so the label has to
+    // get out of the way and stay away until the pointer leaves the source --
+    // otherwise it sits on top of the popup's link
+    var suppressed = false;
+
     aladin.on('objectHovered', function(object) {
-        if (!object || !object.popupTitle) { return; }
+        if (suppressed || !object || !object.popupTitle) { return; }
         label.textContent = object.popupTitle;
         label.style.left = object.x + 'px';
         label.style.top = object.y + 'px';
         label.style.display = 'block';
     });
-    aladin.on('objectHoveredStop', function() { label.style.display = 'none'; });
+    aladin.on('objectHoveredStop', function() {
+        label.style.display = 'none';
+        suppressed = false;
+    });
+    aladin.on('objectClicked', function() {
+        label.style.display = 'none';
+        suppressed = true;
+    });
 }
 
 var aladinScript = document.createElement('script');

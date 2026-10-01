@@ -281,10 +281,12 @@ function wireCandidateSelection() {
 }
 
 wireCandidateSelection();
-// the table is replaced wholesale when filters or sorting change, so re-bind
-document.body.addEventListener('htmx:afterSwap', function (e) {
-    if (e.target.id === 'candidate-results') { wireCandidateSelection(); }
-});
+if (!window.candidateSelectionBound) {
+    window.candidateSelectionBound = true;
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+        if (e.target.id === 'candidate-results') { wireCandidateSelection(); }
+    });
+}
 
 function openSummaryModal() {
     const nleId = "{{ request.GET.nonlocalizedevent }}";
