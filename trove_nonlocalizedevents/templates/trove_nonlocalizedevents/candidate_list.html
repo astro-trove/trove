@@ -27,7 +27,6 @@
 {% block title %}Candidates{% endblock %}
 {% block content %}
 
-{% vet_all_is_allowed as can_vet_all %}
 
 {% if request.GET.nonlocalizedevent %}
 <h1>
@@ -61,22 +60,11 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 <br><br>
 <div class="row">
   {% if request.user.is_authenticated %}
-  {% if can_vet_all or request.user.is_superuser %}
-  <a
-    href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
-    title="Run vetting for all candidates"
-    class="btn btn-warning btn-lg">
-    Vet All
-  </a>
-  {% else %}
-  <a href="{% url 'trove_nonlocalizedevents:vet_all_cooldown_notice' %}"
-     class="btn btn-warning btn-lg"
-     style="opacity: 0.3;"
-     title="Vetting all candidates is not available because it was run within the last hour"
-     onclick="document.getElementById('cooldown-msg').style.display='block'; return false;">
-    Vet All
-  </a>
-  {% endif %}
+  {# one button: "Select all with filters" below covers what Vet All used to do #}
+  <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
+          id="vet-selected-btn" title="Run vetting for the candidates you ticked">
+    Vet Selected (<span id="vet-selected-count">0</span>)
+  </button>
   {% endif %}
   &nbsp;&nbsp;
   {% if request.user.is_superuser %}

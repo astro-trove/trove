@@ -8,7 +8,6 @@ from functools import partial
 from django import template
 from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
-from django.conf import settings
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 from trove_targets.models import Target
@@ -20,6 +19,7 @@ from scoring.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
+    host_distances,
     kilonova_scores_exist,
     most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
@@ -70,29 +70,6 @@ def get_event_candidate_scores(*args, **kwargs):
 def get_target_score(*args, **kwargs):
     """A wrapper on the imported _get_target_score, but registered as a tag"""
     return _get_target_score(*args, **kwargs)
-
-@register.simple_tag(takes_context=True)
-def vet_all_is_allowed(context):
-    """Is the Vet All button enabled, or is this event within its cooldown?
-
-    True when nothing has run recently. ``VetAllView.form_valid`` sets
-    ``VETTING_COOLDOWN_KEY_<nle_id>`` for ``VETTING_COOLDOWN_PERIOD`` (1 hour)
-    when the button is used, so the presence of that key IS the cooldown.
-
-    This used to compute the key and then fall off the end of the function,
-    returning None. None is falsy, so the template took every event to be on
-    cooldown permanently and the button was greyed out for good -- with no
-    cooldown actually set anywhere.
-    """
-    request = context['request']
-    nle_id = request.GET.get('nonlocalizedevent')
-    if not nle_id:
-        # No event in scope, so nothing to rate-limit. Returning True also
-        # avoids `KEY + "_" + None`, which raises TypeError and would take the
-        # whole page down rather than just disabling a button.
-        return True
-    cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
-    return not cache.get(cooldown_cache_key)
 
 def _event_classes_in_scope(context, target_id=None):
     """Classifications of the events the scoring-adjustments panel applies to:
@@ -253,6 +230,10 @@ def display_score_details(context, target_id):
         )
         score_details.append(sf_set)
 
+    # the distance each of this target's candidates was scored against, read
+    # back out of the host galaxy vetting recorded -- one batch for every card
+    distances = host_distances(target.eventcandidate_set.all())
+
     # Build structured data instead of strings
     cards = []
 
@@ -324,6 +305,16 @@ def display_score_details(context, target_id):
                     "text": not numeric,
                     "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
+            if score_factor.key == "host_distance_score":
+                # host_distance_score is written whenever distance scoring ran, so
+                # it is the one row the distance can reliably sit beside
+                event_card["details"].append({
+                    "key": "host_distance",
+                    "label": "Distance",
+                    "value": host_distance_cell(distances.get(ec.id), unit=True),
+                    "text": False,
+                    "only": None,
+                })
             if score_factor.key == "predetection_score":
                 event_card["details"].append({
                     "key": "predetected",
@@ -545,3 +536,39 @@ def _str_int_format(s):
 
 def _str_format(s):
     return str(s)
+
+
+@register.filter
+def host_distance_cell(dist, unit=False):
+    """A host distance with its uncertainty, to one decimal place.
+
+    One place, and `+`/`-` for bounds that differ, is how the host galaxy table
+    beside it shows the same numbers.
+    """
+    if dist is None or dist.distance is None:
+        return "\u2014"
+    mpc = "&nbsp;Mpc" if unit else ""
+    neg, pos = dist.neg_err, dist.pos_err
+    shown = f"{dist.distance:.1f}"
+    if neg is None or pos is None:
+        return mark_safe(f"{shown}{mpc}")
+    if neg == pos:
+        return mark_safe(f"{shown} &plusmn; {pos:.1f}{mpc}")
+    return mark_safe(f"{shown} +{pos:.1f} &minus;{neg:.1f}{mpc}")
+
+
+@register.filter
+def lookup(mapping, key):
+    """One value out of a dict, for templates that need a variable key."""
+    if not mapping:
+        return None
+    return mapping.get(key)
+
+
+@register.simple_tag
+def query_replace(request, key, value):
+    """This page's query string with one parameter replaced."""
+    params = request.GET.copy()
+    params[key] = value
+    params.pop("page", None)
+    return params.urlencode()

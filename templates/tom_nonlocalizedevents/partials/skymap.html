@@ -1,4 +1,6 @@
-<div id='aladin-lite-div' style='aspect-ratio: 2'></div>
+<div id='aladin-wrap' style='position: relative'>
+  <div id='aladin-lite-div' style='aspect-ratio: 2'></div>
+</div>
 <script type="text/javascript">
 (function() {
 function renderAladin() {
@@ -26,11 +28,72 @@ function renderAladin() {
         var cat_ra = {{ candidate.target.ra }};
         var cat_dec = {{ candidate.target.dec }};
         var cat_name = '{{ candidate.target.name }}'
-        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name})]);
+        // popupDesc is rendered as HTML, so the popup can link to the target page
+        var cat_link = '<a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" target="_blank">View Target Page</a>';
+        candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name, popupDesc: cat_link})]);
     {% endfor %}
     var json = {{ credible_region|safe }};
     var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
     aladin.addMOC(moc);
+
+    addHoverLabel(aladin);
+    keepLayoutInStep(aladin);
+}
+
+// Aladin sizes itself once at startup and falls back to 1px on an empty read,
+// which HTMX swapping this partial in can cause; re-measure once layout settles.
+function keepLayoutInStep(aladin) {
+    function remeasure() {
+        var view = aladin && aladin.view;
+        if (!view || typeof view.fixLayoutDimensions !== 'function') { return; }
+        view.fixLayoutDimensions();
+        if (typeof view.requestRedraw === 'function') { view.requestRedraw(); }
+    }
+    requestAnimationFrame(remeasure);
+    setTimeout(remeasure, 250);
+    window.addEventListener('resize', remeasure);
+    window.addEventListener('load', remeasure);
+
+    var wrap = document.getElementById('aladin-wrap');
+    if (wrap && window.IntersectionObserver) {
+        // it can start off-screen, where layout work may be deferred entirely
+        new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) { if (e.isIntersecting) { remeasure(); } });
+        }).observe(wrap);
+    }
+}
+
+// Show a source's name on hover. Clicking still opens Aladin's own popup, which
+// carries the link; this is just the quick look while moving across the map.
+function addHoverLabel(aladin) {
+    var div = document.getElementById('aladin-wrap');
+    var label = document.createElement('div');
+    label.className = 'aladin-hover-label';
+    label.style.cssText = 'position:absolute; z-index:20; display:none; pointer-events:none;' +
+        'background:rgba(0,0,0,0.75); color:#fff; padding:2px 6px; border-radius:3px;' +
+        'font-size:12px; white-space:nowrap; transform:translate(-50%,-150%)';
+    div.appendChild(label);
+
+    // a click opens Aladin's own popup over the same spot, so the label has to
+    // get out of the way and stay away until the pointer leaves the source --
+    // otherwise it sits on top of the popup's link
+    var suppressed = false;
+
+    aladin.on('objectHovered', function(object) {
+        if (suppressed || !object || !object.popupTitle) { return; }
+        label.textContent = object.popupTitle;
+        label.style.left = object.x + 'px';
+        label.style.top = object.y + 'px';
+        label.style.display = 'block';
+    });
+    aladin.on('objectHoveredStop', function() {
+        label.style.display = 'none';
+        suppressed = false;
+    });
+    aladin.on('objectClicked', function() {
+        label.style.display = 'none';
+        suppressed = true;
+    });
 }
 
 var aladinScript = document.createElement('script');
