@@ -99,8 +99,7 @@
           {% endfor %}
           {% if score_columns %}
             {% for transient in score_columns %}
-            {# click a score to sort by it; several scores means several columns #}
-            <th title="Score for the {{ transient }} transient type -- click to sort by it">
+            <th title="{% if score_columns|length == 1 %}The only score for this event class. {% endif %}Score for the {{ transient }} transient type -- click to sort by it.{% if sort_key == transient %} The arrow marks the column the table is sorted by.{% endif %}">
               <a href="?{% query_replace request 'sort' transient %}"
                  hx-get="?{% query_replace request 'sort' transient %}"
                  hx-target="#candidate-results" hx-push-url="true">

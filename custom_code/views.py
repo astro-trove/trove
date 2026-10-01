@@ -9,7 +9,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.models import Group
 from django.urls import reverse, reverse_lazy
 from django.db import IntegrityError
-from django.db.models import Count, Prefetch
+from django.db.models import Prefetch
 from django.http import HttpResponseRedirect, QueryDict
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import TemplateResponseMixin, FormMixin, ProcessFormView, CreateView
@@ -269,7 +269,6 @@ class GWListView(NonLocalizedEventListView):
                   'sequences',
                   queryset=EventSequence.objects.select_related('localization')
                                                 .order_by('sequence_id')))
-              .annotate(candidate_count=Count('candidates', distinct=True))
               .order_by('-event_id'))
         try:
             search_str = self.kwargs["search_str"] # TRY to find a search string

@@ -40,7 +40,6 @@
         <th scope="col">GraceID</th>
         <th scope="col" title="Inverse False Alarm Rate">1/FAR</th>
         <th scope="col" title="Most Likely Classification">Class.</th>
-        <th scope="col" title="Number of candidate counterparts linked to this event">Cands.</th>
         <th scope="col" title="Distance">Distance</th>
         <th scope="col" title="Has Neutron Star?">NS?</th>
         <th scope="col" title="Has Remnant?">Bright?</th>
@@ -65,11 +64,6 @@
         </td>
         <td title="Inverse False Alarm Rate">{{ seq.details.far | format_inverse_far }}</td>
         <td title="Most Likely Classification">{{ seq.details | get_most_likely_class | truncate }}</td>
-        <td title="Number of candidate counterparts linked to this event">
-          {% if event.candidate_count %}
-            <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.candidate_count }}</a>
-          {% else %}0{% endif %}
-        </td>
         <td title="Distance">{{ seq.localization | format_distance }}</td>
         <td title="Has Neutron Star?">{{ seq.details.properties.HasNS | percentformat }}</td>
         <td title="Has Remnant?">{{ seq.details.properties.HasRemnant | percentformat }}</td>
