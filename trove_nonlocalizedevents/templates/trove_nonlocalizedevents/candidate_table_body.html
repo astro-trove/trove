@@ -88,11 +88,15 @@
 function openSummaryModal() {
     const nleId = "{{ request.GET.nonlocalizedevent }}";
     fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=5`)
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('summaryText').value = data.text;
-            $('#summaryModal').modal('show');
-        });
+    .then(r => {
+        if (!r.ok) throw new Error(`Report request failed (${r.status})`);
+        return r.json();
+    })
+    .then(data => {
+        document.getElementById('summaryText').value = data.text;
+        bootstrap.Modal.getOrCreateInstance(document.getElementById('summaryModal')).show();
+    })
+    .catch(err => alert(err.message));
 }
 
 function copyText() {
