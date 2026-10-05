@@ -32,6 +32,11 @@
 <li class="nav-item {% if 'targets' in request.resolver_match.route %}active{% endif %}">
     <a class="nav-link" href="{% url 'trove_targets:targetlist' %}">EM Candidates</a>
 </li>
+<li class="nav-item {% if request.resolver_match.namespace == '/docs' %}active{% endif %}">
+  {% if request.user.is_authenticated %}
+    <a class="nav-link" href="{% url 'sphinx_docs:docs' %}">Documentation</a>
+  {% endif %}
+</li>
 {% if request.user.is_superuser %}
   <li class="nav-item {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
       <a class="nav-link" href="{% url 'user-list' %}">Users</a>
