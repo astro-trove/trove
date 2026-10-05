@@ -72,7 +72,7 @@ MIDDLEWARE = TOMTOOLKIT_MIDDLEWARE + [
     "tom_common.middleware.Raise403Middleware",
     "tom_common.middleware.ExternalServiceMiddleware",
     "tom_common.middleware.AuthStrategyMiddleware",
-    "tom_registration.middleware.RedirectAuthenticatedUsersFromRegisterMiddleware",
+    #"tom_registration.middleware.RedirectAuthenticatedUsersFromRegisterMiddleware",
 ]
 
 ROOT_URLCONF = "trove_tom.urls"
