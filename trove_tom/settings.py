@@ -43,37 +43,10 @@ ALLOWED_HOSTS = [ALLOWED_HOST, "localhost", "127.0.0.1"]
 
 TOM_NAME = "TROVE"
 
-INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "whitenoise.runserver_nostatic",
-    "django.contrib.staticfiles",
-    "django.contrib.sites",
-    "django_extensions",
-    "guardian",
-    "tom_common",
-    "django_comments",
-    "django_bootstrap5",
-    "crispy_forms",
-    "crispy_bootstrap5",
-    "rest_framework",
-    "rest_framework.authtoken",
-    "django_filters",
-    "django_gravatar",
-    "tom_targets",
-    "tom_alerts",
-    "tom_catalogs",
-    "tom_observations",
-    "tom_dataproducts",
+INSTALLED_APPS = TOMTOOLKIT_INSTALLED_APPS + [
     "tom_alertstreams",
     "tom_nonlocalizedevents",
-    "webpack_loader",
     "custom_code",
-    "django_tasks",
-    "django_tasks.backends.database",
     "candidate_vetting",
     "trove_targets",
     "trove_nonlocalizedevents",
@@ -82,12 +55,11 @@ INSTALLED_APPS = [
     "sphinx_docs",
     "dal",
     "dal_select2",
-    "django_tables2",
 ]
 
 SITE_ID = 1
 
-MIDDLEWARE = [
+MIDDLEWARE = TOMTOOLKIT_MIDDLEWARE + [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -121,8 +93,8 @@ TEMPLATES = [
     },
 ]
 
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
-CRISPY_TEMPLATE_PACK = "bootstrap4"
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 WSGI_APPLICATION = "trove_tom.wsgi.application"
 
