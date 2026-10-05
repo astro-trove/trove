@@ -465,13 +465,8 @@ except Exception as exc:
     DUST_MAP = _dust_map_noop
 COMMENTS_ENABLED = False
 
-TOM_REGISTRATION = {
-    "REGISTRATION_AUTHENTICATION_BACKEND": "django.contrib.auth.backends.AllowAllUsersModelBackend",
-    "REGISTRATION_REDIRECT_PATTERN": "home",
-    "REGISTRATION_STRATEGY": "approval_required",
-    "SEND_APPROVAL_EMAILS": True,
-    "APPROVAL_SUBJECT": f"Congratulations!! Welcome to {TOM_NAME}!",
-}
+TOM_REGISTRATION_STRATEGY = 'approval_required'
+
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_USE_TLS = True  # this is needed for gmail, other services may vary
 EMAIL_USE_SSL = False  # this is needed for gmail, other services may vary
