@@ -1,4 +1,4 @@
-{% load static bootstrap4 tom_common_extras %}
+{% load static django_bootstrap5 tom_common_extras %}
 <!doctype html>
 <html lang="en">
   <head>
@@ -16,7 +16,7 @@
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}" sizes="32x32" />
     <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}" sizes="16x16" />
 
-    {% bootstrap_javascript jquery='True' %}
+    {% bootstrap_javascript %}
 
     <title>{% tom_name %} | {% block title %}{% endblock %}</title>
   </head>

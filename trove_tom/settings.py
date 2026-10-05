@@ -55,6 +55,11 @@ INSTALLED_APPS = TOMTOOLKIT_INSTALLED_APPS + [
     "sphinx_docs",
     "dal",
     "dal_select2",
+
+    # for now keep these in until we can finish with migrations
+    # TODO: REMOVE BEFORE OPENING PR
+    'tom_alerts',
+    
 ]
 
 SITE_ID = 1
