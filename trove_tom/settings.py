@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 from .settings_local import *
 import os
 import tempfile
+from tom_common.default_settings import *
 import datetime as _datetime
 from astropy.cosmology import FlatLambdaCDM
 from astropy import units as _u
@@ -55,9 +56,9 @@ INSTALLED_APPS = [
     "guardian",
     "tom_common",
     "django_comments",
-    "bootstrap4",
+    "django_bootstrap5",
     "crispy_forms",
-    "crispy_bootstrap4",
+    "crispy_bootstrap5",
     "rest_framework",
     "rest_framework.authtoken",
     "django_filters",
@@ -69,7 +70,6 @@ INSTALLED_APPS = [
     "tom_dataproducts",
     "tom_alertstreams",
     "tom_nonlocalizedevents",
-    "tom_registration",
     "webpack_loader",
     "custom_code",
     "django_tasks",
@@ -204,10 +204,10 @@ LOGIN_URL = FORCE_SCRIPT_NAME + "/accounts/login/"
 LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + "/"
 LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + "/"
 
-AUTHENTICATION_BACKENDS = (
+AUTHENTICATION_BACKENDS = TOMTOOLKIT_AUTHENTICATION_BACKENDS + [
     "django.contrib.auth.backends.AllowAllUsersModelBackend",
     "guardian.backends.ObjectPermissionBackend",
-)
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
