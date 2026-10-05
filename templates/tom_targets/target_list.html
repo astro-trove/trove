@@ -14,16 +14,16 @@
   <div class="col-md-10">
     <div class="row">
       <div class="col-md-12">
-	<span class="float-left">
+	<span class="float-start">
 	  <h4>{{ target_count }} Candidate{{ target_count|pluralize }}</h4>
 	</span>
-	<span class="float-right">
+	<span class="float-end">
         <a href="{% url 'targets:create' %}" title="Create a Target">
 	<button class="btn btn-primary" type="button">
           Create a New Candidate
         </button>
 	</a>
-        {% catalog_query_menu %}
+        {# catalog_query_menu #}
         </span>
       </div>
     </div>
@@ -36,6 +36,7 @@
     {# Placeholder for OOB target data updates from HTMX #}
     <div id="aladin-targets-data"></div>
 
+    {% comment %}
     {% if request.user.is_superuser %}
     <hr>
     <form id="grouping-form" action="{% url 'targets:add-remove-grouping' %}" method="POST">
@@ -46,6 +47,7 @@
       </div>
     </form>
     {% endif %}
+    {% endcomment %}
     
     <hr>
     <h3>Filter Candidates</h3>
