@@ -3,10 +3,9 @@
 {% block title %}Sign up{% endblock %}
 {% block content %}
 <h2>Sign up</h2>
-<form action="{% url 'registration:register' %}" method="POST">
+<form action="{% url 'account_signup' %}" method="POST">
 {% csrf_token %}
 {% bootstrap_form form %}
-{% bootstrap_formset form.user_profile_formset %}
 <div class="form-check mb-3">
   <input
     class="form-check-input"
@@ -30,5 +29,4 @@
 </div>
 </form>
 <hr/>
-<p><em>Built off of <a target="_blank" href="https://github.com/TOMToolkit/tom_registration">TOM Registration</a> version {{ version }}</em></p>
 {% endblock %}
