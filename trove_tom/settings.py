@@ -54,12 +54,7 @@ INSTALLED_APPS = TOMTOOLKIT_INSTALLED_APPS + [
     "scoring.kilonova_scorer_helpers",
     "sphinx_docs",
     "dal",
-    "dal_select2",
-
-    # for now keep these in until we can finish with migrations
-    # TODO: REMOVE BEFORE OPENING PR
-    'tom_alerts',
-    
+    "dal_select2"
 ]
 
 SITE_ID = 1
