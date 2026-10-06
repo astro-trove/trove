@@ -313,8 +313,9 @@ def estimate_max_find_decay_rate(
     n_dropped_domain = int((~_in_domain).sum())
     if n_dropped_domain:
         logger.info(
-            "Dropped %d photometry row(s) with non-finite mag/magerr or "+
-            "magerr <= 0 before fitting",
+            "Dropped %d photometry row(s) with non-finite mag/magerr, "+
+            f"magerr <= 0, or dt outside of [{t_pre}, {t_post}] days time "+
+            "window, before fitting",
             n_dropped_domain,
         )
     dt_days_tofit = dt_days[_in_domain]
