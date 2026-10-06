@@ -139,13 +139,12 @@ def vet_super_kn(
         nonlocalized_event=nonlocalized_event,
         t_pre=param_ranges["t_pre"],
     )
-    postphot = _get_post_disc_phot( # get post_GW phot
+    allphot = _get_post_disc_phot( # pre and post-GW phot within [t_pre, t_post] time window
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
+        t_pre=param_ranges["t_pre"],
         t_post=param_ranges["t_post"],
     )
-    # pre and post-GW phot within [t_pre, t_post] time window
-    allphot = pd.concat([prephot, postphot]).sort_values(by="dt")
     phot_score, lum, max_time, decay_rate, _, _ = _score_phot(
         allphot=allphot,
         target=target,

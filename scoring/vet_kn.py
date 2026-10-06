@@ -158,6 +158,7 @@ def vet_kn(
     allphot = _get_post_disc_phot(
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
+        t_pre=param_ranges["t_pre"],
         t_post=param_ranges["t_post"],
     )
     phot_score, lum, max_time, decay_rate, _, _ = _score_phot(

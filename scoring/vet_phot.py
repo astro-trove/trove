@@ -704,12 +704,8 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # then we can only do the next stuff if there is more than one photometry point
     # at this filter
-    # has to be at least 2 distinct EPOCHS before max_decay_fit_time to fit the
-    # powerlaw. Counting rows instead let a measurement ingested twice satisfy
-    # this and hand `estimate_max_find_decay_rate` a rank-deficient problem;
-    # that function now refuses such data as well, so this is the cheap guard
-    # and that one is the authoritative check.
-    _in_window = phot.dt[phot.dt < param_ranges["max_decay_fit_time"]]
+    # has to be at least 2 distinct EPOCHS before t_post to fit powerlaw
+    _in_window = phot.dt[phot.dt < param_ranges["t_post"]]
     if _in_window.nunique() > 1:
         # find the maximum and decay rate
         try:
