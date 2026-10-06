@@ -83,7 +83,7 @@ def event_for_target(value, target_pk):
     return None
 
 
-def _vetting_method_fields(form, event_id):
+def _vetting_method_fields(form, event_id, request):
     if event_id is None:
         form.fields["vetting_method"].choices = [("basic", "Basic Vetting")]
     else:
@@ -92,7 +92,7 @@ def _vetting_method_fields(form, event_id):
         form.fields["vetting_method"].initial = VETTING_FORM_INITIALS.get(
             cls, VETTING_FORM_INITIALS[""]
         )
-    return _phot_method_field(form)
+    return _phot_method_field(form, request)
   
 
 def _phot_method_field(form, request):
@@ -138,55 +138,16 @@ class TargetVettingFormView(LoginRequiredMixin, FormView):
         ))
         if not events:  # nothing to choose between, so basic vetting only
             del form.fields["nle"]
-            return _vetting_method_fields(form, None)
+            return _vetting_method_fields(form, None, self.request)
 
-        form.fields["nle"].choices = [("", "--- no event: basic vetting only ---")] + [
+        form.fields["nle"].choices = [("", "\u2014 No event (Basic Vetting only) \u2014")] + [
             (eid, f"{eid} \u2014 {methods_for_event(eid)[1] or 'unknown class'}")
             for eid in events
         ]
         # on POST, build the methods from the submitted event so validation sees
         # the same set the user was shown
         submitted = self.request.POST.get("nle") if self.request.method == "POST" else None
-        return _vetting_method_fields(form, event_for_target(submitted, target_pk))
-
-        # if NLE was provided by referer, use it to choose what vetting is allowed
-        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
-        try:
-            # first try with a TROVE id in the URL
-            nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
-        except (NonLocalizedEvent.DoesNotExist, ValueError):
-            # if these errors are thrown then this might be an event_id instead of a TROVE id
-            try:
-                nle = NonLocalizedEvent.objects.get(event_id=nle_name_or_id)
-            except NonLocalizedEvent.DoesNotExist:
-                nle = None
-
-        if nle:
-            nle_eventseq = localization_sequence_from_name(nle.event_id)
-            nle_most_likely_class = get_most_likely_class(
-                nle_eventseq.details
-            )  # most likely class for the NLE
-            # choices for vetting?
-            try:
-                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                    nle_most_likely_class
-                ]
-            except KeyError:
-                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                    ""
-                ]  # allow all types of vetting if most likely class not recognized
-            # initial option for vetting?
-            try:
-                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                    nle_most_likely_class
-                ]
-            except KeyError:
-                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                    ""
-                ] # set initial to basic if most likely class not recognized
-        else:
-            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
-        return _phot_method_field(form, self.request)
+        return _vetting_method_fields(form, event_for_target(submitted, target_pk), self.request)
 
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
@@ -220,7 +181,7 @@ class VettingMethodsPartialView(LoginRequiredMixin, View):
     def get(self, request, pk, *args, **kwargs):
         form = VettingChoiceForm()
         del form.fields["nle"]
-        form = _vetting_method_fields(form, event_for_target(request.GET.get("nle"), pk))
+        form = _vetting_method_fields(form, event_for_target(request.GET.get("nle"), pk), self.request)
         return render(
             request, "scoring/partials/vetting_method_fields.html", {"form": form}
         )
