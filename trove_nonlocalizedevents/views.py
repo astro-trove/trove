@@ -109,7 +109,7 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
     def handle_no_permission(self):
         # without this an anonymous visitor just saw an empty table, with no
         # hint that logging in was the missing piece
-        messages.warning(self.request, "You must be logged in to view candidates.")
+        messages.warning(self.request, "You must be logged in to view events' candidates.")
         return super().handle_no_permission()
 
     def get_queryset(self):
