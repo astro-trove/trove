@@ -59,8 +59,8 @@ from custom_code.templatetags.target_list_extras import galaxy_table
 
 
 
-def _phot_method_field(form):
-    """Offer the scorer choice, defaulting to whatever the site toggle shows.
+def _phot_method_field(form, request):
+    """Offer the scorer choice, defaulting to whatever this viewer's toggle shows.
 
     The values the template needs to keep the two selects in step ride along as
     data attributes rather than being repeated in the JavaScript, so the vetting
@@ -82,7 +82,7 @@ def _phot_method_field(form):
     form.fields["phot_method"].choices = [
         (m, PHOT_METHOD_LABELS[m]) for m in PHOT_METHOD_CHOICES
     ]
-    form.fields["phot_method"].initial = get_phot_method()
+    form.fields["phot_method"].initial = get_phot_method(request)
     form.fields["phot_method"].widget.attrs.update({
         "data-kn-only": PHOT_METHOD_KILONOVA,
         "data-fallback": PHOT_METHOD_TROVE,
@@ -96,7 +96,7 @@ def _clean_phot_method(value):
     return value if value in PHOT_METHOD_CHOICES else None
 
 
-class TargetVettingFormView(FormView):
+class TargetVettingFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
@@ -145,7 +145,7 @@ class TargetVettingFormView(FormView):
                 ] # set initial to basic if most likely class not recognized
         else:
             form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
-        return _phot_method_field(form)
+        return _phot_method_field(form, self.request)
 
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
@@ -202,7 +202,8 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             )
         else:
             # Only the KN pipeline takes a scorer; the others have just one.
-            phot_method = _clean_phot_method(request.GET.get("phot_method"))
+            phot_method = (_clean_phot_method(request.GET.get("phot_method"))
+                           or get_phot_method(request))
             extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
             vetting_func(target.id, nonlocalized_event_name, **extra)
             label = (f" using {PHOT_METHOD_LABELS[phot_method]} for scoring photometry"
@@ -256,7 +257,7 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
         return referer
 
 
-class TargetRedshiftUpdateFormView(FormView):
+class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/update_redshift_form.html"
     form_class = RedshiftUpdateForm
 
@@ -386,7 +387,7 @@ class TargetRedshiftUpdateFormView(FormView):
         return redirect(base_url)
 
 
-class TargetVettingAllFormView(FormView):
+class TargetVettingAllFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
@@ -418,7 +419,7 @@ class TargetVettingAllFormView(FormView):
             form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
                 ""
             ] # set initial to basic if most likely class not recognized
-        return _phot_method_field(form)
+        return _phot_method_field(form, self.request)
 
     # overriding the get_context_data function
     def get_context_data(self, **kwargs):
@@ -508,9 +509,10 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
         )
 
         # The scorer the user picked on the form, sent with every task so the
-        # whole run uses it -- workers cannot read the site-wide toggle, and it
-        # could be flipped mid-run in any case.
-        phot_method = _clean_phot_method(request.GET.get("phot_method"))
+        # whole run uses it -- workers have no session to read the toggle from,
+        # and it could be flipped mid-run in any case.
+        phot_method = (_clean_phot_method(request.GET.get("phot_method"))
+                       or get_phot_method(request))
 
         # then run the vetting, asynchronously
         messages.info(
@@ -526,7 +528,7 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
 
 
 
-class NonLocalizedEventAssociateTargetsFormView(FormView):
+class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/nle_associate_targets_form.html"
     form_class = NonLocalizedEventAssociateTargetsForm
 
