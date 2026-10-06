@@ -54,7 +54,11 @@ INSTALLED_APPS = TOMTOOLKIT_INSTALLED_APPS + [
     "scoring.kilonova_scorer_helpers",
     "sphinx_docs",
     "dal",
-    "dal_select2"
+    "dal_select2",
+
+    # Including tom_alerts is just to make sure the migrations work in production
+    # TODO: Remove in some future PR, after all three deployments have been migrated
+    "tom_alerts"
 ]
 
 SITE_ID = 1
