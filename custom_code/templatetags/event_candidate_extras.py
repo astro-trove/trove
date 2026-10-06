@@ -18,6 +18,7 @@ from scoring.models import ScoreFactor
 from scoring.scoring import mpc_score_from_match
 from scoring.util import (
     agn_counts_toward,
+    get_agn_toggle as _get_agn_toggle,
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
@@ -37,29 +38,24 @@ from scoring.phot_method import (
 register = template.Library()
 
 
-@register.simple_tag
-def get_agn_toggle():
-    """Current value of the site-wide, cache-backed agn_toggle flag."""
-    return cache.get("agn_toggle", True)
+@register.simple_tag(takes_context=True)
+def get_agn_toggle(context):
+    """This viewer's agn_toggle flag, from their session."""
+    return _get_agn_toggle(context["request"])
 
 
-@register.simple_tag
-def get_phot_method():
-    """Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
-
-    Site-wide and cache-backed, exactly like ``agn_toggle``. Unlike the AGN
-    flag, flipping this does NOT rescore anything -- the stored factors are not
-    recomputed and no vetting is triggered. It only changes which scorer the
-    NEXT Vet All run uses, so the button is cheap to press and cannot cost a
-    user a long re-vet by accident.
+@register.simple_tag(takes_context=True)
+def get_phot_method(context):
     """
-    return _get_phot_method()
+    Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
+    """
+    return _get_phot_method(context["request"])
 
 
-@register.simple_tag
-def get_phot_method_label():
+@register.simple_tag(takes_context=True)
+def get_phot_method_label(context):
     """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
-    return _phot_method_label()
+    return _phot_method_label(request=context["request"])
 
 
 @register.simple_tag
@@ -123,7 +119,7 @@ def _event_classes_in_scope(context, target_id=None):
 
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
-    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+    from scoring.phot_method import PHOT_METHOD_KILONOVA
 
     # Locked on light curve metrics until there is a KilonovaSCORER score to
     # switch to: per candidate on the target page, per event on the list. The
@@ -148,8 +144,8 @@ def scoring_toggles(context, target_id=None):
 
     return {
         "show": True,
-        "agn_toggle": cache.get("agn_toggle", True),
-        "is_kilonova": get_phot_method() == PHOT_METHOD_KILONOVA and not kilonova_locked,
+        "agn_toggle": _get_agn_toggle(request),
+        "is_kilonova": _get_phot_method(request) == PHOT_METHOD_KILONOVA and not kilonova_locked,
         "kilonova_locked": kilonova_locked,
         "next": request.get_full_path(),
     }
@@ -376,7 +372,7 @@ def display_score_details(context, target_id):
             # always on while the candidate list scored with the toggle -- one
             # candidate, two numbers. Also lets the AGN row say truthfully
             # whether it fed the score.
-            agn_toggle = get_agn_toggle()
+            agn_toggle = _get_agn_toggle(context["request"])
             ec_score_details = _get_event_candidate_scores(
                 [ec],
                 include_subscores=True,
@@ -385,7 +381,7 @@ def display_score_details(context, target_id):
             ec_scores = ec_score_details.score
             ec_subscores = ec_score_details.subscores
             # Which photometry factor actually fed the overall score. Taken
-            # from `phot_source` rather than the site-wide toggle, because a
+            # from `phot_source` rather than the viewer's toggle, because a
             # candidate KilonovaSCORER could not score falls back to the TROVE
             # product even while the toggle says KilonovaSCORER -- and the
             # highlight has to follow what was really used.
