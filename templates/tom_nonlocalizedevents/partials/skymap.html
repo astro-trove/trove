@@ -24,7 +24,7 @@ function renderAladin() {
     var sun_overlay = A.graphicOverlay({color: '#ffd700', name: 'Sun Exclusion'});
     aladin.addOverlay(sun_overlay);
     sun_overlay.add(A.circle(sun_ra, sun_dec, 15));
-    var candidates = A.catalog({color: '#84f', name: 'Linked Candidates', shape: 'circle', sourceSize: 10});
+    var candidates = A.catalog({color: '#fff', name: 'Linked Candidates', shape: 'circle', sourceSize: 7});
     aladin.addCatalog(candidates);
     {% for candidate in candidates %}
         var cat_ra = {{ candidate.target.ra }};
@@ -33,7 +33,7 @@ function renderAladin() {
         candidates.addSources([A.marker(cat_ra, cat_dec, {popupTitle: cat_name, useMarkerDefaultIcon: false})]);
     {% endfor %}
     var json = {{ credible_region|safe }};
-    var moc = A.MOCFromJSON(json, {color: '#84f', lineWidth: 1});
+    var moc = A.MOCFromJSON(json, {color: '#6847FF', lineWidth: 1});
     aladin.addMOC(moc);
 }
 
