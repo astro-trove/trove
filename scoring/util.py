@@ -108,11 +108,7 @@ PS_WAIVED_TRANSIENTS = {"AGN-flare"}
 KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
 
 def ps_counts_toward(transient, agn_score):
-    """Whether ps_score enters `transient`'s score.
-
-    Waived only for AGN-flare scoring, and only when agn_association_2d actually
-    matched. With no AGN association the point-source match still stands.
-    """
+    """Whether ps_score enters `transient`'s score."""
     if transient not in PS_WAIVED_TRANSIENTS:
         return True
     matched = AGN_FLARE_PARAM_RANGES["agn_match_score"]
@@ -122,6 +118,12 @@ def ps_counts_toward(transient, agn_score):
 def agn_counts_toward(transient, agn_toggle):
     """Whether agn_score enters `transient`'s score."""
     return bool(agn_toggle) or transient not in AGN_TOGGLE_TRANSIENTS
+
+
+def _phot_score_key(metric_key):
+    """The key a photometry metric's subscore is stored under."""
+    return f"{metric_key}_score"
+
 
 def _check_phot_val(val, param_ranges, param_range_key):
     val_max = max(param_ranges[param_range_key])
@@ -274,7 +276,7 @@ def get_event_candidate_scores(
 
         # Extract values that need special handling
         val_dict = {
-            subscore_key+"_score": sf_dict[subscore_key]
+            _phot_score_key(subscore_key): sf_dict[subscore_key]
             for subscore_key, param_range_key in val_not_score_keys.items()
             if subscore_key in sf_dict
         }
@@ -323,12 +325,14 @@ def get_event_candidate_scores(
             # EM transient
             class_score = classification_score(ec.target, transient)
             
+            # val_dict is keyed with the "_score" suffix the display labels use
             phot_subscores = {
-                subscore_key: _check_phot_val(
-                    val_dict[subscore_key], param_ranges, param_range_key
+                _phot_score_key(subscore_key): _check_phot_val(
+                    val_dict[_phot_score_key(subscore_key)], param_ranges, param_range_key
                 )
                 for subscore_key, param_range_key in val_not_score_keys.items()
-                if subscore_key in val_dict and param_range_key in param_ranges
+                if _phot_score_key(subscore_key) in val_dict
+                and param_range_key in param_ranges
             }
 
             other_subscores = dict(
