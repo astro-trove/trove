@@ -29,7 +29,7 @@
       </button>
 
       <div class="collapse navbar-collapse" id="navbarsExampleDefault">
-        <ul class="navbar-nav mr-auto">
+        <ul class="navbar-nav me-auto">
           {% comment "Navbar Content Template" %}
           The navbar_content.html template defines the list (li) of nav-items that appear
           in the navbar-nav (ul).
@@ -47,10 +47,10 @@
           {% include 'tom_common/navbar_content.html' %}
 
         </ul>
-        <form action="{% url 'custom_code:gwnle-or-target-search' %}" class="form-inline">
+        <form action="{% url 'custom_code:gwnle-or-target-search' %}" class="d-flex">
           <input type="search" name="name" placeholder="Search events/candidates">
         </form>
-        <ul class="navbar-nav ml-auto" id="login-buttons">
+        <ul class="navbar-nav ms-auto" id="login-buttons">
           {# navbar_login #}
 	      {% include 'tom_common/partials/navbar_login.html' %}
         </ul>

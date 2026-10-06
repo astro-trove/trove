@@ -16,5 +16,5 @@ class TroveAppConfig(AppConfig):
         """
         return [{
             'partial': f'{self.name}/partials/navbar.html',
-            'position': 'right'
+            'position': 'end'
         }]
