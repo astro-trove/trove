@@ -8,6 +8,7 @@ from typing import Optional
 from astropy.time import Time, TimeDelta
 from astropy import units as u
 import numpy as np
+import pandas as pd
 
 from .scoring import (
     update_score_factor,
@@ -43,9 +44,8 @@ PARAM_RANGES = dict(
     peak_time=[10, 70],
     decay_rate=[-np.inf, np.inf],
     max_predets=3,
-    t_pre=-1.0,
-    t_post=np.inf,
-    max_decay_fit_time=100,
+    t_pre=-1,
+    t_post=100,
     phot_score_snr_min=5,
     min_time_separation=1/24,
 )
@@ -134,11 +134,18 @@ def vet_super_kn(
     update_score_factor(event_candidate, "agn_score", agn_score)
 
     ## photometry scoring
-    allphot = _get_post_disc_phot(
+    prephot = _get_pre_disc_phot( # get pre-GW phot
+        target_id=target.id,
+        nonlocalized_event=nonlocalized_event,
+        t_pre=param_ranges["t_pre"],
+    )
+    postphot = _get_post_disc_phot( # get post_GW phot
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
         t_post=param_ranges["t_post"],
     )
+    # pre and post-GW phot within [t_pre, t_post] time window
+    allphot = pd.concat([prephot, postphot]).sort_values(by="dt")
     phot_score, lum, max_time, decay_rate, _, _ = _score_phot(
         allphot=allphot,
         target=target,
@@ -171,11 +178,6 @@ def vet_super_kn(
         delete_score_factor(event_candidate, "phot_decay_rate")
 
     # check for *reliable* predetections before time t_pre
-    prephot = _get_pre_disc_phot(
-        target_id=target.id,
-        nonlocalized_event=nonlocalized_event,
-        t_pre=param_ranges["t_pre"],
-    )
     predet_score = 1
     if prephot is not None and len(prephot):
         try:

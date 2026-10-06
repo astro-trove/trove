@@ -54,8 +54,7 @@ PARAM_RANGES = dict(
     decay_rate=[-np.inf, -0.1],
     max_predets=3,
     t_pre=0,
-    t_post=np.inf,
-    max_decay_fit_time=25,
+    t_post=25,
     phot_score_snr_min=5,
     min_time_separation=1/24,
 )
@@ -155,6 +154,7 @@ def vet_kn(
     update_score_factor(event_candidate, "agn_score", agn_score)
 
     ## photometry scoring
+    # no need for pre-GW photometry as KNe cannot begin pre-GW
     allphot = _get_post_disc_phot(
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
