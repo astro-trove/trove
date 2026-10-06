@@ -7,6 +7,7 @@ from .views import (
     TargetVettingAllFormView,
     TargetFPView,
     TargetRedshiftUpdateFormView,
+    VettingMethodsPartialView,
     NonLocalizedEventAssociateTargetsFormView,
 )
 
@@ -26,6 +27,11 @@ urlpatterns = [
         "targets/<int:pk>/vetchoice/", 
         TargetVettingFormView.as_view(), 
         name="vet_form"
+    ),
+    path(
+        "targets/<int:pk>/vetchoice/methods/",
+        VettingMethodsPartialView.as_view(),
+        name="vet_methods",
     ),
     path("targets/<int:pk>/checknewphot/", 
          TargetFPView.as_view(), 
