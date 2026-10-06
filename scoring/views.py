@@ -93,9 +93,9 @@ def _vetting_method_fields(form, event_id):
             cls, VETTING_FORM_INITIALS[""]
         )
     return _phot_method_field(form)
+  
 
-
-def _phot_method_field(form):
+def _phot_method_field(form, request):
     """
     Offer the scorer choice, defaulting to whatever the site toggle shows.
     """
@@ -109,7 +109,7 @@ def _phot_method_field(form):
     form.fields["phot_method"].choices = [
         (m, PHOT_METHOD_LABELS[m]) for m in PHOT_METHOD_CHOICES
     ]
-    form.fields["phot_method"].initial = get_phot_method()
+    form.fields["phot_method"].initial = get_phot_method(request)
     form.fields["phot_method"].widget.attrs.update({
         "data-kn-only": PHOT_METHOD_KILONOVA,
         "data-fallback": PHOT_METHOD_TROVE,
@@ -123,7 +123,7 @@ def _clean_phot_method(value):
     return value if value in PHOT_METHOD_CHOICES else None
 
 
-class TargetVettingFormView(FormView):
+class TargetVettingFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
@@ -148,6 +148,51 @@ class TargetVettingFormView(FormView):
         # the same set the user was shown
         submitted = self.request.POST.get("nle") if self.request.method == "POST" else None
         return _vetting_method_fields(form, event_for_target(submitted, target_pk))
+
+        # if NLE was provided by referer, use it to choose what vetting is allowed
+        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+        try:
+            # first try with a TROVE id in the URL
+            nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
+        except (NonLocalizedEvent.DoesNotExist, ValueError):
+            # if these errors are thrown then this might be an event_id instead of a TROVE id
+            try:
+                nle = NonLocalizedEvent.objects.get(event_id=nle_name_or_id)
+            except NonLocalizedEvent.DoesNotExist:
+                nle = None
+
+        if nle:
+            nle_eventseq = localization_sequence_from_name(nle.event_id)
+            nle_most_likely_class = get_most_likely_class(
+                nle_eventseq.details
+            )  # most likely class for the NLE
+            # choices for vetting?
+            try:
+                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
+                    nle_most_likely_class
+                ]
+            except KeyError:
+                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
+                    ""
+                ]  # allow all types of vetting if most likely class not recognized
+            # initial option for vetting?
+            try:
+                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
+                    nle_most_likely_class
+                ]
+            except KeyError:
+                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
+                    ""
+                ] # set initial to basic if most likely class not recognized
+        else:
+            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
+        return _phot_method_field(form, self.request)
+
+    def get(self, request, *args, **kwargs):
+        referer = request.META.get("HTTP_REFERER")
+        if referer:
+            self.request.session["nle_id"] = urlparse(referer).query
+        return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
         # and now we can actually perform the vetting and redirect
@@ -213,7 +258,8 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             )
         else:
             # Only the KN pipeline takes a scorer; the others have just one.
-            phot_method = _clean_phot_method(request.GET.get("phot_method"))
+            phot_method = (_clean_phot_method(request.GET.get("phot_method"))
+                           or get_phot_method(request))
             extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
             vetting_func(target.id, nonlocalized_event_name, **extra)
             label = (f" using {PHOT_METHOD_LABELS[phot_method]} for scoring photometry"
@@ -260,7 +306,7 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
         return referer
 
 
-class TargetRedshiftUpdateFormView(FormView):
+class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/update_redshift_form.html"
     form_class = RedshiftUpdateForm
 
@@ -390,7 +436,7 @@ class TargetRedshiftUpdateFormView(FormView):
         return redirect(base_url)
 
 
-class TargetVettingAllFormView(FormView):
+class TargetVettingAllFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
@@ -427,7 +473,7 @@ class TargetVettingAllFormView(FormView):
             form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
                 ""
             ] # set initial to basic if most likely class not recognized
-        return _phot_method_field(form)
+        return _phot_method_field(form, self.request)
 
     # overriding the get_context_data function
     def get_context_data(self, **kwargs):
@@ -517,9 +563,10 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
         )
 
         # The scorer the user picked on the form, sent with every task so the
-        # whole run uses it -- workers cannot read the site-wide toggle, and it
-        # could be flipped mid-run in any case.
-        phot_method = _clean_phot_method(request.GET.get("phot_method"))
+        # whole run uses it -- workers have no session to read the toggle from,
+        # and it could be flipped mid-run in any case.
+        phot_method = (_clean_phot_method(request.GET.get("phot_method"))
+                       or get_phot_method(request))
 
         # then run the vetting, asynchronously
         messages.info(
@@ -535,7 +582,7 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
 
 
 
-class NonLocalizedEventAssociateTargetsFormView(FormView):
+class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/nle_associate_targets_form.html"
     form_class = NonLocalizedEventAssociateTargetsForm
 
