@@ -31,7 +31,7 @@ urlpatterns = [
     path(
         "targets/<int:pk>/vetchoice/methods/",
         VettingMethodsPartialView.as_view(),
-        name="vetting_methods",
+        name="vet_methods",
     ),
     path("targets/<int:pk>/checknewphot/", 
          TargetFPView.as_view(), 

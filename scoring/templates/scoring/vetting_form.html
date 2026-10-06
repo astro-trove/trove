@@ -152,7 +152,7 @@
             {% bootstrap_form_errors form type="non_fields" %}
             {% if form.nle %}
               {# the methods depend on the event, so let the server re-render them #}
-              <div hx-get="{% url 'scoring:vetting_methods' pk=view.kwargs.pk %}"
+              <div hx-get="{% url 'scoring:vet_methods' pk=view.kwargs.pk %}"
                    hx-trigger="change from:#id_nle"
                    hx-include="#id_nle"
                    hx-target="#vetting-method-fields"
