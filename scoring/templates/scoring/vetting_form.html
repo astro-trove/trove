@@ -1,5 +1,5 @@
 {% extends 'tom_targets/partials/base.html' %}
-{% load crispy_forms_tags comments django_bootstrap5 %}
+{% load crispy_forms_tags comments django_bootstrap5 static %}
 {% block title %}Vetting{% endblock %}
 {% block content %}
 <style>
@@ -48,15 +48,19 @@
     }
 
     /* 4. Inputs: Pure black background with white text and bright borders */
-    .vetting-card input, 
-    .vetting-card select, 
+    .vetting-card input,
+    .vetting-card select,
     .vetting-card textarea {
-        background: #000 !important; 
+        background: #000 !important;
         border: 2px solid #444 !important; /* Thicker, darker border */
-        color: #fff !important; 
+        color: #fff !important;
         border-radius: 8px !important;
-        padding: 10px !important;
+        padding: 12px !important;
         width: 100%;
+        /* Bootstrap fixes a height that this padding then overflows, clipping
+           the top and bottom of the text. Let the content size the box. */
+        height: auto !important;
+        line-height: 1.5 !important;
     }
 
     /* Highlight inputs when clicked */
@@ -145,7 +149,18 @@
         <form action="" method="post">
             {% csrf_token %}
           
-            {{ form|crispy }}
+            {% bootstrap_form_errors form type="non_fields" %}
+            {% if form.nle %}
+              {# the methods depend on the event, so let the server re-render them #}
+              <div hx-get="{% url 'scoring:vet_methods' pk=view.kwargs.pk %}"
+                   hx-trigger="change from:#id_nle"
+                   hx-include="#id_nle"
+                   hx-target="#vetting-method-fields"
+                   hx-swap="outerHTML">
+                {{ form.nle|as_crispy_field }}
+              </div>
+            {% endif %}
+            {% include "scoring/partials/vetting_method_fields.html" %}
             
             <div class="d-grid">
                 <button type="submit" class="btn btn-primary btn-vet">
@@ -160,13 +175,7 @@
 </div>
 
 <script>
-// Keep the Photometry Scoring Method in step with the Vetting Method.
-// KilonovaSCORER's grid is a two-component kilonova population, so it can only
-// answer for kilonova vetting; the other modes fit the light curve instead.
-// The values come from the widgets' data attributes so they are not restated
-// here -- see `_phot_method_field` in scoring/views.py. The form re-applies
-// this rule server-side, because a disabled <option> is only a browser hint.
-(function () {
+function syncPhotMethod() {
     var vetting = document.getElementById("id_vetting_method");
     var phot = document.getElementById("id_phot_method");
     if (!vetting || !phot) { return; }
@@ -186,6 +195,14 @@
 
     vetting.addEventListener("change", sync);
     sync();  // the form can load with a non-KN mode already selected
-})();
+}
+
+syncPhotMethod();
+// the fields are replaced wholesale when the event changes, so re-bind
+document.body.addEventListener("htmx:afterSwap", function (e) {
+    if (e.target.id === "vetting-method-fields") { syncPhotMethod(); }
+});
+
 </script>
+<script src="{% static 'tom_common/js/htmx.min.js' %}"></script>
 {% endblock %}
