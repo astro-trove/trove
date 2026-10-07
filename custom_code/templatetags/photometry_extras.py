@@ -149,6 +149,38 @@ def _decay_fit_trace(target, nonlocalized_event, t0):
     )
 
 
+def _bbh_baseline_traces(target, nonlocalized_event, xmin, xmax, color_map, other_colors):
+    # Shades a region of the median +/- range that gives the significance for the bbh-scoring
+    from scoring.vet_bbh import fit_agn_baseline, PARAM_RANGES as BBH_PARAMS
+    from scoring.vet_phot import _get_pre_disc_phot
+
+    try:
+        prephot = _get_pre_disc_phot(
+            target_id=target.id, nonlocalized_event=nonlocalized_event,
+            t_pre=BBH_PARAMS["t_pre"],
+        )
+        baseline = fit_agn_baseline(prephot, min_baseline_pts=BBH_PARAMS["min_baseline_pts"])
+    except Exception:
+        logger.exception(
+            "Could not compute the BBH baseline overlay for %s / %s",
+            target.name, nonlocalized_event.event_id,
+        )
+        return []
+
+    traces = []
+    for filt, entry in baseline.items():
+        color = get_marker_for_photometry_point(filt, color_map, other_colors)
+        mag, std = entry["mag"], entry["std"]
+        traces.append(go.Scatter(
+            x=[xmin, xmax, xmax, xmin],
+            y=[mag - std, mag - std, mag + std, mag + std],
+            fill='toself', mode='lines', line=dict(width=0),
+            fillcolor=color, opacity=0.15,
+            name=f'{filt} AGN baseline', hoverinfo='skip',
+        ))
+    return traces
+
+
 def get_marker_for_photometry_point(label, marker_map, others):
     """
     Get marker properties (color or shape) from a dictionary `marker_map` after parsing the photometry `label`.
@@ -251,6 +283,7 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
 
     plot_data = []
     all_ydata = []
+    all_xdata = []
     color_map = COLOR_MAP.copy()
     marker_map = MARKER_MAP.copy()
     other_colors = OTHER_COLORS.copy()
@@ -278,6 +311,7 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
             errs[np.isnan(errs)] = 0.  # missing errors treated as zero
             all_ydata.append(mags + errs)
             all_ydata.append(mags - errs)
+            all_xdata.extend(filter_values['time'])
     for source_name, source_values in limits.items():
         for filter_name, filter_values in source_values.items():
             marker_color = get_marker_for_photometry_point(filter_name, color_map, other_colors)
@@ -292,6 +326,7 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
             )
             plot_data.append(series)
             all_ydata.append(np.array(filter_values['limit'], float))
+            all_xdata.extend(filter_values['time'])
 
     # Add a constant legend item for limit markers.
     plot_data.append(go.Scatter(
@@ -315,6 +350,10 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
     else:
         ymin_view = 0.
         ymax_view = 0.
+    if all_xdata:
+        xmin_view, xmax_view = min(all_xdata), max(all_xdata)
+    else:
+        xmin_view = xmax_view = None
     yaxis = {
         'title': 'Apparent Magnitude',
         'range': (ymax_view, ymin_view),
@@ -383,9 +422,20 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
             x=t0, y=ymax_view, text=candidate.nonlocalizedevent.event_id, showarrow=False, yshift=10,
         )
 
-        fit_trace = _decay_fit_trace(target, candidate.nonlocalizedevent, t0)
-        if fit_trace is not None:
-            fig.add_trace(fit_trace)
+        from scoring.util import most_likely_class_for_event
+        is_bbh = most_likely_class_for_event(candidate.nonlocalizedevent.event_id) == "BBH"
+
+        if not is_bbh:
+            fit_trace = _decay_fit_trace(target, candidate.nonlocalizedevent, t0)
+            if fit_trace is not None:
+                fig.add_trace(fit_trace)
+
+        if xmin_view is not None and is_bbh:
+            for band_trace in _bbh_baseline_traces(
+                target, candidate.nonlocalizedevent, xmin_view, xmax_view,
+                color_map, other_colors,
+            ):
+                fig.add_trace(band_trace)
 
     return {
         'target': target,

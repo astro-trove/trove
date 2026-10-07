@@ -17,6 +17,7 @@ from .scoring import (
     get_distance_score,
     skymap_association,
     _localization_from_name,
+    classification_score,
 )
 from .vet_basic import vet_basic
 from .vet_phot import (
@@ -63,7 +64,7 @@ def vet_kn_in_sn(
         nonlocalizedevent_id=nonlocalized_event.id, target_id=target_id
     )
     target = Target.objects.get(id=target_id)
-
+    
     ## check skymap association
     if np.isfinite(param_ranges["t_post"]):
         gw_disc_date = (
@@ -190,6 +191,4 @@ def vet_kn_in_sn(
             ]  # this ValueError only happens when there aren't any predets
         if any(v >= param_ranges["max_predets"] for v in n_predets):
             predet_score = PHOT_SCORE_MIN
-            update_score_factor(event_candidate, "predetection_score", predet_score)
-        else:
-            delete_score_factor(event_candidate, "predetection_score")
+    update_score_factor(event_candidate, "predetection_score", predet_score)

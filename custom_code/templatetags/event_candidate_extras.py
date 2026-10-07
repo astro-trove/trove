@@ -4,6 +4,7 @@ Some functions for accessing the EventCandidate table inside a django template
 
 import numpy as np
 from collections import OrderedDict
+from decimal import Decimal, InvalidOperation
 from functools import partial
 from django import template
 from django.core.cache import cache
@@ -14,13 +15,21 @@ from django.utils.safestring import mark_safe
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.models import ScoreFactor
+from scoring.scoring import mpc_score_from_match
 from scoring.util import (
+    agn_counts_toward,
+    get_agn_toggle as _get_agn_toggle,
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
+    kilonova_scores_exist,
+    most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
+    KN_STYLE_CLASSES,
+    MPC_KEYS,
     TARGETEXTRA_KEYS,
 )
+from tom_nonlocalizedevents.models import NonLocalizedEvent
 from scoring.phot_method import (
     get_phot_method as _get_phot_method,
     phot_method_label as _phot_method_label,
@@ -29,29 +38,25 @@ from scoring.phot_method import (
 register = template.Library()
 
 
-@register.simple_tag
-def get_agn_toggle():
-    """Current value of the site-wide, cache-backed agn_toggle flag."""
-    return cache.get("agn_toggle", True)
+@register.simple_tag(takes_context=True)
+def get_agn_toggle(context):
+    """This viewer's agn_toggle flag, from their session."""
+    return _get_agn_toggle(context["request"])
 
 
-@register.simple_tag
-def get_phot_method():
-    """Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
-
-    Site-wide and cache-backed, exactly like ``agn_toggle``. Unlike the AGN
-    flag, flipping this does NOT rescore anything -- the stored factors are not
-    recomputed and no vetting is triggered. It only changes which scorer the
-    NEXT Vet All run uses, so the button is cheap to press and cannot cost a
-    user a long re-vet by accident.
+@register.simple_tag(takes_context=True)
+def get_phot_method(context):
     """
-    return _get_phot_method()
+    Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
+    """
+    return _get_phot_method(context["request"])
 
 
-@register.simple_tag
-def get_phot_method_label():
+@register.simple_tag(takes_context=True)
+def get_phot_method_label(context):
     """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
-    return _phot_method_label()
+    return _phot_method_label(request=context["request"])
+
 
 @register.simple_tag
 def get_event_candidate_scores(*args, **kwargs):
@@ -86,23 +91,63 @@ def vet_all_is_allowed(context):
     cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
     return not cache.get(cooldown_cache_key)
 
+def _event_classes_in_scope(context, target_id=None):
+    """Classifications of the events the scoring-adjustments panel applies to:
+    every event `target_id` is a candidate for on a target's page, else the
+    ``?nonlocalizedevent=`` event on the candidate list. Empty when no event is
+    in scope.
+
+    ``?nonlocalizedevent=`` carries the numeric pk on the candidate-list page
+    but the string ``event_id`` on a target's own detail page, so both are
+    accepted.
+    """
+    if target_id is not None:
+        event_ids = set(
+            NonLocalizedEvent.objects.filter(candidates__target_id=target_id)
+            .values_list("event_id", flat=True)
+        )
+        if event_ids:
+            return {most_likely_class_for_event(eid) for eid in event_ids}
+
+    nle_id = context["request"].GET.get("nonlocalizedevent")
+    if not nle_id:
+        return set()
+    lookup = {"id": nle_id} if str(nle_id).isdigit() else {"event_id": nle_id}
+    nle = NonLocalizedEvent.objects.filter(**lookup).first()
+    return {most_likely_class_for_event(nle.event_id)} if nle else set()
+
+
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
-    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+    from scoring.phot_method import PHOT_METHOD_KILONOVA
 
-    # switching to KilonovaSCORER only changes anything if this candidate has a
-    # score to switch TO. With no target_id (e.g. the candidate list page,
-    # which isn't scoped to one candidate) there's nothing to gate on, so the
-    # toggle is always available.
-    is_kilonova = get_phot_method() == PHOT_METHOD_KILONOVA
-    has_kilonova_score = not target_id or ScoreFactor.objects.filter(
-        event_candidate__target_id=target_id, key=KILONOVA_SCORE_KEY
-    ).exists()
+    # Locked on light curve metrics until there is a KilonovaSCORER score to
+    # switch to: per candidate on the target page, per event on the list. The
+    # list with no event in scope has nothing to gate on, so stays unlocked.
+    request = context["request"]
+    nle_id = request.GET.get("nonlocalizedevent", "")
+    if target_id:
+        kilonova_locked = not kilonova_scores_exist(target_id=target_id)
+    elif nle_id.isdigit():
+        kilonova_locked = not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
+    else:
+        kilonova_locked = False
+
+    # KN-style scoring adjustments (AGN sub-score is disqualifying for KNe, and
+    # only the "KN" transient type can use KilonovaSCORER) don't mean anything for
+    # a BBH/AGN-flare event. Shown when ANY event in scope is KN-style, so a
+    # candidate on both a BBH and a KN-style event keeps the panel whichever
+    # event is selected. Fails open when no event in scope can be classified.
+    classes = _event_classes_in_scope(context, target_id)
+    if classes and not any(c is None or c in KN_STYLE_CLASSES for c in classes):
+        return {"show": False}
+
     return {
-        "agn_toggle": cache.get("agn_toggle", True),
-        "is_kilonova": is_kilonova,
-        "has_kilonova_score": has_kilonova_score,
-        "next": context["request"].get_full_path(),
+        "show": True,
+        "agn_toggle": _get_agn_toggle(request),
+        "is_kilonova": _get_phot_method(request) == PHOT_METHOD_KILONOVA and not kilonova_locked,
+        "kilonova_locked": kilonova_locked,
+        "next": request.get_full_path(),
     }
 
 
@@ -132,7 +177,9 @@ def display_score_details(context, target_id):
         host_distance_score=("Distance Score", _float_format),
         host_name=("Host Galaxy used for Distance", _str_int_format),
         host_catalog=("Host Galaxy Source Catalog", _str_format),
-        agn_score=("AGN Score (0.1 or 1.0)", partial(_float_format, precision=1)),
+        agn_score=(AGN_SCORE_LABEL, partial(_float_format, precision=1)),
+        agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
+        nuclear_offset_score=("Nuclear Offset Score", partial(_float_format, precision=2)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
             "Time of Maximum Light Curve",
@@ -141,6 +188,10 @@ def display_score_details(context, target_id):
         phot_decay_rate=(
             "Light Curve Slope (positive is brightening)",
             partial(_float_format, unit="mag/day"),
+        ),
+        predetection_score=(
+            "Score from Pre-Detections",
+            partial(_float_format, precision=1),
         ),
         phot_peak_lum_score=("Score from Maximum Luminosity", partial(_float_format, precision=1)),
         phot_peak_time_score=(
@@ -151,6 +202,7 @@ def display_score_details(context, target_id):
             "Score from Light Curve Slope",
             partial(_float_format, precision=1),
         ),
+        classification_score=("Classification Score", _str_int_format),
         kilonova_score=(
             "KilonovaSCORER Photometry Score",
             partial(_float_format, precision=2),
@@ -160,25 +212,35 @@ def display_score_details(context, target_id):
             _str_format,
         ),
     )
+    
     order = list(keymap.keys())
 
+    def label_and_format(key):
+        return keymap.get(key) or (key, _float_format)
+
     # basic scores/details
-    basic_score_details = []
-    te = TargetExtra.objects.filter(target_id=target_id)
-    basic_score_details.append(te.filter(key="ps_score"))
-    for event_candidate in target.eventcandidate_set.all():
-        sf_set = event_candidate.scorefactor_set.filter(key="mpc_score")
-        basic_score_details.append(sf_set)
-    te_set = te.filter(key__in=TARGETEXTRA_KEYS).exclude(key__in=["ps_score"])
-    basic_score_details.append(te_set)
+    te = dict(
+        TargetExtra.objects.filter(target_id=target_id, key__in=TARGETEXTRA_KEYS)
+        .values_list("key", "value")
+    )
+    basic_score_details = [(key, te[key]) for key in ("ps_score",) if key in te]
+    # derived the way scoring derives it, from the MPC match vet_basic stored;
+    # a ScoreFactor copy would be one row per event and could be stale
+    if "mpc_match_name" in te:
+        mpc_score = mpc_score_from_match(te["mpc_match_name"])
+        basic_score_details.append(("mpc_score", mpc_score))
+        # match details only for a match; with none, a sep or date can only
+        # be left over from an earlier check
+        if mpc_score == 0:
+            basic_score_details += [(key, te[key]) for key in MPC_KEYS if key in te]
 
     # NLE-specific scores/details
     score_details = []
     for event_candidate in target.eventcandidate_set.all():
         sf_set = event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
-            # exclude keys in TargetExtra + exclude mpc_score, predetection_score
-            + ["mpc_score", "predetection_score", "localization_id"]
+            # exclude keys in TargetExtra + mpc_score
+            + ["mpc_score", "localization_id"]
         ).all()
 
         sf_set = sorted(
@@ -196,20 +258,12 @@ def display_score_details(context, target_id):
         "title": "Basic Scores (Not Event-Specific)",
         "details": []
     }
-    for queryset in basic_score_details:
-        for te in queryset:
-            if te.key in keymap:
-                label, fmter = keymap[te.key]
-            else:
-                label = te.key
-                fmter = _float_format
-            
-            value = _safe_format(te.value, fmter)
-            
-            basic_card["details"].append({
-                "label": label,
-                "value": value
-            })
+    for key, raw_value in basic_score_details:
+        label, fmter = label_and_format(key)
+        basic_card["details"].append({
+            "label": label,
+            "value": _safe_format(raw_value, fmter),
+        })
     
     cards.append(basic_card)
 
@@ -217,7 +271,7 @@ def display_score_details(context, target_id):
     for queryset in score_details:
         event_name = None
         event_card = None
-        
+        values = {sf.key: sf.value for sf in queryset}
         for score_factor in queryset:
             ec = score_factor.event_candidate
             nle = ec.nonlocalizedevent
@@ -233,13 +287,24 @@ def display_score_details(context, target_id):
                     "ec": ec,
                     "details": []
                 }
-            
-            if score_factor.key in keymap:
-                label, fmter = keymap[score_factor.key]
-            else:
-                label = score_factor.key
-                fmter = _float_format
-                
+
+            # one "median ± scatter" row per band
+            if score_factor.key.startswith("baseline_std_"):
+                continue
+            if score_factor.key.startswith("baseline_mag_"):
+                filt = score_factor.key[len("baseline_mag_"):]
+                event_card["details"].append({
+                    "key": score_factor.key,
+                    "label": f"AGN baseline ({filt}-band)",
+                    "value": _baseline_format(
+                        score_factor.value, values.get(f"baseline_std_{filt}")
+                    ),
+                    "text": False,
+                    "only": None,
+                })
+                continue
+
+            label, fmter = label_and_format(score_factor.key)
             numeric = fmter not in (_str_format, _str_int_format)
             value = _safe_format(score_factor.value, fmter)
             
@@ -247,6 +312,7 @@ def display_score_details(context, target_id):
             # "could not score" reason belong in the KN subtab alone
             event_card["details"].append(
                 {
+                    "key": score_factor.key,
                     "label": label,
                     "value": value,
                     # a sentence, not a number: the value column is nowrap so
@@ -255,12 +321,19 @@ def display_score_details(context, target_id):
                     "text": not numeric,
                     "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
+            if score_factor.key == "predetection_score":
+                event_card["details"].append({
+                    "key": "predetected",
+                    "label": "Pre-detected?",
+                    "value": _safe_format(score_factor.value, _predetected_yesno),
+                    "text": False,
+                    "only": None,
+                })
         
         if event_card:
             cards.append(event_card)
 
     # Render cards as HTML
-
     # Separate basic card from event cards
     basic_card = cards[0]  # First card is always "Basic Score Details"
     event_cards = cards[1:]  # Rest are event cards
@@ -299,7 +372,7 @@ def display_score_details(context, target_id):
             # always on while the candidate list scored with the toggle -- one
             # candidate, two numbers. Also lets the AGN row say truthfully
             # whether it fed the score.
-            agn_toggle = get_agn_toggle()
+            agn_toggle = _get_agn_toggle(context["request"])
             ec_score_details = _get_event_candidate_scores(
                 [ec],
                 include_subscores=True,
@@ -308,7 +381,7 @@ def display_score_details(context, target_id):
             ec_scores = ec_score_details.score
             ec_subscores = ec_score_details.subscores
             # Which photometry factor actually fed the overall score. Taken
-            # from `phot_source` rather than the site-wide toggle, because a
+            # from `phot_source` rather than the viewer's toggle, because a
             # candidate KilonovaSCORER could not score falls back to the TROVE
             # product even while the toggle says KilonovaSCORER -- and the
             # highlight has to follow what was really used.
@@ -334,7 +407,7 @@ def display_score_details(context, target_id):
             html += '          <div class="event-cards">\n'
             for kdx, (em_transient_score_label, idxlabel) in enumerate(label_idx_map.items()): 
                 em_transient_type = em_transient_score_label.split(" ")[0]
-
+                
                 active_subclass = ""
                 if not kdx:
                     active_subclass = "active"
@@ -343,10 +416,20 @@ def display_score_details(context, target_id):
                 # then add the content with the score details
                 # first the more general scores (2D, Distance, AGN, etc.) that don't change
                 # per transient model 
+                # one row per key so if any sub-score is computed on the fly (classification_score), it will not 
+                # be duplicated with a previous version of it.
+                rows = {
+                    detail["key"]: detail for detail in score_details
+                    if not detail.get("only") or detail["only"] == em_transient_type
+                }
+                for key, subscore in ec_subscores.get(em_transient_type, {}).items():
+                    label, fmter = label_and_format(key)
+                    rows[key] = {"key": key, "label": label,
+                                 "value": _safe_format(subscore, fmter), "score": True}
+
                 html += f'              <div class="score-card-content-filled">\n'
-                for detail in score_details:
-                    if "Score" not in detail["label"]: continue
-                    if detail.get("only") and detail["only"] != em_transient_type:
+                for detail in rows.values():
+                    if not _is_score_row(detail): 
                         continue
                     row_class = _factor_row_class(
                         detail["label"], em_transient_type, kn_is_active, agn_toggle
@@ -356,27 +439,12 @@ def display_score_details(context, target_id):
                     html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
                     html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
                     html += f'                </div>\n'
-
-                # then the photometry scores too. Both lookups are guarded:
-                # a transient with no subscores, or a subscore whose "<key>_score"
-                # has no keymap entry, is a missing label -- not a reason to 500
-                # the page and lose every other score on it.
-                for key, subscore in ec_subscores.get(em_transient_type, {}).items():
-                    label, fmter = keymap.get(key + "_score", (key, _float_format))
-                    row_class = _factor_row_class(
-                        label, em_transient_type, kn_is_active, agn_toggle
-                    )
-                    html += f'                <div class="{row_class}">\n'
-                    html += f'                  <span class="detail-label">{label}</span>\n'
-                    html += f'                  <span class="detail-value">{fmter(subscore)}</span>\n'
-                    html += f'                </div>\n'
                 html += f'              </div>\n'
                 
                 # then the score details (max lum., etc.)
                 html += f'              <div class="score-card-content">\n'
-                for detail in score_details:
-                    if "Score" in detail["label"]: continue
-                    if detail.get("only") and detail["only"] != em_transient_type:
+                for detail in rows.values():
+                    if _is_score_row(detail): 
                         continue
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
                     html += f'                <div class="detail-row">\n'
@@ -404,13 +472,29 @@ _TROVE_FACTOR_LABELS = {
 }
 
 
-# switch rather than a choice: with the toggle off, `agn_score` is dropped
-# from the product, so the value still shown is not part of the score.
-_AGN_FACTOR_LABELS = {"AGN Score (0.1 or 1.0)"}
+AGN_SCORE_LABEL = "AGN Association Score"
+
+
+def _is_score_row(detail):
+    # computed subscores are always scores, whatever their label says
+    return detail.get("score") or "Score" in detail["label"]
 
 
 # formatting
+def _baseline_format(mag, std):
+    """`vet_bbh`'s AGN baseline for one band: median mag ± its scatter,
+    max(1.4826 * MAD, median photometric error)."""
+    try:
+        text = f"{float(mag):.2f}"
+        return text if std is None else f"{text} ± {float(std):.2f}"
+    except (TypeError, ValueError):
+        return str(mag)
+
+
 def _safe_format(value, fmter):
+    # names/IDs are text even when they look numeric; float() would round a long ID
+    if fmter in (_str_format, _str_int_format):
+        return fmter(value)
     for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
         try:
             return candidate()
@@ -424,8 +508,8 @@ def _factor_row_class(label, transient, kn_is_active, agn_toggle=True):
         live = kn_is_active and transient == "KN"
     elif label in _TROVE_FACTOR_LABELS:
         live = not (kn_is_active and transient == "KN")
-    elif label in _AGN_FACTOR_LABELS:
-        live = bool(agn_toggle)
+    elif label == AGN_SCORE_LABEL:
+        live = agn_counts_toward(transient, agn_toggle)
     else:
         return "detail-row"
     return "detail-row factor-active" if live else "detail-row factor-inactive"
@@ -445,12 +529,20 @@ def _bool_format(flt):
 
 def _bool_format_yesno(flt):
     return "No" if bool(flt) else "Yes"
+
+def _predetected_yesno(flt):
+    # predetection_score is below 1 only when the predetection penalty applied
+    return "Yes" if flt < 1 else "No"
   
 def _str_int_format(s):
+    # Decimal, not float: IDs above 2**53 must keep every digit
     try:
-        return str(int(s))
-    except ValueError:
+        d = Decimal(str(s).strip())
+    except InvalidOperation:
         return str(s)
+    if d.is_finite() and d == d.to_integral_value():
+        return str(int(d))
+    return str(s)
 
 def _str_format(s):
     return str(s)

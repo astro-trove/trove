@@ -1,5 +1,5 @@
 {% extends 'tom_common/base.html' %}
-{% load bootstrap4 targets_extras crispy_forms_tags %}
+{% load django_bootstrap5 targets_extras crispy_forms_tags %}
 
 {% block title %}New Target{% endblock %}
 {% block content %}
@@ -16,6 +16,9 @@
 {% endif %}
 </ul>
 {% bootstrap_form_errors form %}
+<p class="text-muted small mb-3">
+  Fields marked <span class="text-danger">*</span> are required
+</p>
 <form method="post" class="form">
 {% csrf_token %}
 {% bootstrap_field form.name %}

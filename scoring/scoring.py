@@ -4,7 +4,7 @@ from .healpix_utils import SaTarget
 
 from candidate_vetting.vet import GALAXY_CATALOGS
 
-import io
+import json
 import logging
 from datetime import timezone
 
@@ -40,6 +40,19 @@ GALAXY_CATALOG_RANKING = {c.__name__: i for i, c in enumerate([UserGalaxy] + GAL
 ### TODO: these are filler values, should just change them to nulls in our database
 # LS DR9 North / DELVE DR3, PS1-STRM, SDSS DR12 photo-z / DELVE DR3
 Z_BAD_VALUES = (-99.0, -999.0, -9999.0)
+
+HOST_ID_COLUMNS = ("ID", "troveID")
+
+
+def read_host_galaxies_json(value: str) -> pd.DataFrame:
+    """The saved "Host Galaxies" JSON as a dataframe, with the ID columns exact."""
+    rows = json.loads(value)
+    host_df = pd.DataFrame(rows)
+    # pandas makes the whole column float64 if any ID is null, rounding IDs above 2**53
+    for col in HOST_ID_COLUMNS:
+        if col in host_df.columns:
+            host_df[col] = pd.Series([row.get(col) for row in rows], dtype=object)
+    return host_df
 
 
 def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
@@ -308,9 +321,7 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
     if not hosts.count():
         return _distance_at_healpix(nonlocalized_event_name, target_id)
-    host_df = pd.read_json(
-        io.StringIO(hosts[0].value)
-    )  # since we store the host info as a json str in the db
+    host_df = read_host_galaxies_json(hosts[0].value)
 
     # clean up dataframe
     host_df = clean_host_df(host_df)
@@ -391,3 +402,48 @@ def _localization_from_name(nonlocalized_event_name, max_time=None):
     )
     # nothing at or before max_time: fall back to the earliest
     return localization or all_localizations.order_by("date").first()
+
+def mpc_score_from_match(mpc_match_name) -> int:
+    """0 if there is a Minor Planet Center match, else 1. run_mpc stores the
+    string "None" when nothing matched; None means the check hasn't run."""
+    return int(mpc_match_name in (None, "None"))
+
+
+def classification_score(
+        target,
+        expected_em_transient:str=None
+) -> float:
+    """Rules out candidates that TNS have already classified
+
+    Follows this general psuedocode logic
+    if classification==SN Ia and any GW event: score = 0
+    elif classification==TDE and any GW event: score = 0
+    elif classification.startswith("SN") and (GW event == BNS, NSBH, or BBH): score = 0
+    elif classification.startswith("SN") and (GW event == SSM) and (expected_em_transient == KN): score = 0
+    else: score = 1
+    """
+    # get the classification, default to an empty string if key not present,
+    # strip any extraneous chars
+    classification = getattr(target, "classification", "")
+    if classification is None:
+        classification = ""
+    clean_class = classification.strip()
+
+    # calculate the classification score
+    if clean_class in {"TDE", "SN Ia"}:
+        # if the transient is classified as a TDE or SN Ia then the score is 0
+        # because these are not expected to be GW counterparts
+        # TODO: When implementing neutrino vetting we should be more careful about
+        #       removing TDEs here!!
+        return 0
+    
+    elif (
+            (clean_class.startswith("SN") or clean_class.startswith("SLSN")) and
+            expected_em_transient not in {"KN-in-SN", "super-KN"}
+    ):
+        # for KN and AGN flares we don't want to include SN or SLSN, for KN-in-SN or
+        # superKN they could *maybe* be a counterpart 
+        return 0
+
+    # if neither of those cases are matched we can just return 1
+    return 1

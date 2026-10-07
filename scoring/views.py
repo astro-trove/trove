@@ -10,11 +10,12 @@ from django.core.cache import cache
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
 from django.http import HttpResponseRedirect, HttpResponseForbidden
 from django.urls import reverse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from dal import autocomplete
 
 from trove_targets.models import Target
@@ -24,7 +25,11 @@ from tom_nonlocalizedevents.models import (
     EventLocalization,
 )
 
-from candidate_vetting.vet import host_association, localization_sequence_from_name
+from candidate_vetting.vet import (
+    GALAXY_CATALOGS,
+    host_association,
+    localization_sequence_from_name,
+)
 from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
 
 from .forms import (VettingChoiceForm,
@@ -45,7 +50,7 @@ from .phot_method import (
     PHOT_METHOD_TROVE,
     get_phot_method,
 )
-from .util import get_vet_all_progress
+from .util import get_vet_all_progress, most_likely_class_for_event
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .dynamic_catalogs import UserGalaxy
@@ -55,17 +60,56 @@ from custom_code.templatetags.target_list_extras import galaxy_table
 
 
 
-def _phot_method_field(form):
-    """Offer the scorer choice, defaulting to whatever the site toggle shows.
+def resolve_event_id(value):
+    if not value:
+        return None
+    nle = NonLocalizedEvent.objects.filter(event_id=value).first()
+    if nle is None and str(value).isdigit():
+        nle = NonLocalizedEvent.objects.filter(id=int(value)).first()
+    return nle.event_id if nle else None
 
-    The values the template needs to keep the two selects in step ride along as
-    data attributes rather than being repeated in the JavaScript, so the vetting
-    mode and the scorer names are still defined in exactly one place.
+
+def methods_for_event(event_id):
+    cls = most_likely_class_for_event(event_id)
+    return VETTING_FORM_CHOICES.get(cls, VETTING_FORM_CHOICES[""]), cls
+
+
+def event_for_target(value, target_pk):
+    event_id = resolve_event_id(value)
+    if event_id and EventCandidate.objects.filter(
+        target_id=target_pk, nonlocalizedevent__event_id=event_id
+    ).exists():
+        return event_id
+    return None
+
+
+def _vetting_method_fields(form, event_id, request):
+    if event_id is None:
+        form.fields["vetting_method"].choices = [("basic", "Basic Vetting")]
+    else:
+        choices, cls = methods_for_event(event_id)
+        form.fields["vetting_method"].choices = choices
+        form.fields["vetting_method"].initial = VETTING_FORM_INITIALS.get(
+            cls, VETTING_FORM_INITIALS[""]
+        )
+    return _phot_method_field(form, request)
+  
+
+def _phot_method_field(form, request):
     """
+    Offer the scorer choice, defaulting to whatever the site toggle shows.
+    """
+    kn_available = any(
+        value == "KN" for value, _ in form.fields["vetting_method"].choices
+    )
+    if not kn_available:
+        del form.fields["phot_method"]
+        return form
+
     form.fields["phot_method"].choices = [
         (m, PHOT_METHOD_LABELS[m]) for m in PHOT_METHOD_CHOICES
     ]
-    form.fields["phot_method"].initial = get_phot_method()
+    form.fields["phot_method"].initial = get_phot_method(request)
     form.fields["phot_method"].widget.attrs.update({
         "data-kn-only": PHOT_METHOD_KILONOVA,
         "data-fallback": PHOT_METHOD_TROVE,
@@ -79,56 +123,31 @@ def _clean_phot_method(value):
     return value if value in PHOT_METHOD_CHOICES else None
 
 
-class TargetVettingFormView(FormView):
+class TargetVettingFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
-
-    # TODO: Only give the user the form if there is a non-localized event associated
-    #       with this target. If there isn't, this should just redirect to the basic
-    #       target vetting!
 
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
+        target_pk = self.kwargs["pk"]
+        events = list(dict.fromkeys(
+            EventCandidate.objects.filter(target_id=target_pk)
+            .select_related("nonlocalizedevent")
+            .values_list("nonlocalizedevent__event_id", flat=True)
+        ))
+        if not events:  # nothing to choose between, so basic vetting only
+            del form.fields["nle"]
+            return _vetting_method_fields(form, None, self.request)
 
-        # if NLE was provided by referer, use it to choose what vetting is allowed
-        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
-        try:
-            # first try with a TROVE id in the URL
-            nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
-        except (NonLocalizedEvent.DoesNotExist, ValueError):
-            # if these errors are thrown then this might be an event_id instead of a TROVE id
-            try:
-                nle = NonLocalizedEvent.objects.get(event_id=nle_name_or_id)
-            except NonLocalizedEvent.DoesNotExist:
-                nle = None
-
-        if nle:
-            nle_eventseq = localization_sequence_from_name(nle.event_id)
-            nle_most_likely_class = get_most_likely_class(
-                nle_eventseq.details
-            )  # most likely class for the NLE
-            # choices for vetting?
-            try:
-                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                    nle_most_likely_class
-                ]
-            except KeyError:
-                form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                    ""
-                ]  # allow all types of vetting if most likely class not recognized
-            # initial option for vetting?
-            try:
-                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                    nle_most_likely_class
-                ]
-            except KeyError:
-                form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                    ""
-                ] # set initial to basic if most likely class not recognized
-        else:
-            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[""]
-        return _phot_method_field(form)
+        form.fields["nle"].choices = [("", "\u2014 No event (Basic Vetting only) \u2014")] + [
+            (eid, f"{eid} \u2014 {methods_for_event(eid)[1] or 'unknown class'}")
+            for eid in events
+        ]
+        # on POST, build the methods from the submitted event so validation sees
+        # the same set the user was shown
+        submitted = self.request.POST.get("nle") if self.request.method == "POST" else None
+        return _vetting_method_fields(form, event_for_target(submitted, target_pk), self.request)
 
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
@@ -144,15 +163,28 @@ class TargetVettingFormView(FormView):
         # generate the base url
         base_url = reverse("scoring:vet", kwargs=dict(pk=pk, vetting_mode=vetting_mode))
 
-        # then also preserve the query parameters
-        query_str = self.request.session.pop("nle_id", "")
-        params = [query_str] if query_str else []
+        chosen = form.cleaned_data.get("nle")
+        params = [f"nonlocalizedevent={chosen}"] if chosen else []
         phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
         if phot_method:
             params.append(f"phot_method={phot_method}")
         if params:
             base_url += "?" + "&".join(params)
         return redirect(base_url)
+
+
+class VettingMethodsPartialView(LoginRequiredMixin, View):
+    """
+    The vetting-method and scorer fields for the event the user just picked.
+    """
+
+    def get(self, request, pk, *args, **kwargs):
+        form = VettingChoiceForm()
+        del form.fields["nle"]
+        form = _vetting_method_fields(form, event_for_target(request.GET.get("nle"), pk), self.request)
+        return render(
+            request, "scoring/partials/vetting_method_fields.html", {"form": form}
+        )
 
 
 class TargetVettingView(LoginRequiredMixin, RedirectView):
@@ -169,37 +201,33 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         target = Target.objects.get(pk=target_pk)
         vetting_mode = kwargs.get("vetting_mode", "basic")
 
-        # get the nonlocalized event name from the referer
-        nonlocalized_event_name = request.GET.get("nonlocalizedevent")
+        # the query parameter may carry either form of identifier
+        nonlocalized_event_name = resolve_event_id(
+            request.GET.get("nonlocalizedevent")
+        )
 
         # then run the vetting
         vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
-        if vetting_mode == "basic" or nonlocalized_event_name is None:
-            # a user asking for this one target wants the host / AGN tables
-            # even if its point source or MPC score has already zeroed it
+        if vetting_mode == "basic":
             vet_basic(target.id, stop_on_zero=False)
-            messages.info(
+            messages.info(request, "Ran basic vetting.")
+        elif nonlocalized_event_name is None:
+            messages.error(
                 request,
                 "Ran basic vetting. If you expected event-dependent "
                 + "vetting, ensure an event is specified in the URL.",
             )
         else:
             # Only the KN pipeline takes a scorer; the others have just one.
-            phot_method = _clean_phot_method(request.GET.get("phot_method"))
+            phot_method = (_clean_phot_method(request.GET.get("phot_method"))
+                           or get_phot_method(request))
             extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
             vetting_func(target.id, nonlocalized_event_name, **extra)
             label = (f" using {PHOT_METHOD_LABELS[phot_method]} for scoring photometry"
                      if extra else "")
             messages.info(request, f"Ran vetting in {vetting_mode} mode{label}.")
 
-        if nonlocalized_event_name:
-            toreverse = (
-                reverse("targets:detail", kwargs=dict(pk=target_pk))
-                + f"?nonlocalizedevent={nonlocalized_event_name}"
-            )
-
-        else:
-            toreverse = reverse("targets:detail", kwargs=dict(pk=target_pk))
+        toreverse = reverse("targets:detail", kwargs=dict(pk=target_pk))
 
         return redirect(toreverse)  # this redirects back to the original target page
 
@@ -239,7 +267,7 @@ class TargetFPView(LoginRequiredMixin, RedirectView):
         return referer
 
 
-class TargetRedshiftUpdateFormView(FormView):
+class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/update_redshift_form.html"
     form_class = RedshiftUpdateForm
 
@@ -251,8 +279,12 @@ class TargetRedshiftUpdateFormView(FormView):
         # get target, potential host galaxies, their IDs, and provenance (source)
         target = Target.objects.get(id=self.kwargs["pk"])
         form.target = target
-        galaxies = galaxy_table(target)["galaxies"]
-        galaxy_choices_ids = [(g["ID"], g["ID"]) for g in galaxies]
+        # a target that has never been vetted has no host galaxy table at all
+        galaxies = galaxy_table(target)["galaxies"] or []
+        form.galaxies = galaxies
+        galaxy_choices_ids = [
+            (gid, gid) for gid in dict.fromkeys(str(g["ID"]) for g in galaxies)
+        ]
         galaxy_choices_sources = [
             (gs, gs) for gs in np.unique([g["Source"] for g in galaxies])
         ]
@@ -260,11 +292,27 @@ class TargetRedshiftUpdateFormView(FormView):
         form.fields["host_galaxy_source"].choices = galaxy_choices_sources
         return form
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        sources_by_galaxy = {}
+        for galaxy in getattr(context["form"], "galaxies", []):
+            sources = sources_by_galaxy.setdefault(str(galaxy["ID"]), [])
+            if str(galaxy["Source"]) not in sources:
+                sources.append(str(galaxy["Source"]))
+        context["sources_by_galaxy"] = sources_by_galaxy
+        return context
+
     def get(self, request, *args, **kwargs):
         referer = request.META.get("HTTP_REFERER")
         if referer:
             self.request.session["nle_id"] = urlparse(referer).query
         return super().get(request, *args, **kwargs)
+
+    def form_invalid(self, form):
+        # TROVE surfaces these through bootstrap_messages in the base template
+        for error in form.non_field_errors():
+            messages.error(self.request, error)
+        return super().form_invalid(form)
 
     def form_valid(self, form):
         host_galaxy_id = form.cleaned_data["host_galaxy_id"]
@@ -281,16 +329,24 @@ class TargetRedshiftUpdateFormView(FormView):
         print(f"z_err = {z_err}")
         pk = self.kwargs["pk"]
         target = Target.objects.get(id=pk)
-        galaxies = galaxy_table(target)["galaxies"]
         UserGalaxy()._add_galaxy(
-            target, galaxies, z, z_err, host_galaxy_id, host_galaxy_source, submitter
+            target,
+            form.galaxies,
+            z,
+            z_err,
+            host_galaxy_id,
+            host_galaxy_source,
+            submitter,
         )
 
-        # re-run host association
-        host_association(target_id=pk)
+        # re-run host association, including the galaxy we just added
+        host_association(target_id=pk, galaxy_catalogs=[UserGalaxy] + GALAXY_CATALOGS)
 
         # re-run vetting if NLE was provided by referer
-        nle_name_or_id = self.request.session["nle_id"].split("=")[-1].split("/")[0]
+        # the session key is missing when the form was opened without a referer
+        nle_name_or_id = (
+            self.request.session.get("nle_id", "").split("=")[-1].split("/")[0]
+        )
         if nle_name_or_id.isdigit():
             nle = NonLocalizedEvent.objects.get(id=nle_name_or_id)
         else:
@@ -341,14 +397,19 @@ class TargetRedshiftUpdateFormView(FormView):
         return redirect(base_url)
 
 
-class TargetVettingAllFormView(FormView):
+class TargetVettingAllFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
-        nle_id = self.request.session["nle_id"].split("=")[-1]
+        # Vet All is scoped to the event in its own URL, so there is nothing to
+        # pick -- the field belongs to the single-candidate form only
+        del form.fields["nle"]
+        # the event is in this view's own URL; reading it from the session
+        # raised KeyError once form_valid had popped the key
+        nle_id = self.kwargs["pk"]
         nle_eventseq = localization_sequence_from_name(
             NonLocalizedEvent.objects.get(id=nle_id)
         )
@@ -373,7 +434,7 @@ class TargetVettingAllFormView(FormView):
             form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
                 ""
             ] # set initial to basic if most likely class not recognized
-        return _phot_method_field(form)
+        return _phot_method_field(form, self.request)
 
     # overriding the get_context_data function
     def get_context_data(self, **kwargs):
@@ -463,9 +524,10 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
         )
 
         # The scorer the user picked on the form, sent with every task so the
-        # whole run uses it -- workers cannot read the site-wide toggle, and it
-        # could be flipped mid-run in any case.
-        phot_method = _clean_phot_method(request.GET.get("phot_method"))
+        # whole run uses it -- workers have no session to read the toggle from,
+        # and it could be flipped mid-run in any case.
+        phot_method = (_clean_phot_method(request.GET.get("phot_method"))
+                       or get_phot_method(request))
 
         # then run the vetting, asynchronously
         messages.info(
@@ -481,7 +543,7 @@ class TargetVettingAllView(LoginRequiredMixin, RedirectView):
 
 
 
-class NonLocalizedEventAssociateTargetsFormView(FormView):
+class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):
     template_name = "scoring/nle_associate_targets_form.html"
     form_class = NonLocalizedEventAssociateTargetsForm
 

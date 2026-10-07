@@ -34,7 +34,7 @@ Welcome to the Treasure TROVE: a Tool for Rapid Object Vetting and Examination!
 
   3. Create virtual environment and install dependencies.
 
-  **Option A — Conda** (from the project root, so `requirements.txt` is found):
+  **Option A — Conda** (from the project root, so `requirements.txt` is found. Can also use mamba/micromamba here instead!):
 
   ```bash
     % cd /var/www/trove
