@@ -17,6 +17,7 @@ from django.conf import settings
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from tom_dataproducts.tasks import atlas_query
+from tom_antares.antares import AntaresDataService
 
 from astropy.table import Table
 from astropy.time import Time
@@ -561,3 +562,81 @@ def handle_icecube_alert(alert):
             calculate_credible_region(skymap, localization)
 
     logger.info(f"Finished processing alert for {nonlocalizedevent.event_id}")
+
+def handle_antares_stream_async(locus):
+    data_service = AntaresDataService()
+    try:
+        alert_finite = data_service.serialize_locus(None, locus)
+        handle_antares_stream.enqueue(alert_finite)
+        logger.debug(f"sent {locus.locus_id} to queue")
+    except Exception:
+        exc = traceback.format_exc()
+        dump_alert_and_send_error(alert_finite, exc)
+
+
+@task(queue_name="antares", priority=settings.PRIORITY_HIGH)
+def handle_antares_stream(alert, cone_search_radius_arcsec=2.0):
+    try:
+        data_service = AntaresDataService()
+
+        # check for existing targets within 2"
+        target_matches = list(
+            cone_search_filter(
+                Target.objects.all(),
+                alert["ra"],
+                alert["dec"],
+                cone_search_radius_arcsec / 3600.0,
+            ).order_by("separation")
+        )
+        logger.info(
+            f"Targets within {cone_search_radius_arcsec:.1f} arcsec: {target_matches}"
+        )
+
+        if target_matches:
+            # then this target already exists in the Targets table
+            target = target_matches[0]
+            logger.info(f"Found existing target matching this alert: {target.name}")
+            if target.name.startswith('J'):
+                target.name = alert['name']
+                logger.info(f" - replacing temporary name with {target.name}")
+
+            # add any new aliases from ANTARES to the existing target
+            alias_data = data_service.query_aliases(target=target)
+            data_service.to_aliases(target, alias_data)
+                
+        else:
+            # then this target does not exist, so we create it from scratch
+            target = data_service.to_target(alert)
+            logger.info(f"No existing target found, adding {target.name} as new target")
+            
+        # then vet this target
+        # vetting includes updating ANTARES photometry and adding host galaxies
+        # this is why we don't do any of that above when we find a target match 
+        target_post_save(target, created=True, tns_time_limit=np.inf)
+
+            
+    except Exception:
+        exc = traceback.format_exc()
+        dump_alert_and_send_error(alert, exc)
+
+
+def dump_alert_and_send_error(
+    alert, exc, dump_dir="antares-alert-errors"
+):
+    """
+    we don't want this *ever* to crash, just log the error, send it as a slack message, and dump the alert to a json file
+    """
+    os.makedirs(dump_dir, exist_ok=True)
+    dump_path = f"{dump_dir}/{uuid.uuid4()}.json"
+    with open(dump_path, "w") as f:
+        json.dump(alert, f, indent=4)
+
+def _should_run_atlas(alert, limit=19.7):
+    """
+    Check if this alert is bright enough to make running ATLAS FP worth it
+
+    The limiting magnitude of ATLAS c and o filters is 19.7
+    (https://fallingstar.com/specifications.php)
+    """
+    mag = alert["properties"]["newest_alert_magnitude"]
+    return mag < limit
