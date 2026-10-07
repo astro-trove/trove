@@ -13,6 +13,7 @@ import smtplib
 from django.contrib.auth.models import Group
 from django.contrib.sites.models import Site
 from django.conf import settings
+from django_tasks import task
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
