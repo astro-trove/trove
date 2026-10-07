@@ -16,6 +16,7 @@ from scipy.optimize import curve_fit
 from django.conf import settings
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
+from tom_antares.antares import AntaresDataService
 from trove_targets.models import Target
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from .tasks import async_atlas_query
@@ -607,6 +608,11 @@ def find_public_phot(
     # check TNS for any new photometry
     created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
 
+    # check ANTARES for new ZTF and LSST photometry from alerts
+    data_service = AntaresDataService()
+    data = data_service.query_reduced_data(target)
+    data_service.to_reduced_datums(target, data)
+    
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
     atlas_data = target.reduceddatum_set.filter(
