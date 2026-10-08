@@ -1,4 +1,6 @@
 import time
+import os
+import uuid
 import json
 from datetime import datetime
 import traceback
@@ -19,6 +21,7 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, Even
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from tom_dataproducts.tasks import atlas_query
 from tom_antares.antares import AntaresDataService
+from tom_targets.utils import cone_search_filter
 
 from astropy.table import Table
 from astropy.time import Time
@@ -512,7 +515,7 @@ def handle_antares_stream_async(locus):
     data_service = AntaresDataService()
     try:
         alert_finite = data_service.serialize_locus(None, locus)
-        handle_antares_stream.enqueue(alert_finite)
+        handle_antares_stream_task.enqueue(alert_finite)
         logger.debug(f"sent {locus.locus_id} to queue")
     except Exception:
         exc = traceback.format_exc()
@@ -520,6 +523,12 @@ def handle_antares_stream_async(locus):
 
 
 @task(queue_name="antares", priority=settings.PRIORITY_HIGH)
+def handle_antares_stream_task(*args, **kwargs):
+    """Just a django tasks Task wrapper on handle_antares_stream, this way
+    we can still execute the antares alert stream handling serially"""
+    handle_antares_stream(*args, **kwargs)
+
+
 def handle_antares_stream(alert, cone_search_radius_arcsec=2.0):
     try:
         data_service = AntaresDataService()
@@ -536,7 +545,6 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0):
         logger.info(
             f"Targets within {cone_search_radius_arcsec:.1f} arcsec: {target_matches}"
         )
-
         if target_matches:
             # then this target already exists in the Targets table
             target = target_matches[0]
@@ -548,20 +556,22 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0):
             # add any new aliases from ANTARES to the existing target
             alias_data = data_service.query_aliases(target=target)
             data_service.to_aliases(target, alias_data)
+
+            # then vet this target
+            # vetting includes updating ANTARES photometry and adding host galaxies
+            # this is why we don't do any of that above when we find a target match
+            target_post_save(target, created=True, tns_time_limit=np.inf)
                 
         else:
             # then this target does not exist, so we create it from scratch
+            # data_service.to_target also saves the target, and will execute the
+            # target_post_save function as a hook (see the configuration in settings.py)
             target = data_service.to_target(alert)
-            logger.info(f"No existing target found, adding {target.name} as new target")
-            
-        # then vet this target
-        # vetting includes updating ANTARES photometry and adding host galaxies
-        # this is why we don't do any of that above when we find a target match 
-        target_post_save(target, created=True, tns_time_limit=np.inf)
-
+            logger.info(f"No existing target found, added {target.name} as new target")
             
     except Exception:
         exc = traceback.format_exc()
+        logger.error(exc)
         dump_alert_and_send_error(alert, exc)
 
 

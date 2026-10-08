@@ -2,6 +2,10 @@
 This management command queries the ANTARES broker for loci associated with
 "active" GW events in their database
 """
+import sys
+import argparse
+from itertools import islice
+
 from django.core.management.base import BaseCommand
 from antares_client.search import search
 from elasticsearch_dsl import Search as ES_Search, Q as ES_Q
@@ -10,7 +14,10 @@ from tom_antares.antares import AntaresDataService
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.models import TargetName
 
-from custom_code.alertstream_handlers import handle_antares_stream_async
+from custom_code.alertstream_handlers import (
+    handle_antares_stream,
+    handle_antares_stream_async
+)
 from custom_code.hooks import get_active_nonlocalizedevents
 
 import logging
@@ -19,14 +26,20 @@ new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-def process_loci(loci):
+def process_loci(loci, test_num_alerts=sys.maxsize, async_alert_processing=True):
     """
     This processes a list of loci and ingests the data and/or target info into the
     TROVE database
     """
     count = 0
+    loci = islice(loci, test_num_alerts)
     for locus in loci:
-        handle_antares_stream_async(locus)
+        if async_alert_processing:
+            handle_antares_stream_async(locus)
+        else:
+            ds = AntaresDataService()
+            alert = ds.serialize_locus(None, locus)
+            handle_antares_stream(alert)
         count += 1
     return count
         
@@ -70,8 +83,8 @@ def query_for_one_event(event_id: str):
     neither_key = ES_Q(
         "bool",
         must_not=[
-            Q("exists", field="properties.ztf_ssnamenr"),
-            Q("exists", field="properties.lsst_diaSource_ssObjectId"),
+            ES_Q("exists", field="properties.ztf_ssnamenr"),
+            ES_Q("exists", field="properties.lsst_diaSource_ssObjectId"),
         ],
     )
 
@@ -125,13 +138,47 @@ class Command(BaseCommand):
             type=float,
             default=10,
         )
-    
-    def handle(self, lookback_days_nle=10, **kwargs):
+        parser.add_argument(
+            "--test-num-alerts",
+            help="For TESTING purposes only. Will limit the number of alerts processed to this number",
+            type=int,
+            default=sys.maxsize
+        )
+        parser.add_argument(
+            "--test-num-gw",
+            help="For TESTING purposes only. Will limit the number of GW events processed to this number",
+            default=sys.maxsize,
+            type=int
+        )
+        parser.add_argument(
+            '--async-alert-processing',
+            action=argparse.BooleanOptionalAction,
+            default=True
+        )
+        
+    def handle(self, lookback_days_nle=10, test_num_alerts=sys.maxsize, test_num_gw=sys.maxsize, async_alert_processing=True, **kwargs):
 
         active_gw_events = get_active_gw_events(lookback_days=lookback_days_nle)
         logger.info("Querying ANTARES for alerts associated with"+
                     f" {len(active_gw_events)} GW events")
-        for event_id in active_gw_events:
+        if test_num_gw:
+            logger.info(f"In TESTING MODE, will only process the first {test_num_gw} GW events!")
+        for idx, event_id in enumerate(active_gw_events):
+
+            if idx >= test_num_gw:
+                break
+            
             loci = query_for_one_event(event_id)
-            count = process_loci(loci)
-            logger.info(f"Async processing {count} loci for {event_id}")
+
+            if test_num_alerts:
+                logger.info(f"In TESTING MODE, will only process {test_num_alerts} alerts!")
+
+            count = process_loci(
+                loci,
+                test_num_alerts=test_num_alerts,
+                async_alert_processing=async_alert_processing
+            )
+            if async_alert_processing:
+                logger.info(f"Async processing started for {count} loci associated with {event_id}")
+            else:
+                logger.info(f"Processed {count} loci associated with {event_id} in real time")
