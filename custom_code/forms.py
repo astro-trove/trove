@@ -372,6 +372,7 @@ class GWFormHelper(FormHelper):
                 Column(PrependedAppendedText('distance_max', '<', 'Mpc')),
                 Column(PrependedAppendedText('has_ns_min', '>', '%')),
                 Column(PrependedAppendedText('has_remnant_min', '>', '%')),
+                Column(PrependedAppendedText('has_massgap_min', '>', '%')),
                 Column(PrependedAppendedText('has_ssm_min', '>', '%')),
             ),
         )

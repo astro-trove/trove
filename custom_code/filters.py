@@ -113,6 +113,26 @@ class GWFilter(NonLocalizedEventFilter):
                  ('retracted', 'Retracted')),
         empty_label='All', label='Status', method='status_filter')
 
+    source_type = django_filters.ChoiceFilter(choices=SOURCE_TYPE_CHOICES, label='Source Type',
+                                              empty_label='All',
+                                              method='most_likely_class_filter')
+
+    inv_far_min = django_filters.NumberFilter('details__far__lte',
+                                              method='last_sequence_filter', label='1/FAR',
+                                              min_value=sys.float_info.epsilon)
+    distance_max = django_filters.NumberFilter('localization__distance_mean__lte',
+                                               method='last_sequence_filter', label='Distance', min_value=0.)
+
+    has_ns_min = django_filters.NumberFilter('details__properties__HasNS__gte',
+                                             method='last_sequence_filter', label='HasNS', min_value=0., max_value=100.)
+    has_remnant_min = django_filters.NumberFilter('details__properties__HasRemnant__gte',
+                                                  method='last_sequence_filter', label='HasRemnant', min_value=0., max_value=100.)
+    has_massgap_min = django_filters.NumberFilter('details__properties__HasMassGap__gte',
+                                                  method='last_sequence_filter', label='HasMassGap', min_value=0., max_value=100.)
+    has_ssm_min = django_filters.NumberFilter('details__properties__HasSSM__gte',
+                                              method='last_sequence_filter', label='HasSSM',
+                                              min_value=0., max_value=100.)
+
     @staticmethod
     def status_filter(queryset, name, value):
         """Confirmed / preliminary / retracted, as the table's marks show them.
@@ -131,12 +151,7 @@ class GWFilter(NonLocalizedEventFilter):
         if value == 'confirmed':
             return qs.exclude(_subtype='PRELIMINARY')
         return qs.filter(_subtype='PRELIMINARY')
-    source_type = django_filters.ChoiceFilter(choices=SOURCE_TYPE_CHOICES, label='Source Type',
-                                              empty_label='All',
-                                              method='most_likely_class_filter')
-    has_ssm_min = django_filters.NumberFilter('details__properties__HasSSM__gte',
-                                              method='last_sequence_filter', label='HasSSM',
-                                              min_value=0., max_value=100.)
+
 
     @staticmethod
     def most_likely_class_filter(queryset, name, value):
@@ -164,15 +179,6 @@ class GWFilter(NonLocalizedEventFilter):
             if other != value:
                 qs = qs.filter(**{f'_p_{value}__gte': F(f'_p_{other}')})
         return qs
-    inv_far_min = django_filters.NumberFilter('details__far__lte',
-                                              method='last_sequence_filter', label='1/FAR',
-                                              min_value=sys.float_info.epsilon)
-    distance_max = django_filters.NumberFilter('localization__distance_mean__lte',
-                                               method='last_sequence_filter', label='Distance', min_value=0.)
-    has_ns_min = django_filters.NumberFilter('details__properties__HasNS__gte',
-                                             method='last_sequence_filter', label='HasNS', min_value=0., max_value=100.)
-    has_remnant_min = django_filters.NumberFilter('details__properties__HasRemnant__gte',
-                                                  method='last_sequence_filter', label='HasRemnant', min_value=0., max_value=100.)
 
 
 class NeutrinoFilter(NonLocalizedEventFilter):
