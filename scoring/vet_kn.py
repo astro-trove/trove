@@ -54,8 +54,7 @@ PARAM_RANGES = dict(
     decay_rate=[-np.inf, -0.1],
     max_predets=3,
     t_pre=0,
-    t_post=np.inf,
-    max_decay_fit_time=25,
+    t_post=25,
     phot_score_snr_min=5,
     min_time_separation=1/24,
 )
@@ -69,9 +68,9 @@ def vet_kn(
 ):
     """
     `phot_method` names the photometry scorer to use. None means "read the
-    site-wide toggle", which is right for the single-target path -- that runs in
-    the web process, where the toggle is. `async_vet` passes it explicitly
-    instead, because a worker in its own container cannot see that cache.
+    viewer's toggle", which is right for the single-target path -- that runs in
+    the web process, where the session is. `async_vet` passes it explicitly
+    instead, because a worker has no session to read.
     """
     logger.info("Running BNS vetting (KN vetting)")
 
@@ -155,9 +154,11 @@ def vet_kn(
     update_score_factor(event_candidate, "agn_score", agn_score)
 
     ## photometry scoring
+    # no need for pre-GW photometry as KNe cannot begin pre-GW
     allphot = _get_post_disc_phot(
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
+        t_pre=param_ranges["t_pre"],
         t_post=param_ranges["t_post"],
     )
     phot_score, lum, max_time, decay_rate, _, _ = _score_phot(
@@ -176,7 +177,7 @@ def vet_kn(
             "c",
         ],  # common optical filters + some Roman filters + ATLAS o,c
     )
-    # The photometry factor can come from either scorer -- the site-wide
+    # The photometry factor can come from either scorer -- the viewer's
     # `phot_method` toggle picks. The TROVE fit above always runs regardless,
     # because its `lum` / `max_time` / `decay_rate` are displayed on the
     # candidate page in their own right, not only as inputs to the factor.

@@ -52,11 +52,16 @@ DICT_TRANSIENTS_PARAM_RANGES = {
 
 
 # ScoreFactor key holding KilonovaSCORER's photometry factor, written by
-# `vet_kn` when the site-wide `phot_method` toggle is on KilonovaSCORER
+# `vet_kn` when the viewer's `phot_method` toggle is on KilonovaSCORER
 KILONOVA_SCORE_KEY = "kilonova_score"
 
 # why KilonovaSCORER could not score a candidate, written by `vet_kn` in place of score
 KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
+
+# session key for the AGN toggle, which decides whether `agn_score` counts
+# towards the total in `get_event_candidate_scores` below. Per viewer.
+AGN_TOGGLE_KEY = "agn_toggle"
+AGN_TOGGLE_DEFAULT = True
 
 # default subscore names
 SUBSCORE_NAMES = [
@@ -97,7 +102,7 @@ MPC_KEYS = [
 ]
 
 
-# the site-wide AGN toggle governs only these; BBH AGN-flare scoring always uses
+# the AGN toggle governs only these; BBH AGN-flare scoring always uses
 # its AGN association
 AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
 
@@ -106,11 +111,7 @@ PS_WAIVED_TRANSIENTS = {"AGN-flare"}
 KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
 
 def ps_counts_toward(transient, agn_score):
-    """Whether ps_score enters `transient`'s score.
-
-    Waived only for AGN-flare scoring, and only when agn_association_2d actually
-    matched. With no AGN association the point-source match still stands.
-    """
+    """Whether ps_score enters `transient`'s score."""
     if transient not in PS_WAIVED_TRANSIENTS:
         return True
     matched = AGN_FLARE_PARAM_RANGES["agn_match_score"]
@@ -120,6 +121,12 @@ def ps_counts_toward(transient, agn_score):
 def agn_counts_toward(transient, agn_toggle):
     """Whether agn_score enters `transient`'s score."""
     return bool(agn_toggle) or transient not in AGN_TOGGLE_TRANSIENTS
+
+
+def _phot_score_key(metric_key):
+    """The key a photometry metric's subscore is stored under."""
+    return f"{metric_key}_score"
+
 
 def _check_phot_val(val, param_ranges, param_range_key):
     val_max = max(param_ranges[param_range_key])
@@ -164,6 +171,20 @@ def get_no_score_message(most_likely_class):
     return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
 
 
+def get_agn_toggle(request=None) -> bool:
+    """Whether this viewer wants AGN scores counted. No session, no request:
+    a queued task gets the default."""
+    if request is None or not hasattr(request, "session"):
+        return AGN_TOGGLE_DEFAULT
+    return bool(request.session.get(AGN_TOGGLE_KEY, AGN_TOGGLE_DEFAULT))
+
+
+def set_agn_toggle(request, value: bool) -> bool:
+    """Set this viewer's AGN toggle. Returns what was stored."""
+    request.session[AGN_TOGGLE_KEY] = bool(value)
+    return bool(value)
+
+
 def get_event_candidate_scores(
         event_candidates,
         dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
@@ -174,7 +195,7 @@ def get_event_candidate_scores(
 ):
     """
     `phot_method` selects which photometry factor the score uses (`None`
-    reads the site-wide toggle.) `agn_toggle` drops agn_score from the
+    falls back to the default, since there may be no session to read.) `agn_toggle` drops agn_score from the
     kilonova-style scores only (`AGN_TOGGLE_TRANSIENTS`).
     """
     from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
@@ -258,7 +279,7 @@ def get_event_candidate_scores(
 
         # Extract values that need special handling
         val_dict = {
-            subscore_key+"_score": sf_dict[subscore_key]
+            _phot_score_key(subscore_key): sf_dict[subscore_key]
             for subscore_key, param_range_key in val_not_score_keys.items()
             if subscore_key in sf_dict
         }
@@ -307,12 +328,14 @@ def get_event_candidate_scores(
             # EM transient
             class_score = classification_score(ec.target, transient)
             
+            # val_dict is keyed with the "_score" suffix the display labels use
             phot_subscores = {
-                subscore_key: _check_phot_val(
-                    val_dict[subscore_key], param_ranges, param_range_key
+                _phot_score_key(subscore_key): _check_phot_val(
+                    val_dict[_phot_score_key(subscore_key)], param_ranges, param_range_key
                 )
                 for subscore_key, param_range_key in val_not_score_keys.items()
-                if subscore_key in val_dict and param_range_key in param_ranges
+                if _phot_score_key(subscore_key) in val_dict
+                and param_range_key in param_ranges
             }
 
             other_subscores = dict(
