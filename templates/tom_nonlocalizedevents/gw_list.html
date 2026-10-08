@@ -41,9 +41,10 @@
         <th scope="col" title="Inverse False Alarm Rate">1/FAR</th>
         <th scope="col" title="Most Likely Classification">Class.</th>
         <th scope="col" title="Distance">Distance</th>
-        <th scope="col" title="Has Neutron Star?">NS?</th>
-        <th scope="col" title="Has Remnant?">Bright?</th>
-        <th scope="col" title="Probability of a sub-solar mass component">SSM?</th>
+        <th scope="col" title="Has Neutron Star?">Has NS?</th>
+        <th scope="col" title="Has Remnant?">Has Remnant?</th>
+        <th scope="col" title="Has a component in the 3-5 M☉ mass gap?">Has MassGap?</th>
+        <th scope="col" title="Has a sub-solar mass component?">Has SSM?</th>
         <th scope="col" title="External Links">Ext. Links</th>
       </tr>
       </thead>
@@ -68,7 +69,8 @@
         <td title="Distance">{{ seq.localization | format_distance }}</td>
         <td title="Has Neutron Star?">{{ seq.details.properties.HasNS | percentformat }}</td>
         <td title="Has Remnant?">{{ seq.details.properties.HasRemnant | percentformat }}</td>
-        <td title="Probability of a sub-solar mass component">{{ seq.details.properties.HasSSM | percentformat }}</td>
+        <td title="Has a component in the 3 - 5 M☉ mass gap?">{{ seq.details.properties.HasMassGap | percentformat }}</td>
+        <td title="Has a sub-solar mass component?">{{ seq.details.properties.HasSSM | percentformat }}</td>
         <td title="External Links">
           <a href="{{ event.gracedb_url }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
           <a href="{{ event.treasuremap_url }}" target="_blank"><img src="https://treasuremap.space/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" /></a>
