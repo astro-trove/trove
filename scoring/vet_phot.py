@@ -14,6 +14,7 @@ import pandas as pd
 from scipy.optimize import curve_fit
 
 from django.conf import settings
+from django.core.exceptions import FieldError
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
 from tom_antares.antares import AntaresDataService
@@ -611,7 +612,12 @@ def find_public_phot(
     # check ANTARES for new ZTF and LSST photometry from alerts
     data_service = AntaresDataService()
     data = data_service.query_reduced_data(target)
-    data_service.to_reduced_datums(target, data)
+    try:
+        data_service.to_reduced_datums(target, data)
+    except FieldError:
+        # this is a known issue with getting light curve info from ANTARES via
+        # the tom-antares package right now :(
+        pass
     
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
