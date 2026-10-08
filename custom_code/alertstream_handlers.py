@@ -29,6 +29,7 @@ import astropy_healpix as ah
 
 from .hooks import (
     target_post_save,
+    target_hook_options,
     associate_targets_with_nle,
 )
 from .templatetags.nonlocalizedevent_extras import (
@@ -511,11 +512,11 @@ def handle_icecube_alert(alert):
 
     logger.info(f"Finished processing alert for {nonlocalizedevent.event_id}")
 
-def handle_antares_stream_async(locus):
+def handle_antares_stream_async(locus, lookback_days_nle=10):
     data_service = AntaresDataService()
     try:
         alert_finite = data_service.serialize_locus(None, locus)
-        handle_antares_stream_task.enqueue(alert_finite)
+        handle_antares_stream_task.enqueue(alert_finite, lookback_days_nle=lookback_days_nle)
         logger.debug(f"sent {locus.locus_id} to queue")
     except Exception:
         exc = traceback.format_exc()
@@ -527,9 +528,9 @@ def handle_antares_stream_task(*args, **kwargs):
     """Just a django tasks Task wrapper on handle_antares_stream, this way
     we can still execute the antares alert stream handling serially"""
     handle_antares_stream(*args, **kwargs)
+    
 
-
-def handle_antares_stream(alert, cone_search_radius_arcsec=2.0):
+def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nle=10):
     try:
         data_service = AntaresDataService()
 
@@ -554,19 +555,19 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0):
                 logger.info(f" - replacing temporary name with {target.name}")
 
             # add any new aliases from ANTARES to the existing target
-            alias_data = data_service.query_aliases(target=target)
-            data_service.to_aliases(target, alias_data)
+            data_service.to_aliases(target, alert.get("aliases", []))
 
             # then vet this target
             # vetting includes updating ANTARES photometry and adding host galaxies
             # this is why we don't do any of that above when we find a target match
-            target_post_save(target, created=True, tns_time_limit=np.inf)
+            target_post_save(target, created=True, lookback_days_nle=lookback_days_nle)
                 
         else:
             # then this target does not exist, so we create it from scratch
             # data_service.to_target also saves the target, and will execute the
             # target_post_save function as a hook (see the configuration in settings.py)
-            target = data_service.to_target(alert)
+            with target_hook_options(lookback_days_nle=lookback_days_nle):
+                target = data_service.to_target(alert)
             logger.info(f"No existing target found, added {target.name} as new target")
             
     except Exception:

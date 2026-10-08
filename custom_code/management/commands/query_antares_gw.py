@@ -26,7 +26,7 @@ new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-def process_loci(loci, test_num_alerts=sys.maxsize, async_alert_processing=True):
+def process_loci(loci, test_num_alerts=sys.maxsize, async_alert_processing=True, lookback_days_nle=10):
     """
     This processes a list of loci and ingests the data and/or target info into the
     TROVE database
@@ -35,11 +35,11 @@ def process_loci(loci, test_num_alerts=sys.maxsize, async_alert_processing=True)
     loci = islice(loci, test_num_alerts)
     for locus in loci:
         if async_alert_processing:
-            handle_antares_stream_async(locus)
+            handle_antares_stream_async(locus, lookback_days_nle=lookback_days_nle)
         else:
             ds = AntaresDataService()
             alert = ds.serialize_locus(None, locus)
-            handle_antares_stream(alert)
+            handle_antares_stream(alert, lookback_days_nle=lookback_days_nle)
         count += 1
     return count
         
@@ -176,7 +176,8 @@ class Command(BaseCommand):
             count = process_loci(
                 loci,
                 test_num_alerts=test_num_alerts,
-                async_alert_processing=async_alert_processing
+                async_alert_processing=async_alert_processing,
+                lookback_days_nle=lookback_days_nle
             )
             if async_alert_processing:
                 logger.info(f"Async processing started for {count} loci associated with {event_id}")

@@ -617,6 +617,7 @@ def find_public_phot(
     except FieldError:
         # this is a known issue with getting light curve info from ANTARES via
         # the tom-antares package right now :(
+        logger.warn("Skipping ANTARES photometry query because of a known bug in tom-antares")
         pass
     
     # query ATLAS for new forced photometry
