@@ -47,6 +47,7 @@ DICT_TRANSIENTS_PARAM_RANGES = {
     "AGN-flare": AGN_FLARE_PARAM_RANGES,
 }
 
+MIN_PROBABILITY_FOR_TRANSIENT = 0.01
 
 # ScoreFactor key holding KilonovaSCORER's photometry factor, written by
 # `vet_kn` when the viewer's `phot_method` toggle is on KilonovaSCORER
@@ -181,6 +182,48 @@ def set_agn_toggle(request, value: bool) -> bool:
     request.session[AGN_TOGGLE_KEY] = bool(value)
     return bool(value)
 
+def get_possible_em_transients(event_id):
+    try:
+        nle_eventseq = localization_sequence_from_name(event_id)
+    except IndexError:
+        return []
+
+    details = nle_eventseq.details
+    transients = []    
+
+    # we can now build the transients list of potential EM counterparts
+    if not details:
+        return transients
+
+    if "properties" in details:
+        # this is a GW alert
+        for key in ["HasNS", "HasMassGap", "HasRemnant"]:
+            if details["properties"].get(key, 0) > MIN_PROBABILITY_FOR_TRANSIENT:
+                transients.append("KN")
+                break
+        
+        has_ssm = details["properties"].get("HasSSM", 0)
+        if has_ssm > MIN_PROBABILITY_FOR_TRANSIENT:
+            transients += ["KN", "KN-in-SN", "super-KN"]
+
+    if "classification" in details:
+        # this is a GW alert
+        for key in ["BNS", "NSBH"]:
+            if details["classification"].get(key, 0) > MIN_PROBABILITY_FOR_TRANSIENT:
+                transients.append("KN")
+
+        is_bbh = details["classification"].get("BBH", 0)
+        if is_bbh > MIN_PROBABILITY_FOR_TRANSIENT:
+            transients.append("AGN-flare")
+
+    if "group" not in details:
+        if "instrument" in details and details["instrument"] == "WXT":
+            transients += ["KN", "SN", "TDE"]
+        elif "messenger" in details and details["messenger"] == "Neutrino":
+            # these are neutrino alerts
+            transients += ["AGN-flare", "TDE"]
+
+    return list(set(transients))
 
 def get_event_candidate_scores(
         event_candidates,
@@ -216,27 +259,10 @@ def get_event_candidate_scores(
     event_candidates_list = list(event_candidates)
 
     # which transient types to consider?
-    try:
-        nle_eventseq = localization_sequence_from_name(
-            event_candidates_list[0].nonlocalizedevent.event_id
-        )
-        most_likely_class = get_most_likely_class(nle_eventseq.details)
-    except IndexError:
-        return []
-
-    if most_likely_class in {"SSM", "Terrestrial"}:
-        transients = ["KN", "KN-in-SN", "super-KN"]
-    elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
-        transients = ["KN"]
-    elif most_likely_class == "LGRB":
-        transients = ["KN", "SN"] # SN is not yet implemented as a vetting mode
-    elif most_likely_class == "FXT":
-        transients = ["KN", "SN", "TDE"] # SN and TDE are not yet implemented as a vetting mode
-    elif most_likely_class == "BBH":
-        transients = ["AGN-flare"]
-    else:
-        transients = []
-
+    transients = get_possible_em_transients(
+        event_candidates_list[0].nonlocalizedevent.event_id
+    )
+    
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
 
