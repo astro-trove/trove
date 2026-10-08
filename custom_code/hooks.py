@@ -3,6 +3,7 @@ from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from contextvars import ContextVar
 
+from django.db import transaction
 from django.db.models import Min
 from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
@@ -251,35 +252,42 @@ def target_post_save(
         kwargs.setdefault("stop_on_zero", False)
         vet_basic(target.id, **kwargs)
 
-        # given a known associated NLE we can associate that
-        if known_associated_nle_id:
-            nle = NonLocalizedEvent.objects.get(event_id=known_associated_nle_id)
-            new_candidates = create_candidates_from_targets(
-                nle.sequences.last(),
-                target_ids=[target.id]
+        # the skymap queries in create_candidates_from_targets go through a separate
+        # SQLAlchemy connection that can't see this target until Target.save's
+        # transaction commits, so defer the NLE association and vetting until then
+        # (on_commit runs immediately if we aren't inside a transaction)
+        def _associate_and_vet():
+            # given a known associated NLE we can associate that
+            if known_associated_nle_id:
+                nle = NonLocalizedEvent.objects.get(event_id=known_associated_nle_id)
+                known_candidates = create_candidates_from_targets(
+                    nle.sequences.last(),
+                    target_ids=[target.id]
+                )
+                if len(known_candidates):
+                    logger.info(f'Created a new EventCandidate from {target} and {nle}')
+
+            # first, check for any existing candidates associated with this target
+            ecs = EventCandidate.objects.filter(target=target)
+            if ecs.exists():
+                for cand in ecs:
+                    # still vet this as a "new" candidate since the target recently had new
+                    # info added and saved
+                    vet_new_candidate(cand)
+
+            # then check if this target is associated with any NLEs
+            new_candidates = associate_nle_with_target(
+                target,
+                lookback_days_nle=lookback_days_nle,
+                first_det_min=first_det_min,
+                first_det_max=first_det_max,
             )
-            logger.info(f'Created a new EventCandidate from {target} and {nle}')
 
-        
-        # first, check for any existing candidates associated with this target
-        ecs = EventCandidate.objects.filter(target=target)
-        if ecs.exists():
-            for cand in ecs:
-                # still vet this as a "new" candidate since the target recently had new
-                # info added and saved
-                vet_new_candidate(cand)
-        
-        # then check if this target is associated with any NLEs
-        new_candidates = associate_nle_with_target(
-            target,
-            lookback_days_nle=lookback_days_nle,
-            first_det_min=first_det_min,
-            first_det_max=first_det_max,
-        )
+            if len(new_candidates):
+                for cand in new_candidates:
+                    vet_new_candidate(cand)
 
-        if len(new_candidates):
-            for cand in new_candidates:
-                vet_new_candidate(cand)
+        transaction.on_commit(_associate_and_vet)
 
                 
     redshift = target.targetextra_set.filter(key="Redshift")
