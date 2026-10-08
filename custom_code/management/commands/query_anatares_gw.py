@@ -6,11 +6,11 @@ from django.core.management.base import BaseCommand
 from antares_client.search import search
 from elasticsearch_dsl import Search as ES_Search, Q as ES_Q
 
-def process_single_locus(locus):
-    """
-    This processes a single locus and ingest the data/photometry/target info into the
-    trove database
-    """
+from tom_antares.antares import AntaresDataService
+from tom_nonlocalizedevents.models import EventCandidate
+from tom_targets.models import TargetName
+
+from custom_code.alertstream_handlers import handle_antares_stream_async
 
 def process_loci(loci):
     """
@@ -18,13 +18,20 @@ def process_loci(loci):
     TROVE database
     """
     for locus in loci:
-        process_single_locus(locus)
+        handle_antares_stream_async(locus)
 
-def get_active_gw_events():
+def get_active_gw_events(lookback_days=10):
     """
     This gets a list of active GW events stored in the TROVE database
     """
-    return []
+    active_nles = get_active_nonlocalizedevents(lookback_days=lookback_days)
+    active_gw = active_nles.filter(
+        event_id__startswith="S"
+    ).values_list(
+        "event_id",
+        flat=True
+    )
+    return list(active_gw)
 
 def query_for_one_event(event_id: str):
     """
@@ -44,6 +51,10 @@ def query_for_one_event(event_id: str):
     )
     """
 
+    # get current ANT* names for the given event_id 
+    ant_target_names = get_current_ant_candidate_names(event_id)
+    
+    # then build the "No SSO" part of the query
     ztf_not_sso = ES_Q("term", **{"properties.ztf_ssnamenr": "null"})
     lsst_not_sso = ES_Q("term", **{"properties.lsst_diaSource_ssObjectId": 0})
     neither_key = ES_Q(
@@ -54,20 +65,59 @@ def query_for_one_event(event_id: str):
         ],
     )
 
+    # put it all together in an ElasticSearch query dict to give to ANTARES
     query = (
         ES_Search()
         .filter("term", **{"grav_wave_events.keyword": event_id})
         .filter(ztf_not_sso | lsst_not_sso | neither_key)
+        .exclude("terms", locus_id=ant_target_names)
         .to_dict()
     )
-    loci = search(query)
 
-    import pdb; pdb.set_trace()
-    
-    return
+    # return all of the ANTARES loci associated with this event that we don't already
+    # have in the TROVE database
+    return search(query) 
+
+def get_current_ant_candidate_names(event_id):
+    """
+    This gets a list of current aliases of targets associated with the passed in NLE
+    so that we can exclude them in our query to ANTARES. This will reduce the processing
+    runtime!
+    """
+
+    # get a list of the event candidate ids
+    ec_ids = EventCandidate.objects.filter(
+        nonlocalizedevent__event_id=event_id
+    ).values_list(
+        "target_id",
+        flat=True
+    )
+
+    # also get a list of target name objects that start with ANT
+    ant_target_names = TargetName.objects.filter(
+        name__startswith="ANT",
+        target_id__in=ec_ids
+    ).values_list(
+        "name",
+        flat=True
+    )
+
+    return list(ant_target_names)
     
 class Command(BaseCommand):
     help = ""
 
-    def handle(self, **kwargs):
-        
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--lookback-days-nle",
+            help="Consider nonlocalized events active if event was discovered at MOST "+
+            "this many days ago. POSITIVE number expected.",
+            type=float,
+            default=10,
+        )
+    
+    def handle(self, lookback_days_nle=10, **kwargs):
+
+        for event_id in get_active_gw_events(lookback_days=lookback_days_nle):
+            loci = query_for_one_event(event_id)
+            process_loci(loci)
