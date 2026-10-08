@@ -106,7 +106,7 @@ AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
 
 PS_WAIVED_TRANSIENTS = {"AGN-flare"}
 
-KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
+KN_STYLE_CLASSES = {"SSM", "MassGap", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
 
 def ps_counts_toward(transient, agn_score):
     """Whether ps_score enters `transient`'s score."""
@@ -158,16 +158,6 @@ def most_likely_class_for_event(nonlocalizedevent_name):
         return get_most_likely_class(nle_eventseq.details)
     except IndexError:
         return None
-
-
-def get_no_score_message(most_likely_class):
-    """Message for event classes with no scoring yet, else None. Takes the
-    class from most_likely_class_for_event."""
-    if most_likely_class in KN_STYLE_CLASSES | {"BBH"}:
-        return None
-
-    return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
-
 
 def get_agn_toggle(request=None) -> bool:
     """Whether this viewer wants AGN scores counted. No session, no request:
@@ -259,6 +249,9 @@ def get_event_candidate_scores(
     event_candidates_list = list(event_candidates)
 
     # which transient types to consider?
+    if not len(event_candidates_list):
+        return []
+    
     transients = get_possible_em_transients(
         event_candidates_list[0].nonlocalizedevent.event_id
     )
