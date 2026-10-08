@@ -5,7 +5,7 @@ from contextvars import ContextVar
 
 from django.db.models import Min
 from tom_targets.models import TargetExtra
-from tom_nonlocalizedevents.models import NonLocalizedEvent
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from tom_dataproducts.models import ReducedDatum
 
 from scoring.vet_kn import vet_kn
@@ -217,11 +217,13 @@ def target_post_save(
     first_det_min = opts.pop("first_det_min")
     first_det_max = opts.pop("first_det_max")
     skip_vet_if_no_new_phot = opts.pop("skip_vet_if_no_new_phot")
-
+    
     # finally, clean out kwargs because we continue to use other items in it later
-    kwargs.pop("lookback_days_nle", None)
-    kwargs.pop("first_det_min", None)
-    kwargs.pop("first_det_max", None)
+    unneeded_kwargs = [
+        "lookback_days_nle", "first_det_min", "first_det_max"
+    ]
+    for k in unneeded_kwargs:
+        kwargs.pop(k, None)
         
     # then we can continue with the normal vetting
     messages = []
@@ -247,6 +249,14 @@ def target_post_save(
         kwargs.setdefault("stop_on_zero", False)
         vet_basic(target.id, **kwargs)
 
+        # first, check for any existing candidates associated with this target
+        ecs = EventCandidate.objects.filter(target=target)
+        if ecs.exists():
+            for cand in ecs:
+                # still vet this as a "new" candidate since the target recently had new
+                # info added and saved
+                vet_new_candidate(cand)
+        
         # then check if this target is associated with any NLEs
         new_candidates = associate_nle_with_target(
             target,
@@ -258,11 +268,8 @@ def target_post_save(
         if len(new_candidates):
             for cand in new_candidates:
                 vet_new_candidate(cand)
-        else:
-            messages.append(
-                "Did not run NLE vetting on this target because there are no NLEs associated with it!"
-            )
 
+                
     redshift = target.targetextra_set.filter(key="Redshift")
     if redshift.exists() and target.distance is None:
         messages.append(f"Updating distance of {target.name} based on redshift")

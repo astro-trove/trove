@@ -30,7 +30,7 @@ import astropy_healpix as ah
 from .hooks import (
     target_post_save,
     target_hook_options,
-    associate_targets_with_nle,
+    associate_targets_with_nle
 )
 from .templatetags.nonlocalizedevent_extras import (
     format_inverse_far,
@@ -557,11 +557,12 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
             # add any new aliases from ANTARES to the existing target
             data_service.to_aliases(target, alert.get("aliases", []))
 
-            # then vet this target
+            # then create a candidate and vet it since we know that it is associated
+            # with the queried NLE
             # vetting includes updating ANTARES photometry and adding host galaxies
             # this is why we don't do any of that above when we find a target match
-            target_post_save(target, created=True, lookback_days_nle=lookback_days_nle)
-                
+            target_post_save(target, created=True, lookback_days_nle=True)
+            
         else:
             # then this target does not exist, so we create it from scratch
             # data_service.to_target also saves the target, and will execute the
