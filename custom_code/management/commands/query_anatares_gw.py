@@ -11,15 +11,25 @@ from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.models import TargetName
 
 from custom_code.alertstream_handlers import handle_antares_stream_async
+from custom_code.hooks import get_active_nonlocalizedevents
+
+import logging
+logger = logging.getLogger(__name__)
+new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
+for handler in logger.handlers:
+    handler.setFormatter(new_format)
 
 def process_loci(loci):
     """
     This processes a list of loci and ingests the data and/or target info into the
     TROVE database
     """
+    count = 0
     for locus in loci:
         handle_antares_stream_async(locus)
-
+        count += 1
+    return count
+        
 def get_active_gw_events(lookback_days=10):
     """
     This gets a list of active GW events stored in the TROVE database
@@ -105,7 +115,7 @@ def get_current_ant_candidate_names(event_id):
     return list(ant_target_names)
     
 class Command(BaseCommand):
-    help = ""
+    help = "Query ANTARES for new alerts associated with active GW events in TROVE"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -118,6 +128,10 @@ class Command(BaseCommand):
     
     def handle(self, lookback_days_nle=10, **kwargs):
 
-        for event_id in get_active_gw_events(lookback_days=lookback_days_nle):
+        active_gw_events = get_active_gw_events(lookback_days=lookback_days_nle)
+        logger.info("Querying ANTARES for alerts associated with"+
+                    f" {len(active_gw_events)} GW events")
+        for event_id in active_gw_events:
             loci = query_for_one_event(event_id)
-            process_loci(loci)
+            count = process_loci(loci)
+            logger.info(f"Async processing {count} loci for {event_id}")
