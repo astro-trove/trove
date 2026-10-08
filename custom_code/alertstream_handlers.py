@@ -15,6 +15,7 @@ import smtplib
 from django.contrib.auth.models import Group
 from django.contrib.sites.models import Site
 from django.conf import settings
+from django.db.utils import IntegrityError
 from django_tasks import task
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
@@ -22,6 +23,7 @@ from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handl
 from tom_dataproducts.tasks import atlas_query
 from tom_antares.antares import AntaresDataService
 from tom_targets.utils import cone_search_filter
+from tom_targets.models import TargetName
 
 from astropy.table import Table
 from astropy.time import Time
@@ -530,7 +532,7 @@ def handle_antares_stream_task(*args, **kwargs):
     handle_antares_stream(*args, **kwargs)
     
 
-def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nle=10):
+def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nle=10, event_id=None):
     try:
         data_service = AntaresDataService()
 
@@ -555,20 +557,28 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
                 logger.info(f" - replacing temporary name with {target.name}")
 
             # add any new aliases from ANTARES to the existing target
-            data_service.to_aliases(target, alert.get("aliases", []))
-
+            _add_aliases(target, alert)
+            
             # then create a candidate and vet it since we know that it is associated
             # with the queried NLE
             # vetting includes updating ANTARES photometry and adding host galaxies
             # this is why we don't do any of that above when we find a target match
-            target_post_save(target, created=True, lookback_days_nle=True)
+            target_post_save(
+                target,
+                created=True,
+                lookback_days_nle=True,
+                known_associated_nle_id=event_id
+            )
             
         else:
             # then this target does not exist, so we create it from scratch
             # data_service.to_target also saves the target, and will execute the
             # target_post_save function as a hook (see the configuration in settings.py)
-            with target_hook_options(lookback_days_nle=lookback_days_nle):
+            with target_hook_options(lookback_days_nle=lookback_days_nle, known_associated_nle_id=event_id):
                 target = data_service.to_target(alert)
+
+            _add_aliases(target, alert)
+                
             logger.info(f"No existing target found, added {target.name} as new target")
             
     except Exception:
@@ -576,7 +586,15 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
         logger.error(exc)
         dump_alert_and_send_error(alert, exc)
 
-
+def _add_aliases(target, alert):
+    # add any aliases from the alert
+    for alias_name in alert.get("aliases", []):
+        alias = TargetName(name=alias_name, target=target)
+        try:
+            alias.save()
+        except IntegrityError:
+            logger.info(f"{alias} already exists, skipping and not saving")
+        
 def dump_alert_and_send_error(
     alert, exc, dump_dir="antares-alert-errors"
 ):

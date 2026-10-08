@@ -26,7 +26,10 @@ new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-def process_loci(loci, test_num_alerts=sys.maxsize, async_alert_processing=True, lookback_days_nle=10):
+def process_loci(
+        loci, test_num_alerts=sys.maxsize, async_alert_processing=True,
+        lookback_days_nle=10, event_id=None
+):
     """
     This processes a list of loci and ingests the data and/or target info into the
     TROVE database
@@ -35,11 +38,19 @@ def process_loci(loci, test_num_alerts=sys.maxsize, async_alert_processing=True,
     loci = islice(loci, test_num_alerts)
     for locus in loci:
         if async_alert_processing:
-            handle_antares_stream_async(locus, lookback_days_nle=lookback_days_nle)
+            handle_antares_stream_async(
+                locus,
+                lookback_days_nle=lookback_days_nle,
+                event_id=event_id
+            )
         else:
             ds = AntaresDataService()
             alert = ds.serialize_locus(None, locus)
-            handle_antares_stream(alert, lookback_days_nle=lookback_days_nle)
+            handle_antares_stream(
+                alert,
+                lookback_days_nle=lookback_days_nle,
+                event_id=event_id
+            )
         count += 1
     return count
         
@@ -76,7 +87,7 @@ def query_for_one_event(event_id: str):
 
     # get current ANT* names for the given event_id 
     ant_target_names = get_current_ant_candidate_names(event_id)
-    
+
     # then build the "No SSO" part of the query
     ztf_not_sso = ES_Q("term", **{"properties.ztf_ssnamenr": "null"})
     lsst_not_sso = ES_Q("term", **{"properties.lsst_diaSource_ssObjectId": 0})
@@ -99,7 +110,7 @@ def query_for_one_event(event_id: str):
 
     # return all of the ANTARES loci associated with this event that we don't already
     # have in the TROVE database
-    return search(query) 
+    return search(query)
 
 def get_current_ant_candidate_names(event_id):
     """
@@ -177,7 +188,8 @@ class Command(BaseCommand):
                 loci,
                 test_num_alerts=test_num_alerts,
                 async_alert_processing=async_alert_processing,
-                lookback_days_nle=lookback_days_nle
+                lookback_days_nle=lookback_days_nle,
+                event_id=event_id
             )
             if async_alert_processing:
                 logger.info(f"Async processing started for {count} loci associated with {event_id}")

@@ -203,6 +203,7 @@ def target_post_save(
         first_det_min=-1,
         first_det_max=10,
         skip_vet_if_no_new_phot=False,
+        known_associated_nle_id=None
     )
     
     # pack these possible options into a single dict such that
@@ -217,10 +218,11 @@ def target_post_save(
     first_det_min = opts.pop("first_det_min")
     first_det_max = opts.pop("first_det_max")
     skip_vet_if_no_new_phot = opts.pop("skip_vet_if_no_new_phot")
+    known_associated_nle_id = opts.pop("known_associated_nle_id")
     
     # finally, clean out kwargs because we continue to use other items in it later
     unneeded_kwargs = [
-        "lookback_days_nle", "first_det_min", "first_det_max"
+        "lookback_days_nle", "first_det_min", "first_det_max", "known_associated_nle_id"
     ]
     for k in unneeded_kwargs:
         kwargs.pop(k, None)
@@ -249,6 +251,16 @@ def target_post_save(
         kwargs.setdefault("stop_on_zero", False)
         vet_basic(target.id, **kwargs)
 
+        # given a known associated NLE we can associate that
+        if known_associated_nle_id:
+            nle = NonLocalizedEvent.objects.get(event_id=known_associated_nle_id)
+            new_candidates = create_candidates_from_targets(
+                nle.sequences.last(),
+                target_ids=[target.id]
+            )
+            logger.info(f'Created a new EventCandidate from {target} and {nle}')
+
+        
         # first, check for any existing candidates associated with this target
         ecs = EventCandidate.objects.filter(target=target)
         if ecs.exists():
