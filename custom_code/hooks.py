@@ -102,16 +102,27 @@ def first_detection_window_days(nle_class, first_det_min, first_det_max):
     return first_det_min, first_det_max
 
 
-def vet_new_candidate(candidate):
+def vet_new_candidate(candidate, basic_results=None):
     """Vet a newly associated candidate for its event's class: an AGN flare for
-    a BBH event, every kilonova-style mode for anything else."""
+    a BBH event, every kilonova-style mode for anything else.
+
+    `basic_results` is the output of an earlier `vet_basic` call on this target,
+    passed through so each vetting mode doesn't rerun it."""
     target_id, event_id = candidate.target.id, candidate.nonlocalizedevent.event_id
+
+    def _basic():
+        # fresh copies so one vetting mode can't modify another's dataframes
+        if basic_results is None:
+            return None
+        host_df, agn_df, keep_vetting = basic_results
+        return host_df.copy(), agn_df.copy(), keep_vetting
+
     if get_most_likely_class(candidate.nonlocalizedevent.sequences.last().details) == "BBH":
-        vet_bbh(target_id, event_id)
+        vet_bbh(target_id, event_id, basic_results=_basic())
     else:
-        vet_kn(target_id, event_id)
-        vet_kn_in_sn(target_id, event_id)
-        vet_super_kn(target_id, event_id)
+        vet_kn(target_id, event_id, basic_results=_basic())
+        vet_kn_in_sn(target_id, event_id, basic_results=_basic())
+        vet_super_kn(target_id, event_id, basic_results=_basic())
 
 
 def associate_nle_with_target(
@@ -250,7 +261,7 @@ def target_post_save(
         # vetting one target from the UI. setdefault rather than a keyword
         # because callers forward arbitrary kwargs into this hook
         kwargs.setdefault("stop_on_zero", False)
-        vet_basic(target.id, **kwargs)
+        basic_results = vet_basic(target.id, **kwargs)
 
         # the skymap queries in create_candidates_from_targets go through a separate
         # SQLAlchemy connection that can't see this target until Target.save's
@@ -273,7 +284,7 @@ def target_post_save(
                 for cand in ecs:
                     # still vet this as a "new" candidate since the target recently had new
                     # info added and saved
-                    vet_new_candidate(cand)
+                    vet_new_candidate(cand, basic_results=basic_results)
 
             # then check if this target is associated with any NLEs
             new_candidates = associate_nle_with_target(
@@ -285,7 +296,7 @@ def target_post_save(
 
             if len(new_candidates):
                 for cand in new_candidates:
-                    vet_new_candidate(cand)
+                    vet_new_candidate(cand, basic_results=basic_results)
 
         transaction.on_commit(_associate_and_vet)
 

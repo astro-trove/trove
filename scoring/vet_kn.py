@@ -66,6 +66,7 @@ def vet_kn(
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
     phot_method: Optional[str] = None,
+    basic_results: Optional[tuple] = None,
 ):
     """
     `phot_method` names the photometry scorer to use. None means "read the
@@ -107,7 +108,10 @@ def vet_kn(
     update_score_factor(event_candidate, "localization_id", localization.id)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    # (unless the caller already ran vet_basic and passed in its results)
+    if basic_results is None:
+        basic_results = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = basic_results
     if not keep_vetting:
         # Scoring has already produced 0, so there is no point in scoring
         # the distance or photometry because it can't change the score
