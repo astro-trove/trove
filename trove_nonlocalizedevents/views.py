@@ -203,6 +203,12 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         # shown whichever way the toggle is set: the toggle stays locked on light
         # curve metrics until the event has KilonovaSCORER scores. KN-style events
         # only, since KilonovaSCORER means nothing for BBH/AGN-flare scoring
+        event_class = None
+        if nle_id:
+            nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
+            if nle:
+                event_class = most_likely_class_for_event(nle.event_id)
+
         context["kilonova_scores_missing"] = (
             event_class in KN_STYLE_CLASSES and bool(scored_candidates)
             and not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
