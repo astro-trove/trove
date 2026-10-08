@@ -146,61 +146,6 @@ def vet_or_post_error(
         logger.error("".join(traceback.format_exception(e)))
         # slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
 
-
-def send_slack(
-    body,
-    format_kwargs,
-    is_test_alert=False,
-    is_significant=True,
-    is_burst=False,
-    has_ns=True,
-    all_workspaces=True,
-    at=None,
-):
-    if is_test_alert:
-        channel = None
-    elif not is_significant:
-        channel = "alerts-subthreshold"
-    elif is_burst:
-        channel = "alerts-burst"
-    elif not has_ns:
-        channel = "alerts-bbh"
-    else:
-        channel = "alerts-ns"
-    if at is not None:
-        body = f"<!{at}>\n" + body
-    for slack_client, (nle_link, service), (target_link, _) in zip(slack_gw, settings.NLE_LINKS, settings.TARGET_LINKS):
-        body_slack = body.format(nle_link=nle_link, service=service, target_link=target_link).format(**format_kwargs)
-        logger.info(f"Sending GW alert: {body_slack}")
-        if channel is None:
-            break  # just print out test alerts for debugging
-        slack_client.chat_postMessage(channel=channel, text=body_slack)
-        if not all_workspaces:
-            break
-
-
-def send_email(subject, body, is_test_alert=False):
-    """This doesn't currently work"""
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = settings.SERVER_EMAIL
-    group = Group.objects.get(name="Test Email Alerts") if is_test_alert else Group.objects.get(name="Email Alerts")
-    msg["To"] = ",".join([u.email.split(",")[0] for u in group.user_set.all()])
-    if not msg["To"]:
-        logger.info(f'Email "{subject}" not sent. No one is subscribed.')
-        return
-    email_text = msg.as_string()
-
-    try:
-        server = smtplib.SMTP()
-        server.connect()
-        server.sendmail(msg["From"], msg["To"], email_text)
-        server.close()
-        logger.info(f'Email "{subject}" sent!')
-    except Exception as e:
-        logger.error(f'Email "{subject}" failed: {e}')
-
-
 def calculate_credible_region(skymap, localization, probability=0.9):
     t0 = time.time()
     """store the credible region contour for skymap plotting"""
@@ -294,8 +239,7 @@ def prepare_and_send_alerts(nle, seq):
         at = "here" if nle.state == "RETRACTED" else "channel"
     else:
         at = None
-    # send_slack(alert_text, format_kwargs,
-    #           is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns, at=at)
+
     return localizations
 
 
