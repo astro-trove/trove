@@ -25,6 +25,7 @@ class VettingChoiceForm(Form):
         choices = [], # these are specified in the view
         widget = Select(),
         label = "Vetting Method",
+        required=False,
     )
     # which photometry scoring method this run should use
     phot_method = ChoiceField(

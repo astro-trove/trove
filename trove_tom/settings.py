@@ -129,7 +129,7 @@ WSGI_APPLICATION = "trove_tom.wsgi.application"
 TASKS = {
     "default": {
         "BACKEND": "django_tasks.backends.database.DatabaseBackend",
-        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_all", "associate_targets"],
+        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_multi", "associate_targets"],
     }
 }
 
@@ -259,7 +259,7 @@ CACHES = {
 
 # cache keys
 VETTING_COOLDOWN_KEY = "vetting_all_button_cooldown"
-VETTING_COOLDOWN_PERIOD = 3600  # 1 hour in seconds
+VETTING_COOLDOWN_PERIOD = 7200  # 2 hours in seconds
 
 # TOM Specific configuration
 TARGET_TYPE = "SIDEREAL"
@@ -515,6 +515,9 @@ PRIORITY_LOW = 0
 
 # skymap probability contour within which we may consider a target and nonlocalized event associated
 SKYMAP_PROB_CONTOUR = 0.95
+
+# max number of candidates a user can vet at once
+MAX_USER_VETTING_SELECTED_CANDIDATES = 20
 
 
 SHOW_PAGINATION_INFO = False

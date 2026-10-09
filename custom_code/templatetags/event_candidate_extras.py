@@ -22,6 +22,7 @@ from scoring.util import (
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
+    host_distances,
     kilonova_scores_exist,
     most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
@@ -151,10 +152,10 @@ def scoring_toggles(context, target_id=None):
     }
 
 
-@register.inclusion_tag("scoring/partials/last_vet_all_card.html")
-def last_vet_all_card(target_id):
-    """Card showing when a Vet All run last covered this candidate."""
-    return {"last_vet_all": _get_last_vetting(target_id)}
+@register.inclusion_tag("scoring/partials/last_vet_multi_card.html")
+def last_vet_multi_card(target_id):
+    """Card showing when a Vet All / Vet Selected run last covered this candidate."""
+    return {"last_vet_multi": _get_last_vetting(target_id)}
 
 
 @register.simple_tag(takes_context=True)
@@ -250,6 +251,10 @@ def display_score_details(context, target_id):
         )
         score_details.append(sf_set)
 
+    # the distance each of this target's candidates was scored against, read
+    # back out of the host galaxy vetting recorded -- one batch for every card
+    distances = host_distances(target.eventcandidate_set.all())
+
     # Build structured data instead of strings
     cards = []
 
@@ -321,6 +326,16 @@ def display_score_details(context, target_id):
                     "text": not numeric,
                     "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
+            if score_factor.key == "host_distance_score":
+                # host_distance_score is written whenever distance scoring ran, so
+                # it is the one row the distance can reliably sit beside
+                event_card["details"].append({
+                    "key": "host_distance",
+                    "label": "Distance",
+                    "value": host_distance_cell(distances.get(ec.id), unit=True),
+                    "text": False,
+                    "only": None,
+                })
             if score_factor.key == "predetection_score":
                 event_card["details"].append({
                     "key": "predetected",
@@ -546,3 +561,41 @@ def _str_int_format(s):
 
 def _str_format(s):
     return str(s)
+
+
+@register.filter
+def host_distance_cell(dist, unit=False):
+    """A host distance with its uncertainty, to one decimal place.
+
+    One place, and `+`/`-` for bounds that differ, is how the host galaxy table
+    beside it shows the same numbers.
+    """
+    if dist is None or dist.distance is None:
+        return "\u2014"
+    mpc = "&nbsp;Mpc" if unit else ""
+    neg, pos = dist.neg_err, dist.pos_err
+    shown = f"{dist.distance:.1f}"
+    if neg is None or pos is None:
+        return mark_safe(f"{shown}{mpc}")
+    if neg == pos:
+        return mark_safe(f"{shown} &plusmn; {pos:.1f}{mpc}")
+    sup_uni = f"<sup>+{pos:.1f}</sup>"
+    sub_uni = f"<sub>-{neg:.1f}</sub>"
+    return mark_safe(f"{shown}<span class='supsubdist'>{sub_uni}{sup_uni}</span>&nbsp;&nbsp;{mpc}")
+
+
+@register.filter
+def lookup(mapping, key):
+    """One value out of a dict, for templates that need a variable key."""
+    if not mapping:
+        return None
+    return mapping.get(key)
+
+
+@register.simple_tag
+def query_replace(request, key, value):
+    """This page's query string with one parameter replaced."""
+    params = request.GET.copy()
+    params[key] = value
+    params.pop("page", None)
+    return params.urlencode()

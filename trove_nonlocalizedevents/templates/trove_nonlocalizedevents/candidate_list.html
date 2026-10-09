@@ -61,11 +61,16 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 <br><br>
 <div class="row">
   {% if request.user.is_authenticated %}
+  <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
+          id="vet-selected-btn" title="Run vetting for the candidates you ticked">
+    Vet Selected (<span id="vet-selected-count">0</span>)
+  </button>
   {% if can_vet_all or request.user.is_superuser %}
+  &nbsp;&nbsp;
   <a
     href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
     title="Run vetting for all candidates"
-    class="btn btn-warning btn-lg">
+    class="btn btn-danger btn-lg">
     Vet All
   </a>
   {% else %}
@@ -123,7 +128,7 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
   </div>
 </div>
 
-{% include 'trove_nonlocalizedevents/partials/last_vet_all_card.html' %}
+{% include 'trove_nonlocalizedevents/partials/last_vet_multi_card.html' %}
 
 {% endblock %}
 
