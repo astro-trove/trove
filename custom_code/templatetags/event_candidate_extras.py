@@ -579,7 +579,9 @@ def host_distance_cell(dist, unit=False):
         return mark_safe(f"{shown}{mpc}")
     if neg == pos:
         return mark_safe(f"{shown} &plusmn; {pos:.1f}{mpc}")
-    return mark_safe(f"{shown} +{pos:.1f} &minus;{neg:.1f}{mpc}")
+    sup_uni = f"<sup>+{pos:.1f}</sup>"
+    sub_uni = f"<sub>-{neg:.1f}</sub>"
+    return mark_safe(f"{shown}<span class='supsubdist'>{sub_uni}{sup_uni}</span>&nbsp;&nbsp;{mpc}")
 
 
 @register.filter

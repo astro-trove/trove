@@ -22,14 +22,14 @@
       {% if galaxy.Dist and galaxy.Dist|floatformat != 'nan' %}
         {% if galaxy.DistErr|islist  %}
           <td style='min-width:8em;'>
-	    {{ galaxy.Dist|floatformat:1 }}<span class="supsubdist"><sub>-{{ galaxy.DistErr.0|floatformat:1 }}</sub><sup>+{{ galaxy.DistErr.1|floatformat:1 }}</sup></span>
-	  </td>
+	      {{ galaxy.Dist|floatformat:1 }}<span class="supsubdist"><sub>-{{ galaxy.DistErr.0|floatformat:1 }}</sub><sup>+{{ galaxy.DistErr.1|floatformat:1 }}</sup></span>
+	      </td>
         {% else %}
-	  {% if galaxy.DistErr|floatformat == 'nan' %}
-	    <td>{{ galaxy.Dist|floatformat:1 }} (no err.)</td>  
+	      {% if galaxy.DistErr|floatformat == 'nan' %}
+	        <td>{{ galaxy.Dist|floatformat:1 }} (no err.)</td>  
       	  {% else %}
-            <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr|floatformat:1 }} </td>  
-	  {% endif %}
+            <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr|floatformat:1 }} </td>
+	    {% endif %}
 	{% endif %}
       {% else %}
         <td> </td>
