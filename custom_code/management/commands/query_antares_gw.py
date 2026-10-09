@@ -112,31 +112,41 @@ def query_for_one_event(event_id: str):
     # have in the TROVE database
     return search(query)
 
-def get_current_ant_candidate_names(event_id):
+def get_current_ant_candidate_names(event_id, strict=False):
     """
     This gets a list of current aliases of targets associated with the passed in NLE
     so that we can exclude them in our query to ANTARES. This will reduce the processing
     runtime!
     """
 
-    # get a list of the event candidate ids
-    ec_ids = EventCandidate.objects.filter(
-        nonlocalizedevent__event_id=event_id
-    ).values_list(
-        "target_id",
-        flat=True
-    )
+    if strict:
+        # get a list of the event candidate ids
+        ec_ids = EventCandidate.objects.filter(
+            nonlocalizedevent__event_id=event_id
+        ).values_list(
+            "target_id",
+            flat=True
+        )
 
-    # also get a list of target name objects that start with ANT
-    ant_target_names = TargetName.objects.filter(
-        name__startswith="ANT",
-        target_id__in=ec_ids
-    ).values_list(
-        "name",
-        flat=True
-    )
+        # also get a list of target name objects that start with ANT
+        ant_target_names = TargetName.objects.filter(
+            name__startswith="ANT",
+            target_id__in=ec_ids
+        ).values_list(
+            "name",
+            flat=True
+        )
+        
+        return list(ant_target_names)
 
-    return list(ant_target_names)
+    return list(
+        TargetName.objects.filter(
+            name__startswith="ANT",
+        ).values_list(
+            "name",
+            flat=True
+        )
+    )
     
 class Command(BaseCommand):
     help = "Query ANTARES for new alerts associated with active GW events in TROVE"
