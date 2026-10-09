@@ -514,8 +514,9 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         messages.info(
             self.request,
             f"Vetting {len(candidates)} selected candidate"
-            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode. "
-            "This takes a few seconds per candidate.",
+            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode with "
+            f"{phot_method} for photometry vetting. "
+            "This takes a few seconds per candidate; check back shortly.",
         )
         return back
 
@@ -606,9 +607,9 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
         invalidate_scored_candidates_cache(str(nle.id))
         messages.info(
             self.request,
-            f"Vetting {len(candidates)} selected candidate"
-            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode; "
-            "this takes a few seconds each, so check back shortly.",
+            f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} mode with "
+            f"{phot_method} for photometry vetting. This takes a few seconds "+
+            "per candidate; check back shortly.",
         )
         return back
 
