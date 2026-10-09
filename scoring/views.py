@@ -469,7 +469,7 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         )
         if "nle" in form.fields:  # the event is in this view's own URL
             del form.fields["nle"]
-        return _phot_method_field(form)
+        return _phot_method_field(form, self.request)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -498,49 +498,11 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         vet_all_async(candidates, nle, vetting_mode, phot_method=phot_method,
                       started_by=self.request.user.get_username(),
                       run_kind="selected")
+
         # imported here to keep scoring.views out of an import cycle
         from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
 
         invalidate_scored_candidates_cache(str(nle.id))
-        # then also preserve the query parameters
-        query_str = self.request.session.pop("nle_id", "")
-        params = [query_str] if query_str else []
-        if phot_method:
-            params.append(f"phot_method={phot_method}")
-        if params:
-            base_url += "?" + "&".join(params)
-        return redirect(base_url)
-
-
-class TargetVettingAllView(LoginRequiredMixin, RedirectView):
-    """
-    View that runs or reruns the candidate vetting code and stores the results,
-    for all candidates
-    """
-
-    def get(self, request, *args, **kwargs):
-        """
-        Method that handles the GET requests for this view. Calls the vetting
-        code for different transients.
-        """
-        pk = kwargs["pk"]
-        vetting_mode = kwargs.get("vetting_mode", "basic")
-
-        # get the nonlocalized event
-        nle = NonLocalizedEvent.objects.filter(id=pk)[0]
-
-        # get all of the event candidates
-        ecs = EventCandidate.objects.filter(nonlocalizedevent_id=nle.id).order_by(
-            "target__name"
-        )
-
-        # The scorer the user picked on the form, sent with every task so the
-        # whole run uses it -- workers have no session to read the toggle from,
-        # and it could be flipped mid-run in any case.
-        phot_method = (_clean_phot_method(request.GET.get("phot_method"))
-                       or get_phot_method(request))
-
-        # then run the vetting, asynchronously
         messages.info(
             self.request,
             f"Vetting {len(candidates)} selected candidate"

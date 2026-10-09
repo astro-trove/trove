@@ -540,7 +540,7 @@ def _redshift_distance(redshift):
 
 def _latest_run(tasks, latest):
     """
-    Get running vetting tasks for the most recent "Vet All" run for some event.
+    Get running vetting tasks for the most recent "Vet Selected" run for some event.
     """
     stamp = (latest.args_kwargs.get("kwargs") or {}).get("run_started")
     if stamp:
@@ -697,7 +697,8 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         latest = tasks.order_by("-enqueued_at").first()
         if latest is None:
             return None
-        counts = _latest_run(tasks, latest).aggregate(
+        latest_tasks = _latest_run(tasks, latest)
+        counts = latest_tasks.aggregate(
             total=Count("id"),
             succeeded=Count("id", filter=Q(status=ResultStatus.SUCCEEDED)),
             failed=Count("id", filter=Q(status=ResultStatus.FAILED)),
@@ -708,11 +709,23 @@ def get_last_vet_all_run(nonlocalizedevent_id):
             finished=Max("finished_at"),
             first_enqueued=Min("enqueued_at"),
         )
+        logger.info(counts["failed"])
+        if counts["failed"]: # if any failed, record names
+            latest_tasks_failed = latest_tasks.filter(status="FAILED")
+            logger.info(latest_tasks_failed)
+            targets_failed = [Target.objects.get(
+                id=task.args_kwargs["kwargs"]["target_ids"][0]) for
+                task in latest_tasks_failed]
+        else:
+            targets_failed = []
     except DatabaseError:
         logger.exception("Could not read last Vet All run for %s", nle.event_id)
         return None
 
     run_kwargs = latest.args_kwargs.get("kwargs") or {}
+    logger.info(f"{latest}")
+    logger.info(f"{run_kwargs}")
+
     return {
         "finished": counts["finished"],
         "started": (parse_datetime(run_kwargs["run_started"])
@@ -723,4 +736,5 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         "succeeded": counts["succeeded"],
         "failed": counts["failed"],
         "running": bool(counts["pending"]),
+        "targets_failed":targets_failed,
     }
