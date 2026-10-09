@@ -120,7 +120,7 @@ def _event_classes_in_scope(context, target_id=None):
 
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
-    from scoring.phot_method import PHOT_METHOD_KILONOVA
+    from scoring.phot_method import PHOT_METHOD_KILONOVASCORER
 
     # Locked on light curve metrics until there is a KilonovaSCORER score to
     # switch to: per candidate on the target page, per event on the list. The
@@ -146,7 +146,7 @@ def scoring_toggles(context, target_id=None):
     return {
         "show": True,
         "agn_toggle": _get_agn_toggle(request),
-        "is_kilonova": _get_phot_method(request) == PHOT_METHOD_KILONOVA and not kilonova_locked,
+        "is_kilonova": _get_phot_method(request) == PHOT_METHOD_KILONOVASCORER and not kilonova_locked,
         "kilonova_locked": kilonova_locked,
         "next": request.get_full_path(),
     }
@@ -400,7 +400,7 @@ def display_score_details(context, target_id):
             # candidate KilonovaSCORER could not score falls back to the TROVE
             # product even while the toggle says KilonovaSCORER -- and the
             # highlight has to follow what was really used.
-            kn_is_active = getattr(ec_score_details, "phot_source", "trove") == "kilonova"
+            kn_is_active = getattr(ec_score_details, "phot_source", "metrics") == "kilonovascorer"
 
             score_details = card["details"]
 

@@ -9,7 +9,7 @@ from django.forms import (
 )
 
 from .dynamic_catalogs import find_galaxy
-from .phot_method import KILONOVA_VETTING_MODE, PHOT_METHOD_TROVE
+from .phot_method import KILONOVASCORER_VETTING_MODE, PHOT_METHOD_METRICS
 
 class VettingChoiceForm(Form):
     # Only shown when the page the user came from named no event. Choices and
@@ -43,9 +43,9 @@ class VettingChoiceForm(Form):
         cleaned = super().clean()
         # the field is absent entirely when no available method can use a scorer
         if "phot_method" in self.fields and (
-            cleaned.get("vetting_method") != KILONOVA_VETTING_MODE
+            cleaned.get("vetting_method") != KILONOVASCORER_VETTING_MODE
         ):
-            cleaned["phot_method"] = PHOT_METHOD_TROVE
+            cleaned["phot_method"] = PHOT_METHOD_METRICS
 
         if "nle" in self.fields and not cleaned.get("nle"):
             submitted = self.data.get("vetting_method")

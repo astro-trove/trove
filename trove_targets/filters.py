@@ -88,7 +88,7 @@ class TroveTargetListFilterSet(TargetFilterSet):
                 HTML("""
                 <div class="row">
                 <div class="col-md-12 mb-2">
-                <a class="btn btn-link p-0" data-toggle="collapse"
+                <a class="btn btn-link p-0" data-bs-toggle="collapse"
                 href="#advancedFilters"
                 role="button" aria-expanded="false" aria-controls="advancedFilters">Advanced Filters &rsaquo;</a>
                 </div>

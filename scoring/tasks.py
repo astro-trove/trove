@@ -25,7 +25,7 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent
 
 logger = logging.getLogger(__name__)
 
-from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
 
 ## tasks
@@ -139,7 +139,7 @@ def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
 
     phot_method = phot_method or get_phot_method()
 
-    if vetting_mode == "KN" and phot_method == PHOT_METHOD_KILONOVA:
+    if vetting_mode == "KN" and phot_method == PHOT_METHOD_KILONOVASCORER:
         # Sorting candidates by distance so that the grid stays in cache for
         # at least a few candidates
         from scoring.scoring import get_eventcandidate_default_distance

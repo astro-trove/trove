@@ -46,7 +46,7 @@ from scoring.kilonova_scorer_helpers.util import (
     score_candidate as kilonova_score_candidate,
     DT_MAX,
 )
-from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
 PARAM_RANGES = dict(
     lum_max=[0 * u.erg / u.s, 1e43 * u.erg / u.s],
@@ -181,7 +181,7 @@ def vet_kn(
     # `phot_method` toggle picks. The TROVE fit above always runs regardless,
     # because its `lum` / `max_time` / `decay_rate` are displayed on the
     # candidate page in their own right, not only as inputs to the factor.
-    if (phot_method or get_phot_method()) == PHOT_METHOD_KILONOVA:
+    if (phot_method or get_phot_method()) == PHOT_METHOD_KILONOVASCORER:
         try:
             phot_score = kilonova_score_candidate(
                 target_id=target_id,

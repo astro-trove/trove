@@ -198,11 +198,11 @@ def get_event_candidate_scores(
     falls back to the default, since there may be no session to read.) `agn_toggle` drops agn_score from the
     kilonova-style scores only (`AGN_TOGGLE_TRANSIENTS`).
     """
-    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+    from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
     if phot_method is None:
         phot_method = get_phot_method()
-    use_kilonova = phot_method == PHOT_METHOD_KILONOVA
+    use_kilonova = phot_method == PHOT_METHOD_KILONOVASCORER
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
 
@@ -353,10 +353,10 @@ def get_event_candidate_scores(
                 # photometry product -- not multiplied with it, which would
                 # apply the photometry twice.
                 phot_score = kn
-                phot_source = "kilonova"
+                phot_source = "kilonovascorer"
             else:
                 phot_score = math.prod(list(phot_subscores.values()))
-                phot_source = "trove"
+                phot_source = "metrics"
 
             if transient == "KN":
                 ec.phot_source = phot_source

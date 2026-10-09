@@ -1,4 +1,4 @@
-{% load bootstrap4 crispy_forms_tags event_candidate_extras %}
+{% load django_bootstrap5 crispy_forms_tags event_candidate_extras %}
 {{ eventcandidate_filter_form.media }}
 {{ eventcandidate_create_form.media }}
 
@@ -15,11 +15,18 @@
       {% if eventcandidate_filter_form.nonlocalizedevent %}
         {% bootstrap_field eventcandidate_filter_form.nonlocalizedevent %}
       {% endif %}
-
+      <div class="mb-3">
+        <button type="submit" class="btn btn-primary">
+          Filter
+        </button>
+        <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-get="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-target="#candidate-results" hx-push-url="true" class="btn btn-secondary" title="Reset">
+          Reset
+        </a>
+      </div>
       {# the rest are used less often, so they start folded away #}
       <div class="d-flex align-items-center" style="gap:0.5rem">
         <button class="btn {% if filters_active %}btn-secondary{% else %}btn-outline-secondary{% endif %}" type="button"
-                data-toggle="collapse" data-target="#more-candidate-filters"
+                data-bs-toggle="collapse" data-bs-target="#more-candidate-filters"
                 aria-expanded="{% if filters_active %}true{% else %}false{% endif %}"
                 aria-controls="more-candidate-filters" id="more-filters-toggle">
           <span id="more-filters-label">{% if filters_active %}Close filters{% else %}More filters{% endif %}</span>
@@ -46,7 +53,6 @@
           <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.cone_radius %}</div>
         </div>
       </div>
-
     </form>
   </div>
   <div class="col" id="target-link-form-col">
@@ -54,11 +60,11 @@
       <form action="{% url 'trove_nonlocalizedevents:eventcandidate-create-from-form' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" method="post" class="form" hx-boost="false">
         {% csrf_token %}
         {% bootstrap_form eventcandidate_create_form %}
-        {% buttons %}
+        <div class="mb-3">
         <button type="submit" class="btn btn-primary">
 	  Link Target
         </button>
-        {% endbuttons %}
+        </div>
       </form>
     {% endif %}
   </div>

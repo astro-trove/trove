@@ -23,7 +23,7 @@
 }
 </style>
 {% extends 'tom_common/base.html' %}
-{% load static bootstrap4 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
+{% load static django_bootstrap5 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
 {% block title %}Candidates{% endblock %}
 {% block content %}
 
@@ -59,36 +59,32 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
   </div>
 </div>
 <br><br>
-<div class="row">
+<div class="d-flex flex-wrap gap-2">
   {% if request.user.is_authenticated %}
-  <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
-          id="vet-selected-btn" title="Run vetting for the candidates you ticked">
-    Vet Selected (<span id="vet-selected-count">0</span>)
-  </button>
-  {% if can_vet_all or request.user.is_superuser %}
-  &nbsp;&nbsp;
-  <a
-    href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
-    title="Run vetting for all candidates"
-    class="btn btn-danger btn-lg">
-    Vet All
-  </a>
-  {% else %}
-  &nbsp;&nbsp;
-  <a href="{% url 'trove_nonlocalizedevents:vet_all_cooldown_notice' %}"
-     class="btn btn-danger btn-lg"
-     style="opacity: 0.3;"
-     title="Vetting all candidates is not available because it was run recently"
-     onclick="document.getElementById('cooldown-msg').style.display='block'; return false;">
-    Vet All
-  </a>
+      <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
+              id="vet-selected-btn" title="Run vetting for the candidates you ticked">
+        Vet Selected (<span id="vet-selected-count">0</span>)
+      </button>
+      {% if can_vet_all or request.user.is_superuser %}
+      <a
+        href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
+        title="Run vetting for all candidates"
+        class="btn btn-danger btn-lg">
+        Vet All
+      </a>
+      {% else %}
+      <a href="{% url 'trove_nonlocalizedevents:vet_all_cooldown_notice' %}"
+         class="btn btn-danger btn-lg"
+         style="opacity: 0.3;"
+         title="Vetting all candidates is not available because it was run recently"
+         onclick="document.getElementById('cooldown-msg').style.display='block'; return false;">
+        Vet All
+      </a>
+      {% endif %}
   {% endif %}
-  {% endif %}
-  &nbsp;&nbsp;
   {% if request.user.is_superuser %}
     <a href="{% url 'scoring:nle_associate_targets_form' request.GET.nonlocalizedevent %}" title="Associate targets with the NLE" class="btn btn-success btn-lg">Associate Targets</a>
   {% endif %}
-  &nbsp;&nbsp;
   {% if request.user.is_superuser %}
     <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
   {% endif %}
@@ -103,19 +99,17 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
     <div class="modal-dialog modal-lg" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Candidate Summary</h5>
-                <button type="button" class="close" data-dismiss="modal">
-                    <span>&times;</span>
-                </button>
+              <h5 class="modal-title">Candidate Summary</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <textarea id="summaryText" class="form-control" rows="15"></textarea>
+              <textarea id="summaryText" class="form-control" rows="15"></textarea>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-                <button type="button" id="copyBtn" class="btn btn-success" onclick="copyText()">
-                    <i class="fa fa-copy"></i> Copy
-                </button>
+	      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+	      <button type="button" id="copyBtn" class="btn btn-success" onclick="copyText()">
+                <i class="fa fa-copy"></i> Copy
+              </button>
             </div>
         </div>
     </div>
