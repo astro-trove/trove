@@ -21,7 +21,6 @@ from scoring.util import (
     get_agn_toggle,
     get_event_candidate_scores,
     get_last_vet_all_run,
-    get_no_score_message,
     get_vet_all_progress,
     kilonova_scores_exist,
     most_likely_class_for_event,
@@ -201,16 +200,15 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm(nle_id=nle_id)
 
         context["no_score_message"] = None
+        # shown whichever way the toggle is set: the toggle stays locked on light
+        # curve metrics until the event has KilonovaSCORER scores. KN-style events
+        # only, since KilonovaSCORER means nothing for BBH/AGN-flare scoring
         event_class = None
         if nle_id:
             nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
             if nle:
                 event_class = most_likely_class_for_event(nle.event_id)
-                context["no_score_message"] = get_no_score_message(event_class)
 
-        # shown whichever way the toggle is set: the toggle stays locked on light
-        # curve metrics until the event has KilonovaSCORER scores. KN-style events
-        # only, since KilonovaSCORER means nothing for BBH/AGN-flare scoring
         context["kilonova_scores_missing"] = (
             event_class in KN_STYLE_CLASSES and bool(scored_candidates)
             and not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))

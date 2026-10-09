@@ -1,4 +1,6 @@
 import time
+import os
+import uuid
 import json
 from datetime import datetime
 import traceback
@@ -13,10 +15,16 @@ import smtplib
 from django.contrib.auth.models import Group
 from django.contrib.sites.models import Site
 from django.conf import settings
+from django.db.utils import IntegrityError
+from django.core.exceptions import FieldError
+from django_tasks import task
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
 from tom_nonlocalizedevents.alertstream_handlers.igwn_event_handler import handle_igwn_message
 from tom_dataproducts.tasks import atlas_query
+from tom_antares.antares import AntaresDataService
+from tom_targets.utils import cone_search_filter
+from tom_targets.models import TargetName
 
 from astropy.table import Table
 from astropy.time import Time
@@ -24,7 +32,8 @@ import astropy_healpix as ah
 
 from .hooks import (
     target_post_save,
-    associate_targets_with_nle,
+    target_hook_options,
+    associate_targets_with_nle
 )
 from .templatetags.nonlocalizedevent_extras import (
     format_inverse_far,
@@ -144,61 +153,6 @@ def vet_or_post_error(
         logger.error("".join(traceback.format_exception(e)))
         # slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
 
-
-def send_slack(
-    body,
-    format_kwargs,
-    is_test_alert=False,
-    is_significant=True,
-    is_burst=False,
-    has_ns=True,
-    all_workspaces=True,
-    at=None,
-):
-    if is_test_alert:
-        channel = None
-    elif not is_significant:
-        channel = "alerts-subthreshold"
-    elif is_burst:
-        channel = "alerts-burst"
-    elif not has_ns:
-        channel = "alerts-bbh"
-    else:
-        channel = "alerts-ns"
-    if at is not None:
-        body = f"<!{at}>\n" + body
-    for slack_client, (nle_link, service), (target_link, _) in zip(slack_gw, settings.NLE_LINKS, settings.TARGET_LINKS):
-        body_slack = body.format(nle_link=nle_link, service=service, target_link=target_link).format(**format_kwargs)
-        logger.info(f"Sending GW alert: {body_slack}")
-        if channel is None:
-            break  # just print out test alerts for debugging
-        slack_client.chat_postMessage(channel=channel, text=body_slack)
-        if not all_workspaces:
-            break
-
-
-def send_email(subject, body, is_test_alert=False):
-    """This doesn't currently work"""
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = settings.SERVER_EMAIL
-    group = Group.objects.get(name="Test Email Alerts") if is_test_alert else Group.objects.get(name="Email Alerts")
-    msg["To"] = ",".join([u.email.split(",")[0] for u in group.user_set.all()])
-    if not msg["To"]:
-        logger.info(f'Email "{subject}" not sent. No one is subscribed.')
-        return
-    email_text = msg.as_string()
-
-    try:
-        server = smtplib.SMTP()
-        server.connect()
-        server.sendmail(msg["From"], msg["To"], email_text)
-        server.close()
-        logger.info(f'Email "{subject}" sent!')
-    except Exception as e:
-        logger.error(f'Email "{subject}" failed: {e}')
-
-
 def calculate_credible_region(skymap, localization, probability=0.9):
     t0 = time.time()
     """store the credible region contour for skymap plotting"""
@@ -292,8 +246,7 @@ def prepare_and_send_alerts(nle, seq):
         at = "here" if nle.state == "RETRACTED" else "channel"
     else:
         at = None
-    # send_slack(alert_text, format_kwargs,
-    #           is_test_alert=is_test_alert, is_significant=is_significant, is_burst=is_burst, has_ns=has_ns, at=at)
+
     return localizations
 
 
@@ -561,3 +514,123 @@ def handle_icecube_alert(alert):
             calculate_credible_region(skymap, localization)
 
     logger.info(f"Finished processing alert for {nonlocalizedevent.event_id}")
+
+def handle_antares_stream_async(locus, lookback_days_nle=10):
+    data_service = AntaresDataService()
+    try:
+        alert_finite = data_service.serialize_locus(None, locus)
+        handle_antares_stream_task.enqueue(alert_finite, lookback_days_nle=lookback_days_nle)
+        logger.debug(f"sent {locus.locus_id} to queue")
+    except Exception:
+        exc = traceback.format_exc()
+        dump_alert_and_send_error(alert_finite, exc)
+
+
+@task(queue_name="antares", priority=settings.PRIORITY_HIGH)
+def handle_antares_stream_task(*args, **kwargs):
+    """Just a django tasks Task wrapper on handle_antares_stream, this way
+    we can still execute the antares alert stream handling serially"""
+    handle_antares_stream(*args, **kwargs)
+    
+
+def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nle=10, event_id=None):
+    try:
+        data_service = AntaresDataService()
+
+        # check for existing targets within 2"
+        target_matches = list(
+            cone_search_filter(
+                Target.objects.all(),
+                alert["ra"],
+                alert["dec"],
+                cone_search_radius_arcsec / 3600.0,
+            ).order_by("separation")
+        )
+        logger.info(
+            f"Targets within {cone_search_radius_arcsec:.1f} arcsec: {target_matches}"
+        )
+        if target_matches:
+            # then this target already exists in the Targets table
+            target = target_matches[0]
+            logger.info(f"Found existing target matching this alert: {target.name}")
+            
+        else:
+            # then this target does not exist, so we create it from scratch
+            # data_service.to_target also saves the target, and will execute the
+            # target_post_save function as a hook (see the configuration in settings.py)
+            #
+            # BUT, we need to fake it and not actually run any of the vetting yet
+            # because we want to wait to update some other fields (e.g., photometry)
+            # from the alert
+            # updating these fields can only happen *after* the target has been
+            # created and saved
+            with target_hook_options(skip_vetting=True):
+                target = data_service.to_target(alert)
+
+
+        # add new aliases from the alert
+        _add_aliases(target, alert)
+
+        # add new photometry from the alert
+        try:
+            _add_antares_phot_to_target(target, alert, data_service)
+        except FieldError:
+            # this is a known issue with getting light curve info from ANTARES via
+            # the tom-antares package right now :(
+            logger.warn("Skipping ANTARES photometry query because of a known bug in tom-antares")
+            pass
+            
+        # now run target post save for real and do the vetting we need to do
+        target_post_save(
+            target,
+            created=True,
+            lookback_days_nle=True,
+            known_associated_nle_id=event_id,
+            query_atlas_fp=_should_run_atlas(alert),
+            query_tns_phot=False,
+            query_antares_phot=False
+        )
+        
+    except Exception:
+        exc = traceback.format_exc()
+        logger.error(exc)
+        dump_alert_and_send_error(alert, exc)
+
+def _add_aliases(target, alert):
+    # add any aliases from the alert
+    for alias_name in alert.get("aliases", []):
+        alias = TargetName(name=alias_name, target=target)
+        try:
+            alias.save()
+        except IntegrityError:
+            logger.info(f"{alias} already exists, skipping and not saving")
+
+def _add_antares_phot_to_target(target, alert, data_service):
+    return data_service.create_reduced_datums_from_query(
+        target,
+        alert["reduced_datums"]["photometry"]
+    )
+            
+def dump_alert_and_send_error(
+    alert, exc, dump_dir="antares-alert-errors"
+):
+    """
+    we don't want this *ever* to crash, just log the error, send it as a slack message, and dump the alert to a json file
+    """
+    os.makedirs(dump_dir, exist_ok=True)
+    dump_path = f"{dump_dir}/{uuid.uuid4()}.json"
+    with open(dump_path, "w") as f:
+        json.dump(alert, f, indent=4)
+
+def _should_run_atlas(alert, limit=19.7):
+    """
+    Check if this alert is bright enough to make running ATLAS FP worth it
+
+    The limiting magnitude of ATLAS c and o filters is 19.7
+    (https://fallingstar.com/specifications.php)
+    """
+    mag = sorted(
+        alert["reduced_datums"]["photometry"],
+        key=lambda x : x["ant_mjd"]
+    )[-1]["ant_mag"]
+    return mag < limit

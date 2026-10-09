@@ -1,8 +1,12 @@
 import logging
 from datetime import datetime, timedelta, timezone
+from contextlib import contextmanager
+from contextvars import ContextVar
+
+from django.db import transaction
 from django.db.models import Min
 from tom_targets.models import TargetExtra
-from tom_nonlocalizedevents.models import NonLocalizedEvent
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from tom_dataproducts.models import ReducedDatum
 
 from scoring.vet_kn import vet_kn
@@ -24,7 +28,8 @@ new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
     handler.setFormatter(new_format)
 
-
+_target_hook_options = ContextVar('target_hook_options', default=None)
+    
 def process_reduced_ztf_data(target, candidates):
     """Ingest data from the ZTF JSON format into ``ReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
     for candidate in candidates:
@@ -97,16 +102,27 @@ def first_detection_window_days(nle_class, first_det_min, first_det_max):
     return first_det_min, first_det_max
 
 
-def vet_new_candidate(candidate):
+def vet_new_candidate(candidate, basic_results=None):
     """Vet a newly associated candidate for its event's class: an AGN flare for
-    a BBH event, every kilonova-style mode for anything else."""
+    a BBH event, every kilonova-style mode for anything else.
+
+    `basic_results` is the output of an earlier `vet_basic` call on this target,
+    passed through so each vetting mode doesn't rerun it."""
     target_id, event_id = candidate.target.id, candidate.nonlocalizedevent.event_id
+
+    def _basic():
+        # fresh copies so one vetting mode can't modify another's dataframes
+        if basic_results is None:
+            return None
+        host_df, agn_df, keep_vetting = basic_results
+        return host_df.copy(), agn_df.copy(), keep_vetting
+
     if get_most_likely_class(candidate.nonlocalizedevent.sequences.last().details) == "BBH":
-        vet_bbh(target_id, event_id)
+        vet_bbh(target_id, event_id, basic_results=_basic())
     else:
-        vet_kn(target_id, event_id)
-        vet_kn_in_sn(target_id, event_id)
-        vet_super_kn(target_id, event_id)
+        vet_kn(target_id, event_id, basic_results=_basic())
+        vet_kn_in_sn(target_id, event_id, basic_results=_basic())
+        vet_super_kn(target_id, event_id, basic_results=_basic())
 
 
 def associate_nle_with_target(
@@ -175,28 +191,57 @@ def associate_targets_with_nle(
 
     # then create candidates from these targets and return them
     return create_candidates_from_targets(seq, target_ids=list(targets)) 
-    
+
+@contextmanager
+def target_hook_options(**opts):
+    token = _target_hook_options.set(opts)
+    try:
+        yield
+    finally:
+        _target_hook_options.reset(token)
+
 def target_post_save(
     target,
     created=True,
-    lookback_days_nle=7,
-    first_det_min=-1,
-    first_det_max=10,
-    skip_vet_if_no_new_phot=False,
     **kwargs,
 ):
     """This hook runs following update of a target."""
-    logger.info("Target post save hook: %s created: %s", target, created)
+    # work with kwargs + post save hook options stored in the target object itself
+    # to figure out which options to use
+    kwargs_defaults = dict(
+        lookback_days_nle=7,
+        first_det_min=-1,
+        first_det_max=10,
+        skip_vet_if_no_new_phot=False,
+        known_associated_nle_id=None,
+        skip_vetting=False
+    )
+    
+    # pack these possible options into a single dict such that
+    # 1. kwargs_defaults first
+    # 2. then overwrite with the options passed via a context manager
+    #    (stored in the target object)
+    # 3. then finally overwrite with any explicitly passed in kwargs by the user
+    opts = {**kwargs_defaults, **(_target_hook_options.get() or {}), **kwargs}
 
+    # unpack the options dictionary into variables
+    skip_vetting = opts.pop("skip_vetting")
+    lookback_days_nle = opts.pop("lookback_days_nle")
+    first_det_min = opts.pop("first_det_min")
+    first_det_max = opts.pop("first_det_max")
+    known_associated_nle_id = opts.pop("known_associated_nle_id")
+    
+    # then we can continue with the normal vetting
     messages = []
     tns_query_status = None
-    if created:
+    logger.info("Target post save hook: %s created: %s vetting %s", target, created, not skip_vetting)
+    if created and not skip_vetting:
         if target.extra_fields.get("MW E(B-V)") is None:
             coord = SkyCoord(target.ra, target.dec, unit="deg")
             try:
-                mwebv = IrsaDust.get_query_table(coord, section="ebv")["ext SandF ref"][
-                    0
-                ]
+                mwebv = IrsaDust.get_query_table(
+                    coord, section="ebv"
+                )["ext SandF ref"][0]
             except Exception as e:
                 logger.error(f"Error querying IRSA dust for {target.name}")
             else:
@@ -208,32 +253,45 @@ def target_post_save(
         # its point source or MPC score has already zeroed it, same as a user
         # vetting one target from the UI. setdefault rather than a keyword
         # because callers forward arbitrary kwargs into this hook
-        kwargs.setdefault("stop_on_zero", False)
-        vet_basic(target.id, **kwargs)
+        opts.setdefault("stop_on_zero", False)
+        basic_results = vet_basic(target.id, **opts)
 
-        # then check if this target is associated with any NLEs
-        new_candidates = associate_nle_with_target(
-            target,
-            lookback_days_nle=lookback_days_nle,
-            first_det_min=first_det_min,
-            first_det_max=first_det_max,
-        )
+        # the skymap queries in create_candidates_from_targets go through a separate
+        # SQLAlchemy connection that can't see this target until Target.save's
+        # transaction commits, so defer the NLE association and vetting until then
+        # (on_commit runs immediately if we aren't inside a transaction)
+        def _associate_and_vet():
+            # given a known associated NLE we can associate that
+            if known_associated_nle_id:
+                nle = NonLocalizedEvent.objects.get(event_id=known_associated_nle_id)
+                known_candidates = create_candidates_from_targets(
+                    nle.sequences.last(),
+                    target_ids=[target.id]
+                )
+                if len(known_candidates):
+                    logger.info(f'Created a new EventCandidate from {target} and {nle}')
 
-        if len(new_candidates):
-            for cand in new_candidates:
-                vet_new_candidate(cand)
-        else:
-            messages.append(
-                "Did not run NLE vetting on this target because there are no NLEs associated with it!"
+            # first, check for any existing candidates associated with this target
+            ecs = EventCandidate.objects.filter(target=target)
+            if ecs.exists():
+                for cand in ecs:
+                    # still vet this as a "new" candidate since the target recently had new
+                    # info added and saved
+                    vet_new_candidate(cand, basic_results=basic_results)
+
+            # then check if this target is associated with any NLEs
+            new_candidates = associate_nle_with_target(
+                target,
+                lookback_days_nle=lookback_days_nle,
+                first_det_min=first_det_min,
+                first_det_max=first_det_max,
             )
 
-    redshift = target.targetextra_set.filter(key="Redshift")
-    if redshift.exists() and target.distance is None:
-        messages.append(f"Updating distance of {target.name} based on redshift")
-        target.distance = (
-            settings.COSMO.luminosity_distance(target.redshift).to("Mpc").value
-        )
-        target.save()
+            if len(new_candidates):
+                for cand in new_candidates:
+                    vet_new_candidate(cand, basic_results=basic_results)
+
+        transaction.on_commit(_associate_and_vet)
 
     for message in messages:
         logger.info(message)

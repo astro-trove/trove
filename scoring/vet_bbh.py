@@ -281,6 +281,7 @@ def vet_bbh(
     target_id: int,
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
+    basic_results: Optional[tuple] = None,
 ):
     logger.info("Running BBH vetting (AGN-flare vetting)")
 
@@ -320,9 +321,12 @@ def vet_bbh(
 
     # always run vet basic
     # stop_on_zero=False: a point-source match shouldn't stop AGN-flare vetting
-    host_df, agn_df, keep_vetting = vet_basic(
-        event_candidate.target.id, stop_on_zero=False
-    )
+    # (unless the caller already ran it and passed in its results)
+    if basic_results is None:
+        basic_results = vet_basic(
+            event_candidate.target.id, stop_on_zero=False
+        )
+    host_df, agn_df, keep_vetting = basic_results
     if not keep_vetting:
         _flush_score_factors()
         return

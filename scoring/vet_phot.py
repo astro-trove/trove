@@ -14,8 +14,10 @@ import pandas as pd
 from scipy.optimize import curve_fit
 
 from django.conf import settings
+from django.core.exceptions import FieldError
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
 from tom_dataproducts.models import ReducedDatum
+from tom_antares.antares import AntaresDataService
 from trove_targets.models import Target
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from .tasks import async_atlas_query
@@ -582,7 +584,8 @@ def get_predetection_stats(
 
 
 def find_public_phot(
-    target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100
+        target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100,
+        query_atlas_fp=True, query_tns_phot=True, query_antares_phot=True
 ) -> None:
     """Query TNS, ATLAS Forced photometry, and other services for publicly available
     photometry. After querying for new photometry it will automatically add it to
@@ -607,8 +610,28 @@ def find_public_phot(
     """
 
     # check TNS for any new photometry
-    created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
+    created_new_tns_phot = False
+    if query_tns_phot:
+        created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
 
+    # check ANTARES for new ZTF and LSST photometry from alerts
+    if query_antares_phot:
+        data_service = AntaresDataService()
+        data = data_service.query_reduced_data(target)
+        try:
+            data_service.to_reduced_datums(target, data)
+        except FieldError:
+            # this is a known issue with getting light curve info from ANTARES via
+            # the tom-antares package right now :(
+            logger.warn("Skipping ANTARES photometry query because of a known bug in tom-antares")
+            pass
+
+    # in some cases, we won't want to query ATLAS FP because it isn't constraining
+    # for dim transients in LSST alerts
+    if not query_atlas_fp:
+        logger.info("Skipping ATLAS FP query, as requested")
+        return created_new_tns_phot
+        
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
     atlas_data = target.reduceddatum_set.filter(
@@ -620,7 +643,7 @@ def find_public_phot(
     )
     if atlas_data.count():  # if this is true there is existing ATLAS data
         last_atlas_point = atlas_data.order_by("timestamp").last()
-
+        
         now = datetime.now(tz=timezone.utc)
         if last_atlas_point.timestamp < now - timedelta(days=forced_phot_tol):
             # then we should only query ATLAS for this target for forced photometry
@@ -636,14 +659,14 @@ def find_public_phot(
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
-
+            
     if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
         logger.info(
             "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
             "photometry for %s", target.name
         )
         query_atlas = False
-
+        
     if query_atlas:
         print(
             "Asynchronously obtaining ATLAS forced photometry with "

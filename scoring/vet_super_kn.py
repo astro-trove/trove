@@ -55,6 +55,7 @@ def vet_super_kn(
     target_id: int,
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
+    basic_results: Optional[tuple] = None,
 ):
     logger.info("Running super-KN vetting")
 
@@ -88,7 +89,10 @@ def vet_super_kn(
     update_score_factor(event_candidate, "localization_id", localization.id)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    # (unless the caller already ran vet_basic and passed in its results)
+    if basic_results is None:
+        basic_results = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = basic_results
     if not keep_vetting:
         # same as vet_kn.py
         return
