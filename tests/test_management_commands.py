@@ -252,8 +252,8 @@ class TestQueryANTARESgw:
     """Tests for the ANTARES GW localization-based query management command"""
     
     def test_query_for_one_event(self):
-        
-        loci = query_for_on_event("S250206dm")
+        from custom_code.management.commands.query_antares_gw import query_for_one_event
+        loci = query_for_one_event("S250206dm")
         assert isinstance(loci, Generator)
 
         test_locus = next(loci)
