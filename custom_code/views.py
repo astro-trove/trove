@@ -22,7 +22,6 @@ from trove_targets.models import Target
 from trove_nonlocalizedevents.permissions import nonlocalizedevents_for_user
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate, EventSequence
-from tom_registration.registration_flows.approval_required.forms import RegistrationApprovalForm
 from .filters import GWFilter, NeutrinoFilter
 from .forms import TargetReportForm, TargetClassifyForm
 from .forms import GWFormHelper, NeutrinoFormHelper
