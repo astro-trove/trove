@@ -10,14 +10,18 @@ has an answer at any time.
   {% if request.user.is_superuser %}
   <div class="col-md-12">
     <div class="card mb-3">
-      <div class="card-header"><h5 class="mb-0">Most Recent vetting run (superuser-viewable only)</h5></div>
+      <div class="card-header"><h5 class="mb-0"><strong>superuser view</strong></h5></div>
       <div class="card-body">
         <dl class="row mb-0">
-          {% if last_vet_all.running %}
           <dt class="col-sm-3">Status</dt>
-          <dd class="col-sm-9"><span class="badge badge-warning">running now</span></dd>
+          {% if last_vet_all.running %}
+            <dd class="col-sm-9"><span class="badge badge-warning">running</span></dd>
+          {% elif last_vet_all.failed %}
+            <dd class="col-sm-9"><span class="badge badge-danger">not all candidates were re-vet</span></dd>
+          {% else %}
+            <dd class="col-sm-9"><span class="badge badge-success">completed</span></dd>
           {% endif %}
-          <dt class="col-sm-3">Last completed</dt>
+          <dt class="col-sm-3">Most recent vetting run</dt>
           <dd class="col-sm-9">
             {% if last_vet_all.finished %}
             {{ last_vet_all.finished|date:"Y-m-d H:i" }} UTC
@@ -40,6 +44,8 @@ has an answer at any time.
             {% if last_vet_all.failed %}
             &mdash; <strong>{{ last_vet_all.failed }} failed</strong> and still
             show their previous score
+            <br>
+            <strong>Failed:</strong> {{ last_vet_all.targets_failed }}
             {% endif %}
           </dd>
           {% endif %}

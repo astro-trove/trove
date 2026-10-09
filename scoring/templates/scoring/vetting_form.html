@@ -145,15 +145,6 @@
             {% for candidate_id in selected_ids %}
             <input type="hidden" name="candidates" value="{{ candidate_id }}">
             {% endfor %}
-            {% if select_all_matching %}
-            <input type="hidden" name="select_all_matching" value="{{ select_all_matching }}">
-            {% endif %}
-            {% if filters %}
-            <input type="hidden" name="filters" value="{{ filters }}">
-            {% endif %}
-
-            {{ form|crispy }}
-          
             {% bootstrap_form_errors form type="non_fields" %}
             {% if form.nle %}
               {# the methods depend on the event, so let the server re-render them #}
@@ -164,9 +155,17 @@
                    hx-swap="outerHTML">
                 {{ form.nle|as_crispy_field }}
               </div>
+              {% include "scoring/partials/vetting_method_fields.html" %}
+            {% else %}
+                {% if select_all_matching %}
+                <input type="hidden" name="select_all_matching" value="{{ select_all_matching }}">
+                {% endif %}
+                {% if filters %}
+                <input type="hidden" name="filters" value="{{ filters }}">
+                {% endif %}
+                {{ form|crispy }}
             {% endif %}
-            {% include "scoring/partials/vetting_method_fields.html" %}
-            
+
             <div class="d-grid">
                 <button type="submit" class="btn btn-primary btn-vet">
                     Execute Vetting Sequence
