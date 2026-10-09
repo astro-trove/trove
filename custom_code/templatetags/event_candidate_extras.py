@@ -128,10 +128,10 @@ def scoring_toggles(context, target_id=None):
     }
 
 
-@register.inclusion_tag("scoring/partials/last_vet_all_card.html")
-def last_vet_all_card(target_id):
-    """Card showing when a Vet All run last covered this candidate."""
-    return {"last_vet_all": _get_last_vetting(target_id)}
+@register.inclusion_tag("scoring/partials/last_vet_multi_card.html")
+def last_vet_multi_card(target_id):
+    """Card showing when a Vet All / Vet Selected run last covered this candidate."""
+    return {"last_vet_multi": _get_last_vetting(target_id)}
 
 
 @register.simple_tag(takes_context=True)

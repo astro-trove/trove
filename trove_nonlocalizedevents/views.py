@@ -23,9 +23,9 @@ from scoring.models import ScoreFactor
 from scoring.util import (
     get_agn_toggle,
     get_event_candidate_scores,
-    get_last_vet_all_run,
+    get_last_vet_multi_run,
     get_no_score_message,
-    get_vet_all_progress,
+    get_vet_multi_progress,
     host_distances,
     kilonova_scores_exist,
     most_likely_class_for_event,
@@ -282,7 +282,7 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
 
         phot_method = get_phot_method(self.request)
 
-        vet_all_progress = get_vet_all_progress(nle_id)
+        vet_multi_progress = get_vet_multi_progress(nle_id)
 
         cache_key = scored_candidates_cache_key(self.request.GET, agn_toggle,
                                                 phot_method)
@@ -298,7 +298,7 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
             )
             # a run in progress rewrites these scores continuously, so hold them
             # for less time than usual to keep the page closer to the truth
-            if vet_all_progress and vet_all_progress["running"]:
+            if vet_multi_progress and vet_multi_progress["running"]:
                 cache_timeout = SCORE_CACHE_PERIOD_WHILE_VETTING
             else:
                 cache_timeout = SCORE_CACHE_PERIOD
@@ -417,10 +417,10 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label(request=self.request)
 
-        context["vet_all_progress"] = vet_all_progress
+        context["vet_multi_progress"] = vet_multi_progress
         # standing record of when these scores were last refreshed in bulk,
         # which outlives the transient progress notice above
-        context["last_vet_all"] = get_last_vet_all_run(nle_id)
+        context["last_vet_multi"] = get_last_vet_multi_run(nle_id)
 
         context["eventcandidate_filter_form"] = EventCandidateSearchForm(
             self.request.GET or None, nle_id=nle_id)
@@ -724,9 +724,9 @@ class RefreshCandidateList(LoginRequiredMixin, View):
         return redirect(url)
 
 
-class VetAllProgressPartialView(View):
+class VetMultiProgressPartialView(View):
     """
-    Just the "Vet All" progress notice.
+    Just the "Vet All" / "Vet Selected" progress notice.
 
     The candidate list polls this while a run is going so the notice keeps up
     with the queue, which costs three counts, rather than re-scoring every
@@ -748,7 +748,7 @@ class VetAllProgressPartialView(View):
 
         return render(
             request,
-            "trove_nonlocalizedevents/partials/vet_all_progress.html",
-            {"vet_all_progress": get_vet_all_progress(nle_id)},
+            "trove_nonlocalizedevents/partials/vet_multi_progress.html",
+            {"vet_multi_progress": get_vet_multi_progress(nle_id)},
         )
 

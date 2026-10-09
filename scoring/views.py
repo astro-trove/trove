@@ -40,7 +40,7 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      VETTING_FORM_INITIALS,
                      DETECTION_HORIZON_DEFAULTS
                      )
-from .tasks import vet_all_async, associate_targets_with_nle_async
+from .tasks import vet_multi_async, associate_targets_with_nle_async
 from .phot_method import (
     KILONOVA_VETTING_MODE,
     PHOT_METHOD_CHOICES,
@@ -50,7 +50,6 @@ from .phot_method import (
     get_phot_method,
 )
 from .util import most_likely_class_for_event
-from .util import get_vet_all_progress, most_likely_class_for_event
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .dynamic_catalogs import UserGalaxy
@@ -495,9 +494,9 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
 
         vetting_mode = form.cleaned_data["vetting_method"]
         phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
-        vet_all_async(candidates, nle, vetting_mode, phot_method=phot_method,
-                      started_by=self.request.user.get_username(),
-                      run_kind="selected")
+        vet_multi_async(candidates, nle, vetting_mode, phot_method=phot_method,
+                        started_by=self.request.user.get_username(),
+                        run_kind="selected")
 
         # imported here to keep scoring.views out of an import cycle
         from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache

@@ -127,13 +127,13 @@
     <div class="vetting-card">
         <h2>Candidate Vetting Submission Page</h2>
 
-        {% if vet_all_progress.running and vet_all_progress.percent < 100 %}
+        {% if vet_multi_progress.running and vet_multi_progress.percent < 100 %}
         <div class="vetting-warning vetting-warning-active">
             <strong>Vetting tasks are already in progress</strong>
-            {% if vet_all_progress.total %}
-            ({{ vet_all_progress.done }} of {{ vet_all_progress.total }} candidates done).
+            {% if vet_multi_progress.total %}
+            ({{ vet_multi_progress.done }} of {{ vet_multi_progress.total }} candidates done).
             {% else %}
-            ({{ vet_all_progress.pending }} candidate{{ vet_all_progress.pending|pluralize }} still queued).
+            ({{ vet_multi_progress.pending }} candidate{{ vet_multi_progress.pending|pluralize }} still queued).
             {% endif %}
             This candidate may be re-scored by that run, so vetting it now could be redundant.
         </div>

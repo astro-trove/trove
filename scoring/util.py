@@ -540,7 +540,8 @@ def _redshift_distance(redshift):
 
 def _latest_run(tasks, latest):
     """
-    Get running vetting tasks for the most recent "Vet Selected" run for some event.
+    Get running vetting tasks for the most recent "Vet All" or "Vet Selected"
+    run for some event.
     """
     stamp = (latest.args_kwargs.get("kwargs") or {}).get("run_started")
     if stamp:
@@ -549,9 +550,9 @@ def _latest_run(tasks, latest):
         enqueued_at__gte=latest.enqueued_at - timedelta(minutes=2))
 
 
-def get_vet_all_progress(nonlocalizedevent_id):
+def get_vet_multi_progress(nonlocalizedevent_id):
     """
-    Get the progress for the most recent "Vet All" run.
+    Get the progress for the most recent "Vet All" or "Vet Selected" run.
     """
     if not nonlocalizedevent_id:
         return None
@@ -563,7 +564,7 @@ def get_vet_all_progress(nonlocalizedevent_id):
 
     # get tasks for given NLE
     tasks = DBTaskResult.objects.filter(
-        queue_name="vet_all",
+        queue_name="vet_multi",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__nle_event_id=nle.event_id,
     )
@@ -588,7 +589,8 @@ def get_vet_all_progress(nonlocalizedevent_id):
         )
     except DatabaseError:
         # the progress notice is never worth taking the candidate list down for
-        logger.exception("Could not read Vet All progress for %s", nle.event_id)
+        logger.exception("Could not read Vet All / Vet Selected progress for %s", 
+                         nle.event_id)
         return None
 
     pending = run["pending"]
@@ -633,7 +635,7 @@ def get_last_vetting(target_id, nonlocalizedevent_id=None):
         return None
 
     tasks = DBTaskResult.objects.filter(
-        queue_name="vet_all",
+        queue_name="vet_multi",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__target_ids__0=int(target_id),
     )
@@ -675,10 +677,10 @@ def get_last_vetting(target_id, nonlocalizedevent_id=None):
     }
 
 
-def get_last_vet_all_run(nonlocalizedevent_id):
+def get_last_vet_multi_run(nonlocalizedevent_id):
     """
-    Summarize the most recent "Vet All" run. Distinct from
-    `get_vet_all_progress`, describes an ongoing run.
+    Summarize the most recent "Vet All" or "Vet Selected" run. Distinct from
+    `get_vet_multi_progress`, describes an ongoing run.
     """
     if not nonlocalizedevent_id:
         return None
@@ -689,7 +691,7 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         return None
 
     tasks = DBTaskResult.objects.filter(
-        queue_name="vet_all",
+        queue_name="vet_multi",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__nle_event_id=nle.event_id,
     )
@@ -719,7 +721,8 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         else:
             targets_failed = []
     except DatabaseError:
-        logger.exception("Could not read last Vet All run for %s", nle.event_id)
+        logger.exception("Could not read last Vet All / Vet Selected run for %s",
+                         nle.event_id)
         return None
 
     run_kwargs = latest.args_kwargs.get("kwargs") or {}

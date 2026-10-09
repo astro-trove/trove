@@ -24,14 +24,14 @@
      </div>
    {% endif %}
    {% if request.GET.nonlocalizedevent %}
-    <div id="vet-all-progress"
-         hx-get="{% url 'trove_nonlocalizedevents:vet-all-progress' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+    <div id="vet-multi-progress"
+         hx-get="{% url 'trove_nonlocalizedevents:vet-multi-progress' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
          hx-trigger="every 60s"
          hx-target="this"
          hx-swap="innerHTML"
          hx-push-url="false"
          hx-history="false">
-      {% include 'trove_nonlocalizedevents/partials/vet_all_progress.html' %}
+      {% include 'trove_nonlocalizedevents/partials/vet_multi_progress.html' %}
     </div>
    {% endif %}
     </br>
