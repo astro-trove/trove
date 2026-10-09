@@ -37,9 +37,9 @@ class EventCandidateSearchForm(forms.Form):
     )
     distance_type = forms.ChoiceField(
         label="Distance method:", required=False,
-        choices=[("", "Any"), ("spec-z", "Spectroscopic redshift"),
-                 ("photo-z", "Photometric redshift"),
-                 ("z-ind", "Redshift-independent")],
+        choices=[("", "Any"), ("spec-z", "spec-z"),
+                 ("photo-z", "photo-z"),
+                 ("z-ind.", "z-independent")],
         widget=forms.Select(attrs={"class": "form-control"}),
     )
     cone_ra = forms.FloatField(
@@ -50,13 +50,10 @@ class EventCandidateSearchForm(forms.Form):
         label="Cone Dec:", required=False,
         widget=forms.NumberInput(attrs={"class": "form-control", "step": "any"}),
     )
-    #: one degree. The search is already scoped to this event's candidates, so a
-    #: bigger cone is not slow so much as meaningless -- it stops being a cone.
-    MAX_CONE_RADIUS = 3600.0
 
     cone_radius = forms.FloatField(
         label="Cone radius (\u2033):", required=False,
-        min_value=0.0, max_value=MAX_CONE_RADIUS, initial=None,
+        min_value=0.0, initial=None,
         widget=forms.NumberInput(attrs={"class": "form-control", "placeholder": "default 2"}),
     )
 

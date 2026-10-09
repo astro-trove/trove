@@ -127,15 +127,23 @@
     <div class="vetting-card">
         <h2>Candidate Vetting Submission Page</h2>
 
-        {% if vet_multi_progress.running and vet_multi_progress.percent < 100 %}
+        {% if vet_all_candidate_count %}
         <div class="vetting-warning vetting-warning-active">
+            <strong>This vets all ({{ vet_all_candidate_count }}) candidate{{ vet_all_candidate_count|pluralize }} of this event.</strong>
+            Each candidate is queued as its own task, run in parallel, taking a few seconds each.
+            <br><br>
+            Users may only vet all every {{ vetting_cooldown_period_hours }} hours. <strong>Make sure you want to vet all candidates and not a subset of them.</strong>
+        </div>
+        {% endif %}
+        {% if vet_multi_progress.running and vet_multi_progress.percent < 100 %}
+        <div class="vetting-warning">
             <strong>Vetting tasks are already in progress</strong>
             {% if vet_multi_progress.total %}
             ({{ vet_multi_progress.done }} of {{ vet_multi_progress.total }} candidates done).
             {% else %}
             ({{ vet_multi_progress.pending }} candidate{{ vet_multi_progress.pending|pluralize }} still queued).
             {% endif %}
-            This candidate may be re-scored by that run, so vetting it now could be redundant.
+            Candidates may be re-scored by that run, so vetting now could be redundant.
         </div>
         {% endif %}
 

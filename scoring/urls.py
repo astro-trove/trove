@@ -4,6 +4,7 @@ from .views import (
     TargetVettingView,
     TargetVettingFormView,
     TargetVettingSelectedFormView,
+    TargetVettingAllFormView,
     TargetFPView,
     TargetRedshiftUpdateFormView,
     VettingMethodsPartialView,
@@ -44,6 +45,11 @@ urlpatterns = [
         "eventcandidates/?nonlocalizedevent=<int:pk>/vetselected/",
         TargetVettingSelectedFormView.as_view(),
         name="vet_selected_form",
+    ),
+    path(
+        "eventcandidates/?nonlocalizedevent=<int:pk>/vetall/",
+        TargetVettingAllFormView.as_view(),
+        name="vet_all_form",
     ),
     path(
          "eventcandidates/?nonlocalizedevent=<int:pk>/associatetargetschoice/", 
