@@ -58,6 +58,8 @@ from .dynamic_catalogs import UserGalaxy
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
 
+import logging
+logger = logging.getLogger(__name__)
 
 
 def resolve_event_id(value):
@@ -566,8 +568,9 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
         cooldown_cache_key = f"{settings.VETTING_COOLDOWN_KEY}_{nle.id}"
         back = redirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
 
-        # first check that no user has clicked this button
-        if cache.get(cooldown_cache_key):
+        # first check that no user has clicked this button AND that user is not a
+        # superuser
+        if cache.get(cooldown_cache_key) and not(self.request.user.is_superuser):
             messages.warning(
                 self.request,
                 "A user has recently run vetting on all candidates, placing it on "+

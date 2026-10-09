@@ -74,10 +74,11 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
     Vet All
   </a>
   {% else %}
+  &nbsp;&nbsp;
   <a href="{% url 'trove_nonlocalizedevents:vet_all_cooldown_notice' %}"
-     class="btn btn-warning btn-lg"
+     class="btn btn-danger btn-lg"
      style="opacity: 0.3;"
-     title="Vetting all candidates is not available because it was run within the last hour"
+     title="Vetting all candidates is not available because it was run recently"
      onclick="document.getElementById('cooldown-msg').style.display='block'; return false;">
     Vet All
   </a>

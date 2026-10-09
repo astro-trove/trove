@@ -711,7 +711,6 @@ def get_last_vet_multi_run(nonlocalizedevent_id):
             finished=Max("finished_at"),
             first_enqueued=Min("enqueued_at"),
         )
-        logger.info(counts["failed"])
         if counts["failed"]: # if any failed, record names
             latest_tasks_failed = latest_tasks.filter(status="FAILED")
             logger.info(latest_tasks_failed)
@@ -726,8 +725,6 @@ def get_last_vet_multi_run(nonlocalizedevent_id):
         return None
 
     run_kwargs = latest.args_kwargs.get("kwargs") or {}
-    logger.info(f"{latest}")
-    logger.info(f"{run_kwargs}")
 
     return {
         "finished": counts["finished"],

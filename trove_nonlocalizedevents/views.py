@@ -1,4 +1,5 @@
 import json
+from django.conf import settings
 from django_filters.views import FilterView
 from django.core.cache import cache
 from django.core.paginator import Paginator
@@ -752,3 +753,16 @@ class VetMultiProgressPartialView(View):
             {"vet_multi_progress": get_vet_multi_progress(nle_id)},
         )
 
+
+def vet_all_cooldown_notice(request):
+    messages.warning(
+        request,
+        "A user has recently run vetting on all candidates, placing it on "+
+        "cooldown. The cooldown period is "+
+        f"{settings.VETTING_COOLDOWN_PERIOD / 3600:.0f} hours from the time of the "+
+        "user submitting the request to vet all. The vetting results will update for "+
+        "all users. Please try again later if you truly need to re-vet *everything* "+
+        "again. You can still vet individual candidates via the candidate pages or "+
+        "select some subset of candidates to vet."
+    )
+    return redirect(request.META.get('HTTP_REFERER', '/'))
