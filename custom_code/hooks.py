@@ -229,16 +229,8 @@ def target_post_save(
     lookback_days_nle = opts.pop("lookback_days_nle")
     first_det_min = opts.pop("first_det_min")
     first_det_max = opts.pop("first_det_max")
-    skip_vet_if_no_new_phot = opts.pop("skip_vet_if_no_new_phot")
     known_associated_nle_id = opts.pop("known_associated_nle_id")
-    
-    # finally, clean out kwargs because we continue to use other items in it later
-    unneeded_kwargs = [
-        "lookback_days_nle", "first_det_min", "first_det_max", "known_associated_nle_id"
-    ]
-    for k in unneeded_kwargs:
-        kwargs.pop(k, None)
-        
+            
     # then we can continue with the normal vetting
     messages = []
     tns_query_status = None
@@ -260,8 +252,8 @@ def target_post_save(
         # its point source or MPC score has already zeroed it, same as a user
         # vetting one target from the UI. setdefault rather than a keyword
         # because callers forward arbitrary kwargs into this hook
-        kwargs.setdefault("stop_on_zero", False)
-        basic_results = vet_basic(target.id, **kwargs)
+        opts.setdefault("stop_on_zero", False)
+        basic_results = vet_basic(target.id, **opts)
 
         # the skymap queries in create_candidates_from_targets go through a separate
         # SQLAlchemy connection that can't see this target until Target.save's

@@ -568,7 +568,8 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
                 created=True,
                 lookback_days_nle=True,
                 known_associated_nle_id=event_id,
-                query_atlas_fp=_should_run_atlas(alert)
+                query_atlas_fp=_should_run_atlas(alert),
+                query_tns_phot=False,
             )
             
         else:
@@ -578,7 +579,8 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
             with target_hook_options(
                     lookback_days_nle=lookback_days_nle,
                     known_associated_nle_id=event_id,
-                    query_atlas_fp=_should_run_atlas(alert)
+                    query_atlas_fp=_should_run_atlas(alert),
+                    query_tns_phot=False,
             ):
                 target = data_service.to_target(alert)
 

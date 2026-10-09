@@ -582,7 +582,8 @@ def get_predetection_stats(
 
 
 def find_public_phot(
-        target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100, query_atlas_fp=True
+        target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100,
+        query_atlas_fp=True, query_tns_phot=True
 ) -> None:
     """Query TNS, ATLAS Forced photometry, and other services for publicly available
     photometry. After querying for new photometry it will automatically add it to
@@ -607,7 +608,9 @@ def find_public_phot(
     """
 
     # check TNS for any new photometry
-    created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
+    created_new_tns_phot = False
+    if query_tns_phot:
+        created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
 
     # check ANTARES for new ZTF and LSST photometry from alerts
     data_service = AntaresDataService()
