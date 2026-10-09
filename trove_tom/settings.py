@@ -516,5 +516,8 @@ PRIORITY_LOW = 0
 # skymap probability contour within which we may consider a target and nonlocalized event associated
 SKYMAP_PROB_CONTOUR = 0.95
 
+# max number of candidates a user can vet at once
+MAX_USER_VETTING_SELECTED_CANDIDATES = 20
+
 
 SHOW_PAGINATION_INFO = False

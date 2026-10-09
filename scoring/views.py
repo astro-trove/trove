@@ -490,7 +490,13 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         candidates = list(self.candidates())
         back = redirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
         if not candidates:
-            messages.warning(self.request, "No candidates were selected.")
+            messages.error(self.request, "No candidates were selected.")
+            return back
+
+        if len(candidates) > settings.MAX_USER_VETTING_SELECTED_CANDIDATES:
+            messages.error(self.request, "Please select at most "+
+                           f"{settings.MAX_USER_VETTING_SELECTED_CANDIDATES:d} "+
+                           "candidates to vet at once and try again.")
             return back
 
         vetting_mode = form.cleaned_data["vetting_method"]
@@ -506,8 +512,8 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         messages.info(
             self.request,
             f"Vetting {len(candidates)} selected candidate"
-            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode; "
-            "this takes a few seconds each, so check back shortly.",
+            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode. "
+            "This takes a few seconds per candidate.",
         )
         return back
 
@@ -545,7 +551,7 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
             nonlocalizedevent_id=nle.id
         ).count()
         context["vet_multi_progress"] = get_vet_multi_progress(nle.id)
-        context["vetting_cooldown_period_hours"] = f"{settings.VETTING_COOLDOWN_PERIOD / 3600:d}"
+        context["vetting_cooldown_period_hours"] = f"{settings.VETTING_COOLDOWN_PERIOD / 3600:.0f}"
         return context
 
     def get(self, request, *args, **kwargs):
@@ -565,7 +571,10 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
             messages.warning(
                 self.request,
                 "A user has recently run vetting on all candidates, placing it on "+
-                "cooldown. The vetting results will update for all users. Please try "+
+                "cooldown. The cooldown period is "+
+                f"{settings.VETTING_COOLDOWN_PERIOD / 3600:.0f} hours from the time "+
+                "of the user submitting the request to vet all. "+
+                "The vetting results will update for all users. Please try "+
                 "again later if you truly need to re-vet *everything* again. You can "+
                 "still vet individual candidates via the candidate pages or select "+
                 "some subset of candidates to vet."
