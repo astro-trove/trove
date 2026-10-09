@@ -48,9 +48,7 @@
     </table>
     {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
     {% else %}
-    <p>No events have been created. Create Superevents via the admin interface, the REST API,
-        or the readstreams management command.</p>
-    <p>Coming soon: event creation from the <a href="{% url 'tom_alerts:list' %}">HERMES Alert Broker</a>.</p>
+    <p>No events have been created or no events match the filters.</p>
     {% endif %}
     </div>
 </div>
