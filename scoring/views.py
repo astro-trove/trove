@@ -13,7 +13,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
-from django.http import HttpResponseRedirect, HttpResponseForbidden
+from django.http import HttpResponseRedirect, HttpResponseForbidden, QueryDict
 from django.urls import reverse
 from django.shortcuts import redirect, render
 from dal import autocomplete
@@ -41,7 +41,7 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      VETTING_FORM_INITIALS,
                      DETECTION_HORIZON_DEFAULTS
                      )
-from .tasks import vet_all_async, associate_targets_with_nle_async
+from .tasks import vet_multi_async, associate_targets_with_nle_async
 from .phot_method import (
     KILONOVA_VETTING_MODE,
     PHOT_METHOD_CHOICES,
@@ -50,7 +50,7 @@ from .phot_method import (
     PHOT_METHOD_TROVE,
     get_phot_method,
 )
-from .util import get_vet_all_progress, most_likely_class_for_event
+from .util import get_vet_multi_progress, most_likely_class_for_event
 from .vet_basic import vet_basic
 from .vet_phot import find_public_phot
 from .dynamic_catalogs import UserGalaxy
@@ -58,6 +58,8 @@ from .dynamic_catalogs import UserGalaxy
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
 
+import logging
+logger = logging.getLogger(__name__)
 
 
 def resolve_event_id(value):
@@ -397,43 +399,146 @@ class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
         return redirect(base_url)
 
 
+class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
+    """Vet the candidates ticked on the event page.
+
+    Same form and same task queue as Vet All; the only difference is which
+    candidates go in. Selected ids arrive by POST from the candidate table and
+    ride through the vetting-method form as hidden inputs.
+    """
+
+    template_name = "scoring/vetting_form.html"
+    form_class = VettingChoiceForm
+
+    def selected_ids(self):
+        """Ids from the table's POST, or from this form's own resubmission."""
+        return self.request.POST.getlist("candidates")
+
+    def candidates(self):
+        """The candidates to vet: the ticked rows, or every row matching the
+        filters when the user asked for all of them.
+
+        Checkboxes only reach the server for the page you can see, so "select
+        all" re-applies the table's own filters rather than posting 456 ids.
+        """
+        scoped = EventCandidate.objects.filter(
+            nonlocalizedevent_id=self.kwargs["pk"]
+        ).select_related("target")
+        if self.request.POST.get("select_all_matching"):
+            from trove_nonlocalizedevents.permissions import candidates_for_user
+            from trove_nonlocalizedevents.views import filter_candidates
+
+            params = QueryDict(self.request.POST.get("filters", ""))
+            scoped = filter_candidates(
+                candidates_for_user(self.request.user, scoped), params
+            )
+            target_name = params.get("target__name")
+            if target_name:
+                scoped = scoped.filter(target__name__icontains=target_name)
+            # the distance cut is not a queryset filter, so apply it the same way
+            # the table does or "select all" vets rows the table did not show
+            from trove_nonlocalizedevents.views import _as_float, within_max_distance
+            from scoring.util import host_distances
+
+            distance_max = _as_float(params.get("distance_max"))
+            if distance_max is not None:
+                scoped = list(scoped)
+                return within_max_distance(
+                    scoped, host_distances(scoped), distance_max)
+            return scoped
+        return scoped.filter(id__in=self.selected_ids())
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        # The table's POST carries the selection, not a vetting method, so it is
+        # not an attempt to submit this form. Binding it to that POST marked
+        # every field as missing before the user had chosen anything.
+        if (self.request.method == "POST"
+                and "vetting_method" not in self.request.POST):
+            kwargs.pop("data", None)
+            kwargs.pop("files", None)
+        return kwargs
+
+    def get_form(self, *args, **kwargs):
+        form = super().get_form(*args, **kwargs)
+        nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
+        cls = most_likely_class_for_event(nle.event_id)
+        form.fields["vetting_method"].choices = VETTING_FORM_CHOICES.get(
+            cls, VETTING_FORM_CHOICES[""]
+        )
+        form.fields["vetting_method"].initial = VETTING_FORM_INITIALS.get(
+            cls, VETTING_FORM_INITIALS[""]
+        )
+        if "nle" in form.fields:  # the event is in this view's own URL
+            del form.fields["nle"]
+        return _phot_method_field(form, self.request)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["selected_ids"] = self.selected_ids()
+        context["select_all_matching"] = self.request.POST.get("select_all_matching", "")
+        context["filters"] = self.request.POST.get("filters", "")
+        return context
+
+    def post(self, request, *args, **kwargs):
+        # the first POST comes from the table and only carries the selection, so
+        # show the form; later POSTs carry the chosen method and run the vetting
+        if "vetting_method" not in request.POST:
+            return self.render_to_response(self.get_context_data(form=self.get_form()))
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
+        candidates = list(self.candidates())
+        back = redirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
+        if not candidates:
+            messages.error(self.request, "No candidates were selected.")
+            return back
+
+        if len(candidates) > settings.MAX_USER_VETTING_SELECTED_CANDIDATES:
+            messages.error(self.request, "Please select at most "+
+                           f"{settings.MAX_USER_VETTING_SELECTED_CANDIDATES:d} "+
+                           "candidates to vet at once and try again.")
+            return back
+
+        vetting_mode = form.cleaned_data["vetting_method"]
+        phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
+        vet_multi_async(candidates, nle, vetting_mode, phot_method=phot_method,
+                        started_by=self.request.user.get_username(),
+                        run_kind="selected")
+
+        # imported here to keep scoring.views out of an import cycle
+        from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
+
+        invalidate_scored_candidates_cache(str(nle.id))
+        messages.info(
+            self.request,
+            f"Vetting {len(candidates)} selected candidate"
+            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode. "
+            "This takes a few seconds per candidate.",
+        )
+        return back
+
+
 class TargetVettingAllFormView(LoginRequiredMixin, FormView):
+    """Vet all candidates."""
+
     template_name = "scoring/vetting_form.html"
     form_class = VettingChoiceForm
 
     # overriding the get_form function
     def get_form(self, *args, **kwargs):
         form = super().get_form(*args, **kwargs)
-        # Vet All is scoped to the event in its own URL, so there is nothing to
-        # pick -- the field belongs to the single-candidate form only
-        del form.fields["nle"]
-        # the event is in this view's own URL; reading it from the session
-        # raised KeyError once form_valid had popped the key
-        nle_id = self.kwargs["pk"]
-        nle_eventseq = localization_sequence_from_name(
-            NonLocalizedEvent.objects.get(id=nle_id)
+        nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
+        cls = most_likely_class_for_event(nle.event_id)
+        form.fields["vetting_method"].choices = VETTING_FORM_CHOICES.get(
+            cls, VETTING_FORM_CHOICES[""]
         )
-        nle_most_likely_class = get_most_likely_class(
-            nle_eventseq.details
-        )  # most likely class for the NLE
-        # choices for vetting?
-        try:
-            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                nle_most_likely_class
-            ]
-        except KeyError:
-            form.fields["vetting_method"].choices = VETTING_FORM_CHOICES[
-                ""
-            ]  # allow all types of vetting if most likely class not recognized
-        # initial option for vetting?
-        try:
-            form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                nle_most_likely_class
-            ]
-        except KeyError:
-            form.fields["vetting_method"].initial = VETTING_FORM_INITIALS[
-                ""
-            ] # set initial to basic if most likely class not recognized
+        form.fields["vetting_method"].initial = VETTING_FORM_INITIALS.get(
+            cls, VETTING_FORM_INITIALS[""]
+        )
+        if "nle" in form.fields:  # the event is in this view's own URL
+            del form.fields["nle"]
         return _phot_method_field(form, self.request)
 
     # overriding the get_context_data function
@@ -443,11 +548,12 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
         # tell the user what they are about to set off before they set it off:
         # this vets every candidate of the event, one at a time, and for a
         # well-populated event that is a job of hours rather than seconds
-        nle_id = self.kwargs["pk"]
+        nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
         context["vet_all_candidate_count"] = EventCandidate.objects.filter(
-            nonlocalizedevent_id=nle_id
+            nonlocalizedevent_id=nle.id
         ).count()
-        context["vet_all_progress"] = get_vet_all_progress(nle_id)
+        context["vet_multi_progress"] = get_vet_multi_progress(nle.id)
+        context["vetting_cooldown_period_hours"] = f"{settings.VETTING_COOLDOWN_PERIOD / 3600:.0f}"
         return context
 
     def get(self, request, *args, **kwargs):
@@ -458,21 +564,26 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
         return super().get(request, *args, **kwargs)
 
     def form_valid(self, form):
-        referer = self.request.META.get("HTTP_REFERER")
-        nle_id = self.request.session.get("nle_id","").split("=")[-1]
-        cooldown_cache_key = settings.VETTING_COOLDOWN_KEY+"_"+nle_id
-        
-        # first check that no user has clicked this button
-        if cache.get(cooldown_cache_key):
+        nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
+        cooldown_cache_key = f"{settings.VETTING_COOLDOWN_KEY}_{nle.id}"
+        back = redirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
+
+        # first check that no user has clicked this button AND that user is not a
+        # superuser
+        if cache.get(cooldown_cache_key) and not(self.request.user.is_superuser):
             messages.warning(
                 self.request,
                 "A user has recently run vetting on all candidates, placing it on "+
-                "cooldown. The vetting results will update for all users. Please try "+
-                "again later if you need to re-vet *everything* again (you can still "+
-                "vet individual targets via the target pages)."
+                "cooldown. The cooldown period is "+
+                f"{settings.VETTING_COOLDOWN_PERIOD / 3600:.0f} hours from the time "+
+                "of the user submitting the request to vet all. "+
+                "The vetting results will update for all users. Please try "+
+                "again later if you truly need to re-vet *everything* again. You can "+
+                "still vet individual candidates via the candidate pages or select "+
+                "some subset of candidates to vet."
             )
-            # Redirect back to the event candidate page
-            return redirect(self.request.session["event_candidate_referer"]) 
+            # redirect back to the event candidate page
+            return redirect(self.request.session["event_candidate_referer"])
 
         # since the button was clicked we need to start the cooldown
         cache.set(
@@ -481,66 +592,25 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
             timeout=settings.VETTING_COOLDOWN_PERIOD
         )
 
-
-        pk = self.kwargs["pk"]
+        # finally, vet
+        candidates = nle.candidates.all()
         vetting_mode = form.cleaned_data["vetting_method"]
-
-        # generate the base url
-        base_url = reverse(
-            "scoring:vet_all", kwargs=dict(pk=pk, vetting_mode=vetting_mode)
-        )
         phot_method = _clean_phot_method(form.cleaned_data.get("phot_method"))
+        vet_multi_async(candidates, nle, vetting_mode, phot_method=phot_method,
+                        started_by=self.request.user.get_username(),
+                        run_kind="all")
 
-        # then also preserve the query parameters
-        query_str = self.request.session.pop("nle_id", "")
-        params = [query_str] if query_str else []
-        if phot_method:
-            params.append(f"phot_method={phot_method}")
-        if params:
-            base_url += "?" + "&".join(params)
-        return redirect(base_url)
+        # imported here to keep scoring.views out of an import cycle
+        from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
 
-
-class TargetVettingAllView(LoginRequiredMixin, RedirectView):
-    """
-    View that runs or reruns the candidate vetting code and stores the results,
-    for all candidates
-    """
-
-    def get(self, request, *args, **kwargs):
-        """
-        Method that handles the GET requests for this view. Calls the vetting
-        code for different transients.
-        """
-        pk = kwargs["pk"]
-        vetting_mode = kwargs.get("vetting_mode", "basic")
-
-        # get the nonlocalized event
-        nle = NonLocalizedEvent.objects.filter(id=pk)[0]
-
-        # get all of the event candidates
-        ecs = EventCandidate.objects.filter(nonlocalizedevent_id=nle.id).order_by(
-            "target__name"
-        )
-
-        # The scorer the user picked on the form, sent with every task so the
-        # whole run uses it -- workers have no session to read the toggle from,
-        # and it could be flipped mid-run in any case.
-        phot_method = (_clean_phot_method(request.GET.get("phot_method"))
-                       or get_phot_method(request))
-
-        # then run the vetting, asynchronously
+        invalidate_scored_candidates_cache(str(nle.id))
         messages.info(
-            request,
-            f"Vetting all candidates in {vetting_mode} vetting mode. This may take a few seconds per each of {ecs.count():.0f} candidates; check back later.",
+            self.request,
+            f"Vetting {len(candidates)} selected candidate"
+            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode; "
+            "this takes a few seconds each, so check back shortly.",
         )
-        vet_all_async(ecs, nle, vetting_mode, phot_method=phot_method,
-                      started_by=request.user.get_username())
-
-        return redirect(
-            f"/eventcandidates/?nonlocalizedevent={nle.id}"
-        )  # this redirects back to the NLE page
-
+        return back
 
 
 class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):

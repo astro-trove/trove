@@ -5,7 +5,47 @@
 <div class="row">
   <div class="col">
     <form action="{% url 'custom_code:event-candidates' %}" method="get" class="form" hx-get="{% url 'custom_code:event-candidates' %}" hx-target="#candidate-results" hx-push-url="true">
-      {% bootstrap_form eventcandidate_filter_form %}
+      {# these come from clean(), which bootstrap_field cannot render #}
+      {% if eventcandidate_filter_form.non_field_errors %}
+        <div class="alert alert-warning py-2 mb-2">
+          {% for error in eventcandidate_filter_form.non_field_errors %}{{ error }}{% endfor %}
+        </div>
+      {% endif %}
+      {% bootstrap_field eventcandidate_filter_form.target__name %}
+      {% if eventcandidate_filter_form.nonlocalizedevent %}
+        {% bootstrap_field eventcandidate_filter_form.nonlocalizedevent %}
+      {% endif %}
+
+      {# the rest are used less often, so they start folded away #}
+      <div class="d-flex align-items-center" style="gap:0.5rem">
+        <button class="btn {% if filters_active %}btn-secondary{% else %}btn-outline-secondary{% endif %}" type="button"
+                data-toggle="collapse" data-target="#more-candidate-filters"
+                aria-expanded="{% if filters_active %}true{% else %}false{% endif %}"
+                aria-controls="more-candidate-filters" id="more-filters-toggle">
+          <span id="more-filters-label">{% if filters_active %}Close filters{% else %}More filters{% endif %}</span>
+          <span id="more-filters-caret">{% if filters_active %}&#9650;{% else %}&#9660;{% endif %}</span>
+        </button>
+        <button type="submit" class="btn btn-primary">Filter</button>
+        <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+           hx-get="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+           hx-target="#candidate-results" hx-push-url="true"
+           class="btn btn-secondary" title="Reset">Reset</a>
+      </div>
+      <div class="collapse {% if filters_active %}show{% endif %} mt-2" id="more-candidate-filters">
+        <div class="form-row align-items-end">
+          <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.distance_max %}</div>
+          <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.distance_type %}</div>
+        </div>
+        <div class="form-row align-items-end">
+          <div class="col-md-6">{% bootstrap_field eventcandidate_filter_form.first_det_after %}</div>
+          <div class="col-md-6">{% bootstrap_field eventcandidate_filter_form.first_det_before %}</div>
+        </div>
+        <div class="form-row align-items-end">
+          <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.cone_ra %}</div>
+          <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.cone_dec %}</div>
+          <div class="col-md-4">{% bootstrap_field eventcandidate_filter_form.cone_radius %}</div>
+        </div>
+      </div>
 
       <div class="mb-3">
 	<button type="submit" class="btn btn-primary">
@@ -31,3 +71,24 @@
 </div>
 
 <br>
+
+<script>
+// the button says what the next click does, so it reads as a real disclosure
+(function () {
+    var panel = document.getElementById('more-candidate-filters');
+    var label = document.getElementById('more-filters-label');
+    var caret = document.getElementById('more-filters-caret');
+    if (!panel || !label) { return; }
+    var toggle = document.getElementById('more-filters-toggle');
+    function sync(open) {
+        label.textContent = open ? 'Close filters' : 'More filters';
+        if (caret) { caret.innerHTML = open ? '&#9650;' : '&#9660;'; }
+        if (toggle) {
+            toggle.classList.toggle('btn-secondary', open);
+            toggle.classList.toggle('btn-outline-secondary', !open);
+        }
+    }
+    $(panel).on('shown.bs.collapse', function () { sync(true); });
+    $(panel).on('hidden.bs.collapse', function () { sync(false); });
+})();
+</script>

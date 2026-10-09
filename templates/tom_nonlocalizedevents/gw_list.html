@@ -3,32 +3,55 @@
 {% block title %}Gravitational Waves{% endblock %}
 {% block content %}
 <h1>Gravitational Waves</h1>
+<div class="alert alert-warning" style="padding:14px 18px; line-height:1.7">
+  <div class="mt-2">
+    <strong>Bold row</strong> &mdash; A <em>significant</em> alert from O4 and beyond: LVK judged it unlikely to be
+    a false alarm. For CBC searches that means an inverse False Alarm Rate (1/FAR) above 0.5 years.<br>
+    <span style="font-size:1.1em">&#x2714;</span> &mdash; Confirmed: The alert has moved past
+    its preliminary notice.<br>
+    <span style="font-size:1.1em">&#x274c;</span> &mdash; Retracted: LVK has withdrawn the alert.<br>
+    <strong>1/FAR</strong> &mdash; Inverse False Alarm Rate. Higher means rarer, so less likely
+    to be noise.
+  </div>
+</div>
 <div class="row">
-    <div class="col-md-12">
-    <form action="" method="get" class="form">
+    <div class="col-md-13">
+    <form action="" method="get" class="form" id="gw-filter-form">
       {% crispy filter.form %}
     </form>
     </div>
 </div>
 <div class="row">
-    <div class="col-md-12">
-    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <div class="col-md-13">
+    <style>.gw-pager-row .pagination { margin-bottom: 0; }</style>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gw-pager-row mb-3">
+      <div>
+        <button type="submit" form="gw-filter-form" class="btn btn-primary">Filter</button>
+        <a href="{{ request.path }}" class="btn btn-secondary ml-1" title="Reset">Reset</a>
+      </div>
+      {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+      <div style="min-width:8rem"></div>{# balances the buttons so the pager stays centred #}
+    </div>
     {% if object_list %}
-    <table class="table">
+    <table class="table table-hover align-middle text-center">
       <thead>
       <tr>
         <th scope="col">GraceID</th>
         <th scope="col" title="Inverse False Alarm Rate">1/FAR</th>
         <th scope="col" title="Most Likely Classification">Class.</th>
         <th scope="col" title="Distance">Distance</th>
-        <th scope="col" title="Has Neutron Star?">NS?</th>
-        <th scope="col" title="Has Remnant?">Bright?</th>
+        <th scope="col" title="Has Neutron Star?">Has NS?</th>
+        <th scope="col" title="Has Remnant?">Has Remnant?</th>
+        <th scope="col" title="Has a component in the 3-5 M☉ mass gap?">Has MassGap?</th>
+        <th scope="col" title="Has a sub-solar mass component?">Has SSM?</th>
+        <th scope="col" title="No. of Event Candidates">Candidates</th>
         <th scope="col" title="External Links">Ext. Links</th>
       </tr>
       </thead>
       <tbody>
       {% for event in object_list %}
-      {% if event.sequences.last.details.significant %}
+      {% with seq=event|last_sequence %}
+      {% if seq.details.significant %}
       <tr style="font-weight: bold">
       {% else %}
       <tr>
@@ -37,24 +60,30 @@
             <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a>
             {% if event.state == "RETRACTED" %}
                 <span title="retracted">&#x274c;</span> {# red X emoji #}
-            {% elif event.sequences.last.event_subtype != "PRELIMINARY" %}
+            {% elif seq.event_subtype != "PRELIMINARY" %}
                 <span title="confirmed">&#x2714;</span> {# heavy check mark emoji #}
             {% endif %}
         </td>
-        <td title="Inverse False Alarm Rate">{{ event.sequences.last.details.far | format_inverse_far }}</td>
-        <td title="Most Likely Classification">{{ event.sequences.last.details | get_most_likely_class | truncate }}</td>
-        <td title="Distance">{{ event.sequences.last.localization | format_distance }}</td>
-        <td title="Has Neutron Star?">{{ event.sequences.last.details.properties.HasNS | percentformat }}</td>
-        <td title="Has Remnant?">{{ event.sequences.last.details.properties.HasRemnant | percentformat }}</td>
+        <td title="Inverse False Alarm Rate">{{ seq.details.far | format_inverse_far }}</td>
+        <td title="Most Likely Classification">{{ seq.details | get_most_likely_class | truncate }}</td>
+        <td title="Distance">{{ seq.localization | format_distance }}</td>
+        <td title="Has Neutron Star?">{{ seq.details.properties.HasNS | percentformat }}</td>
+        <td title="Has Remnant?">{{ seq.details.properties.HasRemnant | percentformat }}</td>
+        <td title="Has a component in the 3 - 5 M☉ mass gap?">{{ seq.details.properties.HasMassGap | percentformat }}</td>
+        <td title="Has a sub-solar mass component?">{{ seq.details.properties.HasSSM | percentformat }}</td>
+        <td title="Candidates">{{ event.candidates.count }}</td>
         <td title="External Links">
           <a href="{{ event.gracedb_url }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
           <a href="{{ event.treasuremap_url }}" target="_blank"><img src="https://treasuremap.space/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" /></a>
         </td>
       </tr>
+      {% endwith %}
       {% endfor %}
       </tbody>
     </table>
-    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    <div class="d-flex justify-content-center">
+      {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+    </div>
     {% else %}
     <p>No events have been created. Create Superevents via the admin interface, the REST API,
         or the readstreams management command.</p>

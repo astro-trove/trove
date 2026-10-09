@@ -1,28 +1,33 @@
 import json
+from django.conf import settings
 from django_filters.views import FilterView
 from django.core.cache import cache
 from django.core.paginator import Paginator
+from django.db.models import Min, Q
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.http import JsonResponse, HttpResponse, QueryDict
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.generic.base import View
 from django.contrib import messages
 
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
-from tom_targets.permissions import targets_for_user
+from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
+from trove_nonlocalizedevents.permissions import candidates_for_user
 import logging
 
 from scoring.models import ScoreFactor
 from scoring.util import (
     get_agn_toggle,
     get_event_candidate_scores,
-    get_last_vet_all_run,
+    get_last_vet_multi_run,
     get_no_score_message,
-    get_vet_all_progress,
+    get_vet_multi_progress,
+    host_distances,
     kilonova_scores_exist,
     most_likely_class_for_event,
     set_agn_toggle,
@@ -55,8 +60,62 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
     """
     query_params = query_params.copy()
     query_params.pop("page", None)  # every page shares one scored list
+    query_params.pop("sort", None)
     return (f"event_candidates_scored_{query_params.urlencode()}"
             f"_{agn_toggle}_{phot_method}")
+
+
+#: z_type strings that count as each kind of distance measurement, as stored in
+#: the "Host Galaxies" TargetExtra. "user spec-z" is a spectroscopic redshift too.
+DISTANCE_TYPE_PATTERNS = {
+    "spec-z": ["spec-z", "user spec-z"],
+    "photo-z": ["photo-z"],
+    "z-ind": ["z ind.", "z-ind."],
+}
+
+#: sub-score columns, chosen by how the event is scored. agn_score is left out
+#: because the AGN toggle can take it out of the total it would appear to explain.
+#: The 2D and distance scores are left out as well: the table already carries the
+#: RA/Dec and the distance they are computed from, and a candidate's page has them.
+SUBSCORE_COLUMNS_BBH = ["agn_flare_score", "nuclear_offset_score"]
+SUBSCORE_COLUMNS_KN = []
+SUBSCORE_LABELS = {
+    "agn_flare_score": "Flare Score",
+    "nuclear_offset_score": "Nuclear Offset Score",
+}
+
+
+#: sort key for the distance column, which is a measurement rather than a score
+#: and so is not a ScoreFactor key like the columns above
+DISTANCE_SORT_KEY = "distance_estimate"
+
+
+def subscore_columns_for(event_class):
+    """The sub-score columns worth showing for this kind of event."""
+    return SUBSCORE_COLUMNS_BBH if event_class == "BBH" else SUBSCORE_COLUMNS_KN
+
+
+def _as_float(value):
+    """A query-string number, or None if it is absent or not a number."""
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _as_date(value):
+    """A query-string YYYY-MM-DD date, or None.
+
+    `parse_date` returns None for a malformed string but raises for a
+    well-formed impossible one like 2025-13-45; a half-typed date in the box
+    must not 500 the page either way.
+    """
+    if not value:
+        return None
+    try:
+        return parse_date(value)
+    except ValueError:
+        return None
 
 
 def invalidate_scored_candidates_cache(query_params):
@@ -70,6 +129,75 @@ def invalidate_scored_candidates_cache(query_params):
         for phot_method in PHOT_METHOD_CHOICES:
             cache.delete(scored_candidates_cache_key(
                 query_params, agn_toggle, phot_method))
+
+
+def within_max_distance(candidates, distances, distance_max):
+    """The candidates inside a distance cut, as the Distance column measures it.
+
+    Not a queryset filter: the distance is read back out of the host galaxy that
+    vetting recorded, so it is only known in Python. `target.distance` is a
+    different quantity -- the target's own redshift distance, which is set for a
+    small minority of candidates -- and filtering on it dropped rows the column
+    was showing as nearby.
+    """
+    if distance_max is None:
+        return candidates
+    # no known distance cannot be shown to be within the cut, so it does not pass
+    return [c for c in candidates
+            if c.id in distances and distances[c.id].distance <= distance_max]
+
+
+def filter_candidates(qs, get):
+    """The filters that can be answered from the database.
+
+    Shared by the candidate table and by "select all matching", so the rows you
+    are shown and the rows you vet are chosen the same way. Score and distance
+    are not here: both are computed in Python, so they run on the scored list.
+    """
+
+    # first detection == earliest photometry point, as in
+    # custom_code.hooks.associate_targets_with_nle
+    after = _as_date(get.get("first_det_after"))
+    before = _as_date(get.get("first_det_before"))
+    if after or before:
+        first_det = (
+            ReducedDatum.objects.filter(
+                data_type="photometry", value__magnitude__isnull=False
+            )
+            .values("target_id")
+            .annotate(min_timestamp=Min("timestamp"))
+        )
+        if after:
+            first_det = first_det.filter(min_timestamp__date__gte=after)
+        if before:
+            first_det = first_det.filter(min_timestamp__date__lte=before)
+        qs = qs.filter(target_id__in=first_det.values_list("target_id", flat=True))
+
+    # z_type lives inside the "Host Galaxies" TargetExtra JSON, so match the
+    # stored text (compact separators); any host measured that way counts
+    distance_type = get.get("distance_type")
+    if distance_type in DISTANCE_TYPE_PATTERNS:
+        match = Q()
+        for pattern in DISTANCE_TYPE_PATTERNS[distance_type]:
+            match |= Q(value__icontains=f'"z_type":"{pattern}')
+        host_targets = TargetExtra.objects.filter(
+            Q(key="Host Galaxies") & match
+        ).values_list("target_id", flat=True)
+        qs = qs.filter(target_id__in=host_targets)
+
+    ra, dec = _as_float(get.get("cone_ra")), _as_float(get.get("cone_dec"))
+    if ra is not None and dec is not None:
+        # `or` would turn an explicit 0 into the default; 0 means 0
+        radius = _as_float(get.get("cone_radius"))
+        if radius is None:
+            radius = 2.0  # arcsec, as in scoring.api
+        targets = cone_search_filter(
+            Target.objects.filter(id__in=qs.values_list("target_id", flat=True)),
+            ra, dec, radius / 3600.0,
+        )
+        qs = qs.filter(target_id__in=targets.values_list("id", flat=True))
+
+    return qs
 
 
 def visible_candidates(candidates, user):
@@ -122,10 +250,9 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         :returns: Set of ``Candidate`` objects
         :rtype: QuerySet
         """
-        qs = (
-            super()
-            .get_queryset()
-            .select_related("target", "nonlocalizedevent")
+        # the skymap above the table draws the same set -- see `candidates_for_user`
+        qs = candidates_for_user(self.request.user, super().get_queryset()).select_related(
+            "target", "nonlocalizedevent"
         )
 
         # Filter by nonlocalizedevent if provided in URL
@@ -138,7 +265,10 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         if target_name:
             qs = qs.filter(target__name__icontains=target_name)
 
-        return qs
+        return self.apply_candidate_filters(qs)
+
+    def apply_candidate_filters(self, qs):
+        return filter_candidates(qs, self.request.GET)
 
     def get_template_names(self):
         if self.request.htmx:
@@ -153,7 +283,7 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
 
         phot_method = get_phot_method(self.request)
 
-        vet_all_progress = get_vet_all_progress(nle_id)
+        vet_multi_progress = get_vet_multi_progress(nle_id)
 
         cache_key = scored_candidates_cache_key(self.request.GET, agn_toggle,
                                                 phot_method)
@@ -169,12 +299,74 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
             )
             # a run in progress rewrites these scores continuously, so hold them
             # for less time than usual to keep the page closer to the truth
-            if vet_all_progress and vet_all_progress["running"]:
+            if vet_multi_progress and vet_multi_progress["running"]:
                 cache_timeout = SCORE_CACHE_PERIOD_WHILE_VETTING
             else:
                 cache_timeout = SCORE_CACHE_PERIOD
             cache.set(cache_key, scored_candidates, cache_timeout)
 
+        # Scores are computed in Python, so this filter cannot be a queryset
+        # filter; it runs on the scored list, after the cache.
+
+        # Which total score the table is sorted by. Several scores means several
+        # columns, and the user picks which one orders the table.
+        all_transients = []
+        for candidate in scored_candidates:
+            for transient in (candidate.score or {}):
+                if transient not in all_transients:
+                    all_transients.append(transient)
+        event_class = None
+        if nle_id:
+            nle_for_class = NonLocalizedEvent.objects.filter(id=nle_id).first()
+            if nle_for_class:
+                event_class = most_likely_class_for_event(nle_for_class.event_id)
+        subscore_columns = subscore_columns_for(event_class)
+
+        # sub-scores for every scored candidate, so these columns can be sorted
+        # on rather than only the ones on the current page
+        subscores = {}
+        if subscore_columns:
+            for sf in ScoreFactor.objects.filter(
+                event_candidate_id__in=[c.id for c in scored_candidates],
+                key__in=subscore_columns,
+            ).only("event_candidate_id", "key", "value"):
+                try:
+                    subscores.setdefault(
+                        sf.event_candidate_id, {})[sf.key] = float(sf.value)
+                except (TypeError, ValueError):
+                    pass
+        context["subscores"] = subscores
+        context["distance_sort_key"] = DISTANCE_SORT_KEY
+
+        sortable = all_transients + subscore_columns + [DISTANCE_SORT_KEY]
+        sort_key = self.request.GET.get("sort")
+        if sort_key not in sortable:
+            sort_key = all_transients[0] if all_transients else None
+
+        # Reading a distance back costs that candidate's host galaxy table, so
+        # the whole list is only fetched when the column is sorted on or cut by;
+        # the rest of the time the page is all that gets shown.
+        distance_max = _as_float(self.request.GET.get("distance_max"))
+        needs_all = sort_key == DISTANCE_SORT_KEY or distance_max is not None
+        distance_estimates = host_distances(scored_candidates) if needs_all else {}
+        scored_candidates = within_max_distance(
+            scored_candidates, distance_estimates, distance_max)
+
+        def sort_value(candidate):
+            """Whatever the chosen column shows for this candidate."""
+            if sort_key in subscore_columns:
+                return subscores.get(candidate.id, {}).get(sort_key, -1)
+            return (candidate.score or {}).get(sort_key, 0)
+
+        if sort_key == DISTANCE_SORT_KEY:
+            # nearest first, unlike the scores, and no distance known sorts last
+            scored_candidates = sorted(scored_candidates, key=lambda c: (
+                c.id not in distance_estimates,
+                getattr(distance_estimates.get(c.id), "distance", 0.0),
+            ))
+        elif sort_key:
+            scored_candidates = sorted(scored_candidates, reverse=True, key=sort_value)
+        context["sort_key"] = sort_key
         # the cached list is everyone's; this viewer sees their share of it
         scored_candidates = visible_candidates(scored_candidates, self.request.user)
 
@@ -189,24 +381,61 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         context["object_list"] = page_obj.object_list
         context["agn_toggle"] = agn_toggle
 
+        # One column per transient type rather than every score stacked into a
+        # single cell. Events scored for one type only then say which it is.
+        context["score_columns"] = all_transients
+
+        # Latest magnitude for every target on this page, in one query rather
+        # than one per row.
+        target_ids = [c.target_id for c in page_obj.object_list]
+        latest_mag = {}
+        for datum in (ReducedDatum.objects
+                      .filter(target_id__in=target_ids, data_type="photometry",
+                              value__magnitude__isnull=False)
+                      .order_by("target_id", "timestamp")
+                      .only("target_id", "timestamp", "value")):
+            latest_mag[datum.target_id] = datum.value  # ordered, so the last wins
+
+        # A target with no magnitude at all has only non-detections; show the
+        # deepest limit as ">20.7" rather than a blank that reads as missing data.
+        undetected = [t for t in target_ids if t not in latest_mag]
+        for datum in (ReducedDatum.objects
+                      .filter(target_id__in=undetected, data_type="photometry",
+                              value__limit__isnull=False)
+                      .order_by("target_id", "timestamp")
+                      .only("target_id", "timestamp", "value")):
+            latest_mag[datum.target_id] = dict(datum.value, is_limit=True)
+        context["latest_mag"] = latest_mag
+
+        if not needs_all:
+            distance_estimates = host_distances(page_obj.object_list)
+        context["distance_estimates"] = distance_estimates
+
+        context["subscore_columns"] = subscore_columns
+        context["subscore_labels"] = SUBSCORE_LABELS
+
+
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label(request=self.request)
 
-        context["vet_all_progress"] = vet_all_progress
+        context["vet_multi_progress"] = vet_multi_progress
         # standing record of when these scores were last refreshed in bulk,
         # which outlives the transient progress notice above
-        context["last_vet_all"] = get_last_vet_all_run(nle_id)
+        context["last_vet_multi"] = get_last_vet_multi_run(nle_id)
 
-        context["eventcandidate_filter_form"] = EventCandidateSearchForm(nle_id=nle_id)
+        context["eventcandidate_filter_form"] = EventCandidateSearchForm(
+            self.request.GET or None, nle_id=nle_id)
+        # open the extra filters if any of them are in play, so an active filter
+        # is never hidden behind a collapsed panel
+        context["filters_active"] = any(
+            self.request.GET.get(f) for f in
+            ("distance_max", "distance_type", "first_det_after",
+             "first_det_before", "cone_ra", "cone_dec", "cone_radius")
+        )
         context["eventcandidate_create_form"] = CreateEventCandidateFromNLEForm(nle_id=nle_id)
 
-        context["no_score_message"] = None
-        event_class = None
-        if nle_id:
-            nle = NonLocalizedEvent.objects.filter(id=nle_id).first()
-            if nle:
-                event_class = most_likely_class_for_event(nle.event_id)
-                context["no_score_message"] = get_no_score_message(event_class)
+        context["no_score_message"] = (
+            get_no_score_message(event_class) if event_class else None)
 
         # shown whichever way the toggle is set: the toggle stays locked on light
         # curve metrics until the event has KilonovaSCORER scores. KN-style events
@@ -496,9 +725,9 @@ class RefreshCandidateList(LoginRequiredMixin, View):
         return redirect(url)
 
 
-class VetAllProgressPartialView(View):
+class VetMultiProgressPartialView(View):
     """
-    Just the "Vet All" progress notice.
+    Just the "Vet All" / "Vet Selected" progress notice.
 
     The candidate list polls this while a run is going so the notice keeps up
     with the queue, which costs three counts, rather than re-scoring every
@@ -520,16 +749,20 @@ class VetAllProgressPartialView(View):
 
         return render(
             request,
-            "trove_nonlocalizedevents/partials/vet_all_progress.html",
-            {"vet_all_progress": get_vet_all_progress(nle_id)},
+            "trove_nonlocalizedevents/partials/vet_multi_progress.html",
+            {"vet_multi_progress": get_vet_multi_progress(nle_id)},
         )
+
 
 def vet_all_cooldown_notice(request):
     messages.warning(
         request,
         "A user has recently run vetting on all candidates, placing it on "+
-        "cooldown. The vetting results will update for all users. Please try "+
-        "again later if you need to re-vet *everything* again (you can still "+
-        "vet individual targets via the target pages)."
+        "cooldown. The cooldown period is "+
+        f"{settings.VETTING_COOLDOWN_PERIOD / 3600:.0f} hours from the time of the "+
+        "user submitting the request to vet all. The vetting results will update for "+
+        "all users. Please try again later if you truly need to re-vet *everything* "+
+        "again. You can still vet individual candidates via the candidate pages or "+
+        "select some subset of candidates to vet."
     )
     return redirect(request.META.get('HTTP_REFERER', '/'))

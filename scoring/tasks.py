@@ -40,7 +40,7 @@ def async_mpc(target_id: int, *args, **kwargs) -> None:
     run_mpc(target_id, *args, **kwargs)
 
 
-@task(queue_name="vet_all", priority=settings.PRIORITY_HIGH)
+@task(queue_name="vet_multi", priority=settings.PRIORITY_HIGH)
 def async_vet(
     target_ids: list,
     nle_event_id: str,
@@ -130,8 +130,10 @@ def async_associate_targets_nle(
     
     
 ## functions which enqueue tasks
-def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None,
-                  started_by=None) -> None:
+def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
+                  started_by=None, run_kind="all") -> None:
+    """`run_kind` records which button started the run; the progress cards
+    report on any of them."""
     ecs = list(eventcandidates)
     run_started = timezone.now().isoformat()
 
@@ -162,6 +164,7 @@ def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None,
             phot_method=phot_method,
             run_started=run_started,
             started_by=started_by,
+            run_kind=run_kind,
         )
 
 def associate_targets_with_nle_async(

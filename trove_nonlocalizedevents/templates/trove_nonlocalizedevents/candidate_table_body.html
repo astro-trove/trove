@@ -1,7 +1,7 @@
 {% load django_bootstrap5 crispy_forms_tags event_candidate_extras %}
 
 <div class="row">
-  <div class="col-md-10">
+  <div class="col-md-12">
   {% if request.user.is_authenticated %}
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:0.75rem; width:100%">
         {% scoring_toggles %}
@@ -19,55 +19,134 @@
        To compute and display KilonovaSCORER scores for a single candidate, visit the
        candidate's page, click <strong>Vet</strong>, and select <em>Transient: Kilonova</em>
        for the Vetting Method and <em>KilonovaSCORER</em> for the Photometry Scoring Method.
-       To do this for all candidates, click <strong>Vet All</strong>.
+       To do this for multiple or all candidates, tick the boxes for candidates of
+       interest and click <strong>Vet Selected</strong> or click <strong>Vet All</strong>.
      </div>
    {% endif %}
    {% if request.GET.nonlocalizedevent %}
-    <div id="vet-all-progress"
-         hx-get="{% url 'trove_nonlocalizedevents:vet-all-progress' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+    <div id="vet-multi-progress"
+         hx-get="{% url 'trove_nonlocalizedevents:vet-multi-progress' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
          hx-trigger="every 60s"
          hx-target="this"
          hx-swap="innerHTML"
          hx-push-url="false"
          hx-history="false">
-      {% include 'trove_nonlocalizedevents/partials/vet_all_progress.html' %}
+      {% include 'trove_nonlocalizedevents/partials/vet_multi_progress.html' %}
     </div>
    {% endif %}
     </br>
   {% if no_score_message %}
     <div class="alert alert-info">{{ no_score_message }}</div>
   {% endif %}
-  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
-    <table class="table table-sm table-hover">
+  <div class="d-flex justify-content-center">
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  </div>
+  {# HTMX swaps this partial, so the form lives here; its button sits below the skymap #}
+  {# vetting is per event, so with no event in scope the form has nowhere to post #}
+  <form method="post" hx-boost="false" id="vet-selected-form"
+        {% if request.GET.nonlocalizedevent %}action="{% url 'scoring:vet_selected_form' request.GET.nonlocalizedevent %}"{% endif %}>
+    {% csrf_token %}
+    {% if request.user.is_authenticated and request.GET.nonlocalizedevent %}
+    <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
+    {% endif %}
+    <style>
+      /* keep "KN {{ '' }}&darr;" on one line; the arrow wrapping under the label
+         is what made the header rows tall */
+      #candidate-results th { white-space: nowrap; }
+      #candidate-results td { white-space: nowrap; }
+      #candidate-results tbody td.select-handle { cursor: pointer; }
+      /* names are strings of differing length, so they scan better left-aligned */
+      #candidate-results th.col-target,
+      #candidate-results td.col-target { text-align: left; }
+      #candidate-results tbody tr.table-active { background-color: rgba(0,123,255,0.12); }
+
+      /* a unit belongs with its header, but should not compete with the label */
+      #candidate-results th .col-unit { font-size: 0.8em; font-weight: normal; }
+    </style>
+    <table class="table table-hover align-middle text-center">
       <thead>
         <tr>
+          <th style="width:1%">
+            <input type="checkbox" name="select_all_matching" value="1" id="select-all-matching"
+                   title="Select all {{ page_obj.paginator.count }} candidates matching the current filters (untick to clear)">
+          </th>
           <th>Rank</th>
-          <th>Target</th>
-          <th>Event</th>
-          <th>Score</th>
+          <th class="col-target">Target</th>
+          {# the event column is dropped when the page is already scoped to one event #}
+          {% if not request.GET.nonlocalizedevent %}<th>Event</th>{% endif %}
+          <th title="Right ascension, degrees -- hover a value for full precision">RA</th>
+          <th title="Declination, degrees -- hover a value for full precision">Dec</th>
+          <th title="Distance to the host galaxy this candidate was scored against -- click to sort nearest first">
+            <a href="?{% query_replace request 'sort' distance_sort_key %}"
+               hx-get="?{% query_replace request 'sort' distance_sort_key %}"
+               hx-target="#candidate-results" hx-push-url="true">
+              Distance <span class="col-unit">(Mpc)</span>{% if sort_key == distance_sort_key %} &uarr;{% endif %}
+            </a>
+          </th>
+          {% for key in subscore_columns %}
+          <th title="{{ key }} -- click to sort by it">
+            <a href="?{% query_replace request 'sort' key %}"
+               hx-get="?{% query_replace request 'sort' key %}"
+               hx-target="#candidate-results" hx-push-url="true">
+              {{ subscore_labels|lookup:key }}{% if sort_key == key %} &darr;{% endif %}
+            </a>
+          </th>
+          {% endfor %}
+          {% if score_columns %}
+            {% for transient in score_columns %}
+            <th title="{% if score_columns|length == 1 %}The only score for this event class. {% endif %}Score for the {{ transient }} transient type -- click to sort by it.{% if sort_key == transient %} The arrow marks the column the table is sorted by.{% endif %}">
+              <a href="?{% query_replace request 'sort' transient %}"
+                 hx-get="?{% query_replace request 'sort' transient %}"
+                 hx-target="#candidate-results" hx-push-url="true">
+                {{ transient }}{% if sort_key == transient %} &darr;{% endif %}
+              </a>
+            </th>
+            {% endfor %}
+          {% else %}
+            <th>Score</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
 	{% for candidate in page_obj.object_list %}
+        {% with rank=page_obj.start_index|add:forloop.counter0 %}
         <tr>
-	  <td>{{ page_obj.start_index|add:forloop.counter0 }}</td>
-	  <td>
+          <td class="select-handle">
+            {# the top 20 by score start selected: the common case is vetting the best few #}
+            <input type="checkbox" name="candidates" value="{{ candidate.id }}"
+                   class="candidate-select" {% if rank <= 20 %}checked{% endif %}>
+          </td>
+	  <td class="select-handle">{{ rank }}</td>
+	  <td class="select-handle col-target">
             {% if candidate.target is not None %}
               <a href="{% url 'targets:detail' candidate.target.id %}?nonlocalizedevent={{ candidate.nonlocalizedevent.event_id }}" title="{{ candidate.target.name }}" target="_blank">{{ candidate.target.name|slice:":9" }}<wbr>{{ candidate.target.name|slice:"9:" }}</a>
             {% else %}
               None
             {% endif %}
           </td>
+          {% if not request.GET.nonlocalizedevent %}
           <td><a href="{% url 'nonlocalizedevents:event-detail' candidate.nonlocalizedevent.event_id %}" target="_blank">{{ candidate.nonlocalizedevent.event_id }}</a></td>
-          <td>
-	    {% for transient, score in candidate.score.items %}
-            {{ transient }} {{score|floatformat:2}}<br>
-            {% endfor %}
+          {% endif %}
+          <td title="{{ candidate.target.ra|floatformat:6 }}">{{ candidate.target.ra|floatformat:3 }}</td>
+          <td title="{{ candidate.target.dec|floatformat:6 }}">{{ candidate.target.dec|floatformat:3 }}</td>
+          {% with dist=distance_estimates|lookup:candidate.id %}
+          <td title="{% if dist %}{{ dist.distance|floatformat:1 }} Mpc, from {{ dist.source }}{% else %}Candidate has no redshift and no known potential host galaxy{% endif %}">
+            {{ dist|host_distance_cell }}
           </td>
+          {% endwith %}
+          {% with row=subscores|lookup:candidate.id %}
+          {% for key in subscore_columns %}
+          <td title="{{ key }}">{{ row|lookup:key|floatformat:2|default:"&mdash;" }}</td>
+          {% endfor %}
+          {% endwith %}
+          {% for transient in score_columns %}
+          <td title="{{ transient }}">{{ candidate.score|lookup:transient|floatformat:2 }}</td>
+          {% endfor %}
         </tr>
+        {% endwith %}
         {% empty %}
         <tr>
-          <td colspan="10">
+          <td colspan="11">
             {% if target_count == 0 %}
             No candidates yet.
             {% else %}
@@ -78,13 +157,125 @@
         {% endfor %}
       </tbody>
     </table>
-  {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  </form>
+  <div class="d-flex justify-content-center">
+    {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
+  </div>
 
 
   </div>
 </div>
 
 <script>
+// keeps the button's count in step with the boxes, and drives select-all
+function wireCandidateSelection() {
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('.candidate-select'));
+    var count = document.getElementById('vet-selected-count');
+    var btn = document.getElementById('vet-selected-btn');
+    if (!boxes.length) { return; }
+
+    var matching = document.getElementById('select-all-matching');
+    var total = {{ page_obj.paginator.count|default:0 }};
+    var rows = boxes.map(function (b) { return b.closest('tr'); });
+    var anchor = null;   // where a shift-range starts, as in a file explorer
+
+    function refresh() {
+        var n = boxes.filter(function (b) { return b.checked; }).length;
+        if (matching && matching.checked) {
+            if (count) { count.textContent = total; }
+            if (btn) { btn.disabled = total === 0; }
+        } else {
+            if (count) { count.textContent = n; }
+            if (btn) { btn.disabled = n === 0; }
+        }
+        rows.forEach(function (row, i) {
+            row.classList.toggle('table-active', boxes[i].checked);
+        });
+    }
+
+    // any hand-picked change means the selection is no longer "everything"
+    function set(i, value) {
+        boxes[i].checked = value;
+        if (matching && matching.checked && !value) { matching.checked = false; }
+    }
+    function only(i) { boxes.forEach(function (b, j) { set(j, j === i); }); }
+    function range(from, to, value) {
+        var lo = Math.min(from, to), hi = Math.max(from, to);
+        for (var j = lo; j <= hi; j++) { set(j, value); }
+    }
+
+    // ticking the corner box takes every row, unticking clears them
+    if (matching) {
+        matching.addEventListener('change', function () {
+            boxes.forEach(function (b) { b.checked = matching.checked; });
+            refresh();
+        });
+    }
+
+    boxes.forEach(function (b, i) {
+        b.addEventListener('click', function (e) { e.stopPropagation(); });
+        b.addEventListener('change', function () {
+            if (matching && matching.checked && !b.checked) { matching.checked = false; }
+            anchor = i;
+            refresh();
+        });
+    });
+
+    // click a row to select it, ctrl/cmd to add, shift for a range -- the
+    // conventions people already know from a file manager
+    rows.forEach(function (row, i) {
+        row.addEventListener('click', function (e) {
+            if (!e.target.closest('.select-handle')) { return; }
+            if (e.target.closest('a') || e.target.closest('input')) { return; }
+            if (e.shiftKey && anchor !== null) {
+                range(anchor, i, true);
+            } else if (e.ctrlKey || e.metaKey) {
+                set(i, !boxes[i].checked);
+                anchor = i;
+            } else {
+                only(i);
+                anchor = i;
+            }
+            refresh();
+        });
+    });
+
+    // drag across rows to select a run of them
+    var dragging = false, dragFrom = null, dragValue = true, moved = false;
+    rows.forEach(function (row, i) {
+        row.addEventListener('mousedown', function (e) {
+            if (e.button !== 0 || !e.target.closest('.select-handle')) { return; }
+            if (e.target.closest('a') || e.target.closest('input')) { return; }
+            dragging = true; dragFrom = i; moved = false;
+            dragValue = !boxes[i].checked;
+            document.body.style.userSelect = 'none';
+        });
+        row.addEventListener('mouseenter', function () {
+            if (!dragging) { return; }
+            moved = true;
+            range(dragFrom, i, dragValue);
+            refresh();
+        });
+    });
+    document.addEventListener('mouseup', function () {
+        if (!dragging) { return; }
+        dragging = false;
+        document.body.style.userSelect = '';
+        // a drag that never left its row is just a click, handled above
+        if (moved) { anchor = dragFrom; }
+    });
+
+    refresh();
+}
+
+wireCandidateSelection();
+if (!window.candidateSelectionBound) {
+    window.candidateSelectionBound = true;
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+        if (e.target.id === 'candidate-results') { wireCandidateSelection(); }
+    });
+}
+
 function openSummaryModal() {
     const nleId = "{{ request.GET.nonlocalizedevent }}";
     fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=5`)

@@ -75,6 +75,17 @@ def format_area(area):
 
 
 @register.filter
+def last_sequence(event):
+    """The event's newest EventSequence, read from the prefetch cache.
+
+    ``event.sequences.last`` issues a fresh query per row even when the
+    sequences are prefetched, which is what made this page N+1.
+    """
+    sequences = event.sequences.all()
+    return sequences[len(sequences) - 1] if sequences else None
+
+
+@register.filter
 def get_most_likely_class(details):
     if not details:
         return
