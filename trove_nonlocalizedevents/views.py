@@ -15,6 +15,7 @@ from django.contrib import messages
 
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
+from tom_targets.permissions import targets_for_user
 from tom_targets.utils import cone_search_filter
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from trove_nonlocalizedevents.permissions import candidates_for_user
