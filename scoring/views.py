@@ -43,11 +43,11 @@ from .config import (FORM_CHOICE_FUNC_MAP,
                      )
 from .tasks import vet_multi_async, associate_targets_with_nle_async
 from .phot_method import (
-    KILONOVA_VETTING_MODE,
+    KILONOVASCORER_VETTING_MODE,
     PHOT_METHOD_CHOICES,
-    PHOT_METHOD_KILONOVA,
+    PHOT_METHOD_METRICS,
+    PHOT_METHOD_KILONOVASCORER,
     PHOT_METHOD_LABELS,
-    PHOT_METHOD_TROVE,
     get_phot_method,
 )
 from .util import get_vet_multi_progress, most_likely_class_for_event
@@ -113,10 +113,10 @@ def _phot_method_field(form, request):
     ]
     form.fields["phot_method"].initial = get_phot_method(request)
     form.fields["phot_method"].widget.attrs.update({
-        "data-kn-only": PHOT_METHOD_KILONOVA,
-        "data-fallback": PHOT_METHOD_TROVE,
+        "data-kn-only": PHOT_METHOD_KILONOVASCORER,
+        "data-fallback": PHOT_METHOD_METRICS,
     })
-    form.fields["vetting_method"].widget.attrs["data-kn-mode"] = KILONOVA_VETTING_MODE
+    form.fields["vetting_method"].widget.attrs["data-kn-mode"] = KILONOVASCORER_VETTING_MODE
     return form
 
 
@@ -514,8 +514,8 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         messages.info(
             self.request,
             f"Vetting {len(candidates)} selected candidate"
-            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} mode with "
-            f"{phot_method} for photometry vetting. "
+            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} vetting mode and "
+            f"{PHOT_METHOD_LABELS[phot_method]} for photometry vetting. "
             "This takes a few seconds per candidate; check back shortly.",
         )
         return back
@@ -607,9 +607,9 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
         invalidate_scored_candidates_cache(str(nle.id))
         messages.info(
             self.request,
-            f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} mode with "
-            f"{phot_method} for photometry vetting. This takes a few seconds "+
-            "per candidate; check back shortly.",
+            f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} vetting "
+            f"and {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. This "
+            "takes a few seconds per candidate; check back shortly.",
         )
         return back
 

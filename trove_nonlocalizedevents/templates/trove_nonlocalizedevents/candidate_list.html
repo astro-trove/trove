@@ -59,36 +59,32 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
   </div>
 </div>
 <br><br>
-<div class="row">
+<div class="d-flex flex-wrap gap-2">
   {% if request.user.is_authenticated %}
-  <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
-          id="vet-selected-btn" title="Run vetting for the candidates you ticked">
-    Vet Selected (<span id="vet-selected-count">0</span>)
-  </button>
-  {% if can_vet_all or request.user.is_superuser %}
-  &nbsp;&nbsp;
-  <a
-    href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
-    title="Run vetting for all candidates"
-    class="btn btn-danger btn-lg">
-    Vet All
-  </a>
-  {% else %}
-  &nbsp;&nbsp;
-  <a href="{% url 'trove_nonlocalizedevents:vet_all_cooldown_notice' %}"
-     class="btn btn-danger btn-lg"
-     style="opacity: 0.3;"
-     title="Vetting all candidates is not available because it was run recently"
-     onclick="document.getElementById('cooldown-msg').style.display='block'; return false;">
-    Vet All
-  </a>
+      <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
+              id="vet-selected-btn" title="Run vetting for the candidates you ticked">
+        Vet Selected (<span id="vet-selected-count">0</span>)
+      </button>
+      {% if can_vet_all or request.user.is_superuser %}
+      <a
+        href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
+        title="Run vetting for all candidates"
+        class="btn btn-danger btn-lg">
+        Vet All
+      </a>
+      {% else %}
+      <a href="{% url 'trove_nonlocalizedevents:vet_all_cooldown_notice' %}"
+         class="btn btn-danger btn-lg"
+         style="opacity: 0.3;"
+         title="Vetting all candidates is not available because it was run recently"
+         onclick="document.getElementById('cooldown-msg').style.display='block'; return false;">
+        Vet All
+      </a>
+      {% endif %}
   {% endif %}
-  {% endif %}
-  &nbsp;&nbsp;
   {% if request.user.is_superuser %}
     <a href="{% url 'scoring:nle_associate_targets_form' request.GET.nonlocalizedevent %}" title="Associate targets with the NLE" class="btn btn-success btn-lg">Associate Targets</a>
   {% endif %}
-  &nbsp;&nbsp;
   {% if request.user.is_superuser %}
     <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
   {% endif %}
