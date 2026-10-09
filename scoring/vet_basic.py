@@ -213,6 +213,7 @@ def vet_basic(
     skip_vet_if_no_new_phot: bool = False,
     use_async_mpc: bool = False,
     stop_on_zero: bool = True,
+    query_atlas_fp: bool = True
 ):
     """Run the NLE-independent vetting for a target and return
     (`host_df`, `agn_df`, `keep_vetting`). `keep_vetting` is False when PS or
@@ -251,6 +252,7 @@ def vet_basic(
         forced_phot_tol=0,
         days_ago_max=days_ago_max,
         queue_priority=queue_priority,
+        query_atlas_fp=query_atlas_fp
     )
     logger.info("Finding public photometry took "+
                 f"{(time.time() - phot_query_start):.2f}s")

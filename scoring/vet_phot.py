@@ -582,7 +582,7 @@ def get_predetection_stats(
 
 
 def find_public_phot(
-    target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100
+        target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100, query_atlas_fp=True
 ) -> None:
     """Query TNS, ATLAS Forced photometry, and other services for publicly available
     photometry. After querying for new photometry it will automatically add it to
@@ -619,7 +619,13 @@ def find_public_phot(
         # the tom-antares package right now :(
         logger.warn("Skipping ANTARES photometry query because of a known bug in tom-antares")
         pass
-    
+
+    # in some cases, we won't want to query ATLAS FP because it isn't constraining
+    # for dim transients in LSST alerts
+    if not query_atlas_fp:
+        logger.info("Skipping ATLAS FP query, as requested")
+        return created_new_tns_phot
+        
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
     atlas_data = target.reduceddatum_set.filter(
@@ -631,7 +637,7 @@ def find_public_phot(
     )
     if atlas_data.count():  # if this is true there is existing ATLAS data
         last_atlas_point = atlas_data.order_by("timestamp").last()
-
+        
         now = datetime.now(tz=timezone.utc)
         if last_atlas_point.timestamp < now - timedelta(days=forced_phot_tol):
             # then we should only query ATLAS for this target for forced photometry
@@ -647,14 +653,14 @@ def find_public_phot(
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
-
+            
     if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
         logger.info(
             "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
             "photometry for %s", target.name
         )
         query_atlas = False
-
+        
     if query_atlas:
         print(
             "Asynchronously obtaining ATLAS forced photometry with "

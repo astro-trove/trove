@@ -567,14 +567,19 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
                 target,
                 created=True,
                 lookback_days_nle=True,
-                known_associated_nle_id=event_id
+                known_associated_nle_id=event_id,
+                query_atlas_fp=_should_run_atlas(alert)
             )
             
         else:
             # then this target does not exist, so we create it from scratch
             # data_service.to_target also saves the target, and will execute the
             # target_post_save function as a hook (see the configuration in settings.py)
-            with target_hook_options(lookback_days_nle=lookback_days_nle, known_associated_nle_id=event_id):
+            with target_hook_options(
+                    lookback_days_nle=lookback_days_nle,
+                    known_associated_nle_id=event_id,
+                    query_atlas_fp=_should_run_atlas(alert)
+            ):
                 target = data_service.to_target(alert)
 
             _add_aliases(target, alert)
@@ -613,5 +618,8 @@ def _should_run_atlas(alert, limit=19.7):
     The limiting magnitude of ATLAS c and o filters is 19.7
     (https://fallingstar.com/specifications.php)
     """
-    mag = alert["properties"]["newest_alert_magnitude"]
+    mag = sorted(
+        alert["reduced_datums"]["photometry"],
+        key=lambda x : x["ant_mjd"]
+    )[-1]["ant_mag"]
     return mag < limit
