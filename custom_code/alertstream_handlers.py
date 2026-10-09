@@ -16,6 +16,7 @@ from django.contrib.auth.models import Group
 from django.contrib.sites.models import Site
 from django.conf import settings
 from django.db.utils import IntegrityError
+from django.core.exceptions import FieldError
 from django_tasks import task
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence, EventCandidate
@@ -552,42 +553,44 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
             # then this target already exists in the Targets table
             target = target_matches[0]
             logger.info(f"Found existing target matching this alert: {target.name}")
-            if target.name.startswith('J'):
-                target.name = alert['name']
-                logger.info(f" - replacing temporary name with {target.name}")
-
-            # add any new aliases from ANTARES to the existing target
-            _add_aliases(target, alert)
-            
-            # then create a candidate and vet it since we know that it is associated
-            # with the queried NLE
-            # vetting includes updating ANTARES photometry and adding host galaxies
-            # this is why we don't do any of that above when we find a target match
-            target_post_save(
-                target,
-                created=True,
-                lookback_days_nle=True,
-                known_associated_nle_id=event_id,
-                query_atlas_fp=_should_run_atlas(alert),
-                query_tns_phot=False,
-            )
             
         else:
             # then this target does not exist, so we create it from scratch
             # data_service.to_target also saves the target, and will execute the
             # target_post_save function as a hook (see the configuration in settings.py)
-            with target_hook_options(
-                    lookback_days_nle=lookback_days_nle,
-                    known_associated_nle_id=event_id,
-                    query_atlas_fp=_should_run_atlas(alert),
-                    query_tns_phot=False,
-            ):
+            #
+            # BUT, we need to fake it and not actually run any of the vetting yet
+            # because we want to wait to update some other fields (e.g., photometry)
+            # from the alert
+            # updating these fields can only happen *after* the target has been
+            # created and saved
+            with target_hook_options(skip_vetting=True):
                 target = data_service.to_target(alert)
 
-            _add_aliases(target, alert)
-                
-            logger.info(f"No existing target found, added {target.name} as new target")
+
+        # add new aliases from the alert
+        _add_aliases(target, alert)
+
+        # add new photometry from the alert
+        try:
+            _add_antares_phot_to_target(target, alert, data_service)
+        except FieldError:
+            # this is a known issue with getting light curve info from ANTARES via
+            # the tom-antares package right now :(
+            logger.warn("Skipping ANTARES photometry query because of a known bug in tom-antares")
+            pass
             
+        # now run target post save for real and do the vetting we need to do
+        target_post_save(
+            target,
+            created=True,
+            lookback_days_nle=True,
+            known_associated_nle_id=event_id,
+            query_atlas_fp=_should_run_atlas(alert),
+            query_tns_phot=False,
+            query_antares_phot=False
+        )
+        
     except Exception:
         exc = traceback.format_exc()
         logger.error(exc)
@@ -601,7 +604,13 @@ def _add_aliases(target, alert):
             alias.save()
         except IntegrityError:
             logger.info(f"{alias} already exists, skipping and not saving")
-        
+
+def _add_antares_phot_to_target(target, alert, data_service):
+    return data_service.create_reduced_datums_from_query(
+        target,
+        alert["reduced_datums"]["photometry"]
+    )
+            
 def dump_alert_and_send_error(
     alert, exc, dump_dir="antares-alert-errors"
 ):

@@ -206,8 +206,6 @@ def target_post_save(
     **kwargs,
 ):
     """This hook runs following update of a target."""
-    logger.info("Target post save hook: %s created: %s", target, created)
-
     # work with kwargs + post save hook options stored in the target object itself
     # to figure out which options to use
     kwargs_defaults = dict(
@@ -215,7 +213,8 @@ def target_post_save(
         first_det_min=-1,
         first_det_max=10,
         skip_vet_if_no_new_phot=False,
-        known_associated_nle_id=None
+        known_associated_nle_id=None,
+        skip_vetting=False
     )
     
     # pack these possible options into a single dict such that
@@ -226,15 +225,17 @@ def target_post_save(
     opts = {**kwargs_defaults, **(_target_hook_options.get() or {}), **kwargs}
 
     # unpack the options dictionary into variables
+    skip_vetting = opts.pop("skip_vetting")
     lookback_days_nle = opts.pop("lookback_days_nle")
     first_det_min = opts.pop("first_det_min")
     first_det_max = opts.pop("first_det_max")
     known_associated_nle_id = opts.pop("known_associated_nle_id")
-            
+    
     # then we can continue with the normal vetting
     messages = []
     tns_query_status = None
-    if created:
+    logger.info("Target post save hook: %s created: %s vetting %s", target, created, not skip_vetting)
+    if created and not skip_vetting:
         if target.extra_fields.get("MW E(B-V)") is None:
             coord = SkyCoord(target.ra, target.dec, unit="deg")
             try:
@@ -291,15 +292,6 @@ def target_post_save(
                     vet_new_candidate(cand, basic_results=basic_results)
 
         transaction.on_commit(_associate_and_vet)
-
-                
-    redshift = target.targetextra_set.filter(key="Redshift")
-    if redshift.exists() and target.distance is None:
-        messages.append(f"Updating distance of {target.name} based on redshift")
-        target.distance = (
-            settings.COSMO.luminosity_distance(target.redshift).to("Mpc").value
-        )
-        target.save()
 
     for message in messages:
         logger.info(message)
