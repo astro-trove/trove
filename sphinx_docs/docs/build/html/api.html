@@ -382,11 +382,14 @@ page: <a class="reference external" href="https://datatrove.as.arizona.edu/api/d
 <p>An example curl command is:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-X<span class="w"> </span><span class="s1">&#39;GET&#39;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span><span class="s1">&#39;https://datatrove.as.arizona.edu/api/score/S251112cm&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span>-u<span class="w"> </span><span class="s1">&#39;&lt;username&gt;:&lt;password&gt;&#39;</span>
+<span class="w">    </span>-H<span class="w"> </span><span class="s1">&#39;Authorization: Bearer &lt;api_token&gt;&#39;</span>
 </pre></div>
 </div>
-<p>where you replace &lt;username&gt; with your username and &lt;password&gt; with your password. If you are doing this in python,
-see the <a class="reference external" href="nbs/basic_usage.html">Example Jupyter Notebooks</a>.</p>
+<p>where you replace &lt;api_token&gt; with the API token listed on your user profile page,
+<a class="reference external" href="https://datatrove.as.arizona.edu/users/profile/">https://datatrove.as.arizona.edu/users/profile/</a>. If your token is ever exposed, you can
+click the “edit” button in the top right corner, then scroll down and click
+“Regenerate API Token” on that page; the old token stops working immediately and it will display a new token.
+If you are doing this in python, see the <a class="reference external" href="nbs/basic_usage.html">Example Jupyter Notebooks</a>.</p>
 <div class="toctree-wrapper compound">
 </div>
 <p class="rubric">Footnotes</p>
