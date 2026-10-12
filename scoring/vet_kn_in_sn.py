@@ -28,6 +28,7 @@ from .vet_phot import (
     get_predetection_stats,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
+    OPTICAL_FILTS,
 )
 
 from trove_targets.models import Target
@@ -150,16 +151,7 @@ def vet_kn_in_sn(
         target=target,
         nonlocalized_event=nonlocalized_event,
         param_ranges=param_ranges,
-        filt=[
-            "g",
-            "r",
-            "i",
-            "z",
-            "F129",
-            "F158",
-            "o",
-            "c",
-        ],  # common optical filters + some Roman filters + ATLAS o,c
+        filt=OPTICAL_FILTS,
     )
     if lum is not None:
         update_score_factor(event_candidate, "phot_peak_lum", lum.value)

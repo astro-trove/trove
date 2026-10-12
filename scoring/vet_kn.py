@@ -27,6 +27,7 @@ from .vet_phot import (
     get_predetection_stats,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
+    OPTICAL_FILTS,
 )
 
 from trove_targets.models import Target
@@ -166,16 +167,7 @@ def vet_kn(
         target=target,
         nonlocalized_event=nonlocalized_event,
         param_ranges=param_ranges,
-        filt=[
-            "g",
-            "r",
-            "i",
-            "z",
-            "F129",
-            "F158",
-            "o",
-            "c",
-        ],  # common optical filters + some Roman filters + ATLAS o,c
+        filt=OPTICAL_FILTS
     )
     # The photometry factor can come from either scorer -- the viewer's
     # `phot_method` toggle picks. The TROVE fit above always runs regardless,
