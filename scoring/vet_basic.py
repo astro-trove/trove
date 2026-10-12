@@ -14,7 +14,6 @@ vetting modules. That way we can reduce the code duplication between them!
 """
 
 import importlib.metadata
-import io
 import json
 import logging
 import warnings
@@ -44,7 +43,7 @@ from .dynamic_catalogs import UserGalaxy
 from .models import CatalogWriteCounters, UserGalaxyQ3C
 from .vet_phot import find_public_phot
 from .tasks import async_mpc
-from .scoring import mpc_score_from_match
+from .scoring import mpc_score_from_match, read_host_galaxies_json
 
 logger = logging.getLogger(__name__)
 
@@ -145,7 +144,7 @@ def _cached_host_df(target_extras, cache_key: str):
     if not hosts.exists():
         return None
 
-    df = pd.read_json(io.StringIO(hosts[0].value), orient="records")
+    df = read_host_galaxies_json(hosts[0].value)
     if not len(df):
         return None  # cheaper to re-run than to hand-build the empty columns
 

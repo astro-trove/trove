@@ -6,7 +6,7 @@ from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
 from trove_targets.models import Target
 from custom_code.hooks import target_post_save
-from candidate_vetting.public_catalogs.util import create_phot
+from tom_dataproducts.models import PhotometryReducedDatum
 
 router = Router()
 
@@ -43,6 +43,7 @@ def _save_target(payload:UploadTargetSchema):
 
     # then save the photometry
     if phot is not None:
+        uploaded_phot = []
         for d in phot:
             d = d.dict(exclude_unset=True)
             jd = d.pop("jd")
@@ -54,14 +55,34 @@ def _save_target(payload:UploadTargetSchema):
                 timezone=TimezoneInfo()
             )
             source = d.pop("telescope")
+
+            value = {
+                "source_name":source,
+                "telescope":source,
+                "bandpass":d.get("filter"),
+            }
+            if "magnitude" in d:
+                value["brightness"] = d.pop("magnitude")
+            elif "limit" in d:
+                value["limit"] = d.pop("limit")
+
+            if "error" in d:
+                value["brightness_error"] = d.pop("error")
             
-            create_phot(
-                target = target,
-                time = time,
-                fluxdict = d,
-                source = source
+
+            uploaded_phot.append(
+                PhotometryReducedDatum(
+                    target=target,
+                    timestamp=time,
+                    **value
+                )
             )
-    
+            
+
+    PhotometryReducedDatum.objects.bulk_create(
+        uploaded_phot, ignore_conflicts=True
+    )
+                 
     # run the target post save hook
     target_post_save(target, created=True)
 

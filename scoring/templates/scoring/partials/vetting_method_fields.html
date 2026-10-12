@@ -1,0 +1,5 @@
+{% load crispy_forms_tags %}
+<div id="vetting-method-fields">
+  {{ form.vetting_method|as_crispy_field }}
+  {% if form.phot_method %}{{ form.phot_method|as_crispy_field }}{% endif %}
+</div>

@@ -11,7 +11,7 @@ from dal import autocomplete
 
 
 class TargetNLEForm(forms.Form):
-    # django-bootstrap4 adds this to the form-group of every required field
+    # django_bootstrap5 adds this to the form-group of every required field
     required_css_class = "field-required"
 
     nle_select = forms.ModelChoiceField(

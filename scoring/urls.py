@@ -3,10 +3,11 @@ from django.urls import path
 from .views import (
     TargetVettingView,
     TargetVettingFormView,
-    TargetVettingAllView,
+    TargetVettingSelectedFormView,
     TargetVettingAllFormView,
     TargetFPView,
     TargetRedshiftUpdateFormView,
+    VettingMethodsPartialView,
     NonLocalizedEventAssociateTargetsFormView,
 )
 
@@ -27,6 +28,11 @@ urlpatterns = [
         TargetVettingFormView.as_view(), 
         name="vet_form"
     ),
+    path(
+        "targets/<int:pk>/vetchoice/methods/",
+        VettingMethodsPartialView.as_view(),
+        name="vet_methods",
+    ),
     path("targets/<int:pk>/checknewphot/", 
          TargetFPView.as_view(), 
          name="checknewphot"),
@@ -36,12 +42,12 @@ urlpatterns = [
         name="updatez",
     ),
     path(
-        "eventcandidates/?nonlocalizedevent=<int:pk>/vetall/<vetting_mode>/",
-        TargetVettingAllView.as_view(),
-        name="vet_all",
+        "eventcandidates/?nonlocalizedevent=<int:pk>/vetselected/",
+        TargetVettingSelectedFormView.as_view(),
+        name="vet_selected_form",
     ),
     path(
-        "eventcandidates/?nonlocalizedevent=<int:pk>/vetallchoice/",
+        "eventcandidates/?nonlocalizedevent=<int:pk>/vetall/",
         TargetVettingAllFormView.as_view(),
         name="vet_all_form",
     ),

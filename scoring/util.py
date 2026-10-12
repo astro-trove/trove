@@ -2,9 +2,12 @@
 Some common functions used in multiple places throughout the app
 """
 
+from collections import namedtuple
 from datetime import timedelta
+import json
 import math
 import logging
+from astropy import units as u
 from astropy.units import Quantity
 from django.db import DatabaseError
 from django.db.models import Count, FloatField, Max, Min, Q
@@ -21,7 +24,7 @@ from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_cl
 
 from candidate_vetting.vet import localization_sequence_from_name
 
-from .scoring import classification_score, mpc_score_from_match
+from .scoring import classification_score, cosmo, mpc_score_from_match
 from .vet_phot import PHOT_SCORE_MIN
 from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
@@ -49,11 +52,16 @@ DICT_TRANSIENTS_PARAM_RANGES = {
 
 
 # ScoreFactor key holding KilonovaSCORER's photometry factor, written by
-# `vet_kn` when the site-wide `phot_method` toggle is on KilonovaSCORER
+# `vet_kn` when the viewer's `phot_method` toggle is on KilonovaSCORER
 KILONOVA_SCORE_KEY = "kilonova_score"
 
 # why KilonovaSCORER could not score a candidate, written by `vet_kn` in place of score
 KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
+
+# session key for the AGN toggle, which decides whether `agn_score` counts
+# towards the total in `get_event_candidate_scores` below. Per viewer.
+AGN_TOGGLE_KEY = "agn_toggle"
+AGN_TOGGLE_DEFAULT = True
 
 # default subscore names
 SUBSCORE_NAMES = [
@@ -94,7 +102,7 @@ MPC_KEYS = [
 ]
 
 
-# the site-wide AGN toggle governs only these; BBH AGN-flare scoring always uses
+# the AGN toggle governs only these; BBH AGN-flare scoring always uses
 # its AGN association
 AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
 
@@ -103,11 +111,7 @@ PS_WAIVED_TRANSIENTS = {"AGN-flare"}
 KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
 
 def ps_counts_toward(transient, agn_score):
-    """Whether ps_score enters `transient`'s score.
-
-    Waived only for AGN-flare scoring, and only when agn_association_2d actually
-    matched. With no AGN association the point-source match still stands.
-    """
+    """Whether ps_score enters `transient`'s score."""
     if transient not in PS_WAIVED_TRANSIENTS:
         return True
     matched = AGN_FLARE_PARAM_RANGES["agn_match_score"]
@@ -117,6 +121,12 @@ def ps_counts_toward(transient, agn_score):
 def agn_counts_toward(transient, agn_toggle):
     """Whether agn_score enters `transient`'s score."""
     return bool(agn_toggle) or transient not in AGN_TOGGLE_TRANSIENTS
+
+
+def _phot_score_key(metric_key):
+    """The key a photometry metric's subscore is stored under."""
+    return f"{metric_key}_score"
+
 
 def _check_phot_val(val, param_ranges, param_range_key):
     val_max = max(param_ranges[param_range_key])
@@ -161,6 +171,20 @@ def get_no_score_message(most_likely_class):
     return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
 
 
+def get_agn_toggle(request=None) -> bool:
+    """Whether this viewer wants AGN scores counted. No session, no request:
+    a queued task gets the default."""
+    if request is None or not hasattr(request, "session"):
+        return AGN_TOGGLE_DEFAULT
+    return bool(request.session.get(AGN_TOGGLE_KEY, AGN_TOGGLE_DEFAULT))
+
+
+def set_agn_toggle(request, value: bool) -> bool:
+    """Set this viewer's AGN toggle. Returns what was stored."""
+    request.session[AGN_TOGGLE_KEY] = bool(value)
+    return bool(value)
+
+
 def get_event_candidate_scores(
         event_candidates,
         dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
@@ -171,14 +195,14 @@ def get_event_candidate_scores(
 ):
     """
     `phot_method` selects which photometry factor the score uses (`None`
-    reads the site-wide toggle.) `agn_toggle` drops agn_score from the
+    falls back to the default, since there may be no session to read.) `agn_toggle` drops agn_score from the
     kilonova-style scores only (`AGN_TOGGLE_TRANSIENTS`).
     """
-    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+    from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
     if phot_method is None:
         phot_method = get_phot_method()
-    use_kilonova = phot_method == PHOT_METHOD_KILONOVA
+    use_kilonova = phot_method == PHOT_METHOD_KILONOVASCORER
 
     val_not_score_keys = VAL_NOT_SCORE_KEYS
 
@@ -255,7 +279,7 @@ def get_event_candidate_scores(
 
         # Extract values that need special handling
         val_dict = {
-            subscore_key+"_score": sf_dict[subscore_key]
+            _phot_score_key(subscore_key): sf_dict[subscore_key]
             for subscore_key, param_range_key in val_not_score_keys.items()
             if subscore_key in sf_dict
         }
@@ -304,12 +328,14 @@ def get_event_candidate_scores(
             # EM transient
             class_score = classification_score(ec.target, transient)
             
+            # val_dict is keyed with the "_score" suffix the display labels use
             phot_subscores = {
-                subscore_key: _check_phot_val(
-                    val_dict[subscore_key], param_ranges, param_range_key
+                _phot_score_key(subscore_key): _check_phot_val(
+                    val_dict[_phot_score_key(subscore_key)], param_ranges, param_range_key
                 )
                 for subscore_key, param_range_key in val_not_score_keys.items()
-                if subscore_key in val_dict and param_range_key in param_ranges
+                if _phot_score_key(subscore_key) in val_dict
+                and param_range_key in param_ranges
             }
 
             other_subscores = dict(
@@ -327,10 +353,10 @@ def get_event_candidate_scores(
                 # photometry product -- not multiplied with it, which would
                 # apply the photometry twice.
                 phot_score = kn
-                phot_source = "kilonova"
+                phot_source = "kilonovascorer"
             else:
                 phot_score = math.prod(list(phot_subscores.values()))
-                phot_source = "trove"
+                phot_source = "metrics"
 
             if transient == "KN":
                 ec.phot_source = phot_source
@@ -370,9 +396,152 @@ def get_target_score(target_id):
     return out
 
 
+#: the distance a candidate was scored against, and where it came from
+HostDistance = namedtuple("HostDistance", "distance neg_err pos_err source")
+
+
+def host_distances(event_candidates):
+    """The distance each candidate was scored against, in Mpc, by candidate id.
+
+    Three batched queries whatever the number of candidates, so a whole list
+    costs about what one row used to. Vetting records the galaxy it picked in
+    `host_name`/`host_catalog`, so the distance is read back out of that
+    galaxy's row rather than stored per candidate. Candidates scored off the
+    target's own redshift have no host, so theirs comes from that redshift.
+    """
+    candidates = list(event_candidates)
+    if not candidates:
+        return {}
+
+    recorded = {}
+    for score_factor in ScoreFactor.objects.filter(
+        event_candidate_id__in=[c.id for c in candidates],
+        key__in=("host_name", "host_catalog"),
+    ).only("event_candidate_id", "key", "value"):
+        recorded.setdefault(score_factor.event_candidate_id, {})[
+            score_factor.key] = score_factor.value
+
+    hosted = {c.id: recorded[c.id] for c in candidates
+              if _recorded_host_name(recorded.get(c.id))}
+
+    galaxies = {}
+    if hosted:
+        rows = TargetExtra.objects.filter(
+            target_id__in={c.target_id for c in candidates if c.id in hosted},
+            key="Host Galaxies",
+        ).values_list("target_id", "value")
+        for target_id, value in rows:
+            galaxies[target_id] = _host_galaxy_rows(value)
+
+    # the remainder were scored off the target's own redshift, if it has one
+    redshifts = dict(
+        Target.objects.filter(
+            id__in={c.target_id for c in candidates if c.id not in hosted}
+        ).values_list("id", "redshift")
+    )
+
+    distances = {}
+    for candidate in candidates:
+        if candidate.id in hosted:
+            found = _recorded_host_distance(
+                galaxies.get(candidate.target_id), hosted[candidate.id])
+        else:
+            found = _redshift_distance(redshifts.get(candidate.target_id))
+        if found is not None:
+            distances[candidate.id] = found
+    return distances
+
+
+def _recorded_host_name(recorded):
+    """The host id vetting recorded, or None where it recorded no host."""
+    if not recorded:
+        return None
+    name = recorded.get("host_name")
+    return None if name in (None, "", "None", "nan") else name
+
+
+def _host_galaxy_rows(value):
+    """The galaxy rows of a "Host Galaxies" TargetExtra, always as a list."""
+    try:
+        rows = json.loads(value)
+    except (TypeError, ValueError):
+        return []
+    return rows if isinstance(rows, list) else [rows]
+
+
+def _recorded_host_distance(galaxies, recorded):
+    """The distance of the galaxy vetting recorded, matched out of its table."""
+    if not galaxies:
+        return None
+    name = recorded.get("host_name")
+    matches = [g for g in galaxies if str(g.get("ID")) == str(name)]
+    if not matches:
+        # ids above 2**53 are recorded having been through a float, so the
+        # stored name can be a rounded copy of the one in this table
+        matches = [g for g in galaxies if _same_id_through_float(g.get("ID"), name)]
+    # ids repeat across catalogs, so the catalog breaks the tie where we have it
+    catalog = recorded.get("host_catalog")
+    if len(matches) > 1 and catalog:
+        matches = [g for g in matches if str(g.get("Source")) == str(catalog)]
+    # the same galaxy is sometimes ingested twice; rows that agree on the
+    # distance are not a real ambiguity, only conflicting ones are
+    found = {_finite(g.get("Dist")) for g in matches}
+    if len(found) != 1:
+        return None
+    distance = found.pop()
+    if distance is None:
+        return None
+    galaxy = matches[0]
+    neg_err, pos_err = _distance_bounds(galaxy.get("DistErr"))
+    return HostDistance(distance, neg_err, pos_err,
+                        f"{name} ({galaxy.get('Source')})")
+
+
+def _same_id_through_float(table_id, recorded):
+    """Whether two galaxy ids agree once both are put through a float."""
+    try:
+        return float(str(table_id).strip("'")) == float(str(recorded))
+    except (TypeError, ValueError):
+        return False
+
+
+def _distance_bounds(err):
+    """A galaxy's distance error, which the host table stores either as a
+    [low, high] pair or as one symmetric number."""
+    if isinstance(err, (list, tuple)) and len(err) == 2:
+        return _finite(err[0]), _finite(err[1])
+    symmetric = _finite(err)
+    return symmetric, symmetric
+
+
+def _finite(value):
+    """A float, or None where it is missing or not a finite number."""
+    try:
+        value = float(value)
+    except (TypeError, ValueError):
+        return None
+    return None if math.isnan(value) or math.isinf(value) else value
+
+
+def _redshift_distance(redshift):
+    """The luminosity distance of a target's own redshift, as vetting takes it.
+
+    Redshifts are stored as NaN rather than NULL where unknown, and a
+    non-positive one is not a distance, so both come back as no distance.
+    """
+    redshift = _finite(redshift)
+    if redshift is None or redshift <= 0:
+        return None
+    err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
+    return HostDistance(
+        cosmo.luminosity_distance(redshift).to(u.Mpc).value,
+        err, err, "target redshift")
+
+
 def _latest_run(tasks, latest):
     """
-    Get running vetting tasks for the most recent "Vet All" run for some event.
+    Get running vetting tasks for the most recent "Vet All" or "Vet Selected"
+    run for some event.
     """
     stamp = (latest.args_kwargs.get("kwargs") or {}).get("run_started")
     if stamp:
@@ -381,9 +550,9 @@ def _latest_run(tasks, latest):
         enqueued_at__gte=latest.enqueued_at - timedelta(minutes=2))
 
 
-def get_vet_all_progress(nonlocalizedevent_id):
+def get_vet_multi_progress(nonlocalizedevent_id):
     """
-    Get the progress for the most recent "Vet All" run.
+    Get the progress for the most recent "Vet All" or "Vet Selected" run.
     """
     if not nonlocalizedevent_id:
         return None
@@ -395,7 +564,7 @@ def get_vet_all_progress(nonlocalizedevent_id):
 
     # get tasks for given NLE
     tasks = DBTaskResult.objects.filter(
-        queue_name="vet_all",
+        queue_name="vet_multi",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__nle_event_id=nle.event_id,
     )
@@ -420,7 +589,8 @@ def get_vet_all_progress(nonlocalizedevent_id):
         )
     except DatabaseError:
         # the progress notice is never worth taking the candidate list down for
-        logger.exception("Could not read Vet All progress for %s", nle.event_id)
+        logger.exception("Could not read Vet All / Vet Selected progress for %s", 
+                         nle.event_id)
         return None
 
     pending = run["pending"]
@@ -465,7 +635,7 @@ def get_last_vetting(target_id, nonlocalizedevent_id=None):
         return None
 
     tasks = DBTaskResult.objects.filter(
-        queue_name="vet_all",
+        queue_name="vet_multi",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__target_ids__0=int(target_id),
     )
@@ -507,10 +677,10 @@ def get_last_vetting(target_id, nonlocalizedevent_id=None):
     }
 
 
-def get_last_vet_all_run(nonlocalizedevent_id):
+def get_last_vet_multi_run(nonlocalizedevent_id):
     """
-    Summarize the most recent "Vet All" run. Distinct from
-    `get_vet_all_progress`, describes an ongoing run.
+    Summarize the most recent "Vet All" or "Vet Selected" run. Distinct from
+    `get_vet_multi_progress`, describes an ongoing run.
     """
     if not nonlocalizedevent_id:
         return None
@@ -521,7 +691,7 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         return None
 
     tasks = DBTaskResult.objects.filter(
-        queue_name="vet_all",
+        queue_name="vet_multi",
         task_path=async_vet.module_path,
         args_kwargs__kwargs__nle_event_id=nle.event_id,
     )
@@ -529,7 +699,8 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         latest = tasks.order_by("-enqueued_at").first()
         if latest is None:
             return None
-        counts = _latest_run(tasks, latest).aggregate(
+        latest_tasks = _latest_run(tasks, latest)
+        counts = latest_tasks.aggregate(
             total=Count("id"),
             succeeded=Count("id", filter=Q(status=ResultStatus.SUCCEEDED)),
             failed=Count("id", filter=Q(status=ResultStatus.FAILED)),
@@ -540,11 +711,21 @@ def get_last_vet_all_run(nonlocalizedevent_id):
             finished=Max("finished_at"),
             first_enqueued=Min("enqueued_at"),
         )
+        if counts["failed"]: # if any failed, record names
+            latest_tasks_failed = latest_tasks.filter(status="FAILED")
+            logger.info(latest_tasks_failed)
+            targets_failed = [Target.objects.get(
+                id=task.args_kwargs["kwargs"]["target_ids"][0]) for
+                task in latest_tasks_failed]
+        else:
+            targets_failed = []
     except DatabaseError:
-        logger.exception("Could not read last Vet All run for %s", nle.event_id)
+        logger.exception("Could not read last Vet All / Vet Selected run for %s",
+                         nle.event_id)
         return None
 
     run_kwargs = latest.args_kwargs.get("kwargs") or {}
+
     return {
         "finished": counts["finished"],
         "started": (parse_datetime(run_kwargs["run_started"])
@@ -555,4 +736,5 @@ def get_last_vet_all_run(nonlocalizedevent_id):
         "succeeded": counts["succeeded"],
         "failed": counts["failed"],
         "running": bool(counts["pending"]),
+        "targets_failed":targets_failed,
     }

@@ -20,8 +20,7 @@ DECAY_FIT_PARAM_RANGES = dict(
     peak_time=[-np.inf, np.inf],
     decay_rate=[-np.inf, np.inf],
     t_pre=0,
-    t_post=np.inf,
-    max_decay_fit_time=100,
+    t_post=100,
     phot_score_snr_min=5,
     min_time_separation=1 / 24,
 )
@@ -111,8 +110,8 @@ def _decay_fit_trace(target, nonlocalized_event, t0):
         allphot = _get_post_disc_phot(
             target_id=target.id,
             nonlocalized_event=nonlocalized_event,
-            t_post=DECAY_FIT_PARAM_RANGES["t_post"],
             t_pre=DECAY_FIT_PARAM_RANGES["t_pre"],
+            t_post=DECAY_FIT_PARAM_RANGES["t_post"],
         )
         _, _, _, _, fit_model, fit_params = _score_phot(
             allphot=allphot,
@@ -133,7 +132,7 @@ def _decay_fit_trace(target, nonlocalized_event, t0):
         return None
 
     dt_fittable = allphot.dt[allphot.dt > 0]
-    dt_max = min(float(dt_fittable.max()), DECAY_FIT_PARAM_RANGES["max_decay_fit_time"])
+    dt_max = min(float(dt_fittable.max()), DECAY_FIT_PARAM_RANGES["t_post"])
     xtest_dt = np.linspace(float(dt_fittable.min()), dt_max, 200)
     ytest_mag = fit_model(xtest_dt, *fit_params)
     xtest_abs = [t0 + timedelta(days=float(dt)) for dt in xtest_dt]

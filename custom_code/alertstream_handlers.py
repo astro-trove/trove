@@ -39,7 +39,7 @@ from candidate_vetting.vet import localization_sequence_from_name
 from scoring.config import DETECTION_HORIZON_DEFAULTS, VETTING_FORM_INITIALS
 from scoring.models import ScoreFactor
 from scoring.scoring import _localization_from_name
-from scoring.tasks import vet_all_async
+from scoring.tasks import vet_multi_async
 from trove_targets.models import Target
 
 import logging
@@ -371,7 +371,7 @@ def revet_stale_candidates(nle, most_likely_class):
         + f"{nle.event_id} in {vetting_mode} mode against localization "
         + f"{localization.id} ({localization.date})"
     )
-    vet_all_async(stale, nle, vetting_mode)
+    vet_multi_async(stale, nle, vetting_mode)
     return n_stale
 
 

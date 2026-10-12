@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render, redirect
 from django.views.generic.edit import CreateView
 from django.conf import settings
@@ -14,6 +15,7 @@ from tom_common.hooks import run_hook
 from tom_targets.views import TargetCreateView, TargetListView
 from tom_targets.models import BaseTarget, Target
 from tom_targets.forms import TargetForm, SiderealTargetCreateForm
+from tom_targets.permissions import targets_for_user
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 
@@ -30,7 +32,7 @@ PERMISSIONS_MAP = {
 }
 
 
-class NLEAutocompleteView(autocomplete.Select2QuerySetView):
+class NLEAutocompleteView(LoginRequiredMixin, autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = NonLocalizedEvent.objects.all()
 
@@ -41,9 +43,11 @@ class NLEAutocompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-class TargetAutocompleteView(autocomplete.Select2QuerySetView):
+class TargetAutocompleteView(LoginRequiredMixin, autocomplete.Select2QuerySetView):
     def get_queryset(self):
-        qs = Target.objects.all()
+        # only what this user may view -- an unfiltered queryset let anyone
+        # enumerate every target name a substring at a time
+        qs = targets_for_user(self.request.user, Target.objects.all(), "view_target")
 
         if self.q:
             qs = qs.filter(name__icontains=self.q)

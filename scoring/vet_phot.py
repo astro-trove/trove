@@ -262,13 +262,14 @@ def estimate_max_find_decay_rate(
     dt_days: Iterable[float],
     mag: Iterable[float],
     magerr: Iterable[float],
-    max_decay_fit_time: Optional[int] = 25,
+    t_pre: Iterable[float],
+    t_post: Iterable[float],
     min_time_separation: Optional[float] = None,
 ) -> Tuple[float, float, float]:
     """
     Fit both a single and broken powerlaw to the data, compute AIC, and
     takes the "better" fit (lower AIC) and uses that to find an analytic time
-    of maximum and decay rate over peak_time -> max_decay_fit_time.
+    of maximum and decay rate over peak_time -> t_post
 
     PARAMETERS
     ---------
@@ -278,9 +279,8 @@ def estimate_max_find_decay_rate(
         A list/array of the magnitudes since the GW discovery
     magerr: Iterable[float]
         A list/array of the magnitude errors since the GW discovery
-    max_decay_fit_time: float, optional
-        The maximum time after the GW discovery in days that we should fit the decay to.
-        The default is 25 days based on discussion from Rastinejad+2022.
+    t_pre, t_post: Iterable[float]
+        Start and end times for the window in which we fit photometry
     min_time_separation: float, optional
         Refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
         used for fitting) is below this many days.
@@ -304,8 +304,8 @@ def estimate_max_find_decay_rate(
     magerr = np.asarray(magerr, dtype=float)
 
     _in_domain = (
-        (dt_days > 0)
-        & (dt_days <= max_decay_fit_time)
+        (dt_days > t_pre)
+        & (dt_days <= t_post)
         & np.isfinite(mag)
         & np.isfinite(magerr)
         & (magerr > 0)
@@ -313,8 +313,9 @@ def estimate_max_find_decay_rate(
     n_dropped_domain = int((~_in_domain).sum())
     if n_dropped_domain:
         logger.info(
-            "Dropped %d photometry row(s) with dt <= 0, non-finite mag/magerr, "
-            "or magerr <= 0 before fitting",
+            "Dropped %d photometry row(s) with non-finite mag/magerr, "+
+            f"magerr <= 0, or dt outside of [{t_pre}, {t_post}] days time "+
+            "window, before fitting",
             n_dropped_domain,
         )
     dt_days_tofit = dt_days[_in_domain]
@@ -339,7 +340,8 @@ def estimate_max_find_decay_rate(
     n_epochs = int(np.unique(dt_days_tofit).size)
     if n_epochs < 2:
         raise RuntimeError(
-            f"Only {n_epochs} distinct epoch(s) within {max_decay_fit_time}; "+
+            f"Only {n_epochs} distinct epoch(s) within "+
+            f"[{t_pre}, {t_post}] days; "+
             "decay rate is not determined by this data"
         )
 
@@ -447,7 +449,7 @@ def estimate_max_find_decay_rate(
     # finally, compute the maximum time using a finely spaced array
     # from min -> max of the dt_days array
     xtest = np.linspace(
-        np.min(dt_days_tofit), np.max(dt_days_tofit), 100 * max_decay_fit_time
+        np.min(dt_days_tofit), np.max(dt_days_tofit), 100 * t_post
     )
     ytest = model(xtest, *best_fit_params)
     max_time = xtest[
@@ -703,12 +705,8 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # then we can only do the next stuff if there is more than one photometry point
     # at this filter
-    # has to be at least 2 distinct EPOCHS before max_decay_fit_time to fit the
-    # powerlaw. Counting rows instead let a measurement ingested twice satisfy
-    # this and hand `estimate_max_find_decay_rate` a rank-deficient problem;
-    # that function now refuses such data as well, so this is the cheap guard
-    # and that one is the authoritative check.
-    _in_window = phot.dt[phot.dt < param_ranges["max_decay_fit_time"]]
+    # has to be at least 2 distinct EPOCHS before t_post to fit powerlaw
+    _in_window = phot.dt[phot.dt < param_ranges["t_post"]]
     if _in_window.nunique() > 1:
         # find the maximum and decay rate
         try:
@@ -717,7 +715,8 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                     phot.dt,
                     phot.mag,
                     phot.magerr,
-                    max_decay_fit_time=param_ranges["max_decay_fit_time"],
+                    t_pre=param_ranges["t_pre"],
+                    t_post=param_ranges["t_post"],
                     min_time_separation=param_ranges["min_time_separation"],
                 )
             )

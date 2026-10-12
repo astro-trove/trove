@@ -4,6 +4,7 @@ Some functions for accessing the EventCandidate table inside a django template
 
 import numpy as np
 from collections import OrderedDict
+from decimal import Decimal, InvalidOperation
 from functools import partial
 from django import template
 from django.core.cache import cache
@@ -17,9 +18,11 @@ from scoring.models import ScoreFactor
 from scoring.scoring import mpc_score_from_match
 from scoring.util import (
     agn_counts_toward,
+    get_agn_toggle as _get_agn_toggle,
     get_event_candidate_scores as _get_event_candidate_scores,
     get_last_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
+    host_distances,
     kilonova_scores_exist,
     most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
@@ -36,29 +39,24 @@ from scoring.phot_method import (
 register = template.Library()
 
 
-@register.simple_tag
-def get_agn_toggle():
-    """Current value of the site-wide, cache-backed agn_toggle flag."""
-    return cache.get("agn_toggle", True)
+@register.simple_tag(takes_context=True)
+def get_agn_toggle(context):
+    """This viewer's agn_toggle flag, from their session."""
+    return _get_agn_toggle(context["request"])
 
 
-@register.simple_tag
-def get_phot_method():
-    """Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
-
-    Site-wide and cache-backed, exactly like ``agn_toggle``. Unlike the AGN
-    flag, flipping this does NOT rescore anything -- the stored factors are not
-    recomputed and no vetting is triggered. It only changes which scorer the
-    NEXT Vet All run uses, so the button is cheap to press and cannot cost a
-    user a long re-vet by accident.
+@register.simple_tag(takes_context=True)
+def get_phot_method(context):
     """
-    return _get_phot_method()
+    Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
+    """
+    return _get_phot_method(context["request"])
 
 
-@register.simple_tag
-def get_phot_method_label():
+@register.simple_tag(takes_context=True)
+def get_phot_method_label(context):
     """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
-    return _phot_method_label()
+    return _phot_method_label(request=context["request"])
 
 
 @register.simple_tag
@@ -122,7 +120,7 @@ def _event_classes_in_scope(context, target_id=None):
 
 @register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
 def scoring_toggles(context, target_id=None):
-    from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+    from scoring.phot_method import PHOT_METHOD_KILONOVASCORER
 
     # Locked on light curve metrics until there is a KilonovaSCORER score to
     # switch to: per candidate on the target page, per event on the list. The
@@ -147,17 +145,17 @@ def scoring_toggles(context, target_id=None):
 
     return {
         "show": True,
-        "agn_toggle": cache.get("agn_toggle", True),
-        "is_kilonova": get_phot_method() == PHOT_METHOD_KILONOVA and not kilonova_locked,
+        "agn_toggle": _get_agn_toggle(request),
+        "is_kilonova": _get_phot_method(request) == PHOT_METHOD_KILONOVASCORER and not kilonova_locked,
         "kilonova_locked": kilonova_locked,
         "next": request.get_full_path(),
     }
 
 
-@register.inclusion_tag("scoring/partials/last_vet_all_card.html")
-def last_vet_all_card(target_id):
-    """Card showing when a Vet All run last covered this candidate."""
-    return {"last_vet_all": _get_last_vetting(target_id)}
+@register.inclusion_tag("scoring/partials/last_vet_multi_card.html")
+def last_vet_multi_card(target_id):
+    """Card showing when a Vet All / Vet Selected run last covered this candidate."""
+    return {"last_vet_multi": _get_last_vetting(target_id)}
 
 
 @register.simple_tag(takes_context=True)
@@ -253,6 +251,10 @@ def display_score_details(context, target_id):
         )
         score_details.append(sf_set)
 
+    # the distance each of this target's candidates was scored against, read
+    # back out of the host galaxy vetting recorded -- one batch for every card
+    distances = host_distances(target.eventcandidate_set.all())
+
     # Build structured data instead of strings
     cards = []
 
@@ -324,6 +326,16 @@ def display_score_details(context, target_id):
                     "text": not numeric,
                     "only": "KN" if score_factor.key.startswith("kilonova") else None,
             })
+            if score_factor.key == "host_distance_score":
+                # host_distance_score is written whenever distance scoring ran, so
+                # it is the one row the distance can reliably sit beside
+                event_card["details"].append({
+                    "key": "host_distance",
+                    "label": "Distance",
+                    "value": host_distance_cell(distances.get(ec.id), unit=True),
+                    "text": False,
+                    "only": None,
+                })
             if score_factor.key == "predetection_score":
                 event_card["details"].append({
                     "key": "predetected",
@@ -375,7 +387,7 @@ def display_score_details(context, target_id):
             # always on while the candidate list scored with the toggle -- one
             # candidate, two numbers. Also lets the AGN row say truthfully
             # whether it fed the score.
-            agn_toggle = get_agn_toggle()
+            agn_toggle = _get_agn_toggle(context["request"])
             ec_score_details = _get_event_candidate_scores(
                 [ec],
                 include_subscores=True,
@@ -384,11 +396,11 @@ def display_score_details(context, target_id):
             ec_scores = ec_score_details.score
             ec_subscores = ec_score_details.subscores
             # Which photometry factor actually fed the overall score. Taken
-            # from `phot_source` rather than the site-wide toggle, because a
+            # from `phot_source` rather than the viewer's toggle, because a
             # candidate KilonovaSCORER could not score falls back to the TROVE
             # product even while the toggle says KilonovaSCORER -- and the
             # highlight has to follow what was really used.
-            kn_is_active = getattr(ec_score_details, "phot_source", "trove") == "kilonova"
+            kn_is_active = getattr(ec_score_details, "phot_source", "metrics") == "kilonovascorer"
 
             score_details = card["details"]
 
@@ -495,9 +507,9 @@ def _baseline_format(mag, std):
 
 
 def _safe_format(value, fmter):
-    # a name is text even when it looks numeric; float() would round a long ID
-    if fmter is _str_format:
-        return str(value)
+    # names/IDs are text even when they look numeric; float() would round a long ID
+    if fmter in (_str_format, _str_int_format):
+        return fmter(value)
     for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
         try:
             return candidate()
@@ -538,10 +550,52 @@ def _predetected_yesno(flt):
     return "Yes" if flt < 1 else "No"
   
 def _str_int_format(s):
+    # Decimal, not float: IDs above 2**53 must keep every digit
     try:
-        return str(int(s))
-    except ValueError:
+        d = Decimal(str(s).strip())
+    except InvalidOperation:
         return str(s)
+    if d.is_finite() and d == d.to_integral_value():
+        return str(int(d))
+    return str(s)
 
 def _str_format(s):
     return str(s)
+
+
+@register.filter
+def host_distance_cell(dist, unit=False):
+    """A host distance with its uncertainty, to one decimal place.
+
+    One place, and `+`/`-` for bounds that differ, is how the host galaxy table
+    beside it shows the same numbers.
+    """
+    if dist is None or dist.distance is None:
+        return "\u2014"
+    mpc = "&nbsp;Mpc" if unit else ""
+    neg, pos = dist.neg_err, dist.pos_err
+    shown = f"{dist.distance:.1f}"
+    if neg is None or pos is None:
+        return mark_safe(f"{shown}{mpc}")
+    if neg == pos:
+        return mark_safe(f"{shown} &plusmn; {pos:.1f}{mpc}")
+    sup_uni = f"<sup>+{pos:.1f}</sup>"
+    sub_uni = f"<sub>-{neg:.1f}</sub>"
+    return mark_safe(f"{shown}<span class='supsubdist'>{sub_uni}{sup_uni}</span>&nbsp;&nbsp;{mpc}")
+
+
+@register.filter
+def lookup(mapping, key):
+    """One value out of a dict, for templates that need a variable key."""
+    if not mapping:
+        return None
+    return mapping.get(key)
+
+
+@register.simple_tag
+def query_replace(request, key, value):
+    """This page's query string with one parameter replaced."""
+    params = request.GET.copy()
+    params[key] = value
+    params.pop("page", None)
+    return params.urlencode()
