@@ -24,6 +24,7 @@ from scoring.util import (
     get_target_score as _get_target_score,
     host_distances,
     kilonova_scores_exist,
+    latest_score_factors,
     most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
     KN_STYLE_CLASSES,
@@ -238,11 +239,11 @@ def display_score_details(context, target_id):
     # NLE-specific scores/details
     score_details = []
     for event_candidate in target.eventcandidate_set.all():
-        sf_set = event_candidate.scorefactor_set.exclude(
+        sf_set = latest_score_factors(event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
             # exclude keys in TargetExtra + mpc_score
             + ["mpc_score", "localization_id"]
-        ).all()
+        ))
 
         sf_set = sorted(
             sf_set,
@@ -293,6 +294,10 @@ def display_score_details(context, target_id):
                     "details": []
                 }
 
+            # "basic" factors belong in every model's subtab, the rest only in
+            # the subtab of the EM model whose vetting saved them
+            only = None if score_factor.em_model == "basic" else score_factor.em_model
+
             # one "median ± scatter" row per band
             if score_factor.key.startswith("baseline_std_"):
                 continue
@@ -305,7 +310,7 @@ def display_score_details(context, target_id):
                         score_factor.value, values.get(f"baseline_std_{filt}")
                     ),
                     "text": False,
-                    "only": None,
+                    "only": only,
                 })
                 continue
 
@@ -313,8 +318,6 @@ def display_score_details(context, target_id):
             numeric = fmter not in (_str_format, _str_int_format)
             value = _safe_format(score_factor.value, fmter)
             
-            # KilonovaSCORER scores only the KN model, so its score and its
-            # "could not score" reason belong in the KN subtab alone
             event_card["details"].append(
                 {
                     "key": score_factor.key,
@@ -324,7 +327,7 @@ def display_score_details(context, target_id):
                     # that figures stay on one line, which sent the skip reason
                     # off the edge of the card instead of wrapping
                     "text": not numeric,
-                    "only": "KN" if score_factor.key.startswith("kilonova") else None,
+                    "only": only,
             })
             if score_factor.key == "host_distance_score":
                 # host_distance_score is written whenever distance scoring ran, so
@@ -342,7 +345,7 @@ def display_score_details(context, target_id):
                     "label": "Pre-detected?",
                     "value": _safe_format(score_factor.value, _predetected_yesno),
                     "text": False,
-                    "only": None,
+                    "only": only,
                 })
         
         if event_card:
