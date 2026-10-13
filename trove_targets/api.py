@@ -79,9 +79,9 @@ def _save_target(payload:UploadTargetSchema):
             )
             
 
-    PhotometryReducedDatum.objects.bulk_create(
-        uploaded_phot, ignore_conflicts=True
-    )
+        PhotometryReducedDatum.objects.bulk_create(
+            uploaded_phot, ignore_conflicts=True
+        )
                  
     # run the target post save hook
     target_post_save(target, created=True)
