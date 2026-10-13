@@ -104,7 +104,14 @@ WSGI_APPLICATION = "trove_tom.wsgi.application"
 TASKS = {
     "default": {
         "BACKEND": "django_tasks.backends.database.DatabaseBackend",
-        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_multi", "associate_targets"],
+        "QUEUES": [
+            "default",
+            "mpc",
+            "atlas_fphot",
+            "vet_multi",
+            "associate_targets",
+            "target_post_save"
+        ],
     }
 }
 
