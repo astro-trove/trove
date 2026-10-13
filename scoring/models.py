@@ -8,10 +8,15 @@ class ScoreFactor(models.Model):
     event_candidate = models.ForeignKey(EventCandidate, on_delete=models.CASCADE)
     key = models.CharField(max_length=200)
     value = models.CharField(max_length=200)
-
+    timestamp = models.DateTimeField(auto_now_add=True)
+    em_model = models.CharField(max_length=200)
+    
     class Meta:
-        unique_together = ("event_candidate", "key")
-
+        get_latest_by = "timestamp"
+        indexes = [
+            models.Index(fields=["event_candidate", "key", "em_model", "-timestamp"]),
+        ]
+        
 ## catalog of user-provided host galaxies
 class UserGalaxyQ3C(models.Model):
     id = models.AutoField(primary_key=True)
@@ -35,7 +40,7 @@ class UserGalaxyQ3C(models.Model):
     # managed = True (default, specified here for clarity)
     # --> allow Django to modify this table
     class Meta:
-        managed = True
+        managed = False
         db_table = "usergalaxy_q3c"
 
 
