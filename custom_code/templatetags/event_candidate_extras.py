@@ -20,7 +20,7 @@ from scoring.util import (
     agn_counts_toward,
     get_agn_toggle as _get_agn_toggle,
     get_event_candidate_scores as _get_event_candidate_scores,
-    get_last_vetting as _get_last_vetting,
+    get_last_multi_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
     host_distances,
     kilonova_scores_exist,
