@@ -76,9 +76,20 @@ def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
     return host_df
 
 
-def update_score_factor(event_candidate, key, value):
-    ScoreFactor.objects.update_or_create(
-        event_candidate=event_candidate, key=key, defaults=dict(value=value)
+# score factors that don't depend on the EM model, saved once under em_model="basic"
+BASIC_SCORE_KEYS = {
+    "mpc_match_sep", "mpc_match_date", "mpc_match_name", "mpc_score",
+    "host_catalog", "host_name", "host_distance_score",
+    "skymap_score", "ps_score", "localization_id",
+}
+
+
+def update_score_factor(event_candidate, key, value, em_model):
+    ScoreFactor.objects.create(
+        event_candidate=event_candidate,
+        key=key,
+        value=value,
+        em_model="basic" if key in BASIC_SCORE_KEYS else em_model,
     )
 
 
