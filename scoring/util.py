@@ -142,6 +142,20 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
+def latest_score_factors(queryset):
+    """Only the newest ScoreFactor for each (event candidate, key, EM model) in
+    `queryset`. A window filter rather than DISTINCT ON so this also works on
+    SQLite. Filters chained afterwards run before the window, so only filter
+    on event candidate / key / em_model after calling this, never on value."""
+    return queryset.annotate(
+        latest_rank=Window(
+            RowNumber(),
+            partition_by=[F("event_candidate"), F("key"), F("em_model")],
+            order_by=[F("timestamp").desc(), F("id").desc()],
+        )
+    ).filter(latest_rank=1)
+
+
 def kilonova_scores_exist(nonlocalizedevent_id=None, target_id=None):
     """Whether any KilonovaSCORER score is stored for this event and/or target."""
     qs = ScoreFactor.objects.filter(key=KILONOVA_SCORE_KEY)
@@ -250,19 +264,13 @@ def get_event_candidate_scores(
             target_extras_by_id[te.target_id] = {}
         target_extras_by_id[te.target_id][te.key] = te.value
 
-    # Prefetch the latest ScoreFactor for each (event candidate, key, EM model)
-    # at once. A window filter rather than DISTINCT ON so this also works on SQLite
-    score_factors = ScoreFactor.objects.filter(
-        event_candidate__in=event_candidates_list,
-        key__in=list(subscore_names),
-    ).annotate(
-        rank=Window(
-            RowNumber(),
-            partition_by=[F("event_candidate"), F("key"), F("em_model")],
-            order_by=[F("timestamp").desc(), F("id").desc()],
-        ),
-        value_float=Cast("value", FloatField()),
-    ).filter(rank=1)
+    # Prefetch the latest ScoreFactor for each (event candidate, key, EM model) at once
+    score_factors = latest_score_factors(
+        ScoreFactor.objects.filter(
+            event_candidate__in=event_candidates_list,
+            key__in=list(subscore_names),
+        )
+    ).annotate(value_float=Cast("value", FloatField()))
 
     # Group score factors by event candidate, then by EM model
     score_factors_by_ec = {}
@@ -428,10 +436,10 @@ def host_distances(event_candidates):
         return {}
 
     recorded = {}
-    for score_factor in ScoreFactor.objects.filter(
+    for score_factor in latest_score_factors(ScoreFactor.objects.filter(
         event_candidate_id__in=[c.id for c in candidates],
         key__in=("host_name", "host_catalog"),
-    ).only("event_candidate_id", "key", "value"):
+    )).only("event_candidate_id", "key", "value"):
         recorded.setdefault(score_factor.event_candidate_id, {})[
             score_factor.key] = score_factor.value
 
