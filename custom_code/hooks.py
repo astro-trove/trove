@@ -188,8 +188,6 @@ def target_hook_options(**opts):
     finally:
         _target_hook_options.reset(token)
 
-from line_profiler import profile
-@profile
 def target_post_save(
     target,
     created=True,
@@ -244,8 +242,8 @@ def target_post_save(
         # its point source or MPC score has already zeroed it, same as a user
         # vetting one target from the UI. setdefault rather than a keyword
         # because callers forward arbitrary kwargs into this hook
-        kwargs.setdefault("stop_on_zero", False)
-        vet_basic(target.id, **kwargs)
+        opts.setdefault("stop_on_zero", False)
+        vet_basic(target.id, **opts)
 
         # then check if this target is associated with any NLEs
         new_candidates = associate_nle_with_target(
