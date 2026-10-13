@@ -6,7 +6,8 @@ from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
 from trove_targets.models import Target
 from tom_targets.models import TargetName
-from custom_code.hooks import target_post_save, target_hook_options
+from custom_code.hooks import target_hook_options
+from custom_code.tasks import async_target_post_save
 from tom_dataproducts.models import PhotometryReducedDatum
 
 router = Router()
@@ -44,7 +45,6 @@ def _save_target(payload:UploadTargetSchema):
         payload_dict["dec"],
         2/3600, # radius, 2 arcsec converted to degrees
     ).order_by("separation").first()
-
     if target is None:
         target = Target(**payload_dict)
         target.full_clean(validate_unique=False)
@@ -53,7 +53,7 @@ def _save_target(payload:UploadTargetSchema):
     
     # add the alias from this name, if needed
     name = payload_dict["name"]
-    if name != target.name and not target.aliases.filter(name=name).exists():
+    if name != target.name and not TargetName.objects.filter(name=name).exists():
         target.aliases.create(name=name)
     
     # then save the photometry, if provided
@@ -99,7 +99,7 @@ def _save_target(payload:UploadTargetSchema):
         )
                  
     # run the target post save hook
-    target_post_save(target, created=True)
+    async_target_post_save.enqueue(target.id)
 
     return target
 
