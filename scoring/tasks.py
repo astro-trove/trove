@@ -29,18 +29,18 @@ from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
 
 ## tasks
-@task(queue_name="atlas_fphot", priority=settings.PRIORITY_MID)
+@task(queue_name="atlas_fphot", priority=settings.PRIORITY_MID, backend=settings.TASK_BACKEND)
 def async_atlas_query(target_id: int, *args, **kwargs) -> None:
     t = Target.objects.get(id=target_id)
     ATLAS_Forced_Phot("atlas").query(t, token=settings.ATLAS_API_KEY, *args, **kwargs)
 
 
-@task(queue_name="mpc", priority=settings.PRIORITY_MID)
+@task(queue_name="mpc", priority=settings.PRIORITY_MID, backend=settings.TASK_BACKEND)
 def async_mpc(target_id: int, *args, **kwargs) -> None:
     run_mpc(target_id, *args, **kwargs)
 
 
-@task(queue_name="vet_multi", priority=settings.PRIORITY_HIGH)
+@task(queue_name="vet_multi", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)
 def async_vet(
     target_ids: list,
     nle_event_id: str,
@@ -64,7 +64,7 @@ def async_vet(
                 target_id=ti, nonlocalized_event_name=nle_event_id, **extra
             )
 
-@task(queue_name="associate_targets", priority=settings.PRIORITY_HIGH)
+@task(queue_name="associate_targets", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)
 def async_associate_targets_nle(
     target_ids: list,
     nle_id: str,
