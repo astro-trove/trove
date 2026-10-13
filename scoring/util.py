@@ -651,7 +651,7 @@ def get_vet_multi_progress(nonlocalizedevent_id):
     }
 
 
-def get_last_vetting(target_id, nonlocalizedevent_id=None):
+def get_last_multi_vetting(target_id, nonlocalizedevent_id=None):
     """When was this candidate last vetted?"""
     if target_id is None:
         return None
@@ -697,6 +697,24 @@ def get_last_vetting(target_id, nonlocalizedevent_id=None):
         "last": describe(finished),
         "queued_at": latest.enqueued_at if latest.status == ResultStatus.NEW else None,
     }
+
+def get_last_vet_per_candidate(candidates):
+    """Get the timestamp for the last time each candidate was vet and return a dict"""
+    return dict(
+        ScoreFactor.objects.filter(
+            event_candidate__in=candidates
+        ).annotate(
+            latest_rank=Window(
+                RowNumber(),
+                partition_by=[F("event_candidate")],
+                order_by=[F("timestamp").desc(), F("id").desc()],
+            )
+        ).filter(
+            latest_rank=1
+        ).values_list(
+            "event_candidate_id", "timestamp"
+        )
+    )
 
 
 def get_last_vet_multi_run(nonlocalizedevent_id):
