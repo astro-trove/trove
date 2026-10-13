@@ -5,7 +5,8 @@ from ninja.orm import create_schema
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
 from trove_targets.models import Target
-from custom_code.hooks import target_post_save
+from tom_targets.models import TargetName
+from custom_code.hooks import target_post_save, target_hook_options
 from tom_dataproducts.models import PhotometryReducedDatum
 
 router = Router()
@@ -36,12 +37,26 @@ def _save_target(payload:UploadTargetSchema):
     del payload_dict["photometry"]
     phot = payload.photometry
     
-    # now save the target
-    target, _ = Target.objects.get_or_create(**payload_dict)
-    target.full_clean()
-    target.save()
+    # now save the target if it doesn't exist already
+    target = cone_search_filter(
+        Target.objects.all(),
+        payload_dict["ra"],
+        payload_dict["dec"],
+        2/3600, # radius, 2 arcsec converted to degrees
+    ).order_by("separation").first()
 
-    # then save the photometry
+    if target is None:
+        target = Target(**payload_dict)
+        target.full_clean(validate_unique=False)
+        with target_hook_options(skip_vetting=True):
+            target.save()
+    
+    # add the alias from this name, if needed
+    name = payload_dict["name"]
+    if name != target.name and not target.aliases.filter(name=name).exists():
+        target.aliases.create(name=name)
+    
+    # then save the photometry, if provided
     if phot is not None:
         uploaded_phot = []
         for d in phot:
