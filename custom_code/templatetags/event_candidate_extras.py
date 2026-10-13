@@ -309,6 +309,7 @@ def display_score_details(context, target_id):
                     "value": _baseline_format(
                         score_factor.value, values.get(f"baseline_std_{filt}")
                     ),
+                    "timestamp":score_factor.timestamp,
                     "text": False,
                     "only": only,
                 })
@@ -326,6 +327,7 @@ def display_score_details(context, target_id):
                     # a sentence, not a number: the value column is nowrap so
                     # that figures stay on one line, which sent the skip reason
                     # off the edge of the card instead of wrapping
+                    "timestamp":score_factor.timestamp,
                     "text": not numeric,
                     "only": only,
             })
@@ -336,6 +338,7 @@ def display_score_details(context, target_id):
                     "key": "host_distance",
                     "label": "Distance",
                     "value": host_distance_cell(distances.get(ec.id), unit=True),
+                    "timestamp":score_factor.timestamp,
                     "text": False,
                     "only": None,
                 })
@@ -343,6 +346,7 @@ def display_score_details(context, target_id):
                 event_card["details"].append({
                     "key": "predetected",
                     "label": "Pre-detected?",
+                    "timestamp":score_factor.timestamp,
                     "value": _safe_format(score_factor.value, _predetected_yesno),
                     "text": False,
                     "only": only,
@@ -442,8 +446,12 @@ def display_score_details(context, target_id):
                 }
                 for key, subscore in ec_subscores.get(em_transient_type, {}).items():
                     label, fmter = label_and_format(key)
-                    rows[key] = {"key": key, "label": label,
-                                 "value": _safe_format(subscore, fmter), "score": True}
+                    rows[key] = {
+                        "key": key,
+                        "label": label,
+                        "value": _safe_format(subscore, fmter),
+                        "score": True
+                    }
 
                 html += f'              <div class="score-card-content-filled">\n'
                 for detail in rows.values():
@@ -454,7 +462,10 @@ def display_score_details(context, target_id):
                     )
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
                     html += f'                <div class="{row_class}">\n'
-                    html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
+                    if "timestamp" in detail:
+                        html += f'                  <span class="detail-label">{detail["label"]} ({detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S")})</span>\n'
+                    else:
+                        html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
                     html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
                     html += f'                </div>\n'
                 html += f'              </div>\n'
@@ -466,7 +477,11 @@ def display_score_details(context, target_id):
                         continue
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
                     html += f'                <div class="detail-row">\n'
-                    html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
+                    if "timestamp" in detail:
+                        html += f'                  <span class="detail-label">{detail["label"]} ({detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S")})</span>\n'
+                    else:
+                        html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
+
                     html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
                     html += f'                </div>\n'
                 html += f'              </div>\n'
