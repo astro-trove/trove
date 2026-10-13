@@ -34,6 +34,7 @@ from scoring.util import (
     most_likely_class_for_event,
     set_agn_toggle,
     KN_STYLE_CLASSES,
+    get_last_vet_per_candidate
 )
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
@@ -416,6 +417,7 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         context["subscore_columns"] = subscore_columns
         context["subscore_labels"] = SUBSCORE_LABELS
 
+        context["last_vet_timestamp"] = get_last_vet_per_candidate(scored_candidates)
 
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label(request=self.request)
