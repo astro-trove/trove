@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('scoring', '0001_initial'),
-        ('tom_nonlocalizedevents', '0021_alter_eventcandidate_target'),
+        #('tom_nonlocalizedevents', '0021_alter_eventcandidate_target'),
     ]
 
     operations = [
