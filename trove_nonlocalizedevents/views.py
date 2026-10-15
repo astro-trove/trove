@@ -25,10 +25,7 @@ from scoring.models import ScoreFactor
 from scoring.util import (
     get_agn_toggle,
     get_event_candidate_scores,
-    get_last_vet_all_run,
-    get_vet_all_progress,
     get_last_vet_multi_run,
-    get_no_score_message,
     get_vet_multi_progress,
     host_distances,
     kilonova_scores_exist,
