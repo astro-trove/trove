@@ -26,6 +26,8 @@ from tom_antares.antares import AntaresDataService
 from tom_targets.utils import cone_search_filter
 from tom_targets.models import TargetName
 
+from antares_client.models import Locus
+
 from astropy.table import Table
 from astropy.time import Time
 import astropy_healpix as ah
@@ -537,6 +539,10 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
     try:
         data_service = AntaresDataService()
 
+        # json serialize the locus object, if needed
+        if isinstance(alert, Locus):
+            alert = data_service.serialize_locus(None, alert)
+        
         # check for existing targets within 2"
         target_matches = list(
             cone_search_filter(
