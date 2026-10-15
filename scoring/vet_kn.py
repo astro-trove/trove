@@ -46,7 +46,7 @@ from scoring.kilonova_scorer_helpers.util import (
     score_candidate as kilonova_score_candidate,
     DT_MAX,
 )
-from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
 PARAM_RANGES = dict(
     lum_max=[0 * u.erg / u.s, 1e43 * u.erg / u.s],
@@ -54,8 +54,7 @@ PARAM_RANGES = dict(
     decay_rate=[-np.inf, -0.1],
     max_predets=3,
     t_pre=0,
-    t_post=np.inf,
-    max_decay_fit_time=25,
+    t_post=25,
     phot_score_snr_min=5,
     min_time_separation=1/24,
 )
@@ -159,9 +158,11 @@ def vet_kn(
     update_score_factor(event_candidate, "agn_score", agn_score)
 
     ## photometry scoring
+    # no need for pre-GW photometry as KNe cannot begin pre-GW
     allphot = _get_post_disc_phot(
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
+        t_pre=param_ranges["t_pre"],
         t_post=param_ranges["t_post"],
     )
     phot_score, lum, max_time, decay_rate, _, _ = _score_phot(
@@ -184,7 +185,7 @@ def vet_kn(
     # `phot_method` toggle picks. The TROVE fit above always runs regardless,
     # because its `lum` / `max_time` / `decay_rate` are displayed on the
     # candidate page in their own right, not only as inputs to the factor.
-    if (phot_method or get_phot_method()) == PHOT_METHOD_KILONOVA:
+    if (phot_method or get_phot_method()) == PHOT_METHOD_KILONOVASCORER:
         try:
             phot_score = kilonova_score_candidate(
                 target_id=target_id,

@@ -3,24 +3,24 @@ from __future__ import annotations
 # session key. Per viewer, matching `agn_toggle` in scoring.util.
 PHOT_METHOD_KEY = "phot_method"
 
-PHOT_METHOD_TROVE = "trove"
-PHOT_METHOD_KILONOVA = "kilonova"
+PHOT_METHOD_METRICS = "metrics"
+PHOT_METHOD_KILONOVASCORER = "kilonovascorer"
 
 # TROVE's own check stays the default: it needs no simulation grid, so it can
 # never fail for want of one
-PHOT_METHOD_DEFAULT = PHOT_METHOD_TROVE
+PHOT_METHOD_DEFAULT = PHOT_METHOD_METRICS
 
-PHOT_METHOD_CHOICES = (PHOT_METHOD_TROVE, PHOT_METHOD_KILONOVA)
+PHOT_METHOD_CHOICES = (PHOT_METHOD_METRICS, PHOT_METHOD_KILONOVASCORER)
 
 # the one vetting mode KilonovaSCORER can score: its grid is a two-component
 # kilonova population, so the choice is meaningless for the other modes, which
 # fit the light curve and have no second scorer to pick between
-KILONOVA_VETTING_MODE = "KN"
+KILONOVASCORER_VETTING_MODE = "KN"
 
 # what the toggle shows for each value
 PHOT_METHOD_LABELS = {
-    PHOT_METHOD_TROVE: "Light curve metrics",
-    PHOT_METHOD_KILONOVA: "KilonovaSCORER",
+    PHOT_METHOD_METRICS: "Light curve metrics",
+    PHOT_METHOD_KILONOVASCORER: "KilonovaSCORER",
 }
 
 
@@ -52,7 +52,7 @@ def toggle_phot_method(request) -> str:
     current = get_phot_method(request)
     return set_phot_method(
         request,
-        PHOT_METHOD_KILONOVA if current == PHOT_METHOD_TROVE else PHOT_METHOD_TROVE,
+        PHOT_METHOD_KILONOVASCORER if current == PHOT_METHOD_METRICS else PHOT_METHOD_METRICS,
     )
 
 

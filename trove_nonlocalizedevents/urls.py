@@ -6,8 +6,8 @@ from .views import (
     TogglePhotMethodCacheView,
     RefreshCandidateList,
     SkymapPartialView,
-    VetAllProgressPartialView,
-    vet_all_cooldown_notice
+    VetMultiProgressPartialView,
+    vet_all_cooldown_notice,
 )
 
 app_name = "trove_nonlocalizedevents"
@@ -40,9 +40,9 @@ urlpatterns = [
         name="skymap"
     ),
     path(
-        "vet-all-progress/",
-        VetAllProgressPartialView.as_view(),
-        name="vet-all-progress"
+        "vet-multi-progress/",
+        VetMultiProgressPartialView.as_view(),
+        name="vet-multi-progress"
     ),
     path(
         'vet-all-cooldown/',

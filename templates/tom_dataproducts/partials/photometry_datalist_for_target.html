@@ -12,41 +12,41 @@
           Photometry Data
         </div> -->
         <div class="card-body">
-          <div class="form-row">
+          <div class="d-flex flex-wrap gap-2">
             <div class="form-group col-md-4">
-              <label for="bandFilter" class="font-weight-bold">Band Filter</label>
+              <label for="bandFilter" class="font-weight-bold">Bands</label>
               <select class="form-control form-control-sm" id="bandFilter" onchange="applyFilters()">
-                <option value="">All bands</option>
+                <option value="">All</option>
                 {% for filter_val in band_filters %}
                 <option value="{{ filter_val }}">{{ filter_val }}</option>
                 {% endfor %}
               </select>
             </div>
             <div class="form-group col-md-4">
-              <label for="sourceFilter" class="font-weight-bold">Source Filter</label>
+              <label for="sourceFilter" class="font-weight-bold">Sources</label>
               <select class="form-control form-control-sm" id="sourceFilter" onchange="applyFilters()">
-                <option value="">All Sources</option>
+                <option value="">All</option>
                 {% for source_val in sources %}
                 <option value="{{ source_val }}">{{ source_val }}</option>
                 {% endfor %}
               </select>
             </div>
             <div class="form-group col-md-4">
-              <label for="snrFilter" class="font-weight-bold">Minimum S/N</label>
+              <label for="snrFilter" class="font-weight-bold">Minimum SNR</label>
               <input class="form-control form-control-sm" id="snrFilter" type="number" min="0" placeholder="0" onchange="applyFilters()">
             </div>
             <div class="form-group col-md-4 d-flex align-items-end">
-              <button type="button" class="btn btn-outline-secondary btn-sm btn-block" onclick="resetFilters()">Reset filters</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm btn-block" onclick="resetFilters()">Reset Filters</button>
             </div>
           </div>
         </div>
         <div class="form-row align-items-center mb-2">
             <div class="col-md-3">
-              <label for="phot-page-size" class="font-weight-bold">Rows per page</label>
-              <select class="form-control form-control-sm" id="phot-page-size" onchange="renderPagination()">
-                <option value="25" selected>25</option>
-                <option value="50">50</option>
-                <option value="100">100</option>
+              <label for="phot-page-size" class="font-weight-bold">&nbsp;&nbsp;&nbsp;&nbsp;Rows per page</label>
+              <select class="form-control form-control-sm ms-3" id="phot-page-size" onchange="renderPagination()">
+                 <option value="25" selected>25</option>
+                 <option value="50">50</option>
+                 <option value="100">100</option>
               </select>
             </div>
             <div class="col-md-9 text-right">
@@ -74,7 +74,7 @@
                         Magnitude <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(3, 'number')">⬘</button>
                     </th>
                     <th>
-                        S/N <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(4, 'number')">⬘</button>
+                        SNR <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(4, 'number')">⬘</button>
                     </th>
                     <th>
                         Source <button type="button" class="btn btn-sm btn-link p-0" onclick="sortTable(5, 'string')">⬘</button>

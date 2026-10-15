@@ -4,10 +4,29 @@ from astropy.coordinates import get_body
 from astropy.time import Time
 from datetime import timedelta
 from astroplan import moon_illumination
+from django.contrib.auth.models import AnonymousUser
+from trove_nonlocalizedevents.permissions import candidates_for_user
 
 
 register = template.Library()
 
+
+
+def skymap_candidates(request, localization):
+    """The candidates the map should draw for this event.
+
+    Kept in step with the candidate table below it: the same permission rules
+    and the same target-name filter. Drawing `candidates.all()` instead put
+    candidates on the map that the table would not list, and exposed target
+    names to users not allowed to see them.
+    """
+    qs = localization.nonlocalizedevent.candidates.select_related("target")
+    user = getattr(request, "user", None) or AnonymousUser()
+    qs = candidates_for_user(user, qs)
+    target_name = request.GET.get("target__name") if hasattr(request, "GET") else None
+    if target_name:
+        qs = qs.filter(target__name__icontains=target_name)
+    return qs
 
 @register.inclusion_tag(
     "tom_nonlocalizedevents/partials/skymap.html", takes_context=True
@@ -29,7 +48,7 @@ def skymap(context, localization):
         "current_moon_ra": current_moon_pos.ra.deg,
         "current_moon_dec": current_moon_pos.dec.deg,
         "current_moon_exclusion": current_moon_exclusion,
-        "candidates": localization.nonlocalizedevent.candidates.all(),
+        "candidates": skymap_candidates(context["request"], localization),
     }
 
     # GW skymap
@@ -51,7 +70,7 @@ def skymap_simple(context, localization):
     print("Fetching skymap")
     # candidates only
     extras = {
-        "candidates": localization.nonlocalizedevent.candidates.all(),
+        "candidates": skymap_candidates(context["request"], localization),
     }
 
     # GW skymap

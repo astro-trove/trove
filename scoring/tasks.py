@@ -25,7 +25,7 @@ from tom_nonlocalizedevents.models import NonLocalizedEvent
 
 logger = logging.getLogger(__name__)
 
-from scoring.phot_method import PHOT_METHOD_KILONOVA, get_phot_method
+from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
 
 ## tasks
@@ -40,7 +40,7 @@ def async_mpc(target_id: int, *args, **kwargs) -> None:
     run_mpc(target_id, *args, **kwargs)
 
 
-@task(queue_name="vet_all", priority=settings.PRIORITY_HIGH)
+@task(queue_name="vet_multi", priority=settings.PRIORITY_HIGH)
 def async_vet(
     target_ids: list,
     nle_event_id: str,
@@ -130,14 +130,16 @@ def async_associate_targets_nle(
     
     
 ## functions which enqueue tasks
-def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None,
-                  started_by=None) -> None:
+def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
+                  started_by=None, run_kind="all") -> None:
+    """`run_kind` records which button started the run; the progress cards
+    report on any of them."""
     ecs = list(eventcandidates)
     run_started = timezone.now().isoformat()
 
     phot_method = phot_method or get_phot_method()
 
-    if vetting_mode == "KN" and phot_method == PHOT_METHOD_KILONOVA:
+    if vetting_mode == "KN" and phot_method == PHOT_METHOD_KILONOVASCORER:
         # Sorting candidates by distance so that the grid stays in cache for
         # at least a few candidates
         from scoring.scoring import get_eventcandidate_default_distance
@@ -162,6 +164,7 @@ def vet_all_async(eventcandidates, nle, vetting_mode, phot_method=None,
             phot_method=phot_method,
             run_started=run_started,
             started_by=started_by,
+            run_kind=run_kind,
         )
 
 def associate_targets_with_nle_async(

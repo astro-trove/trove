@@ -22,3 +22,18 @@ def nonlocalizedevents_for_user(user, qs):
 
 
 
+
+def candidates_for_user(user, qs):
+    """
+    The EventCandidates whose target this user is allowed to see.
+
+    The candidate list and the skymap both draw the same candidates, so both
+    have to hide the same ones -- see `targets_for_user` for the rules.
+    """
+    from tom_targets.permissions import targets_for_user
+
+    from trove_targets.models import Target
+
+    return qs.filter(
+        target__in=targets_for_user(user, Target.objects.all(), "view_target")
+    )
