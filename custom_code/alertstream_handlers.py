@@ -535,7 +535,7 @@ def handle_antares_stream_task(*args, **kwargs):
     handle_antares_stream(*args, **kwargs)
     
 
-def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nle=10, event_id=None):
+def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nle=10, event_id=None, verbose=False):
     try:
         data_service = AntaresDataService()
 
@@ -544,22 +544,22 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
             alert = data_service.serialize_locus(None, alert)
         
         # check for existing targets within 2"
-        target_matches = list(
-            cone_search_filter(
+        target_matches = cone_search_filter(
                 Target.objects.all(),
                 alert["ra"],
                 alert["dec"],
                 cone_search_radius_arcsec / 3600.0,
             ).order_by("separation")
-        )
-        logger.info(
-            f"Targets within {cone_search_radius_arcsec:.1f} arcsec: {target_matches}"
-        )
-        if target_matches:
-            # then this target already exists in the Targets table
-            target = target_matches[0]
-            logger.info(f"Found existing target matching this alert: {target.name}")
-            
+        if verbose:
+            logger.info(
+                f"Targets within {cone_search_radius_arcsec:.1f} arcsec: {target_matches.count()}"
+            )
+        target = target_matches.first()
+        if target:
+            # add new aliases from the alert
+            _add_aliases(target, alert)
+            with target_hook_options(skip_vetting=True):
+                target.save()
         else:
             # then this target does not exist, so we create it from scratch
             # data_service.to_target also saves the target, and will execute the
@@ -571,26 +571,16 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
             # updating these fields can only happen *after* the target has been
             # created and saved
             with target_hook_options(skip_vetting=True):
-                target = data_service.to_target(alert)
-
-
-        # add new aliases from the alert
-        _add_aliases(target, alert)
+                target = data_service.to_target(alert) # this also adds aliases
 
         # add new photometry from the alert
-        try:
-            _add_antares_phot_to_target(target, alert, data_service)
-        except FieldError:
-            # this is a known issue with getting light curve info from ANTARES via
-            # the tom-antares package right now :(
-            logger.warn("Skipping ANTARES photometry query because of a known bug in tom-antares")
-            pass
-            
+        data_service.to_reduced_datums(target, alert["reduced_datums"])
+                    
         # now run target post save for real and do the vetting we need to do
         target_post_save(
             target,
             created=True,
-            lookback_days_nle=True,
+            lookback_days_nle=10,
             known_associated_nle_id=event_id,
             query_atlas_fp=_should_run_atlas(alert),
             query_tns_phot=False,
