@@ -616,16 +616,11 @@ def find_public_phot(
 
     # check ANTARES for new ZTF and LSST photometry from alerts
     if query_antares_phot:
+        logger.info("Checking ANTARES for new photometry")
         data_service = AntaresDataService()
         data = data_service.query_reduced_data(target)
-        try:
-            data_service.to_reduced_datums(target, data)
-        except FieldError:
-            # this is a known issue with getting light curve info from ANTARES via
-            # the tom-antares package right now :(
-            logger.warn("Skipping ANTARES photometry query because of a known bug in tom-antares")
-            pass
-
+        data_service.to_reduced_datums(target, data)
+        
     # in some cases, we won't want to query ATLAS FP because it isn't constraining
     # for dim transients in LSST alerts
     if not query_atlas_fp:
