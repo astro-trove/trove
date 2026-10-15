@@ -4,13 +4,14 @@ their resemblance to kilonovae.
 """
 
 import logging
+from functools import partial
 from typing import Optional
 from astropy.time import Time, TimeDelta
 from astropy import units as u
 import numpy as np
 
 from .scoring import (
-    update_score_factor,
+    update_score_factor as _update_score_factor,
     delete_score_factor,
     clean_host_df,
     host_distance_match,
@@ -40,6 +41,7 @@ from candidate_vetting.vet import localization_sequence_from_name
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 
 logger = logging.getLogger(__name__)
+update_score_factor = partial(_update_score_factor, em_model="KN")
 
 from scoring.kilonova_scorer_helpers.util import (
     KilonovaScoreUnavailable,

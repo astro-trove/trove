@@ -6,13 +6,16 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
+from django.utils import timezone
+
 from .scoring import (
     host_distance_match,
     get_distance_score,
     skymap_association,
     clean_host_df,
     _localization_from_name,
-    classification_score
+    classification_score,
+    BASIC_SCORE_KEYS,
 )
 from .models import ScoreFactor
 from .vet_basic import vet_basic
@@ -312,10 +315,15 @@ def vet_bbh(
             pending_deletes.clear()
         if pending_updates:
             ScoreFactor.objects.bulk_create(
-                [ScoreFactor(event_candidate=event_candidate, key=k, value=v)
-                 for k, v in pending_updates.items()],
-                update_conflicts=True, unique_fields=["event_candidate", "key"],
-                update_fields=["value"],
+                [
+                    ScoreFactor(
+                        event_candidate=event_candidate,
+                        key=k,
+                        value=v,
+                        em_model="basic" if k in BASIC_SCORE_KEYS else "AGN-flare",
+                        timestamp=timezone.now()
+                    ) for k, v in pending_updates.items()
+                ],
             )
             pending_updates.clear()
 
