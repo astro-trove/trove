@@ -577,11 +577,6 @@ Below, we report the top {ncands} candidates that remain viable after running ou
         except (AttributeError, IndexError):
             host_str = None
 
-        except KeyError:
-            import pdb
-
-            pdb.set_trace()
-
         # get photometry info
         first_phot = PhotometryReducedDatum.objects.filter(
             target_id=t.id, brightness__isnull=False, brightness_error__isnull=False
