@@ -388,6 +388,19 @@ ALERT_STREAMS = [
             },
         },
     },
+    {
+        'ACTIVE': True,
+        'NAME': 'tom_alertstreams.alertstreams.antares.AntaresAlertStream',
+        'OPTIONS': {
+            'API_KEY': ANTARES_API_KEY,
+            'API_SECRET': ANTARES_API_SECRET,
+            'GROUP': ANTARES_GROUP_ID,
+            'TOPIC_HANDLERS': {
+                # this is just for now, so we can test the alert stream handling
+                'in_passta_nearby_transients': 'custom_code.alertstream_handlers.handle_antares_stream', #_async',
+            }
+        },
+    }
 ]
 
 VUE_FRONTEND_DIR_TOM_NONLOCAL = os.path.join(STATIC_ROOT, "tom_nonlocalizedevents/vue")
