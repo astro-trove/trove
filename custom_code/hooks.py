@@ -7,7 +7,7 @@ from django.db import transaction
 from django.db.models import Min
 from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
-from tom_dataproducts.models import ReducedDatum
+from tom_dataproducts.models import PhotometryReducedDatum
 
 from scoring.vet_kn import vet_kn
 from scoring.vet_kn_in_sn import vet_kn_in_sn
@@ -31,7 +31,7 @@ for handler in logger.handlers:
 _target_hook_options = ContextVar('target_hook_options', default=None)
     
 def process_reduced_ztf_data(target, candidates):
-    """Ingest data from the ZTF JSON format into ``ReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
+    """Ingest data from the ZTF JSON format into ``PhotometryReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
     for candidate in candidates:
         if all(
             [
@@ -46,18 +46,17 @@ def process_reduced_ztf_data(target, candidates):
             continue
         jd = Time(candidate["candidate"]["jd"], format="jd", scale="utc")
         jd.to_datetime(timezone=TimezoneInfo())
-        value = {"filter": {1: "g", 2: "r", 3: "i"}[candidate["candidate"]["fid"]]}
+        value = {"bandpass": {1: "g", 2: "r", 3: "i"}[candidate["candidate"]["fid"]]}
         if nondetection:
             value["limit"] = candidate["candidate"]["diffmaglim"]
         else:
-            value["magnitude"] = candidate["candidate"]["magpsf"]
-            value["error"] = candidate["candidate"]["sigmapsf"]
-        rd, created = ReducedDatum.objects.get_or_create(
+            value["brightness"] = candidate["candidate"]["magpsf"]
+            value["brightness_error"] = candidate["candidate"]["sigmapsf"]
+        rd, created = PhotometryReducedDatum.objects.get_or_create(
             timestamp=jd.to_datetime(timezone=TimezoneInfo()),
-            value=value,
             source_name="ZTF",
-            data_type="photometry",
             target=target,
+            **value,
         )
         if created:  # do this afterward, in case there are duplicate candidates with distinct ZIDs
             rd.source_location = candidate["zid"]
@@ -131,9 +130,7 @@ def associate_nle_with_target(
     # automatically associate with nonlocalized events
     new_candidates = []
     first_det = (
-        target.reduceddatum_set.filter(
-            data_type="photometry", value__magnitude__isnull=False
-        )
+        target.photometryreduceddatum_set.filter(brightness__isnull=False)
         .order_by("timestamp")
         .first()
     )
@@ -174,9 +171,8 @@ def associate_targets_with_nle(
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
 
     # query for relevant targets
-    targets = ReducedDatum.objects.filter(
-        data_type="photometry",
-        value__magnitude__isnull=False
+    targets = PhotometryReducedDatum.objects.filter(
+        brightness__isnull=False
     ).values(
         "target_id"
     ).annotate(

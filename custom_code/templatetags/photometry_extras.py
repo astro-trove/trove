@@ -4,7 +4,7 @@ from guardian.shortcuts import get_objects_for_user
 import plotly.io as pio
 import plotly.graph_objs as go
 from plotly import colors
-from tom_dataproducts.models import ReducedDatum
+from tom_dataproducts.models import PhotometryReducedDatum
 import numpy as np
 from datetime import datetime, timedelta
 import re
@@ -86,6 +86,7 @@ COLOR_MAP = {
 MARKER_MAP = {
     'limit': 50,  # arrow-bar-down
     'ATLAS': 2,  # diamond
+    'ATLAS FP': 2,  # diamond
     'MARS': 1,  # square
     'SAGUARO pipeline': 0,  # circle
     'ZTF': 1,  # square
@@ -205,19 +206,21 @@ def recent_photometry(context, target, limit=1):
     """
 
     if settings.TARGET_PERMISSIONS_ONLY:
-        datums = ReducedDatum.objects.filter(target=target, data_type=settings.DATA_PRODUCT_TYPES['photometry'][0])
+        datums = PhotometryReducedDatum.objects.filter(target=target)
     else:
-        datums = get_objects_for_user(context['request'].user,
-                                      'tom_dataproducts.view_reduceddatum',
-                                      klass=ReducedDatum.objects.filter(
-                                        target=target,
-                                        data_type=settings.DATA_PRODUCT_TYPES['photometry'][0]))
+        datums = get_objects_for_user(
+            context['request'].user,
+            'tom_dataproducts.view_photometryreduceddatum',
+            klass=PhotometryReducedDatum.objects.filter(
+                target=target,
+            )
+        )
     recent_det = {'data': []}
     for datum in datums.order_by('-timestamp')[:limit]:
-        if 'magnitude' in datum.value.keys():
-            phot_point = {'timestamp': datum.timestamp, 'magnitude': datum.value['magnitude']}
-        elif 'limit' in datum.value.keys():
-            phot_point = {'timestamp': datum.timestamp, 'limit': datum.value['limit']}
+        if datum.brightness is not None:
+            phot_point = {'timestamp': datum.timestamp, 'magnitude': datum.brightness}
+        elif datum.limit is not None:
+            phot_point = {'timestamp': datum.timestamp, 'limit': datum.limit}
         else:
             continue
 
@@ -235,8 +238,8 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
     """
     Renders a photometric plot for a target.
 
-    This templatetag requires all ``ReducedDatum`` objects with a data_type of ``photometry`` to be structured with the
-    following keys in the JSON representation: magnitude, error, filter
+    This templatetag plots the ``PhotometryReducedDatum`` objects for the target, using their brightness,
+    brightness_error, limit, and bandpass fields
 
     :param width: Width of generated plot
     :type width: int
@@ -254,31 +257,33 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
     :type grid: bool
     """
     if settings.TARGET_PERMISSIONS_ONLY:
-        datums = ReducedDatum.objects.filter(target=target, data_type=settings.DATA_PRODUCT_TYPES['photometry'][0])
+        datums = PhotometryReducedDatum.objects.filter(target=target)
     else:
-        datums = get_objects_for_user(context['request'].user,
-                                      'tom_dataproducts.view_reduceddatum',
-                                      klass=ReducedDatum.objects.filter(
-                                        target=target,
-                                        data_type=settings.DATA_PRODUCT_TYPES['photometry'][0]))
-    datums = datums.order_by("source_name", "value__filter") # sort data by telescope/filter name
+        datums = get_objects_for_user(
+            context['request'].user,
+            'tom_dataproducts.view_photometryreduceddatum',
+            klass=PhotometryReducedDatum.objects.filter(
+                target=target,
+            )
+        )
+    datums = datums.order_by("source_name", "bandpass") # sort data by telescope/filter name
 
     detections = {}
     limits = {}
     for datum in datums:
-        if 'magnitude' in datum.value:
+        if datum.brightness is not None:
             detections.setdefault(datum.source_name, {})
-            detections[datum.source_name].setdefault(datum.value['filter'], {})
-            filter_data = detections[datum.source_name][datum.value['filter']]
+            detections[datum.source_name].setdefault(datum.bandpass, {})
+            filter_data = detections[datum.source_name][datum.bandpass]
             filter_data.setdefault('time', []).append(datum.timestamp)
-            filter_data.setdefault('magnitude', []).append(datum.value['magnitude'])
-            filter_data.setdefault('error', []).append(datum.value.get('error', 0.))
-        elif 'limit' in datum.value:
+            filter_data.setdefault('magnitude', []).append(datum.brightness)
+            filter_data.setdefault('error', []).append(datum.brightness_error or 0.)
+        elif datum.limit is not None:
             limits.setdefault(datum.source_name, {})
-            limits[datum.source_name].setdefault(datum.value['filter'], {})
-            filter_data = limits[datum.source_name][datum.value['filter']]
+            limits[datum.source_name].setdefault(datum.bandpass, {})
+            filter_data = limits[datum.source_name][datum.bandpass]
             filter_data.setdefault('time', []).append(datum.timestamp)
-            filter_data.setdefault('limit', []).append(datum.value['limit'])
+            filter_data.setdefault('limit', []).append(datum.limit)
 
     plot_data = []
     all_ydata = []
@@ -447,11 +452,11 @@ def get_photometry_data(context, target, target_share=False):
     Displays a table of the all photometric points for a target.
     """
 
-    photometry = ReducedDatum.objects.filter(data_type='photometry', target=target).order_by('-timestamp')
+    photometry = PhotometryReducedDatum.objects.filter(target=target).order_by('-timestamp')
     if not settings.TARGET_PERMISSIONS_ONLY:
         photometry = get_objects_for_user(
             context["request"].user,
-            "tom_dataproducts.view_reduceddatum",
+            "tom_dataproducts.view_photometryreduceddatum",
             klass=photometry,
         )
     
@@ -460,16 +465,16 @@ def get_photometry_data(context, target, target_share=False):
         rd_data = {'id': reduced_datum.pk,
                    'timestamp': reduced_datum.timestamp,
                    'source': reduced_datum.source_name,
-                   'filter': reduced_datum.value.get('filter', ''),
-                   'telescope': reduced_datum.value.get('telescope', ''),
-                   'error': reduced_datum.value.get('error', reduced_datum.value.get('magnitude_error', ''))
+                   'filter': reduced_datum.bandpass,
+                   'telescope': reduced_datum.telescope,
+                   'error': reduced_datum.brightness_error if reduced_datum.brightness_error is not None else ''
                    }
 
-        if 'limit' in reduced_datum.value.keys():
-            rd_data['magnitude'] = reduced_datum.value['limit']
+        if reduced_datum.brightness is None:
+            rd_data['magnitude'] = reduced_datum.limit
             rd_data['limit'] = True
         else:
-            rd_data['magnitude'] = reduced_datum.value['magnitude']
+            rd_data['magnitude'] = reduced_datum.brightness
             rd_data['limit'] = False
         data.append(rd_data)
 

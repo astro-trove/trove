@@ -192,7 +192,23 @@ class Command(BaseCommand):
                 SET target_id=new_id
                 FROM targets_to_merge
                 WHERE target_id=old_id;
-                
+
+                -- skip points the new target already has, which would violate the
+                -- unique constraints (they get deleted along with the old target)
+                UPDATE tom_dataproducts_photometryreduceddatum AS p
+                SET target_id=new_id
+                FROM targets_to_merge
+                WHERE p.target_id=old_id
+                AND NOT EXISTS (
+                    SELECT 1 FROM tom_dataproducts_photometryreduceddatum AS q
+                    WHERE q.target_id=new_id
+                    AND q.bandpass=p.bandpass
+                    AND q.timestamp=p.timestamp
+                    AND q.instrument=p.instrument
+                    AND q.reduction_version=p.reduction_version
+                    AND (q.brightness=p.brightness OR q."limit"=p."limit")
+                );
+
                 UPDATE tom_nonlocalizedevents_eventcandidate
                 SET target_id=new_id
                 FROM targets_to_merge

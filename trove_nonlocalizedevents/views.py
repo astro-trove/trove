@@ -40,7 +40,7 @@ from scoring.phot_method import (
     toggle_phot_method,
 )
 logger = logging.getLogger(__name__)
-from tom_dataproducts.models import ReducedDatum
+from tom_dataproducts.models import PhotometryReducedDatum
 from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
 
 from astropy.coordinates import SkyCoord
@@ -161,9 +161,7 @@ def filter_candidates(qs, get):
     before = _as_date(get.get("first_det_before"))
     if after or before:
         first_det = (
-            ReducedDatum.objects.filter(
-                data_type="photometry", value__magnitude__isnull=False
-            )
+            PhotometryReducedDatum.objects.filter(brightness__isnull=False)
             .values("target_id")
             .annotate(min_timestamp=Min("timestamp"))
         )
@@ -389,22 +387,30 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         # than one per row.
         target_ids = [c.target_id for c in page_obj.object_list]
         latest_mag = {}
-        for datum in (ReducedDatum.objects
-                      .filter(target_id__in=target_ids, data_type="photometry",
-                              value__magnitude__isnull=False)
+        for datum in (PhotometryReducedDatum.objects
+                      .filter(target_id__in=target_ids, brightness__isnull=False)
                       .order_by("target_id", "timestamp")
-                      .only("target_id", "timestamp", "value")):
-            latest_mag[datum.target_id] = datum.value  # ordered, so the last wins
+                      .only("target_id", "timestamp", "brightness",
+                            "brightness_error", "bandpass")):
+            # ordered, so the last wins
+            latest_mag[datum.target_id] = {
+                "magnitude": datum.brightness,
+                "error": datum.brightness_error,
+                "filter": datum.bandpass,
+            }
 
         # A target with no magnitude at all has only non-detections; show the
         # deepest limit as ">20.7" rather than a blank that reads as missing data.
         undetected = [t for t in target_ids if t not in latest_mag]
-        for datum in (ReducedDatum.objects
-                      .filter(target_id__in=undetected, data_type="photometry",
-                              value__limit__isnull=False)
+        for datum in (PhotometryReducedDatum.objects
+                      .filter(target_id__in=undetected, limit__isnull=False)
                       .order_by("target_id", "timestamp")
-                      .only("target_id", "timestamp", "value")):
-            latest_mag[datum.target_id] = dict(datum.value, is_limit=True)
+                      .only("target_id", "timestamp", "limit", "bandpass")):
+            latest_mag[datum.target_id] = {
+                "limit": datum.limit,
+                "filter": datum.bandpass,
+                "is_limit": True,
+            }
         context["latest_mag"] = latest_mag
 
         if not needs_all:
@@ -577,42 +583,42 @@ Below, we report the top {ncands} candidates that remain viable after running ou
             pdb.set_trace()
 
         # get photometry info
-        first_phot = ReducedDatum.objects.filter(
-            target_id=t.id, value__magnitude__isnull=False, value__error__isnull=False
+        first_phot = PhotometryReducedDatum.objects.filter(
+            target_id=t.id, brightness__isnull=False, brightness_error__isnull=False
         ).first()
         if first_phot:
-            v = first_phot.value
             src_first = first_phot.source_name
-            if "instrument" in v:
-                src_str_first = f"{src_first}; {v['instrument']} {v['filter']}"
-            elif "telescope" in v:
-                src_str_first = f"{src_first}; {v['telescope']} {v['filter']}"
+            if first_phot.instrument:
+                src_str_first = f"{src_first}; {first_phot.instrument} {first_phot.bandpass}"
+            elif first_phot.telescope:
+                src_str_first = f"{src_first}; {first_phot.telescope} {first_phot.bandpass}"
             else:
-                src_str_first = f"{src_first}; {v['filter']}"
+                src_str_first = f"{src_first}; {first_phot.bandpass}"
             src_str_first = src_str_first.replace(
                 " (TNS)", ""
             )  # strip (TNS) if present
         else:
             src_str_first = None
 
-        latest_phot = ReducedDatum.objects.filter(target_id=t.id).latest()
+        latest_phot = PhotometryReducedDatum.objects.filter(
+            target_id=t.id
+        ).order_by("timestamp").last()
         if latest_phot:
-            v = latest_phot.value
             src_latest = latest_phot.source_name
 
-            if "instrument" in v:
-                src_str_latest = f"({v['instrument']} {v['filter']}; {src_latest})"
-            elif "telescope" in v:
-                src_str_latest = f"({v['telescope']} {v['filter']}; {src_latest})"
+            if latest_phot.instrument:
+                src_str_latest = f"({latest_phot.instrument} {latest_phot.bandpass}; {src_latest})"
+            elif latest_phot.telescope:
+                src_str_latest = f"({latest_phot.telescope} {latest_phot.bandpass}; {src_latest})"
             else:
-                src_str_latest = f"({v['filter']}; {src_latest})"
+                src_str_latest = f"({latest_phot.bandpass}; {src_latest})"
 
-            if "magnitude" in v:  # detection
+            if latest_phot.brightness is not None:  # detection
                 phot_str_latest = (
-                    f"{v['magnitude']:.2f} +/- {v['error']:.2f} {src_str_latest}"
+                    f"{latest_phot.brightness:.2f} +/- {latest_phot.brightness_error:.2f} {src_str_latest}"
                 )
             else:  # non-detection
-                phot_str_latest = f">{v['limit']:.2f} {src_str_latest}"
+                phot_str_latest = f">{latest_phot.limit:.2f} {src_str_latest}"
 
             epoch_latest = Time(latest_phot.timestamp).mjd
             epoch_str_latest = f"{float(epoch_latest):.5f}"
