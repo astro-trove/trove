@@ -591,21 +591,6 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
         exc = traceback.format_exc()
         logger.error(exc)
         dump_alert_and_send_error(alert, exc)
-
-def _add_aliases(target, alert):
-    # add any aliases from the alert
-    for alias_name in alert.get("aliases", []):
-        alias = TargetName(name=alias_name, target=target)
-        try:
-            alias.save()
-        except IntegrityError:
-            logger.info(f"{alias} already exists, skipping and not saving")
-
-def _add_antares_phot_to_target(target, alert, data_service):
-    return data_service.create_reduced_datums_from_query(
-        target,
-        alert["reduced_datums"]["photometry"]
-    )
             
 def dump_alert_and_send_error(
     alert, exc, dump_dir="antares-alert-errors"
