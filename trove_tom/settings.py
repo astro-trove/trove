@@ -403,7 +403,7 @@ ALERT_STREAMS = [
             'GROUP': ANTARES_GROUP_ID,
             'TOPIC_HANDLERS': {
                 # this is just for now, so we can test the alert stream handling
-                'in_passta_nearby_transients': 'custom_code.alertstream_handlers.handle_antares_stream', #_async',
+                'in_passta_nearby_transients': 'custom_code.alertstream_handlers.handle_antares_stream_async',
             }
         },
     }

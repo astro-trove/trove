@@ -528,7 +528,7 @@ def handle_antares_stream_async(locus, lookback_days_nle=10):
         dump_alert_and_send_error(alert_finite, exc)
 
 
-@task(queue_name="antares", priority=settings.PRIORITY_HIGH)
+@task(queue_name="antares", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)
 def handle_antares_stream_task(*args, **kwargs):
     """Just a django tasks Task wrapper on handle_antares_stream, this way
     we can still execute the antares alert stream handling serially"""
