@@ -41,8 +41,8 @@ def recent_comments(context, limit=10):
 @register.inclusion_tag("custom_code/partials/countdown.html", takes_context=True)
 def countdown_IR1(context):
     name = "IR1"
-    flavortext = 'Assuming start on 31 October 2026'
-    event_date = datetime.fromisoformat("2026-10-31T00:00:00")
+    flavortext = 'Assuming start on 15 January 2027'
+    event_date = datetime.fromisoformat("2027-01-15T00:00:00")
     time_remaining = event_date - datetime.now()
     days = time_remaining.days
     hours = time_remaining.seconds // 3600
@@ -63,8 +63,8 @@ def countdown_IR1(context):
 @register.inclusion_tag("custom_code/partials/countdown.html", takes_context=True)
 def countdown_IR1_end(context):
     name = "end of IR1"
-    flavortext = 'Assuming end on 30 June 2027'
-    event_date = datetime.fromisoformat("2027-06-30T00:00:00")
+    flavortext = 'Assuming end on 15 July 2027'
+    event_date = datetime.fromisoformat("2027-07-15T00:00:00")
     time_remaining = event_date - datetime.now()
     days = time_remaining.days
     hours = time_remaining.seconds // 3600
