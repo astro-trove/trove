@@ -216,6 +216,7 @@ def vet_basic(
     query_atlas_fp: bool = True,
     query_tns_phot: bool = True,
     query_antares_phot: bool = True,
+    run_mpc: bool = True
 ):
     """Run the NLE-independent vetting for a target and return
     (`host_df`, `agn_df`, `keep_vetting`). `keep_vetting` is False when PS or
@@ -263,7 +264,7 @@ def vet_basic(
 
     # (2) Minor Planet Center association
     # proceed if overwrite **OR** MPC score doesn't exist...
-    if overwrite or not te.filter(key="mpc_match_name").exists():
+    if run_mpc and (overwrite or not te.filter(key="mpc_match_name").exists()):
         if skip_vet_if_no_new_phot and not created_new_phot: # ... but stop if skip_vet_if_no_new_phot **AND** no new phot created
             logger.info(
                         "Skipping Minor Planet Center association because no new "

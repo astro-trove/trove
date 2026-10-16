@@ -210,7 +210,8 @@ def target_post_save(
         first_det_max=10,
         skip_vet_if_no_new_phot=False,
         known_associated_nle_id=None,
-        skip_vetting=False
+        skip_vetting=False,
+        run_mpc=True
     )
     
     # pack these possible options into a single dict such that

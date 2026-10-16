@@ -584,7 +584,8 @@ def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nl
             known_associated_nle_id=event_id,
             query_atlas_fp=_should_run_atlas(alert),
             query_tns_phot=False,
-            query_antares_phot=False
+            query_antares_phot=False,
+            run_mpc=False # these are filtered out by ANTARES
         )
         
     except Exception:
