@@ -30,9 +30,11 @@ from scoring.util import (
     get_vet_multi_progress,
     host_distances,
     kilonova_scores_exist,
+    latest_score_factors,
     most_likely_class_for_event,
     set_agn_toggle,
     KN_STYLE_CLASSES,
+    get_last_vet_per_candidate
 )
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
@@ -327,10 +329,10 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         # on rather than only the ones on the current page
         subscores = {}
         if subscore_columns:
-            for sf in ScoreFactor.objects.filter(
+            for sf in latest_score_factors(ScoreFactor.objects.filter(
                 event_candidate_id__in=[c.id for c in scored_candidates],
                 key__in=subscore_columns,
-            ).only("event_candidate_id", "key", "value"):
+            )).only("event_candidate_id", "key", "value"):
                 try:
                     subscores.setdefault(
                         sf.event_candidate_id, {})[sf.key] = float(sf.value)
@@ -415,6 +417,7 @@ class EventCandidateListView(LoginRequiredMixin, FilterView):
         context["subscore_columns"] = subscore_columns
         context["subscore_labels"] = SUBSCORE_LABELS
 
+        context["last_vet_timestamp"] = get_last_vet_per_candidate(scored_candidates)
 
         context["phot_method"] = phot_method
         context["phot_method_label"] = phot_method_label(request=self.request)
@@ -535,9 +538,9 @@ Below, we report the top {ncands} candidates that remain viable after running ou
         )
 
         # get subscore info
-        sf = ScoreFactor.objects.filter(
+        sf = latest_score_factors(ScoreFactor.objects.filter(
             event_candidate=ec, key__in=subscore_keys_to_report
-        )
+        ))
 
         try:
             loc_prob = f"{float(sf.filter(key='skymap_score').first().value):.2f}"

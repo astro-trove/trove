@@ -20,10 +20,11 @@ from scoring.util import (
     agn_counts_toward,
     get_agn_toggle as _get_agn_toggle,
     get_event_candidate_scores as _get_event_candidate_scores,
-    get_last_vetting as _get_last_vetting,
+    get_last_multi_vetting as _get_last_vetting,
     get_target_score as _get_target_score,
     host_distances,
     kilonova_scores_exist,
+    latest_score_factors,
     most_likely_class_for_event,
     KILONOVA_SCORE_KEY,
     KN_STYLE_CLASSES,
@@ -238,11 +239,11 @@ def display_score_details(context, target_id):
     # NLE-specific scores/details
     score_details = []
     for event_candidate in target.eventcandidate_set.all():
-        sf_set = event_candidate.scorefactor_set.exclude(
+        sf_set = latest_score_factors(event_candidate.scorefactor_set.exclude(
             key__in=TARGETEXTRA_KEYS
             # exclude keys in TargetExtra + mpc_score
             + ["mpc_score", "localization_id"]
-        ).all()
+        ))
 
         sf_set = sorted(
             sf_set,
@@ -293,6 +294,10 @@ def display_score_details(context, target_id):
                     "details": []
                 }
 
+            # "basic" factors belong in every model's subtab, the rest only in
+            # the subtab of the EM model whose vetting saved them
+            only = None if score_factor.em_model == "basic" else score_factor.em_model
+
             # one "median ± scatter" row per band
             if score_factor.key.startswith("baseline_std_"):
                 continue
@@ -304,8 +309,9 @@ def display_score_details(context, target_id):
                     "value": _baseline_format(
                         score_factor.value, values.get(f"baseline_std_{filt}")
                     ),
+                    "timestamp":score_factor.timestamp,
                     "text": False,
-                    "only": None,
+                    "only": only,
                 })
                 continue
 
@@ -313,8 +319,6 @@ def display_score_details(context, target_id):
             numeric = fmter not in (_str_format, _str_int_format)
             value = _safe_format(score_factor.value, fmter)
             
-            # KilonovaSCORER scores only the KN model, so its score and its
-            # "could not score" reason belong in the KN subtab alone
             event_card["details"].append(
                 {
                     "key": score_factor.key,
@@ -323,8 +327,9 @@ def display_score_details(context, target_id):
                     # a sentence, not a number: the value column is nowrap so
                     # that figures stay on one line, which sent the skip reason
                     # off the edge of the card instead of wrapping
+                    "timestamp":score_factor.timestamp,
                     "text": not numeric,
-                    "only": "KN" if score_factor.key.startswith("kilonova") else None,
+                    "only": only,
             })
             if score_factor.key == "host_distance_score":
                 # host_distance_score is written whenever distance scoring ran, so
@@ -333,6 +338,7 @@ def display_score_details(context, target_id):
                     "key": "host_distance",
                     "label": "Distance",
                     "value": host_distance_cell(distances.get(ec.id), unit=True),
+                    "timestamp":score_factor.timestamp,
                     "text": False,
                     "only": None,
                 })
@@ -340,9 +346,10 @@ def display_score_details(context, target_id):
                 event_card["details"].append({
                     "key": "predetected",
                     "label": "Pre-detected?",
+                    "timestamp":score_factor.timestamp,
                     "value": _safe_format(score_factor.value, _predetected_yesno),
                     "text": False,
-                    "only": None,
+                    "only": only,
                 })
         
         if event_card:
@@ -355,16 +362,24 @@ def display_score_details(context, target_id):
 
     # Render basic card
     html = '<div class="score-details-wrapper">\n'
-    html += f'  <div class="score-card">\n'
+    html += '  <div class="score-card">\n'
     html += f'    <div class="score-card-header">{basic_card["title"]}</div>\n'
-    html += f'    <div class="score-card-content-basic">\n'
+    html += '    <table class="score-card-content-basic" style="width: 98%; table-layout: fixed;">\n'
+    html += '      <colgroup>\n'
+    html += '        <col style="width: 58%;">\n'
+    html += '        <col style="width: 40%;">\n'
+    html += '      </colgroup>\n'
+    html += '      <tbody>\n'
+    
     for detail in basic_card["details"]:
-        html += f'      <div class="detail-row">\n'
-        html += f'        <span class="detail-label">{detail["label"]}</span>\n'
-        html += f'        <span class="detail-value">{detail["value"]}</span>\n'
-        html += f'      </div>\n'
-    html += f'    </div>\n'
-    html += f'  </div>\n'
+        html += '        <tr class="detail-row">\n'
+        html += f'          <td class="detail-label" style="padding: 6px 8px;">{detail["label"]}</td>\n'
+        html += f'          <td class="detail-value" style="padding: 6px 8px;">{detail["value"]}</td>\n'
+        html += '        </tr>\n'
+    
+    html += '      </tbody>\n'
+    html += '    </table>\n'
+    html += '  </div>\n'
     
     # Render event tabs and cards
     if event_cards:
@@ -422,6 +437,11 @@ def display_score_details(context, target_id):
             html += '          <div class="event-cards">\n'
             for kdx, (em_transient_score_label, idxlabel) in enumerate(label_idx_map.items()): 
                 em_transient_type = em_transient_score_label.split(" ")[0]
+                print(em_transient_type)
+                print("tab label:", em_transient_score_label)
+                print("em_transient_type:", repr(em_transient_type))
+                print("only values:", {repr(d.get("only")) for d in score_details})
+                print("subscore keys:", list(ec_subscores.get(em_transient_type, {}).keys()))
                 
                 active_subclass = ""
                 if not kdx:
@@ -439,10 +459,18 @@ def display_score_details(context, target_id):
                 }
                 for key, subscore in ec_subscores.get(em_transient_type, {}).items():
                     label, fmter = label_and_format(key)
-                    rows[key] = {"key": key, "label": label,
-                                 "value": _safe_format(subscore, fmter), "score": True}
+                    rows[key] = {
+                        "key": key,
+                        "label": label,
+                        "value": _safe_format(subscore, fmter),
+                        "score": True
+                    }
 
-                html += f'              <div class="score-card-content-filled">\n'
+                print("rows:", len(rows))
+                print("score rows:", sum(_is_score_row(d) for d in rows.values()))
+
+                html += '              <table class="score-card-content-filled">\n'
+                html += '                <tbody>\n'
                 for detail in rows.values():
                     if not _is_score_row(detail): 
                         continue
@@ -450,24 +478,36 @@ def display_score_details(context, target_id):
                         detail["label"], em_transient_type, kn_is_active, agn_toggle
                     )
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
-                    html += f'                <div class="{row_class}">\n'
-                    html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
-                    html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
-                    html += f'                </div>\n'
-                html += f'              </div>\n'
+                    html += f'                <tr class="{row_class}">\n'
+                    html += f'                  <td class="detail-label">{detail["label"]}</td>\n'
+                    if "timestamp" in detail:
+                        html += f'                  <td class="detail-label" style="color: #00000075;">{detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S %Z")}</td>\n'
+                    else:
+                        html += '                  <td class="detail-label"></td>\n' # empty cell
+                    html += f'                  <td class="{value_class}">{detail["value"]}</td>\n'
+                    html += '                </tr>\n'
+                html += '                </tbody>\n'
+                html += '              </table>\n'
                 
                 # then the score details (max lum., etc.)
-                html += f'              <div class="score-card-content">\n'
+                html += '              <table class="score-card-content">\n'
+                html += '                <tbody>\n'
                 for detail in rows.values():
                     if _is_score_row(detail): 
                         continue
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
-                    html += f'                <div class="detail-row">\n'
-                    html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
-                    html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
-                    html += f'                </div>\n'
-                html += f'              </div>\n'
-                html += f'            </div>\n'
+                    html += '                <tr class="detail-row">\n'
+                    html += f'                  <td class="detail-label">{detail["label"]}</td>\n'
+                    if "timestamp" in detail:
+                        html += f'                  <td class="detail-label" style="color: #00000075;">{detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S %Z")}</td>\n'
+                    else:
+                        html += '                  <td class="detail-label"></td>\n' # empty-cell
+
+                    html += f'                  <td class="{value_class}">{detail["value"]}</td>\n'
+                    html += '                </tr>\n'
+                html += '              </tbody>\n'
+                html += '            </table>\n'
+                html += '          </div>\n'  # Close the current subtab-content panel
             html += '          </div>\n'
             html += '        </div>\n'
             html += '      </div>\n'

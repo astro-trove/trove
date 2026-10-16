@@ -29,7 +29,7 @@
 }
 
 .score-details-wrapper .detail-row {
-  display: flex;
+  display: table-row;
   justify-content: space-between;
   align-items: center;
   padding: 12px 0;
@@ -157,24 +157,36 @@
 }
 
 .score-card-content {
+  width: 98%;
+  table-layout: fixed;
+  margin: 0;
+  padding: 0;
+  border-spacing: 0;
+  position: relative;
   background-color: white;
-  padding: 20px;
   border: 4px solid #2c3e50;
   border-radius: 0 0 6px 6px;
-  position: relative;
-  margin-left: 20px;
-  margin-right: 20px;
 }
 
 .score-card-content-filled {
+  width: 98%;
+  table-layout: fixed;
+  margin: 0;
+  padding: 0;
+  border-spacing: 0;
+  position: relative;
   background-color: #f0f4f8;
-  padding: 20px;
   border-left: 4px solid #2c3e50;
   border-right: 4px solid #2c3e50;
-  border-bottom: none;
   border-top: none;
-  margin-left: 20px;
-  margin-right: 20px;
+  border-bottom: none;
+}
+
+.score-card-content td,
+.score-card-content-filled td {
+  padding: 8px;
+  vertical-align: top;
+  background-color: transparent;
 }
 
 .event-card {
@@ -191,6 +203,11 @@
 
 .event-subtab-content {
   display: none;
+  box-sizing: border-box;
+  padding-left: 20px;
+  padding-right: 4px;
+  padding-bottom: 8px;
+  padding-top: 0;
 }
 
 .event-subtab-content.active {

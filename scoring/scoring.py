@@ -76,9 +76,20 @@ def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
     return host_df
 
 
-def update_score_factor(event_candidate, key, value):
-    ScoreFactor.objects.update_or_create(
-        event_candidate=event_candidate, key=key, defaults=dict(value=value)
+# score factors that don't depend on the EM model, saved once under em_model="basic"
+BASIC_SCORE_KEYS = {
+    "mpc_match_sep", "mpc_match_date", "mpc_match_name", "mpc_score",
+    "host_catalog", "host_name", "host_distance_score",
+    "skymap_score", "ps_score", "localization_id",
+}
+
+
+def update_score_factor(event_candidate, key, value, em_model):
+    ScoreFactor.objects.create(
+        event_candidate=event_candidate,
+        key=key,
+        value=value,
+        em_model="basic" if key in BASIC_SCORE_KEYS else em_model,
     )
 
 
@@ -279,16 +290,26 @@ def _host_used_for_distance_scoring(host_df, target_id, nonlocalized_event_name)
         return None
     try:
         nle = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
-        factors = dict(
-            ScoreFactor.objects.filter(
-                event_candidate__target_id=target_id,
-                event_candidate__nonlocalizedevent_id=nle.id,
-                key__in=["host_name", "host_catalog"],
-            ).values_list("key", "value")
+        score_factors = ScoreFactor.objects.filter(
+            event_candidate__target_id=target_id,
+            event_candidate__nonlocalizedevent_id=nle.id
         )
-    except (NonLocalizedEvent.DoesNotExist, ValueError):
+        host_name = score_factors.filter(
+            key="host_name",
+        ).latest().value
+    except (NonLocalizedEvent.DoesNotExist, ScoreFactor.DoesNotExist, ValueError):
         return None
 
+    # the catalog is optional, it only disambiguates IDs shared across catalogs
+    host_catalog = score_factors.filter(
+        key = "host_catalog"
+    ).order_by("-timestamp", "-id").first()
+
+    factors = dict(
+        host_name = host_name,
+        host_catalog = host_catalog.value if host_catalog else None
+    )
+    
     host_name = factors.get("host_name")
     if not host_name or host_name == "None":
         return None
