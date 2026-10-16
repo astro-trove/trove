@@ -116,7 +116,7 @@ def upload_target(request, payload: List[UploadTargetSchema]):
     To upload a target without photometry
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json' -H 'Authorization: Bearer <api_token>'  -d '[
+    curl -X 'POST'   'https://datatrove.as.arizona.edu/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json' -H 'Authorization: Bearer <api_token>'  -d '[
       {
         "name": "test",
         "ra": 0,
@@ -128,7 +128,7 @@ def upload_target(request, payload: List[UploadTargetSchema]):
     To upload a target with photometry:
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -H 'Authorization: Bearer <api_token>'  -d '[
+    curl -X 'POST'   'https://datatrove.as.arizona.edu/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -H 'Authorization: Bearer <api_token>'  -d '[
       {
         "name": "test",
         "ra": 0,
@@ -155,7 +155,7 @@ def upload_target(request, payload: List[UploadTargetSchema]):
     To upload a new photometry point to an existing target 
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -H 'Authorization: Bearer <api_token>'  -d '[
+    curl -X 'POST'   'https://datatrove.as.arizona.edu/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -H 'Authorization: Bearer <api_token>'  -d '[
       {
         "name": "test",
         "ra": 0,
