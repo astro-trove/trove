@@ -8,34 +8,6 @@ from .vet_super_kn import vet_super_kn
 from .vet_bbh import vet_bbh, AGN_FLARE_HORIZON_DAYS
 
 VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
-    "": # if NLE most likely class not known, everything goes
-        [("basic", "Basic Vetting"),
-         ("KN", "Transient: Kilonova"),
-         ("KN-in-SN", "Transient: Kilonova-in-Supernova"),
-         ("super-KN", "Transient: Super-Kilonova"),
-         ("AGN-flare", "Transient: BBH-induced AGN Flare"),
-        ],
-    "BNS":
-        [("basic", "Basic Vetting"),
-         ("KN", "Transient: Kilonova")
-        ],
-    "NSBH":
-        [("basic", "Basic Vetting"),
-         ("KN", "Transient: Kilonova")
-        ],
-    "SSM":
-        [("basic", "Basic Vetting"),
-         ("KN", "Transient: Kilonova"),
-         ("KN-in-SN", "Transient: Kilonova-in-Supernova"),
-         ("super-KN", "Transient: Super-Kilonova"),
-         #("AGN-flare", "Transient: BBH-induced AGN Flare"),
-        ],
-    "BBH":
-        [("basic", "Basic Vetting"),
-         ("AGN-flare", "Transient: BBH-induced AGN Flare"),
-        ]
-    }
-VETTING_FORM_CHOICES = {
     "basic":("basic", "Basic Vetting"),
     "KN":("KN", "Transient: Kilonova"),
     "KN-in-SN":("KN-in-SN", "Transient: Kilonova-in-Supernova"),
