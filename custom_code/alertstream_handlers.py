@@ -615,3 +615,12 @@ def _should_run_atlas(alert, limit=19.7):
         key=lambda x : x["ant_mjd"]
     )[-1]["ant_mag"]
     return mag < limit
+
+def _add_aliases(target, alert):
+    # add any aliases from the alert
+    for alias_name in alert.get("aliases", []):
+        alias = TargetName(name=alias_name, target=target)
+        try:
+            alias.save()
+        except IntegrityError:
+            logger.info(f"{alias} already exists, skipping and not saving")
