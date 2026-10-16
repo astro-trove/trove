@@ -437,11 +437,6 @@ def display_score_details(context, target_id):
             html += '          <div class="event-cards">\n'
             for kdx, (em_transient_score_label, idxlabel) in enumerate(label_idx_map.items()): 
                 em_transient_type = em_transient_score_label.split(" ")[0]
-                print(em_transient_type)
-                print("tab label:", em_transient_score_label)
-                print("em_transient_type:", repr(em_transient_type))
-                print("only values:", {repr(d.get("only")) for d in score_details})
-                print("subscore keys:", list(ec_subscores.get(em_transient_type, {}).keys()))
                 
                 active_subclass = ""
                 if not kdx:
@@ -465,9 +460,6 @@ def display_score_details(context, target_id):
                         "value": _safe_format(subscore, fmter),
                         "score": True
                     }
-
-                print("rows:", len(rows))
-                print("score rows:", sum(_is_score_row(d) for d in rows.values()))
 
                 html += '              <table class="score-card-content-filled">\n'
                 html += '                <tbody>\n'
