@@ -110,7 +110,8 @@ TASKS = {
             "atlas_fphot",
             "vet_multi",
             "associate_targets",
-            "antares"
+            "target_post_save",
+            "antares",
         ],
     }
 }
