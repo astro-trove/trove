@@ -364,13 +364,21 @@ def display_score_details(context, target_id):
     html = '<div class="score-details-wrapper">\n'
     html += '  <div class="score-card">\n'
     html += f'    <div class="score-card-header">{basic_card["title"]}</div>\n'
-    html += '    <div class="score-card-content-basic">\n'
+    html += '    <table class="score-card-content-basic" style="width: 98%; table-layout: fixed;">\n'
+    html += '      <colgroup>\n'
+    html += '        <col style="width: 58%;">\n'
+    html += '        <col style="width: 40%;">\n'
+    html += '      </colgroup>\n'
+    html += '      <tbody>\n'
+    
     for detail in basic_card["details"]:
-        html += '      <div class="detail-row">\n'
-        html += f'        <span class="detail-label">{detail["label"]}</span>\n'
-        html += f'        <span class="detail-value">{detail["value"]}</span>\n'
-        html += f'      </div>\n'
-    html += '    </div>\n'
+        html += '        <tr class="detail-row">\n'
+        html += f'          <td class="detail-label" style="padding: 6px 8px;">{detail["label"]}</td>\n'
+        html += f'          <td class="detail-value" style="padding: 6px 8px;">{detail["value"]}</td>\n'
+        html += '        </tr>\n'
+    
+    html += '      </tbody>\n'
+    html += '    </table>\n'
     html += '  </div>\n'
     
     # Render event tabs and cards
