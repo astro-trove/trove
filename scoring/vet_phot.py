@@ -14,8 +14,10 @@ import pandas as pd
 from scipy.optimize import curve_fit
 
 from django.conf import settings
+from django.core.exceptions import FieldError
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
-from tom_dataproducts.models import ReducedDatum
+from tom_dataproducts.models import PhotometryReducedDatum
+from tom_antares.antares import AntaresDataService
 from trove_targets.models import Target
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
 from .tasks import async_atlas_query
@@ -25,6 +27,33 @@ from custom_code.templatetags.photometry_extras import error_to_snr
 logger = logging.getLogger(__name__)
 
 FILTER_PRIORITY_ORDER = ["r", "g", "V", "R", "G"]
+
+# common optical filters + ATLAS o,c + other misc optical survey filters 
+OPTICAL_FILTS = [
+    # SDSS ugrizy
+    "u"
+    "g",
+    "r",
+    "i",
+    "z",
+    "y",
+    
+    # Johnson-Cousins
+    "U",
+    "B",
+    "V",
+    "R",
+    "I",
+
+    # ATLAS
+    "o",
+    "c",
+
+    # other, misc
+    "G", # GAIA G
+    "w", # Pan-STARRS wide
+]
+    
 PHOT_SCORE_MIN = 0.1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
@@ -144,7 +173,7 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
     target = Target.objects.filter(id=target_id)[0]
 
     # get the photometry
-    phot = list(ReducedDatum.objects.filter(target=target, data_type="photometry"))
+    phot = list(PhotometryReducedDatum.objects.filter(target=target))
 
     # clean up the photometry
     fordf = dict(
@@ -163,8 +192,8 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
     for p in phot:
         if hasattr(p, "source_name"):
             fordf["telescope"].append(p.source_name)
-        elif "telescope" in p.value:
-            fordf["telescope"].append(p.value["telescope"])
+        elif p.telescope:
+            fordf["telescope"].append(p.telescope)
         else:
             fordf["telescope"].append("unknown")
 
@@ -172,20 +201,20 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
             continue
         fordf["mjd"].append(Time(p.timestamp).mjd)
 
-        if "filter" not in p.value:
+        if not p.bandpass:
             continue
-        fordf["filter"].append(p.value["filter"])
+        fordf["filter"].append(p.bandpass)
 
-        if "magnitude" in p.value:
-            fordf["mag"].append(p.value["magnitude"])
+        if p.brightness is not None:
+            fordf["mag"].append(p.brightness)
             fordf["upperlimit"].append(False)
-            if "error" in p.value:
-                fordf["magerr"].append(p.value["error"])
+            if p.brightness_error is not None:
+                fordf["magerr"].append(p.brightness_error)
             else:
                 fordf["magerr"].append(0)
-        elif "limit" in p.value:
+        elif p.limit is not None:
             fordf["upperlimit"].append(True)
-            fordf["mag"].append(p.value["limit"])
+            fordf["mag"].append(p.limit)
             fordf["magerr"].append(np.nan)
         else:
             continue
@@ -582,7 +611,8 @@ def get_predetection_stats(
 
 
 def find_public_phot(
-    target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100
+        target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100,
+        query_atlas_fp=True, query_tns_phot=True, query_antares_phot=True
 ) -> None:
     """Query TNS, ATLAS Forced photometry, and other services for publicly available
     photometry. After querying for new photometry it will automatically add it to
@@ -607,12 +637,27 @@ def find_public_phot(
     """
 
     # check TNS for any new photometry
-    created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
+    created_new_tns_phot = False
+    if query_tns_phot:
+        created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
 
+    # check ANTARES for new ZTF and LSST photometry from alerts
+    if query_antares_phot:
+        logger.info("Checking ANTARES for new photometry")
+        data_service = AntaresDataService()
+        data = data_service.query_reduced_data(target)
+        data_service.to_reduced_datums(target, data)
+        
+    # in some cases, we won't want to query ATLAS FP because it isn't constraining
+    # for dim transients in LSST alerts
+    if not query_atlas_fp:
+        logger.info("Skipping ATLAS FP query, as requested")
+        return created_new_tns_phot
+        
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
-    atlas_data = target.reduceddatum_set.filter(
-        data_type="photometry", source_name="ATLAS"
+    atlas_data = target.photometryreduceddatum_set.filter(
+        source_name__in=["ATLAS", "ATLAS FP"]
     )
     query_atlas = True
     days_ago = (
@@ -620,7 +665,7 @@ def find_public_phot(
     )
     if atlas_data.count():  # if this is true there is existing ATLAS data
         last_atlas_point = atlas_data.order_by("timestamp").last()
-
+        
         now = datetime.now(tz=timezone.utc)
         if last_atlas_point.timestamp < now - timedelta(days=forced_phot_tol):
             # then we should only query ATLAS for this target for forced photometry
@@ -636,14 +681,14 @@ def find_public_phot(
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
-
+            
     if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
         logger.info(
             "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
             "photometry for %s", target.name
         )
         query_atlas = False
-
+        
     if query_atlas:
         print(
             "Asynchronously obtaining ATLAS forced photometry with "

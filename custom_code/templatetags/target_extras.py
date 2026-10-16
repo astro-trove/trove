@@ -1,7 +1,7 @@
 import math
 from django import template
 from django.template.defaultfilters import stringfilter
-from tom_dataproducts.models import ReducedDatum
+from tom_dataproducts.models import ReducedDatum, PhotometryReducedDatum
 from astropy.coordinates import SkyCoord
 import json
 import re
@@ -24,8 +24,7 @@ def ecliptic_lat(target):
 
 @register.simple_tag
 def count_phot(target):
-    return ReducedDatum.objects.filter(
-        data_type="photometry",
+    return PhotometryReducedDatum.objects.filter(
         target_id=target.id
     ).count()
 

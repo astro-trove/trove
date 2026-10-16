@@ -101,11 +101,10 @@ class Command(BaseCommand):
             # if excluding based on first detection's SNR...
             # ...is first detection >= SNR minimum?
             if snr_min > 0:
-                first_det = target.reduceddatum_set.filter(
-                    data_type="photometry",
-                    value__magnitude__isnull=False,
-                    value__error__isnull=False,
-                    value__error__lte=2.5/np.log(10)/snr_min).order_by("timestamp").first()
+                first_det = target.photometryreduceddatum_set.filter(
+                    brightness__isnull=False,
+                    brightness_error__isnull=False,
+                    brightness_error__lte=2.5/np.log(10)/snr_min).order_by("timestamp").first()
                 # is first detection >= SNR threshold?
                 if first_det:
                     logger.info(f"First non-limit, SNR >= {snr_min} detection: {first_det.timestamp}")
@@ -113,10 +112,9 @@ class Command(BaseCommand):
                     logger.info(f"No SNR >= {snr_min} detections, skipping")
                     continue
             else:
-                first_det = target.reduceddatum_set.filter(
-                    data_type="photometry",
-                    value__magnitude__isnull=False,
-                    value__error__isnull=False).order_by("timestamp").first()
+                first_det = target.photometryreduceddatum_set.filter(
+                    brightness__isnull=False,
+                    brightness_error__isnull=False).order_by("timestamp").first()
 
             # is first detection within prescribed time window?
             if not(

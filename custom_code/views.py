@@ -137,16 +137,16 @@ class TargetReportView(PermissionListMixin, TemplateResponseMixin, FormMixin, Pr
             'dec': target.dec,
             'reporter': f'{self.request.user.get_full_name()}, on behalf of SAGUARO',
         }
-        photometry = target.reduceddatum_set.filter(data_type='photometry')
+        photometry = target.photometryreduceddatum_set.all()
         if photometry.exists():
             reduced_datum = photometry.latest()
             initial['observation_date'] = reduced_datum.timestamp
-            initial['flux'] = reduced_datum.value.get('magnitude')
-            initial['flux_error'] = reduced_datum.value.get('error')
-            filter_name = reduced_datum.value.get('filter')
+            initial['flux'] = reduced_datum.brightness
+            initial['flux_error'] = reduced_datum.brightness_error
+            filter_name = reduced_datum.bandpass
             if filter_name in TNS_FILTER_IDS:
                 initial['filter'] = (TNS_FILTER_IDS[filter_name], filter_name)
-            instrument_name = reduced_datum.value.get('instrument')
+            instrument_name = reduced_datum.instrument
             if instrument_name in TNS_INSTRUMENT_IDS:
                 initial['instrument'] = (TNS_INSTRUMENT_IDS[instrument_name], instrument_name)
         return initial

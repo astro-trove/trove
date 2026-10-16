@@ -3,10 +3,11 @@ from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from contextvars import ContextVar
 
+from django.db import transaction
 from django.db.models import Min
 from tom_targets.models import TargetExtra
-from tom_nonlocalizedevents.models import NonLocalizedEvent
-from tom_dataproducts.models import ReducedDatum
+from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
+from tom_dataproducts.models import PhotometryReducedDatum
 
 from scoring.vet_kn import vet_kn
 from scoring.vet_kn_in_sn import vet_kn_in_sn
@@ -28,9 +29,9 @@ for handler in logger.handlers:
     handler.setFormatter(new_format)
 
 _target_hook_options = ContextVar('target_hook_options', default=None)
-
+    
 def process_reduced_ztf_data(target, candidates):
-    """Ingest data from the ZTF JSON format into ``ReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
+    """Ingest data from the ZTF JSON format into ``PhotometryReducedDatum`` objects. Mostly copied from tom_base v2.13.0."""
     for candidate in candidates:
         if all(
             [
@@ -45,18 +46,17 @@ def process_reduced_ztf_data(target, candidates):
             continue
         jd = Time(candidate["candidate"]["jd"], format="jd", scale="utc")
         jd.to_datetime(timezone=TimezoneInfo())
-        value = {"filter": {1: "g", 2: "r", 3: "i"}[candidate["candidate"]["fid"]]}
+        value = {"bandpass": {1: "g", 2: "r", 3: "i"}[candidate["candidate"]["fid"]]}
         if nondetection:
             value["limit"] = candidate["candidate"]["diffmaglim"]
         else:
-            value["magnitude"] = candidate["candidate"]["magpsf"]
-            value["error"] = candidate["candidate"]["sigmapsf"]
-        rd, created = ReducedDatum.objects.get_or_create(
+            value["brightness"] = candidate["candidate"]["magpsf"]
+            value["brightness_error"] = candidate["candidate"]["sigmapsf"]
+        rd, created = PhotometryReducedDatum.objects.get_or_create(
             timestamp=jd.to_datetime(timezone=TimezoneInfo()),
-            value=value,
             source_name="ZTF",
-            data_type="photometry",
             target=target,
+            **value,
         )
         if created:  # do this afterward, in case there are duplicate candidates with distinct ZIDs
             rd.source_location = candidate["zid"]
@@ -101,16 +101,27 @@ def first_detection_window_days(nle_class, first_det_min, first_det_max):
     return first_det_min, first_det_max
 
 
-def vet_new_candidate(candidate):
+def vet_new_candidate(candidate, basic_results=None):
     """Vet a newly associated candidate for its event's class: an AGN flare for
-    a BBH event, every kilonova-style mode for anything else."""
+    a BBH event, every kilonova-style mode for anything else.
+
+    `basic_results` is the output of an earlier `vet_basic` call on this target,
+    passed through so each vetting mode doesn't rerun it."""
     target_id, event_id = candidate.target.id, candidate.nonlocalizedevent.event_id
+
+    def _basic():
+        # fresh copies so one vetting mode can't modify another's dataframes
+        if basic_results is None:
+            return None
+        host_df, agn_df, keep_vetting = basic_results
+        return host_df.copy(), agn_df.copy(), keep_vetting
+
     if get_most_likely_class(candidate.nonlocalizedevent.sequences.last().details) == "BBH":
-        vet_bbh(target_id, event_id)
+        vet_bbh(target_id, event_id, basic_results=_basic())
     else:
-        vet_kn(target_id, event_id)
-        vet_kn_in_sn(target_id, event_id)
-        vet_super_kn(target_id, event_id)
+        vet_kn(target_id, event_id, basic_results=_basic())
+        vet_kn_in_sn(target_id, event_id, basic_results=_basic())
+        vet_super_kn(target_id, event_id, basic_results=_basic())
 
 
 def associate_nle_with_target(
@@ -119,9 +130,7 @@ def associate_nle_with_target(
     # automatically associate with nonlocalized events
     new_candidates = []
     first_det = (
-        target.reduceddatum_set.filter(
-            data_type="photometry", value__magnitude__isnull=False
-        )
+        target.photometryreduceddatum_set.filter(brightness__isnull=False)
         .order_by("timestamp")
         .first()
     )
@@ -162,9 +171,8 @@ def associate_targets_with_nle(
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
 
     # query for relevant targets
-    targets = ReducedDatum.objects.filter(
-        data_type="photometry",
-        value__magnitude__isnull=False
+    targets = PhotometryReducedDatum.objects.filter(
+        brightness__isnull=False
     ).values(
         "target_id"
     ).annotate(
@@ -194,7 +202,6 @@ def target_post_save(
     **kwargs,
 ):
     """This hook runs following update of a target."""
-
     # work with kwargs + post save hook options stored in the target object itself
     # to figure out which options to use
     kwargs_defaults = dict(
@@ -203,7 +210,8 @@ def target_post_save(
         first_det_max=10,
         skip_vet_if_no_new_phot=False,
         known_associated_nle_id=None,
-        skip_vetting=False
+        skip_vetting=False,
+        run_mpc=True
     )
     
     # pack these possible options into a single dict such that
@@ -228,9 +236,9 @@ def target_post_save(
         if target.extra_fields.get("MW E(B-V)") is None:
             coord = SkyCoord(target.ra, target.dec, unit="deg")
             try:
-                mwebv = IrsaDust.get_query_table(coord, section="ebv")["ext SandF ref"][
-                    0
-                ]
+                mwebv = IrsaDust.get_query_table(
+                    coord, section="ebv"
+                )["ext SandF ref"][0]
             except Exception as e:
                 logger.error(f"Error querying IRSA dust for {target.name}")
             else:
@@ -243,31 +251,44 @@ def target_post_save(
         # vetting one target from the UI. setdefault rather than a keyword
         # because callers forward arbitrary kwargs into this hook
         opts.setdefault("stop_on_zero", False)
-        vet_basic(target.id, **opts)
+        basic_results = vet_basic(target.id, **opts)
 
-        # then check if this target is associated with any NLEs
-        new_candidates = associate_nle_with_target(
-            target,
-            lookback_days_nle=lookback_days_nle,
-            first_det_min=first_det_min,
-            first_det_max=first_det_max,
-        )
+        # the skymap queries in create_candidates_from_targets go through a separate
+        # SQLAlchemy connection that can't see this target until Target.save's
+        # transaction commits, so defer the NLE association and vetting until then
+        # (on_commit runs immediately if we aren't inside a transaction)
+        def _associate_and_vet():
+            # given a known associated NLE we can associate that
+            if known_associated_nle_id:
+                nle = NonLocalizedEvent.objects.get(event_id=known_associated_nle_id)
+                known_candidates = create_candidates_from_targets(
+                    nle.sequences.last(),
+                    target_ids=[target.id]
+                )
+                if len(known_candidates):
+                    logger.info(f'Created a new EventCandidate from {target} and {nle}')
 
-        if len(new_candidates):
-            for cand in new_candidates:
-                vet_new_candidate(cand)
-        else:
-            messages.append(
-                "Did not run NLE vetting on this target because there are no NLEs associated with it!"
+            # first, check for any existing candidates associated with this target
+            ecs = EventCandidate.objects.filter(target=target)
+            if ecs.exists():
+                for cand in ecs:
+                    # still vet this as a "new" candidate since the target recently had new
+                    # info added and saved
+                    vet_new_candidate(cand, basic_results=basic_results)
+
+            # then check if this target is associated with any NLEs
+            new_candidates = associate_nle_with_target(
+                target,
+                lookback_days_nle=lookback_days_nle,
+                first_det_min=first_det_min,
+                first_det_max=first_det_max,
             )
 
-    redshift = target.targetextra_set.filter(key="Redshift")
-    if redshift.exists() and target.distance is None:
-        messages.append(f"Updating distance of {target.name} based on redshift")
-        target.distance = (
-            settings.COSMO.luminosity_distance(target.redshift).to("Mpc").value
-        )
-        target.save()
+            if len(new_candidates):
+                for cand in new_candidates:
+                    vet_new_candidate(cand, basic_results=basic_results)
+
+        transaction.on_commit(_associate_and_vet)
 
     for message in messages:
         logger.info(message)

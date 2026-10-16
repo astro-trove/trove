@@ -65,6 +65,9 @@ jobs:
           SLACK_TOKEN_TNS = ''
           TNS_API_KEY = ''
           TREASUREMAP_API_KEY = ''
+          ANTARES_API_KEY = ""
+          ANTARES_API_SECRET = ""
+          ANTARES_GROUP_ID = ""
           EOF
 
       - name: Install package and dependencies

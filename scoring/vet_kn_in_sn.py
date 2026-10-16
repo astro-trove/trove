@@ -4,6 +4,7 @@ their resemblance to kilonovae-in-supernovae.
 """
 
 import logging
+from functools import partial
 from typing import Optional
 from astropy.time import Time, TimeDelta
 from astropy import units as u
@@ -11,7 +12,7 @@ import numpy as np
 import pandas as pd
 
 from .scoring import (
-    update_score_factor,
+    update_score_factor as _update_score_factor,
     delete_score_factor,
     clean_host_df,
     host_distance_match,
@@ -28,6 +29,7 @@ from .vet_phot import (
     get_predetection_stats,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
+    OPTICAL_FILTS,
 )
 
 from trove_targets.models import Target
@@ -38,6 +40,7 @@ from tom_nonlocalizedevents.models import (
 )
 
 logger = logging.getLogger(__name__)
+update_score_factor = partial(_update_score_factor, em_model="KN-in-SN")
 
 PARAM_RANGES = dict(
     lum_max=[5e41 * u.erg / u.s, 1e44 * u.erg / u.s],
@@ -55,6 +58,7 @@ def vet_kn_in_sn(
     target_id: int,
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
+    basic_results: Optional[tuple] = None,
 ):
     logger.info("Running KN-in-SN vetting")
 
@@ -88,7 +92,10 @@ def vet_kn_in_sn(
     update_score_factor(event_candidate, "localization_id", localization.id)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    # (unless the caller already ran vet_basic and passed in its results)
+    if basic_results is None:
+        basic_results = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = basic_results
     if not keep_vetting:
         # same as vet_kn.py
         return
@@ -150,16 +157,7 @@ def vet_kn_in_sn(
         target=target,
         nonlocalized_event=nonlocalized_event,
         param_ranges=param_ranges,
-        filt=[
-            "g",
-            "r",
-            "i",
-            "z",
-            "F129",
-            "F158",
-            "o",
-            "c",
-        ],  # common optical filters + some Roman filters + ATLAS o,c
+        filt=OPTICAL_FILTS,
     )
     if lum is not None:
         update_score_factor(event_candidate, "phot_peak_lum", lum.value)

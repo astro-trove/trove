@@ -58,6 +58,8 @@ from .dynamic_catalogs import UserGalaxy
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
 
+from scoring.util import get_possible_em_transients
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -73,7 +75,13 @@ def resolve_event_id(value):
 
 def methods_for_event(event_id):
     cls = most_likely_class_for_event(event_id)
-    return VETTING_FORM_CHOICES.get(cls, VETTING_FORM_CHOICES[""]), cls
+    transients = get_possible_em_transients(event_id)
+    methods = [VETTING_FORM_CHOICES["basic"]]
+    for tr in transients:
+        methods += [VETTING_FORM_CHOICES[tr]]
+    if not len(methods):
+        methods = list(VETTING_FORM_CHOICES.values())
+    return methods, cls
 
 
 def event_for_target(value, target_pk):
@@ -143,7 +151,7 @@ class TargetVettingFormView(LoginRequiredMixin, FormView):
             return _vetting_method_fields(form, None, self.request)
 
         form.fields["nle"].choices = [("", "\u2014 No event (Basic Vetting only) \u2014")] + [
-            (eid, f"{eid} \u2014 {methods_for_event(eid)[1] or 'unknown class'}")
+            (eid, f"{eid}")
             for eid in events
         ]
         # on POST, build the methods from the submitted event so validation sees
@@ -358,17 +366,7 @@ class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
                 nle = None
 
         if nle:
-            nle_eventseq = localization_sequence_from_name(nle.event_id)
-            nle_most_likely_class = get_most_likely_class(
-                nle_eventseq.details
-            )  # most likely class for the NLE
-            try:
-                vetting_choices = VETTING_FORM_CHOICES[nle_most_likely_class]
-            except KeyError:
-                vetting_choices = VETTING_FORM_CHOICES[
-                    ""
-                ]  # allow all types of vetting if most likely class not recognized
-
+            vetting_choices = methods_for_event(nle.event_id)[0]
             vetting_modes = [v for v, _ in vetting_choices]
             vetting_modes.remove("basic")  # no need to re-run basic vetting
             for vm in vetting_modes:
@@ -463,9 +461,7 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         form = super().get_form(*args, **kwargs)
         nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
         cls = most_likely_class_for_event(nle.event_id)
-        form.fields["vetting_method"].choices = VETTING_FORM_CHOICES.get(
-            cls, VETTING_FORM_CHOICES[""]
-        )
+        form.fields["vetting_method"].choices = methods_for_event(nle.event_id)[0]
         form.fields["vetting_method"].initial = VETTING_FORM_INITIALS.get(
             cls, VETTING_FORM_INITIALS[""]
         )
@@ -532,9 +528,7 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
         form = super().get_form(*args, **kwargs)
         nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
         cls = most_likely_class_for_event(nle.event_id)
-        form.fields["vetting_method"].choices = VETTING_FORM_CHOICES.get(
-            cls, VETTING_FORM_CHOICES[""]
-        )
+        form.fields["vetting_method"].choices = methods_for_event(nle.event_id)[0]
         form.fields["vetting_method"].initial = VETTING_FORM_INITIALS.get(
             cls, VETTING_FORM_INITIALS[""]
         )

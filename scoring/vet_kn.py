@@ -4,13 +4,14 @@ their resemblance to kilonovae.
 """
 
 import logging
+from functools import partial
 from typing import Optional
 from astropy.time import Time, TimeDelta
 from astropy import units as u
 import numpy as np
 
 from .scoring import (
-    update_score_factor,
+    update_score_factor as _update_score_factor,
     delete_score_factor,
     clean_host_df,
     host_distance_match,
@@ -27,6 +28,7 @@ from .vet_phot import (
     get_predetection_stats,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
+    OPTICAL_FILTS,
 )
 
 from trove_targets.models import Target
@@ -40,6 +42,7 @@ from candidate_vetting.vet import localization_sequence_from_name
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 
 logger = logging.getLogger(__name__)
+update_score_factor = partial(_update_score_factor, em_model="KN")
 
 from scoring.kilonova_scorer_helpers.util import (
     KilonovaScoreUnavailable,
@@ -65,6 +68,7 @@ def vet_kn(
     nonlocalized_event_name: Optional[str] = None,
     param_ranges: dict = PARAM_RANGES,
     phot_method: Optional[str] = None,
+    basic_results: Optional[tuple] = None,
 ):
     """
     `phot_method` names the photometry scorer to use. None means "read the
@@ -106,7 +110,10 @@ def vet_kn(
     update_score_factor(event_candidate, "localization_id", localization.id)
 
     ## get dataframes of potential hosts / AGN
-    host_df, agn_df, keep_vetting = vet_basic(event_candidate.target.id)
+    # (unless the caller already ran vet_basic and passed in its results)
+    if basic_results is None:
+        basic_results = vet_basic(event_candidate.target.id)
+    host_df, agn_df, keep_vetting = basic_results
     if not keep_vetting:
         # Scoring has already produced 0, so there is no point in scoring
         # the distance or photometry because it can't change the score
@@ -166,16 +173,7 @@ def vet_kn(
         target=target,
         nonlocalized_event=nonlocalized_event,
         param_ranges=param_ranges,
-        filt=[
-            "g",
-            "r",
-            "i",
-            "z",
-            "F129",
-            "F158",
-            "o",
-            "c",
-        ],  # common optical filters + some Roman filters + ATLAS o,c
+        filt=OPTICAL_FILTS
     )
     # The photometry factor can come from either scorer -- the viewer's
     # `phot_method` toggle picks. The TROVE fit above always runs regardless,

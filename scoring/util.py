@@ -10,8 +10,8 @@ import logging
 from astropy import units as u
 from astropy.units import Quantity
 from django.db import DatabaseError
-from django.db.models import Count, FloatField, Max, Min, Q
-from django.db.models.functions import Cast
+from django.db.models import Count, F, FloatField, Max, Min, Q, Window
+from django.db.models.functions import Cast, RowNumber
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django_tasks import ResultStatus
@@ -50,6 +50,7 @@ DICT_TRANSIENTS_PARAM_RANGES = {
     "AGN-flare": AGN_FLARE_PARAM_RANGES,
 }
 
+MIN_PROBABILITY_FOR_TRANSIENT = 0.01
 
 # ScoreFactor key holding KilonovaSCORER's photometry factor, written by
 # `vet_kn` when the viewer's `phot_method` toggle is on KilonovaSCORER
@@ -108,7 +109,7 @@ AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
 
 PS_WAIVED_TRANSIENTS = {"AGN-flare"}
 
-KN_STYLE_CLASSES = {"SSM", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
+KN_STYLE_CLASSES = {"SSM", "MassGap", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
 
 def ps_counts_toward(transient, agn_score):
     """Whether ps_score enters `transient`'s score."""
@@ -142,6 +143,20 @@ def _check_phot_val(val, param_ranges, param_range_key):
     return 1
 
 
+def latest_score_factors(queryset):
+    """Only the newest ScoreFactor for each (event candidate, key, EM model) in
+    `queryset`. A window filter rather than DISTINCT ON so this also works on
+    SQLite. Filters chained afterwards run before the window, so only filter
+    on event candidate / key / em_model after calling this, never on value."""
+    return queryset.annotate(
+        latest_rank=Window(
+            RowNumber(),
+            partition_by=[F("event_candidate"), F("key"), F("em_model")],
+            order_by=[F("timestamp").desc(), F("id").desc()],
+        )
+    ).filter(latest_rank=1)
+
+
 def kilonova_scores_exist(nonlocalizedevent_id=None, target_id=None):
     """Whether any KilonovaSCORER score is stored for this event and/or target."""
     qs = ScoreFactor.objects.filter(key=KILONOVA_SCORE_KEY)
@@ -161,16 +176,6 @@ def most_likely_class_for_event(nonlocalizedevent_name):
     except IndexError:
         return None
 
-
-def get_no_score_message(most_likely_class):
-    """Message for event classes with no scoring yet, else None. Takes the
-    class from most_likely_class_for_event."""
-    if most_likely_class in KN_STYLE_CLASSES | {"BBH"}:
-        return None
-
-    return f"Scoring is not yet implemented for events of class {most_likely_class or 'unknown'}."
-
-
 def get_agn_toggle(request=None) -> bool:
     """Whether this viewer wants AGN scores counted. No session, no request:
     a queued task gets the default."""
@@ -184,6 +189,48 @@ def set_agn_toggle(request, value: bool) -> bool:
     request.session[AGN_TOGGLE_KEY] = bool(value)
     return bool(value)
 
+def get_possible_em_transients(event_id):
+    try:
+        nle_eventseq = localization_sequence_from_name(event_id)
+    except IndexError:
+        return []
+
+    details = nle_eventseq.details
+    transients = []    
+
+    # we can now build the transients list of potential EM counterparts
+    if not details:
+        return transients
+
+    if "properties" in details:
+        # this is a GW alert
+        for key in ["HasNS", "HasMassGap", "HasRemnant"]:
+            if details["properties"].get(key, 0) > MIN_PROBABILITY_FOR_TRANSIENT:
+                transients.append("KN")
+                break
+        
+        has_ssm = details["properties"].get("HasSSM", 0)
+        if has_ssm > MIN_PROBABILITY_FOR_TRANSIENT:
+            transients += ["KN", "KN-in-SN", "super-KN"]
+
+    if "classification" in details:
+        # this is a GW alert
+        for key in ["BNS", "NSBH"]:
+            if details["classification"].get(key, 0) > MIN_PROBABILITY_FOR_TRANSIENT:
+                transients.append("KN")
+
+        is_bbh = details["classification"].get("BBH", 0)
+        if is_bbh > MIN_PROBABILITY_FOR_TRANSIENT:
+            transients.append("AGN-flare")
+
+    if "group" not in details:
+        if "instrument" in details and details["instrument"] == "WXT":
+            transients += ["KN", "SN", "TDE"]
+        elif "messenger" in details and details["messenger"] == "Neutrino":
+            # these are neutrino alerts
+            transients += ["AGN-flare", "TDE"]
+
+    return list(set(transients))
 
 def get_event_candidate_scores(
         event_candidates,
@@ -219,27 +266,13 @@ def get_event_candidate_scores(
     event_candidates_list = list(event_candidates)
 
     # which transient types to consider?
-    try:
-        nle_eventseq = localization_sequence_from_name(
-            event_candidates_list[0].nonlocalizedevent.event_id
-        )
-        most_likely_class = get_most_likely_class(nle_eventseq.details)
-    except IndexError:
+    if not len(event_candidates_list):
         return []
-
-    if most_likely_class in {"SSM", "Terrestrial"}:
-        transients = ["KN", "KN-in-SN", "super-KN"]
-    elif most_likely_class in {"BNS", "NSBH", "SGRB"}:
-        transients = ["KN"]
-    elif most_likely_class == "LGRB":
-        transients = ["KN", "SN"] # SN is not yet implemented as a vetting mode
-    elif most_likely_class == "FXT":
-        transients = ["KN", "SN", "TDE"] # SN and TDE are not yet implemented as a vetting mode
-    elif most_likely_class == "BBH":
-        transients = ["AGN-flare"]
-    else:
-        transients = []
-
+    
+    transients = get_possible_em_transients(
+        event_candidates_list[0].nonlocalizedevent.event_id
+    )
+    
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
 
@@ -250,19 +283,19 @@ def get_event_candidate_scores(
             target_extras_by_id[te.target_id] = {}
         target_extras_by_id[te.target_id][te.key] = te.value
 
-    # Prefetch all ScoreFactor objects at once.
-    score_factors = ScoreFactor.objects.filter(
-        event_candidate__in=event_candidates_list,
-        key__in=list(subscore_names),
+    # Prefetch the latest ScoreFactor for each (event candidate, key, EM model) at once
+    score_factors = latest_score_factors(
+        ScoreFactor.objects.filter(
+            event_candidate__in=event_candidates_list,
+            key__in=list(subscore_names),
+        )
     ).annotate(value_float=Cast("value", FloatField()))
 
-    # Group score factors by event candidate
+    # Group score factors by event candidate, then by EM model
     score_factors_by_ec = {}
     for sf in score_factors:
-        ec_id = sf.event_candidate_id
-        if ec_id not in score_factors_by_ec:
-            score_factors_by_ec[ec_id] = {}
-        score_factors_by_ec[ec_id][sf.key] = sf.value_float
+        score_factors_by_ec.setdefault(sf.event_candidate_id, {}).setdefault(
+            sf.em_model, {})[sf.key] = sf.value_float
 
     ecs_out = []
     for ec in event_candidates_list:
@@ -273,18 +306,11 @@ def get_event_candidate_scores(
             ec.subscores = {}
         
         # get all 'subscores' (sometimes actually calculated values)
-        # for object; need to re-do this per transient because of step
-        # below where we exclude certain scores from the queryset
-        sf_dict = score_factors_by_ec.get(ec.id, {})
+        # for object, keyed by the EM model whose vetting saved them
+        sf_by_model = score_factors_by_ec.get(ec.id, {})
 
-        # Extract values that need special handling
-        val_dict = {
-            _phot_score_key(subscore_key): sf_dict[subscore_key]
-            for subscore_key, param_range_key in val_not_score_keys.items()
-            if subscore_key in sf_dict
-        }
-
-        # now get all the scores stored in TargetExtra objects
+        # now get all the scores stored in TargetExtra objects, these are
+        # shared by every EM model
         te = target_extras_by_id.get(ec.target_id, {})
         ps_score = 1
         if "ps_score" in te:
@@ -292,31 +318,46 @@ def get_event_candidate_scores(
 
         mpc_score = mpc_score_from_match(te.get("mpc_match_name"))
 
-        # removed ps_score because if it is a vet_bbh() call, then ps_score of 0
-        # might just be because AGN is in the point source catalogue
-        subscore_no_phot = (
-            math.prod([sf_dict[key] for key in sf_dict
-                       if key not in exclude_keys])
-            * mpc_score
-        )
-        agn_score = sf_dict.get("agn_score")
-
         # add things to the subscores dict, if requested by the user
         if include_subscores:
             ec.subscores["ps_score"] = ps_score
             ec.subscores["mpc_score"] = mpc_score
-            for key in sf_dict:
-                if key in exclude_keys: continue
-                if key == "agn_score" and not any(agn_counts_toward(t, agn_toggle) for t in transients):
-                    continue
-                ec.subscores[key] = sf_dict[key]
-                
+
         # now for EM transient/model specific scores
         for transient in transients:
             # allowed parameter ranges for given transient
             if transient not in dict_transients_param_ranges:
                 continue # this is fine, some transient scoring algorithms aren't implemented yet
             param_ranges = dict_transients_param_ranges[transient]
+
+            # each vetting mode saves its score factors under its own EM model, and
+            # model-independent factors are shared under "basic"; the model's own
+            # factors take precedence
+            sf_dict = {**sf_by_model.get("basic", {}), **sf_by_model.get(transient, {})}
+
+            # Extract values that need special handling
+            val_dict = {
+                _phot_score_key(subscore_key): sf_dict[subscore_key]
+                for subscore_key, param_range_key in val_not_score_keys.items()
+                if subscore_key in sf_dict
+            }
+
+            # removed ps_score because if it is a vet_bbh() call, then ps_score of 0
+            # might just be because AGN is in the point source catalogue
+            subscore_no_phot = (
+                math.prod([sf_dict[key] for key in sf_dict
+                           if key not in exclude_keys])
+                * mpc_score
+            )
+            agn_score = sf_dict.get("agn_score")
+
+            if include_subscores:
+                for key in sf_dict:
+                    if key in exclude_keys: continue
+                    if key == "agn_score" and not agn_counts_toward(transient, agn_toggle):
+                        continue
+                    # keys shared by several EM models keep the first model's value
+                    ec.subscores.setdefault(key, sf_dict[key])
 
             # handle the agn and PS scores, whose behaviour changes based on the
             # expected transient type
@@ -414,10 +455,10 @@ def host_distances(event_candidates):
         return {}
 
     recorded = {}
-    for score_factor in ScoreFactor.objects.filter(
+    for score_factor in latest_score_factors(ScoreFactor.objects.filter(
         event_candidate_id__in=[c.id for c in candidates],
         key__in=("host_name", "host_catalog"),
-    ).only("event_candidate_id", "key", "value"):
+    )).only("event_candidate_id", "key", "value"):
         recorded.setdefault(score_factor.event_candidate_id, {})[
             score_factor.key] = score_factor.value
 
@@ -629,7 +670,7 @@ def get_vet_multi_progress(nonlocalizedevent_id):
     }
 
 
-def get_last_vetting(target_id, nonlocalizedevent_id=None):
+def get_last_multi_vetting(target_id, nonlocalizedevent_id=None):
     """When was this candidate last vetted?"""
     if target_id is None:
         return None
@@ -675,6 +716,24 @@ def get_last_vetting(target_id, nonlocalizedevent_id=None):
         "last": describe(finished),
         "queued_at": latest.enqueued_at if latest.status == ResultStatus.NEW else None,
     }
+
+def get_last_vet_per_candidate(candidates):
+    """Get the timestamp for the last time each candidate was vet and return a dict"""
+    return dict(
+        ScoreFactor.objects.filter(
+            event_candidate__in=candidates
+        ).annotate(
+            latest_rank=Window(
+                RowNumber(),
+                partition_by=[F("event_candidate")],
+                order_by=[F("timestamp").desc(), F("id").desc()],
+            )
+        ).filter(
+            latest_rank=1
+        ).values_list(
+            "event_candidate_id", "timestamp"
+        )
+    )
 
 
 def get_last_vet_multi_run(nonlocalizedevent_id):
