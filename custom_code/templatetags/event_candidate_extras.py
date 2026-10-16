@@ -362,16 +362,16 @@ def display_score_details(context, target_id):
 
     # Render basic card
     html = '<div class="score-details-wrapper">\n'
-    html += f'  <div class="score-card">\n'
+    html += '  <div class="score-card">\n'
     html += f'    <div class="score-card-header">{basic_card["title"]}</div>\n'
-    html += f'    <div class="score-card-content-basic">\n'
+    html += '    <div class="score-card-content-basic">\n'
     for detail in basic_card["details"]:
-        html += f'      <div class="detail-row">\n'
+        html += '      <div class="detail-row">\n'
         html += f'        <span class="detail-label">{detail["label"]}</span>\n'
         html += f'        <span class="detail-value">{detail["value"]}</span>\n'
         html += f'      </div>\n'
-    html += f'    </div>\n'
-    html += f'  </div>\n'
+    html += '    </div>\n'
+    html += '  </div>\n'
     
     # Render event tabs and cards
     if event_cards:
@@ -429,6 +429,11 @@ def display_score_details(context, target_id):
             html += '          <div class="event-cards">\n'
             for kdx, (em_transient_score_label, idxlabel) in enumerate(label_idx_map.items()): 
                 em_transient_type = em_transient_score_label.split(" ")[0]
+                print(em_transient_type)
+                print("tab label:", em_transient_score_label)
+                print("em_transient_type:", repr(em_transient_type))
+                print("only values:", {repr(d.get("only")) for d in score_details})
+                print("subscore keys:", list(ec_subscores.get(em_transient_type, {}).keys()))
                 
                 active_subclass = ""
                 if not kdx:
@@ -453,7 +458,11 @@ def display_score_details(context, target_id):
                         "score": True
                     }
 
-                html += f'              <div class="score-card-content-filled">\n'
+                print("rows:", len(rows))
+                print("score rows:", sum(_is_score_row(d) for d in rows.values()))
+
+                html += '              <table class="score-card-content-filled">\n'
+                html += '                <tbody>\n'
                 for detail in rows.values():
                     if not _is_score_row(detail): 
                         continue
@@ -461,31 +470,36 @@ def display_score_details(context, target_id):
                         detail["label"], em_transient_type, kn_is_active, agn_toggle
                     )
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
-                    html += f'                <div class="{row_class}">\n'
+                    html += f'                <tr class="{row_class}">\n'
+                    html += f'                  <td class="detail-label">{detail["label"]}</td>\n'
                     if "timestamp" in detail:
-                        html += f'                  <span class="detail-label">{detail["label"]} ({detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S")})</span>\n'
+                        html += f'                  <td class="detail-label" style="color: #00000075;">{detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S %Z")}</td>\n'
                     else:
-                        html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
-                    html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
-                    html += f'                </div>\n'
-                html += f'              </div>\n'
+                        html += '                  <td class="detail-label"></td>\n' # empty cell
+                    html += f'                  <td class="{value_class}">{detail["value"]}</td>\n'
+                    html += '                </tr>\n'
+                html += '                </tbody>\n'
+                html += '              </table>\n'
                 
                 # then the score details (max lum., etc.)
-                html += f'              <div class="score-card-content">\n'
+                html += '              <table class="score-card-content">\n'
+                html += '                <tbody>\n'
                 for detail in rows.values():
                     if _is_score_row(detail): 
                         continue
                     value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
-                    html += f'                <div class="detail-row">\n'
+                    html += '                <tr class="detail-row">\n'
+                    html += f'                  <td class="detail-label">{detail["label"]}</td>\n'
                     if "timestamp" in detail:
-                        html += f'                  <span class="detail-label">{detail["label"]} ({detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S")})</span>\n'
+                        html += f'                  <td class="detail-label" style="color: #00000075;">{detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S %Z")}</td>\n'
                     else:
-                        html += f'                  <span class="detail-label">{detail["label"]}</span>\n'
+                        html += '                  <td class="detail-label"></td>\n' # empty-cell
 
-                    html += f'                  <span class="{value_class}">{detail["value"]}</span>\n'
-                    html += f'                </div>\n'
-                html += f'              </div>\n'
-                html += f'            </div>\n'
+                    html += f'                  <td class="{value_class}">{detail["value"]}</td>\n'
+                    html += '                </tr>\n'
+                html += '              </tbody>\n'
+                html += '            </table>\n'
+                html += '          </div>\n'  # Close the current subtab-content panel
             html += '          </div>\n'
             html += '        </div>\n'
             html += '      </div>\n'
