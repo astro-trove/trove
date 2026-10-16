@@ -37,8 +37,6 @@ class UserGalaxyQ3C(models.Model):
     submitter = models.TextField(blank=True, null=True)  # submitter and original source
     og_id = models.BigIntegerField(blank=True, null=True)
 
-    # managed = True (default, specified here for clarity)
-    # --> allow Django to modify this table
     class Meta:
         managed = False
         db_table = "usergalaxy_q3c"
