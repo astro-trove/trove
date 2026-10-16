@@ -5,7 +5,7 @@ These test the management commands in custom_code/management/commands/.
 """
 import pytest
 from unittest.mock import MagicMock, patch
-
+from typing import Generator
 
 class TestRepairMigrateCommand:
     """Tests for repair_migrate management command."""
@@ -247,3 +247,21 @@ class TestSlackNotifications:
         truncated = long_error[:max_length] if len(long_error) > max_length else long_error
         
         assert len(truncated) <= max_length
+
+class TestQueryANTARESgw:
+    """Tests for the ANTARES GW localization-based query management command"""
+    
+    # CI has no database, so stub out the TargetName lookup of existing ANT* names
+    @patch(
+        "custom_code.management.commands.query_antares_gw.get_current_ant_candidate_names",
+        return_value=[],
+    )
+    def test_query_for_one_event(self, mock_names):
+        from custom_code.management.commands.query_antares_gw import query_for_one_event
+        loci = query_for_one_event("S250206dm")
+        mock_names.assert_called_once_with("S250206dm")
+        assert isinstance(loci, Generator)
+
+        test_locus = next(loci)
+        assert "locus_id" in test_locus.__dict__
+        assert test_locus.locus_id == "ANT2018ftkss"

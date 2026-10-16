@@ -87,7 +87,9 @@ def get_target_ids_in_prob_credible_region(
         
         return results
 
-def create_candidates_from_targets(eventsequence, prob=0.95, target_ids=None):
+def create_candidates_from_targets(
+        eventsequence, prob=settings.SKYMAP_PROB_CONTOUR, target_ids=None
+):
     """
     Creates an EventCandidate for each target that falls within the `prob` credible region of the localization region
     associated with `eventsequence`. If no `target_ids` are given, all targets created after the

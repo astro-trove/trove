@@ -213,6 +213,10 @@ def vet_basic(
     skip_vet_if_no_new_phot: bool = False,
     use_async_mpc: bool = False,
     stop_on_zero: bool = True,
+    query_atlas_fp: bool = True,
+    query_tns_phot: bool = True,
+    query_antares_phot: bool = True,
+    run_mpc: bool = True
 ):
     """Run the NLE-independent vetting for a target and return
     (`host_df`, `agn_df`, `keep_vetting`). `keep_vetting` is False when PS or
@@ -251,13 +255,16 @@ def vet_basic(
         forced_phot_tol=0,
         days_ago_max=days_ago_max,
         queue_priority=queue_priority,
+        query_atlas_fp=query_atlas_fp,
+        query_tns_phot=query_tns_phot,
+        query_antares_phot=query_antares_phot,
     )
     logger.info("Finding public photometry took "+
                 f"{(time.time() - phot_query_start):.2f}s")
 
     # (2) Minor Planet Center association
     # proceed if overwrite **OR** MPC score doesn't exist...
-    if overwrite or not te.filter(key="mpc_match_name").exists():
+    if run_mpc and (overwrite or not te.filter(key="mpc_match_name").exists()):
         if skip_vet_if_no_new_phot and not created_new_phot: # ... but stop if skip_vet_if_no_new_phot **AND** no new phot created
             logger.info(
                         "Skipping Minor Planet Center association because no new "

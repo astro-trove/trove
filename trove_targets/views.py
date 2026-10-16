@@ -160,11 +160,10 @@ class TroveTargetListView(TargetListView):
         # add the date of first detection
         qs = qs.annotate(
             first_detection=Min(
-                "reduceddatum__timestamp",
+                "photometryreduceddatum__timestamp",
                 filter=Q(
-                    ~Q(reduceddatum__source_name="ATLAS"), # exclude ATLAS FP which can have spurious detections
-                    reduceddatum__data_type="photometry", # only include phot, not spec
-                    reduceddatum__value__has_key="magnitude", # make sure it is a detection, not a limit
+                    ~Q(photometryreduceddatum__source_name__in=["ATLAS", "ATLAS FP"]), # exclude ATLAS FP which can have spurious detections
+                    photometryreduceddatum__brightness__isnull=False, # make sure it is a detection, not a limit
                 )
             )
         )
