@@ -35,6 +35,13 @@ VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
          ("AGN-flare", "Transient: BBH-induced AGN Flare"),
         ]
     }
+VETTING_FORM_CHOICES = {
+    "basic":("basic", "Basic Vetting"),
+    "KN":("KN", "Transient: Kilonova"),
+    "KN-in-SN":("KN-in-SN", "Transient: Kilonova-in-Supernova"),
+    "super-KN":("super-KN", "Transient: Super-Kilonova"),
+    "AGN-flare":("AGN-flare", "Transient: BBH-induced AGN Flare")
+}
 
 VETTING_FORM_INITIALS = {
     "": ("basic", "Basic Vetting"),
@@ -51,7 +58,6 @@ FORM_CHOICE_FUNC_MAP = { # this should have the same keys as the first value in 
     "super-KN":vet_super_kn,
     "AGN-flare":vet_bbh,
 }
-
 
 DETECTION_HORIZON_DEFAULTS = { # time horizon (min, max) for first detections, dependent on NLE
     "": (0, 10), # if NLE most likely class not known, 0, 10
