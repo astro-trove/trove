@@ -27,6 +27,33 @@ from custom_code.templatetags.photometry_extras import error_to_snr
 logger = logging.getLogger(__name__)
 
 FILTER_PRIORITY_ORDER = ["r", "g", "V", "R", "G"]
+
+# common optical filters + ATLAS o,c + other misc optical survey filters 
+OPTICAL_FILTS = [
+    # SDSS ugrizy
+    "u"
+    "g",
+    "r",
+    "i",
+    "z",
+    "y",
+    
+    # Johnson-Cousins
+    "U",
+    "B",
+    "V",
+    "R",
+    "I",
+
+    # ATLAS
+    "o",
+    "c",
+
+    # other, misc
+    "G", # GAIA G
+    "w", # Pan-STARRS wide
+]
+    
 PHOT_SCORE_MIN = 0.1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
