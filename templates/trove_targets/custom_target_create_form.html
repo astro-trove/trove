@@ -1,10 +1,10 @@
 {% extends 'tom_common/base.html' %}
 {% load django_bootstrap5 targets_extras crispy_forms_tags %}
 
-{% block title %}New Target{% endblock %}
+{% block title %}New Candidate{% endblock %}
 {% block content %}
 {% if not object %}
-  <h3>Create a Target</h3>
+  <h3>Create a Candidate</h3>
   <ul class="nav nav-tabs mb-2">
     {% for k, v in type_choices %}
       <li class="nav-item">
