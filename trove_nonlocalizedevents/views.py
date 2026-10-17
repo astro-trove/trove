@@ -72,7 +72,7 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
 DISTANCE_TYPE_PATTERNS = {
     "spec-z": ["spec-z", "user spec-z"],
     "photo-z": ["photo-z"],
-    "z-ind": ["z ind.", "z-ind."],
+    "z-ind.": ["z-ind.", "spec-z/z-ind."], # put spec-z/z-ind. on same footing as z-ind.
 }
 
 #: sub-score columns, chosen by how the event is scored. agn_score is left out
