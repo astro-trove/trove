@@ -67,12 +67,13 @@ def scored_candidates_cache_key(query_params, agn_toggle, phot_method):
             f"_{agn_toggle}_{phot_method}")
 
 
-#: z_type strings that count as each kind of distance measurement, as stored in
-#: the "Host Galaxies" TargetExtra. "user spec-z" is a spectroscopic redshift too.
+# z_type strings that count as each kind of distance measurement, as stored in
+# the "Host Galaxies" TargetExtra. "user spec-z" is a spectroscopic redshift too.
+# some JSON configs escape the / character
 DISTANCE_TYPE_PATTERNS = {
-    "spec-z": ["spec-z", "user spec-z"],
+    "spec-z": ["spec-z", "user spec-z", "spec-z/z-ind.", r"spec-z\/z-ind."],
     "photo-z": ["photo-z"],
-    "z-ind.": ["z-ind.", "spec-z/z-ind."], # put spec-z/z-ind. on same footing as z-ind.
+    "z-ind.": ["z-ind.", "spec-z/z-ind.", r"spec-z\/z-ind."],
 }
 
 #: sub-score columns, chosen by how the event is scored. agn_score is left out
@@ -179,7 +180,7 @@ def filter_candidates(qs, get):
     if distance_type in DISTANCE_TYPE_PATTERNS:
         match = Q()
         for pattern in DISTANCE_TYPE_PATTERNS[distance_type]:
-            match |= Q(value__icontains=f'"z_type":"{pattern}')
+            match |= Q(value__icontains=f'"z_type":"{pattern}"')
         host_targets = TargetExtra.objects.filter(
             Q(key="Host Galaxies") & match
         ).values_list("target_id", flat=True)
