@@ -1,0 +1,12 @@
+{% load django_bootstrap5 static %}
+<h4>Upload Photometry / Spectroscopy</h4>
+<h6>Only superusers can use this feature. Regular users should upload via TNS.</h6>
+<br>
+<p>
+  For example CSVs, see the <a href="{% static 'tom_dataproducts/photometry_sample.csv' %}">photometry</a> and <a href="{% static 'tom_dataproducts/spectrum_sample.csv' %}">spectroscopy</a> sample files. FITS is supported for spectra.
+</p>
+<form method="POST" action="{% url 'tom_dataproducts:upload' %}" enctype="multipart/form-data">
+  {% csrf_token %}
+  {% bootstrap_form data_product_form %}
+  {% bootstrap_button "Upload" button_type="submit" button_class="btn btn-primary" value="Upload" name="upload_dataproduct_form" %}
+</form>
