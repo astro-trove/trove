@@ -366,7 +366,7 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     # start with user-provided host spec z's
     if "z_type" in host_df.columns:
         userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
-        ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+        ind_distance_hosts = host_df[host_df.z_type.isin(["z-ind.", "spec-z/z-ind."])]
         specz_hosts = host_df[host_df.z_type.str.contains("spec-z", na=False)]
     else:
         _none = host_df.iloc[:0]
