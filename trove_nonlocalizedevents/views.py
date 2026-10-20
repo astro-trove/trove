@@ -524,9 +524,26 @@ def generate_report(request):
     nle_name = NonLocalizedEvent.objects.get(id=nle_id)
 
     text = f"""
-We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational wave (GW) event {nle_name} using the Multi-messenger Tool for Rapid Object Vetting and Examination (TROVE). We searched within the 95th percentile localization region for candidate optical counterparts in host galaxies at the approximate luminosity distance of {nle_name}. We further crossmatch to minor planet, point source, and AGN catalogs and rule out sources that do not appear photometrically similar to kilonova light curves. For additional details, see the vetting procedures described in N. Franz, et al., 2025, arXiv:2510.17104.
+We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational wave 
+(GW) event {nle_name} using the Multi-messenger Tool for Rapid Object Vetting and 
+Examination (TROVE). We searched within the 95th percentile localization region for 
+candidate electromagnetic (EM) counterparts in host galaxies at the approximate 
+luminosity distance of {nle_name}. We further crossmatch to minor planet, point source, 
+and AGN catalogs and rule out sources that do not appear photometrically similar to 
+expected transients. For additional details, see the vetting procedures described in 
+N. Franz, et al., 2025 (ApJL 994, 2, L45) and Vieira et al., 2026 (ApJ 1007, 2, 116).
 
-Below, we report the top {ncands} candidates that remain viable after running our vetting procedure using publicly available information on all publicly reported sources, to date, on the Transient Name Server (TNS).  We include their TNS identifier, instrument with earliest detection, coordinates, cumulative probability at the coordinate location in the latest LVK map, most likely host redshift, joint GW luminosity distance and candidate redshift probability, most recent magnitude, epoch of that most recent magnitude, TROVE KN score. Candidates are ranked using a scoring procedure designed to identify kilonova counterparts to GW events (N. Franz, et al., 2025, arXiv:2510.17104). The reported candidates are not clearly identified as kilonovae.
+Below, we report the top {ncands} candidates that remain viab, arXiv:2510.17104le after running our 
+vetting procedure using publicly available information on all publicly reported 
+sources, to date, on the Transient Name Server (TNS) or ingested with ANTARES.  We 
+include their TNS/ANTARES identifier, instrument with earliest detection, coordinates, 
+cumulative probability at the coordinate location in the latest LVK map, most likely 
+host redshift, joint GW luminosity distance and candidate redshift probability, most 
+recent magnitude, epoch of that most recent magnitude, and TROVE score (kilonova, 
+AGN-flare, kilonova-in-supernova, or super-kilonova, based on the type of GW event). 
+Candidates are ranked using a scoring procedure designed to identify counterparts to GW 
+events (N. Franz, et al., 2025 and Vieira et al., 2026). The reported candidates are 
+not clearly identified as EM counterparts to {nle_name}.
 
 | Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most Likely Host-z | Joint Distance Probability | Most Recent Mag | Most Recent Mag Time [MJD] | TROVE Score |
 | :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
@@ -577,7 +594,7 @@ Below, we report the top {ncands} candidates that remain viable after running ou
 
             host_str = f"{float(host_info['z']):.3f} ({host_info['Source']} {host_info['z_type']})"
 
-        except (AttributeError, IndexError):
+        except (AttributeError, IndexError, TypeError):
             host_str = None
 
         # get photometry info
