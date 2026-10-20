@@ -39,6 +39,11 @@ class TroveTargetTable(HTMXTable):
     first_detection = tables.Column(verbose_name="First Detection")
     associated_events = _EventIDListColumn(verbose_name="Associated Events")
 
+    def render_first_detection(self, value):
+        if value is None:
+            return "—"
+        return value.strftime("%Y-%m-%d %H:%M:%S %Z")
+
     class Meta(HTMXTable.Meta):
         model = Target # the model to pull the table info from
         fields = ['name', '_ra', '_dec', 'first_detection', '_z', 'associated_events'] # the columns in the table

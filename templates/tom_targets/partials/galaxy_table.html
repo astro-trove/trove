@@ -29,27 +29,25 @@
 	        <td>{{ galaxy.Dist|floatformat:1 }} (no err.)</td>  
       	  {% else %}
             <td>{{ galaxy.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ galaxy.DistErr|floatformat:1 }} </td>
+	      {% endif %}
 	    {% endif %}
-	{% endif %}
       {% else %}
         <td> </td>
       {% endif %}
       {% if galaxy.z and galaxy.z|floatformat != 'nan'%}
         {% if galaxy.zErr|islist %}
           <td> {{ galaxy.z }}<span class="supsubz"><sup>+{{ galaxy.zErr.1 }}</sup><sub>-{{ galaxy.zErr.0 }}</sub></span> </td>
-          <td> {{ galaxy.z_type }} </td>
-	{% else %}
-	  {% if galaxy.zErr|floatformat == 'nan' %}
-	    <td> {{ galaxy.z|floatformat:2 }} (no err.) </td>
-	  {% else %}
+	    {% else %}
+	      {% if galaxy.zErr|floatformat == 'nan' %}
+	        <td> {{ galaxy.z|floatformat:2 }} (no err.) </td>
+	      {% else %}
             <td> {{ galaxy.z }}&nbsp;&plusmn;&nbsp;{{ galaxy.zErr }} </td>
-	  {% endif %}
-	  <td> {{ galaxy.z_type }} </td>
-	{% endif %}
+	      {% endif %}
+	    {% endif %}
       {% else %}
         <td> </td>
-        <td> </td>
       {% endif %}
+      <td> {{ galaxy.z_type }} </td>
       <td>{% if galaxy.Filter %}<i>{{ galaxy.Filter }}</i>&nbsp;=&nbsp;{% endif %}{{ galaxy.Mags|floatformat:1 }}</td>
       <!-- <td>{{ galaxy.Source }}</td> -->
       <td>{{ galaxy.Submitter }}</td>
