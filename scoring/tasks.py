@@ -12,7 +12,7 @@ from django_tasks import task
 from django.conf import settings
 from django.utils import timezone
 
-from candidate_vetting.public_catalogs.phot_catalogs import ATLAS_Forced_Phot
+from tom_dataproducts.tasks import atlas_query
 from candidate_vetting.vet import run_mpc
 
 from custom_code.healpix_utils import (
@@ -29,10 +29,11 @@ from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
 
 
 ## tasks
-@task(queue_name="atlas_fphot", priority=settings.PRIORITY_MID, backend=settings.TASK_BACKEND)
-def async_atlas_query(target_id: int, *args, **kwargs) -> None:
-    t = Target.objects.get(id=target_id)
-    ATLAS_Forced_Phot("atlas").query(t, token=settings.ATLAS_API_KEY, *args, **kwargs)
+async_atlas_query = atlas_query.using(
+    queue_name="atlas_fphot",
+    priority=settings.PRIORITY_LOW,
+    backend=settings.TASK_BACKEND
+)
 
 
 @task(queue_name="mpc", priority=settings.PRIORITY_MID, backend=settings.TASK_BACKEND)
