@@ -4,6 +4,7 @@ from django.forms import (
     ChoiceField,
     FloatField,
     CharField,
+    BooleanField,
     # RadioSelect,
     Select
 )
@@ -111,3 +112,7 @@ class NonLocalizedEventAssociateTargetsForm(Form):
     first_det_tmin = FloatField(label=r"Minimum time [days]")
     first_det_tmax = FloatField(label="Maximum time [days]")
     snr_min = FloatField(label="SNR minimum [default 5.0]", required=False)
+
+class DissociateSelectedTargetsForm(Form):
+    confirm = BooleanField(label="I want to dissociate the selected candidate(s) from "+
+                           "the event.", required=True)

@@ -165,8 +165,6 @@
   <div class="d-flex justify-content-center">
     {% bootstrap_pagination page_obj extra=request.GET.urlencode %}
   </div>
-
-
   </div>
 </div>
 
@@ -174,7 +172,6 @@
 // keeps the button's count in step with the boxes, and drives select-all
 function wireCandidateSelection() {
     var boxes = Array.prototype.slice.call(document.querySelectorAll('.candidate-select'));
-    var count = document.getElementById('vet-selected-count');
     var btn = document.getElementById('vet-selected-btn');
     if (!boxes.length) { return; }
 
@@ -184,17 +181,19 @@ function wireCandidateSelection() {
     var anchor = null;   // where a shift-range starts, as in a file explorer
 
     function refresh() {
+        var selectedCount = document.getElementById('vet-selected-count');
+        var exportCount = document.getElementById('export-selected-count');
+        var dissociateCount = document.getElementById('dissociate-selected-count');
+
         var n = boxes.filter(function (b) { return b.checked; }).length;
-        if (matching && matching.checked) {
-            if (count) { count.textContent = total; }
-            if (btn) { btn.disabled = total === 0; }
-        } else {
-            if (count) { count.textContent = n; }
-            if (btn) { btn.disabled = n === 0; }
-        }
-        rows.forEach(function (row, i) {
-            row.classList.toggle('table-active', boxes[i].checked);
+        var display = (matching && matching.checked) ? total : n;
+        var isEmpty = display === 0;
+
+        [selectedCount, exportCount, dissociateCount].forEach(function (el) {
+            if (el) { el.textContent = display; }
         });
+
+        if (btn) { btn.disabled = isEmpty; }
     }
 
     // any hand-picked change means the selection is no longer "everything"
@@ -282,7 +281,9 @@ if (!window.candidateSelectionBound) {
 
 function openSummaryModal() {
     const nleId = "{{ request.GET.nonlocalizedevent }}";
-    fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=5`)
+    const n = prompt("How many top candidates to include?", "5");
+    if (n === null) { return; }  // user cancelled
+    fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=${encodeURIComponent(n)}`)
     .then(r => {
         if (!r.ok) throw new Error(`Report request failed (${r.status})`);
         return r.json();
