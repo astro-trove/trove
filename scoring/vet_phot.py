@@ -700,7 +700,8 @@ def find_public_phot(
             min_date_mjd=Time.now().mjd-min(
                 days_ago_max, days_ago
             ),  # this min ensures we never query more than days_ago_max
-            max_date_mjd=Time.now(),
+            max_date_mjd=Time.now().mjd,
+            target_id=target.id,
             data_product_type="atlas_photometry"
         )
 
