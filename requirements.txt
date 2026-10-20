@@ -38,11 +38,11 @@ skypatrol==0.6.21
 slack_sdk==3.42.0
 specutils==1.20.3
 sphinx==9.0.4
-candidate_vetting @ git+https://github.com/astro-trove/candidate_vetting.git@v0.6.0
+candidate_vetting @ git+https://github.com/astro-trove/candidate_vetting.git@update-atlas-fp
 sphinx_book_theme==1.2.0
 sphinx_design==0.7.0
 SQLAlchemy==2.0.50
-tomtoolkit==3.1.0
+tomtoolkit @ git+https://github.com/noahfranz13/tom_base.git@detach-atlas-fp-submit-from-data-processing
 tom-alertstreams==1.3.0
 tom-nonlocalizedevents @ git+https://github.com/TOMToolkit/tom_nonlocalizedevents.git@1.0.0
 whitenoise==6.12.0
