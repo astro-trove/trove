@@ -276,7 +276,7 @@ DATA_PRODUCT_TYPES = {
 DATA_PROCESSORS = {
     "photometry": "tom_dataproducts.processors.photometry_processor.PhotometryProcessor",
     "spectroscopy": "custom_code.processors.spectroscopy_processor.SpectroscopyProcessor",
-    # TODO: custom processor for ATLAS forced photometry
+    'atlas_photometry': 'candidate_vetting.atlas.ClippedStackedAtlasProcessor',   
 }
 
 TOM_ALERT_CLASSES = [

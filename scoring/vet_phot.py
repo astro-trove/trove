@@ -697,10 +697,12 @@ def find_public_phot(
         async_atlas_query.using(
             priority=queue_priority  # this sets the priority to whatever is passed in
         ).enqueue(
-            target.id,
-            days_ago=min(
+            min_date_mjd=Time.now().mjd-min(
                 days_ago_max, days_ago
             ),  # this min ensures we never query more than days_ago_max
+            max_date_mjd=Time.now().mjd,
+            target_id=target.id,
+            data_product_type="atlas_photometry"
         )
 
     return created_new_tns_phot
