@@ -53,3 +53,5 @@ DUSTMAPS_DIR=None # set to the local path for SFD dustmaps, or leave as 'None' t
 ANTARES_API_KEY = ""
 ANTARES_API_SECRET = ""
 ANTARES_GROUP_ID = ""
+
+ATLAS_CALLBACK_URL = "https://datatrove-test.as.arizona.edu/dataproducts/api/atlas_processor/"
