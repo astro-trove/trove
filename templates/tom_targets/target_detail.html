@@ -1,5 +1,6 @@
 {% extends 'tom_targets/partials/base.html' %}
 {% load comments django_bootstrap5 tom_common_extras targets_extras observation_extras dataproduct_extras target_list_extras photometry_extras cache target_extras spectroscopy_extras event_candidate_extras static %}
+{% load dataservices_extras %}
 {% block title %}Target {{ object.name }}{% endblock %}
 {% block content %}
 
@@ -29,6 +30,7 @@
       <li class="nav-item">
         <a class="nav-link active" id="score-details-tab" href="#score-details" role="tab" data-bs-toggle="tab"><h5>Score Details</h5></a>
       </li>
+
       {% if nphot %}
       <li class="nav-item">
         <a class="nav-link" id="photometry-tab" href="#photometry" role="tab" data-bs-toggle="tab"><h5>Photometry</h5></a>
@@ -37,6 +39,11 @@
       {% if nspec %}
       <li class="nav-item">
         <a class="nav-link" id="spectroscopy-tab" href="#spectroscopy" role="tab" data-bs-toggle="tab"><h5>Spectroscopy</h5></a>
+      </li>
+      {% endif %}
+      {% if request.user.is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link" id="manage-data-tab" href="#manage-data" role="tab" data-bs-toggle="tab"><h5>Upload Data</h5></a>
       </li>
       {% endif %}
       <li class="nav-item">
@@ -58,6 +65,9 @@
 	  <summary><h5 style="display:inline-block">Photometry Table</h5></summary>
 	  {% get_photometry_data object %}
 	</details>
+	</div>
+      <div class="tab-pane" id="manage-data">
+        {% upload_dataproduct object %}
       </div>
       <div class="tab-pane" id="spectroscopy">
 	{% spectroscopy_for_target target %}

@@ -46,7 +46,7 @@ update_score_factor = partial(_update_score_factor, em_model="KN")
 
 from scoring.kilonova_scorer_helpers.util import (
     KilonovaScoreUnavailable,
-    score_candidate as kilonova_score_candidate,
+    kilonova_score_candidate,
     DT_MAX,
 )
 from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method

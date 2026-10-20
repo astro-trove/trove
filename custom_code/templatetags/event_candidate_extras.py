@@ -146,8 +146,8 @@ def scoring_toggles(context, target_id=None):
 
     return {
         "show": True,
-        "agn_toggle": _get_agn_toggle(request),
-        "is_kilonova": _get_phot_method(request) == PHOT_METHOD_KILONOVASCORER and not kilonova_locked,
+        "agn_toggle": get_agn_toggle(context),
+        "is_kilonova": get_phot_method(context) == PHOT_METHOD_KILONOVASCORER and not kilonova_locked,
         "kilonova_locked": kilonova_locked,
         "next": request.get_full_path(),
     }
@@ -161,8 +161,8 @@ def last_vet_multi_card(target_id):
 
 @register.simple_tag(takes_context=True)
 def display_score_details(context, target_id):
-    request = context['request']
-    nle_requested = request.GET.get('nonlocalizedevent')
+    request = context["request"]
+    nle_requested = request.GET.get("nonlocalizedevent")
     
     if target_id is None:
         return "Target ID is None!"
@@ -402,11 +402,13 @@ def display_score_details(context, target_id):
             # always on while the candidate list scored with the toggle -- one
             # candidate, two numbers. Also lets the AGN row say truthfully
             # whether it fed the score.
-            agn_toggle = _get_agn_toggle(context["request"])
+            agn_toggle = get_agn_toggle(context)
+            phot_method = get_phot_method(context)
             ec_score_details = _get_event_candidate_scores(
                 [ec],
                 include_subscores=True,
                 agn_toggle=agn_toggle,
+                phot_method=phot_method,
             )[0]
             ec_scores = ec_score_details.score
             ec_subscores = ec_score_details.subscores

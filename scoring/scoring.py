@@ -61,7 +61,7 @@ def clean_host_df(host_df: pd.DataFrame) -> pd.DataFrame:
         return host_df
 
     z = pd.to_numeric(host_df.z, errors="coerce")
-    host_df = host_df[z.notna() & ~z.isin(Z_BAD_VALUES)]
+    host_df = host_df[~z.isin(Z_BAD_VALUES)]
 
     for col in ("lumdist", "Dist"):
         if col in host_df.columns:
@@ -201,7 +201,7 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
         return max_score, max_score_host_name, max_score_host_catalog
 
     # then use the redshift independent measurements of distances
-    ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+    ind_distance_hosts = host_df[host_df.z_type.isin(["z-ind.", "spec-z/z-ind."])]
     ind_distance_hosts.reset_index(inplace=True)  # avoid iloc exception
     if ind_distance_hosts["hybrid_distance_score"].notna().any():
         max_score = ind_distance_hosts.hybrid_distance_score.max()
@@ -366,7 +366,7 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
     # start with user-provided host spec z's
     if "z_type" in host_df.columns:
         userz_distance_hosts = host_df[host_df.z_type == "user spec-z"]
-        ind_distance_hosts = host_df[host_df.z_type == "z ind."]
+        ind_distance_hosts = host_df[host_df.z_type.isin(["z-ind.", "spec-z/z-ind."])]
         specz_hosts = host_df[host_df.z_type.str.contains("spec-z", na=False)]
     else:
         _none = host_df.iloc[:0]

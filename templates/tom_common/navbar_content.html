@@ -29,8 +29,16 @@
         </li>
     </ul>
 </li>
-<li class="nav-item {% if 'targets' in request.resolver_match.route %}active{% endif %}">
-    <a class="nav-link" href="{% url 'trove_targets:targetlist' %}">EM Candidates</a>
+<li class="nav-item dropdown {% if 'targets' in request.resolver_match.route %}active{% endif %}">
+    <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown">EM Candidates</a>
+    <ul class="dropdown-menu">
+        <li class="dropdown-item">
+            <a class="nav-link" href="{% url 'trove_targets:targetlist' %}" style="color:black"">All Candidates</a>
+        </li>
+        <li class="dropdown-item">
+            <a class="nav-link" href="{% url 'targets:create' %}" style="color:black"">Create a Candidate</a>
+        </li>
+    </ul>
 </li>
 <li class="nav-item {% if request.resolver_match.namespace == '/docs' %}active{% endif %}">
   {% if request.user.is_authenticated %}

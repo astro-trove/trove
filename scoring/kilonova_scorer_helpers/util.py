@@ -20,7 +20,6 @@ RUNG_LADDER_MPC = (
     300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0,
 )
 
-# DIAGNOSTIC: 202/456 candidates for S251112cm are greater than this
 MAX_DISTANCE_MPC = 1000.0
 
 DT_MIN, DT_MAX = 0.0, 30.0
@@ -271,7 +270,7 @@ def _cumulative_factor(results: pd.DataFrame) -> float:
     return float(np.clip(value, 0.0, 1.0))
 
 
-def score_candidate(
+def kilonova_score_candidate(
     target_id: int,
     nonlocalized_event,
     candidate_name: Optional[str] = None,
