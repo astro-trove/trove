@@ -297,7 +297,10 @@ View the built documentation in `docs/_build/html/index.html`
 
 ## Getting Help
 
-Questions? Reach out!
+Questions? Reach out! You can reach current developers at
+1. The [TROVE Slack](https://join.slack.com/t/trove-9ld3754/shared_invite/zt-47yroqfkh-1leL66TmhfMtiLuUUKrO7Q)
+2. via [GitHub Issues](https://github.com/astro-trove/trove/issues/new)
+3. The TROVE email: astrotrove@gmail.com
 
 ## Additional Resources
 
