@@ -414,12 +414,7 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         return self.request.POST.getlist("candidates")
 
     def candidates(self):
-        """The candidates to vet: the ticked rows, or every row matching the
-        filters when the user asked for all of them.
-
-        Checkboxes only reach the server for the page you can see, so "select
-        all" re-applies the table's own filters rather than posting 456 ids.
-        """
+        """Selected candidates"""
         scoped = EventCandidate.objects.filter(
             nonlocalizedevent_id=self.kwargs["pk"]
         ).select_related("target")
@@ -603,7 +598,7 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
         messages.info(
             self.request,
             f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} vetting "
-            f"and {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. This "
+            f"mode and {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. This "
             "takes a few seconds per candidate; check back shortly.",
         )
         return back
@@ -695,13 +690,6 @@ class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):
         )  # this redirects back to the NLE page
 
 
-class TargetExportSelectedView(LoginRequiredMixin, FormView):
-    """Export selected targets to a .csv file."""
-
-    template_name = "scoring/vetting_form.html"
-    form_class = VettingChoiceForm
-
-
 class TargetDissociateSelectedFormView(LoginRequiredMixin, FormView):
     """Dissociate selected candidates from the event."""
 
@@ -713,12 +701,7 @@ class TargetDissociateSelectedFormView(LoginRequiredMixin, FormView):
 
 
     def candidates(self):
-        """The candidates to vet: the ticked rows, or every row matching the
-        filters when the user asked for all of them.
-
-        Checkboxes only reach the server for the page you can see, so "select
-        all" re-applies the table's own filters rather than posting 456 ids.
-        """
+        """Selected candidates"""
         scoped = EventCandidate.objects.filter(
             nonlocalizedevent_id=self.kwargs["pk"]
         ).select_related("target")
