@@ -1,4 +1,6 @@
 import json
+import csv
+import io
 from django.conf import settings
 from django_filters.views import FilterView
 from django.core.cache import cache
@@ -6,11 +8,12 @@ from django.core.paginator import Paginator
 from django.db.models import Min, Q
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponse, QueryDict
+from django.http import JsonResponse, HttpResponse, HttpResponseBadRequest, QueryDict
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
 from django.views.generic.base import View
+from django.views.decorators.http import require_POST
 from django.contrib import messages
 
 from trove_targets.models import Target
@@ -657,6 +660,150 @@ We encourage additional follow up of these candidates to determine whether they 
     )
 
     return JsonResponse({"text": "\n".join(lines)})
+
+
+@require_POST
+def generate_report_csv(request):
+    nle_id = request.GET.get("nonlocalizedevent")
+    print(nle_id)
+    nle_name = NonLocalizedEvent.objects.get(id=nle_id)
+
+    scoped = EventCandidate.objects.filter(
+        nonlocalizedevent_id=nle_id
+    ).select_related("target", "nonlocalizedevent")
+
+    if request.POST.get("select_all_matching"):
+        from trove_nonlocalizedevents.permissions import candidates_for_user
+        from trove_nonlocalizedevents.views import filter_candidates
+
+        params = QueryDict(request.POST.get("filters", ""))
+        scoped = filter_candidates(candidates_for_user(request.user, scoped), params)
+        target_name = params.get("target__name")
+        if target_name:
+            scoped = scoped.filter(target__name__icontains=target_name)
+
+        from trove_nonlocalizedevents.views import _as_float, within_max_distance
+        from scoring.util import host_distances
+
+        distance_max = _as_float(params.get("distance_max"))
+        if distance_max is not None:
+            scoped = list(scoped)
+            scoped = within_max_distance(scoped, host_distances(scoped), distance_max)
+    else:
+        selected_ids = request.POST.getlist("candidates")
+        if not selected_ids:
+            return HttpResponseBadRequest("No candidates selected.")
+        scoped = scoped.filter(id__in=selected_ids)
+
+    candidates = list(get_event_candidate_scores(scoped, agn_toggle=False))
+
+    subscore_keys_to_report = ["skymap_score", "host_distance_score"]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Name",
+        "Initial Detecting Instrument",
+        "RA [HMS]",
+        "Dec [DMS]",
+        "Localization Score",
+        "Most Likely Host z",
+        "Distance Score",
+        "Most Recent Mag",
+        "Most Recent Mag Time [MJD]",
+        "TROVE Score",
+    ])
+
+    for ec in candidates:
+        t = ec.target
+        ra, dec = (
+            SkyCoord(t.ra, t.dec, unit="deg")
+            .to_string("hmsdms", precision=2)
+            .split(" ")
+        )
+
+        sf = latest_score_factors(ScoreFactor.objects.filter(
+            event_candidate=ec, key__in=subscore_keys_to_report
+        ))
+
+        try:
+            loc_prob = f"{float(sf.filter(key='skymap_score').first().value):.2f}"
+        except AttributeError:
+            loc_prob = None
+
+        try:
+            host_score = f"{float(sf.filter(key='host_distance_score').first().value):.2f}"
+        except AttributeError:
+            host_score = None
+
+        try:
+            host_info = json.loads(
+                TargetExtra.objects.filter(target_id=t.id, key="Host Galaxies")
+                .first()
+                .value
+            )
+            if isinstance(host_info, list):
+                host_info = host_info[0]
+            host_str = f"{float(host_info['z']):.3f} ({host_info['Source']} {host_info['z_type']})"
+        except (AttributeError, IndexError, TypeError):
+            host_str = None
+
+        first_phot = PhotometryReducedDatum.objects.filter(
+            target_id=t.id, brightness__isnull=False, brightness_error__isnull=False
+        ).first()
+        if first_phot:
+            src_first = first_phot.source_name
+            if first_phot.instrument:
+                src_str_first = f"{src_first}; {first_phot.instrument} {first_phot.bandpass}"
+            elif first_phot.telescope:
+                src_str_first = f"{src_first}; {first_phot.telescope} {first_phot.bandpass}"
+            else:
+                src_str_first = f"{src_first}; {first_phot.bandpass}"
+            src_str_first = src_str_first.replace(" (TNS)", "")
+        else:
+            src_str_first = None
+
+        latest_phot = PhotometryReducedDatum.objects.filter(
+            target_id=t.id
+        ).order_by("timestamp").last()
+        if latest_phot:
+            src_latest = latest_phot.source_name
+            if latest_phot.instrument:
+                src_str_latest = f"({latest_phot.instrument} {latest_phot.bandpass}; {src_latest})"
+            elif latest_phot.telescope:
+                src_str_latest = f"({latest_phot.telescope} {latest_phot.bandpass}; {src_latest})"
+            else:
+                src_str_latest = f"({latest_phot.bandpass}; {src_latest})"
+
+            if latest_phot.brightness is not None:
+                phot_str_latest = f"{latest_phot.brightness:.2f} +/- {latest_phot.brightness_error:.2f} {src_str_latest}"
+            else:
+                phot_str_latest = f">{latest_phot.limit:.2f} {src_str_latest}"
+
+            epoch_str_latest = f"{float(Time(latest_phot.timestamp).mjd):.5f}"
+        else:
+            phot_str_latest = None
+            epoch_str_latest = None
+
+        best_score = max(ec.score.values()) if ec.score else float("nan")
+
+        writer.writerow([
+            t.name,
+            src_str_first,
+            ra,
+            dec,
+            loc_prob,
+            host_str,
+            host_score,
+            phot_str_latest,
+            epoch_str_latest,
+            f"{best_score:.2f}",
+        ])
+
+    response = HttpResponse(output.getvalue(), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="trove_report_{nle_name}.csv"'
+    return response
 
 
 def _return_to(request, fallback):

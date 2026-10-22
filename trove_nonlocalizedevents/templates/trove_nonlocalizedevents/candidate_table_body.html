@@ -304,4 +304,36 @@ function copyText() {
         setTimeout(() => btn.innerHTML = '<i class="fa fa-copy"></i> Copy', 2000);
     });
 }
+
+function openCsvDownload() {
+    const selectAll = document.getElementById('select-all-matching');
+    const anyChecked = document.querySelectorAll('.candidate-select:checked').length > 0;
+
+    if (!selectAll?.checked && !anyChecked) {
+        alert("Please select at least one candidate before downloading.");
+        return;
+    }
+
+    const csvForm = document.getElementById('export-csv-form');
+    csvForm.querySelectorAll('input[name="candidates"]').forEach(el => el.remove());
+    csvForm.querySelector('input[name="select_all_matching"]')?.remove();
+
+    document.querySelectorAll('.candidate-select:checked').forEach(el => {
+        const copy = document.createElement('input');
+        copy.type = 'hidden';
+        copy.name = 'candidates';
+        copy.value = el.value;
+        csvForm.appendChild(copy);
+    });
+
+    if (selectAll?.checked) {
+        const copy = document.createElement('input');
+        copy.type = 'hidden';
+        copy.name = 'select_all_matching';
+        copy.value = '1';
+        csvForm.appendChild(copy);
+    }
+
+    csvForm.submit();
+}
 </script>

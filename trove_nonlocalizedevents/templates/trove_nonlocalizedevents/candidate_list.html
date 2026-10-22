@@ -61,14 +61,17 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 <br><br>
 {% if request.user.is_authenticated %}
   <div class="d-flex flex-wrap gap-2">
-      <button type="submit" form="export-selected" class="btn btn-secondary btn-lg"
-              id="export-selected-btn" title="Export selected candidates to a CSV file">
+      <button type="button" class="btn btn-secondary btn-lg"
+              id="export-selected-btn"
+              title="Export selected candidates as a CSV file"
+              onclick="openCsvDownload()">
         Export Selected (<span id="export-selected-count">0</span>)
       </button>
-      <form id="export-selected"
+      <form id="export-csv-form"
             method="post"
-            action="{% url 'scoring:export_selected' request.GET.nonlocalizedevent %}">
+            action="{% url 'trove_nonlocalizedevents:generate-report-csv' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}">
         {% csrf_token %}
+        <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
       </form>
       <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
               id="vet-selected-btn" title="Run vetting for selected candidates">
