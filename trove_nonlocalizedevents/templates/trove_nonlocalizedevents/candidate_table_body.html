@@ -281,7 +281,7 @@ if (!window.candidateSelectionBound) {
 
 function openSummaryModal() {
     const nleId = "{{ request.GET.nonlocalizedevent }}";
-    const n = prompt("How many top candidates to include?", "5");
+    const n = prompt("How many top candidates to include?", "10");
     if (n === null) { return; }  // user cancelled
     fetch(`{% url 'trove_nonlocalizedevents:generate-report' %}?nonlocalizedevent=${nleId}&n=${encodeURIComponent(n)}`)
     .then(r => {

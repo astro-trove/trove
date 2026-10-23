@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     EventCandidateCreateFromNLEView,
     generate_report,
-    generate_report_csv,
+    generate_selected_candidates_csv,
     ToggleAgnCacheView,
     TogglePhotMethodCacheView,
     RefreshCandidateList,
@@ -15,7 +15,7 @@ app_name = "trove_nonlocalizedevents"
 
 urlpatterns = [
     path("generate-report/", generate_report, name="generate-report"),
-    path("generate-report-csv/", generate_report_csv, name="generate-report-csv"),
+    path("generate-report-csv/", generate_selected_candidates_csv, name="generate-selected-candidates-csv"),
     path(
         "create-eventcandidate-from-nle/",
         EventCandidateCreateFromNLEView.as_view(),

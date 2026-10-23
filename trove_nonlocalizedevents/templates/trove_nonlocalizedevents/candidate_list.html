@@ -69,7 +69,7 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
       </button>
       <form id="export-csv-form"
             method="post"
-            action="{% url 'trove_nonlocalizedevents:generate-report-csv' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}">
+            action="{% url 'trove_nonlocalizedevents:generate-selected-candidates-csv' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}">
         {% csrf_token %}
         <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
       </form>
