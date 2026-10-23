@@ -9,6 +9,7 @@ from .views import (
     TargetRedshiftUpdateFormView,
     VettingMethodsPartialView,
     NonLocalizedEventAssociateTargetsFormView,
+    TargetDissociateSelectedFormView,
 )
 
 from tom_common.api_router import SharedAPIRootRouter
@@ -52,9 +53,13 @@ urlpatterns = [
         name="vet_all_form",
     ),
     path(
-         "eventcandidates/?nonlocalizedevent=<int:pk>/associatetargetschoice/", 
-         NonLocalizedEventAssociateTargetsFormView.as_view(), 
+         "eventcandidates/?nonlocalizedevent=<int:pk>/associatetargetschoice/",
+         NonLocalizedEventAssociateTargetsFormView.as_view(),
          name="nle_associate_targets_form"
     ),
-
+    path(
+         "eventcandidates/?nonlocalizedevent=<int:pk>/dissociateselected/",
+         TargetDissociateSelectedFormView.as_view(),
+         name="dissociate_selected"
+    ),
 ]

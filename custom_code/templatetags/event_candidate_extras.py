@@ -184,7 +184,7 @@ def display_score_details(context, target_id):
         nuclear_offset_score=("Nuclear Offset Score", partial(_float_format, precision=2)),
         phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
         phot_peak_time=(
-            "Time of Maximum Light Curve",
+            "Rise Time",
             partial(_float_format, unit="days"),
         ),
         phot_decay_rate=(
@@ -197,7 +197,7 @@ def display_score_details(context, target_id):
         ),
         phot_peak_lum_score=("Score from Maximum Luminosity", partial(_float_format, precision=1)),
         phot_peak_time_score=(
-            "Score from Time of Maximum Light Curve",
+            "Score from Rise Time",
             partial(_float_format, precision=1),
         ),
         phot_decay_rate_score=(
