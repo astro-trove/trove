@@ -553,7 +553,7 @@ GW event and selecting the highest when multiple scores are computed). Candidate
 ranked using the scoring procedure designed to identify counterparts to GW events 
 (N. Franz, et al., 2025 and N. Vieira et al., 2026).
 
-| Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Score | Most Likely Host-z | Distance Score | Most Recent Mag | Most Recent Mag Time [MJD] | Most Recent Det | Most Recent Det Time [MJD] |TROVE Score |
+| Name | RA [HMS] | Dec [DMS] | Initial Detecting Instrument | Localization Score | Most Likely Host-z | Distance Score | Most Recent Mag | Most Recent Mag Time [MJD] | Most Recent Det | Most Recent Det Time [MJD] |TROVE Score |
 | :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
 
     subscore_keys_to_report = ["skymap_score", "host_distance_score"]
@@ -639,7 +639,7 @@ ranked using the scoring procedure designed to identify counterparts to GW event
             src_str_latest_phot = src_str_latest_phot.replace("TNS; ", "") # strip "TNS; " if present
 
             if latest_phot.brightness_error is not None:  # detection
-                phot_str_latest = f"{latest_phot.brightness:.2f} +/- {latest_phot.brightness_error:.2f} {src_str_latest_phot}"
+                phot_str_latest_phot = f"{latest_phot.brightness:.2f} +/- {latest_phot.brightness_error:.2f} {src_str_latest_phot}"
             else:  # non-detection
                 phot_str_latest_phot = f">{latest_phot.limit:.2f} {src_str_latest_phot}"
 
@@ -690,7 +690,7 @@ ranked using the scoring procedure designed to identify counterparts to GW event
 
         # append lines
         lines.append(
-            f"| {t.name} | {src_str_first} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest_phot} | {epoch_str_latest_phot} | {phot_str_latest_det} | {epoch_str_latest_det} | {best_score_toprint} |"
+            f"| {t.name} | {ra} | {dec} | {src_str_first} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest_phot} | {epoch_str_latest_phot} | {phot_str_latest_det} | {epoch_str_latest_det} | {best_score_toprint} |"
         )
 
     lines.append(
@@ -744,9 +744,9 @@ def generate_selected_candidates_csv(request):
 
     writer.writerow([
         "Name",
+        "RA [deg]",
+        "Dec [deg]",
         "Initial Detecting Instrument",
-        "RA [HMS]",
-        "Dec [DMS]",
         "Localization Score",
         "Most Likely Host z",
         "Distance Score",
@@ -766,7 +766,7 @@ def generate_selected_candidates_csv(request):
         t = ec.target
         ra, dec = (
             SkyCoord(t.ra, t.dec, unit="deg")
-            .to_string("hmsdms", precision=2)
+            .to_string("decimal", precision=5)
             .split(" ")
         )
 
@@ -880,9 +880,9 @@ def generate_selected_candidates_csv(request):
 
         writer.writerow([
             t.name,
-            src_str_first,
             ra,
             dec,
+            src_str_first,
             loc_prob,
             host_str,
             host_score,
