@@ -6,7 +6,6 @@ and scoring/management/commands/.
 """
 import pytest
 from unittest.mock import MagicMock, patch
-from typing import Generator
 
 class TestRepairMigrateCommand:
     """Tests for repair_migrate management command."""
@@ -251,21 +250,49 @@ class TestSlackNotifications:
 
 class TestQueryANTARESgw:
     """Tests for the ANTARES GW localization-based query management command"""
-    
-    # CI has no database, so stub out the TargetName lookup of existing ANT* names
-    @patch(
-        "custom_code.management.commands.query_antares_gw.get_current_ant_candidate_names",
-        return_value=[],
-    )
-    def test_query_for_one_event(self, mock_names):
-        from custom_code.management.commands.query_antares_gw import query_for_one_event
-        loci = query_for_one_event("S250206dm")
-        mock_names.assert_called_once_with("S250206dm")
-        assert isinstance(loci, Generator)
 
-        test_locus = next(loci)
-        assert "locus_id" in test_locus.__dict__
-        assert test_locus.locus_id == "ANT2018ftkss"
+    # CI has no database, so stub out the TargetName lookup of existing ANT* names,
+    # and mock the ANTARES client so we test our query rather than their live results
+    def _query(self):
+        from custom_code.management.commands import query_antares_gw
+
+        with patch.object(query_antares_gw, "get_current_ant_candidate_names",
+                          return_value=["ANT2020old"]) as mock_names, \
+                patch.object(query_antares_gw, "search",
+                             return_value=iter([MagicMock(locus_id="ANT2025abc")])) as mock_search:
+            loci = query_antares_gw.query_for_one_event("S250206dm")
+        return loci, mock_names, mock_search
+
+    def test_query_for_one_event(self):
+        loci, mock_names, mock_search = self._query()
+
+        mock_names.assert_called_once_with("S250206dm")
+        mock_search.assert_called_once()
+        # the loci come straight back from the ANTARES client
+        assert next(loci).locus_id == "ANT2025abc"
+
+    def test_query_structure(self):
+        _, _, mock_search = self._query()
+        query = mock_search.call_args.args[0]
+
+        # ANTARES only accepts a single top-level "query" key
+        assert list(query) == ["query"]
+        filters = query["query"]["bool"]["filter"]
+        assert {"term": {"grav_wave_events.keyword": "S250206dm"}} in filters
+
+        # loci that aren't solar system objects in ZTF, LSST, or either
+        not_sso = {"bool": {"should": [
+            {"term": {"properties.ztf_ssnamenr": "null"}},
+            {"term": {"properties.lsst_diaSource_ssObjectId": 0}},
+            {"bool": {"must_not": [
+                {"exists": {"field": "properties.ztf_ssnamenr"}},
+                {"exists": {"field": "properties.lsst_diaSource_ssObjectId"}},
+            ]}},
+        ]}}
+        assert not_sso in filters
+
+        # loci already in TROVE are excluded
+        assert {"bool": {"must_not": [{"terms": {"locus_id": ["ANT2020old"]}}]}} in filters
 
 
 class TestScoringSmokeTestCommand:
