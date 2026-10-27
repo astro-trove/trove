@@ -9,11 +9,7 @@ from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from tom_dataproducts.models import PhotometryReducedDatum
 
-from scoring.vet_kn import vet_kn
-from scoring.vet_kn_in_sn import vet_kn_in_sn
-from scoring.vet_super_kn import vet_super_kn
-from scoring.vet_basic import vet_basic
-from scoring.vet_bbh import vet_bbh, AGN_FLARE_HORIZON_DAYS
+from scoring.unified_scorer import score, vet_basic
 
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
@@ -116,13 +112,13 @@ def vet_new_candidate(candidate, basic_results=None):
         host_df, agn_df, keep_vetting = basic_results
         return host_df.copy(), agn_df.copy(), keep_vetting
 
-    if get_most_likely_class(candidate.nonlocalizedevent.sequences.last().details) == "BBH":
-        vet_bbh(target_id, event_id, basic_results=_basic())
-    else:
-        vet_kn(target_id, event_id, basic_results=_basic())
-        vet_kn_in_sn(target_id, event_id, basic_results=_basic())
-        vet_super_kn(target_id, event_id, basic_results=_basic())
-
+    for em_model in get_possible_em_transients(event_id):
+        score(
+            target_id=target_id,
+            nonlocalized_event_name=event_id,
+            em_model_name=em_model,
+            basic_results=_basic()
+        )
 
 def associate_nle_with_target(
     target: Target, lookback_days_nle, first_det_min, first_det_max
