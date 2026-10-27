@@ -256,7 +256,7 @@ FACILITIES = {}
 
 SINGLE_TARGET_DATA_SERVICES = {
     "ATLAS": {
-        "class": "custom_code.atlas.CustomAtlasForcedPhotometryService",
+        "class": "trove_targets.atlas.CustomAtlasForcedPhotometryService",
         "url": "https://fallingstar-data.com/forcedphot",
         "api_key": os.getenv("ATLAS_FORCED_PHOTOMETRY_API_KEY", ATLAS_API_KEY),
     },
@@ -272,7 +272,7 @@ DATA_PRODUCT_TYPES = {
 
 DATA_PROCESSORS = {
     "photometry": "tom_dataproducts.processors.photometry_processor.PhotometryProcessor",
-    "spectroscopy": "custom_code.processors.spectroscopy_processor.SpectroscopyProcessor",
+    "spectroscopy": "trove_targets.processors.spectroscopy_processor.SpectroscopyProcessor",
     'atlas_photometry': 'candidate_vetting.atlas.ClippedStackedAtlasProcessor',   
 }
 
@@ -342,7 +342,7 @@ TARGET_DEFAULT_PERMISSION = "PUBLIC"
 OPEN_URLS = ["/accounts/register/"]
 
 HOOKS = {
-    "target_post_save": "custom_code.hooks.target_post_save",
+    "target_post_save": "trove_targets.hooks.target_post_save",
     "observation_change_state": "tom_common.hooks.observation_change_state",
     "data_product_post_upload": "tom_dataproducts.hooks.data_product_post_upload",
     "data_product_post_save": "tom_dataproducts.hooks.data_product_post_save",
@@ -386,8 +386,8 @@ ALERT_STREAMS = [
             "USERNAME": os.getenv("SCIMMA_AUTH_USERNAME", SCIMMA_AUTH_USERNAME),
             "PASSWORD": os.getenv("SCIMMA_AUTH_PASSWORD", SCIMMA_AUTH_PASSWORD),
             "TOPIC_HANDLERS": {
-                "gcn.notices.einstein_probe.wxt.alert": "custom_code.alertstream_handlers.handle_einstein_probe_alert",
-                "igwn.gwalert": "custom_code.alertstream_handlers.handle_message_and_send_alerts",
+                "gcn.notices.einstein_probe.wxt.alert": "trove_nonlocalizedevents.alertstream_handlers.handle_einstein_probe_alert",
+                "igwn.gwalert": "trove_nonlocalizedevents.alertstream_handlers.handle_message_and_send_alerts",
                 "icecube.HE-tracks": "tom_alertstreams.alertstreams.hopskotch.alert_logger",
             },
         },
@@ -401,7 +401,7 @@ ALERT_STREAMS = [
             'GROUP': ANTARES_GROUP_ID,
             'TOPIC_HANDLERS': {
                 # this is just for now, so we can test the alert stream handling
-                'in_passta_nearby_transients': 'custom_code.alertstream_handlers.handle_antares_stream_async',
+                'in_passta_nearby_transients': 'trove_targets.alertstream_handlers.handle_antares_stream_async',
             }
         },
     }
