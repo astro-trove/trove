@@ -2,58 +2,65 @@
 *Generalized* functionality for computing the score from the em_model jsons
 """
 import logging
-from typing import Optional, Tuple
+import time
+import warnings
 from functools import partial
-from astropy.time import Time, TimeDelta
-from astropy import units as u
+
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
-
-from candidate_vetting.vet import localization_sequence_from_name
-from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
-from trove_targets.models import Target
+from astropy import units as u
+from astropy.time import Time, TimeDelta
+from candidate_vetting.vet import (
+    GALAXY_CATALOGS,
+    agn_association_2d,
+    host_association,
+    localization_sequence_from_name,
+    point_source_association,
+    save_score_to_targetextra,
+)
+from tom_nonlocalizedevents.models import EventCandidate, EventSequence
 from tom_targets.models import TargetExtra
 
-from tom_nonlocalizedevents.models import (
-    EventCandidate,
-    NonLocalizedEvent,
-    EventSequence
-)
+from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_targets.models import Target
 
-from django.utils import timezone
-
-from .em_models.util import MODELS_BY_NAME
-from .scoring import (
-    host_distance_match,
-    get_distance_score,
-    skymap_association,
-    clean_host_df,
-    _localization_from_name,
-    classification_score,
-    BASIC_SCORE_KEYS,
-    update_score_factor as _update_score_factor,
-    delete_score_factor,
-    clean_host_df,
-    host_distance_match,
-    get_distance_score,
-    skymap_association,
-    classification_score
-)
+from .dynamic_catalogs import UserGalaxy
+from .em_models.util import MODEL_BY_NAME
 from .kilonova_scorer_helpers.util import (
+    DT_MAX,
     KilonovaScoreUnavailable,
     kilonova_score_candidate,
-    DT_MAX,
 )
-from .phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
+from .scoring import (
+    HOST_GALAXY_CACHE_KEY,
+    _agn_nucleus_row,
+    _cached_host_df,
+    _catalog_state,
+    _host_galaxy_cache_key,
+    _host_rows,
+    _localization_from_name,
+    _minor_planet_score,
+    classification_score,
+    clean_host_df,
+    delete_score_factor,
+    flare_confidence_score,
+    get_distance_score,
+    host_distance_match,
+    nuclear_offset_score,
+    skymap_association,
+)
+from .scoring import update_score_factor as _update_score_factor
 from .vet_phot import (
-    _get_post_disc_phot,
-    _score_phot,
-    _get_pre_disc_phot,
-    get_predetection_stats,
+    OPTICAL_FILTS,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
-    OPTICAL_FILTS,
+    _get_post_disc_phot,
+    _get_pre_disc_phot,
+    _score_phot,
+    detect_flare,
+    find_public_phot,
+    fit_agn_baseline,
+    get_predetection_stats,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,19 +69,21 @@ NUCLEAR_SCALE_KPC = 0.5
 ASTROMETRIC_PRECISION_ARCSEC = 2.0
 
 def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=None, **kwargs):
-    
+
     params = MODEL_BY_NAME[em_model_name]
     target = candidate.target
+    target_id = target.id
     nonlocalized_event = candidate.nonlocalizedevent
+    nonlocalized_event_name = nonlocalized_event.event_id
     nle_eventseq = localization_sequence_from_name(nonlocalized_event.event_id)
     nle_type = get_most_likely_class(nle_eventseq.details)
 
     update_score_factor = partial(_update_score_factor, em_model=params.name)
-    
+
     # run basic vetting
     if basic_results is None:
         basic_results = vet_basic(
-            candidate.target.id,
+            target_id,
             run_mpc=kwargs.pop("run_mpc", params.mpc_crossmatch),
             run_agn=kwargs.pop("run_agn", params.agn_crossmatch),
             run_ps=kwargs.pop("run_ps", params.ps_crossmatch),
@@ -92,19 +101,19 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
     host_df = clean_host_df(host_df)
 
     if params.classification_score:
-        class_score = classification_score(target.id, params.name)
+        class_score = classification_score(target_id, params.name)
         if class_score == 0:
             return
 
-    
+
     if params.agn_crossmatch:
         if len(agn_df):
             agn_assoc_score = params.score_metrics.agn.match
         else:
             agn_assoc_score = params.score_metrics.agn.no_match
-        update_score_factor(event_candidate, "agn_score", agn_assoc_score)
+        update_score_factor(candidate, "agn_score", agn_assoc_score)
 
-    
+
     if params.localization_score:
         ## check skymap association
         if np.isfinite(params.t_post):
@@ -121,20 +130,20 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
             skymap_score = skymap_association(
                 nonlocalized_event_name, target_id, max_time=max_time
             )
-        update_score_factor(event_candidate, "skymap_score", skymap_score)
+        update_score_factor(candidate, "skymap_score", skymap_score)
 
         # the skymap and distance scores are only valid for one localization, so
         # record which one produced them
         localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
-        update_score_factor(event_candidate, "localization_id", localization.id)
-        
+        update_score_factor(candidate, "localization_id", localization.id)
+
     if params.distance_score:
         if target.redshift is not None and not np.isnan(target.redshift):
             # use target redshift, so no need to compute distance scores for galaxies
             host_score, host_name = get_distance_score(
                 host_df, target_id, nonlocalized_event_name
             )
-            update_score_factor(event_candidate, "host_distance_score", host_score)
+            update_score_factor(candidate, "host_distance_score", host_score)
 
         elif len(host_df) != 0:
             # then run the distance comparison for each of these hosts
@@ -145,9 +154,9 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
                 host_score, host_name, host_catalog = get_distance_score(
                     host_df, target_id, nonlocalized_event_name
                 )
-                update_score_factor(event_candidate, "host_distance_score", host_score)
-                update_score_factor(event_candidate, "host_name", host_name)
-                update_score_factor(event_candidate, "host_catalog", host_catalog)
+                update_score_factor(candidate, "host_distance_score", host_score)
+                update_score_factor(candidate, "host_name", host_name)
+                update_score_factor(candidate, "host_catalog", host_catalog)
 
         else:
             # if no target redshift is known and no hosts are found, we don't want
@@ -155,10 +164,22 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
             host_score = 1
 
             # and we should also clear out any existing scores / host names for it
-            delete_score_factor(event_candidate, "host_distance_score")
-            delete_score_factor(event_candidate, "host_name")
-            delete_score_factor(event_candidate, "host_catalog")
+            delete_score_factor(candidate, "host_distance_score")
+            delete_score_factor(candidate, "host_name")
+            delete_score_factor(candidate, "host_catalog")
 
+
+    prephot = _get_pre_disc_phot(
+        target_id=target_id,
+        nonlocalized_event=nonlocalized_event,
+        t_pre=params.t_pre,
+    )
+    postphot = _get_post_disc_phot(
+        target_id=target_id,
+        nonlocalized_event=nonlocalized_event,
+        t_post=params.t_post,
+        t_pre=params.t_pre,
+    )
 
     if params.phot_method.knscorer:
         try:
@@ -166,79 +187,59 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
                 target_id=target_id,
                 nonlocalized_event=nonlocalized_event,
                 candidate_name=target.name,
-                allphot=allphot,
-                t_post=np.nanmin([param_ranges["t_post"], DT_MAX]),
+                allphot=postphot,
+                t_post=np.nanmin([params.t_post, DT_MAX]),
                 overlap_k=3.0,
             )
-            update_score_factor(event_candidate, "kilonova_score", phot_score)
-            delete_score_factor(event_candidate, "kilonova_skip_reason")
+            update_score_factor(candidate, "kilonova_score", phot_score)
+            delete_score_factor(candidate, "kilonova_skip_reason")
         except KilonovaScoreUnavailable as exc:
             # Unscoreable is not the same as rejected. Falling through to the
             # TROVE factor keeps the candidate rankable instead of zeroing it
             # for missing a distance or a grid band.
             logger.warning("KilonovaSCORER unavailable for %s: %s", target.name, exc)
-            update_score_factor(event_candidate, "kilonova_skip_reason", str(exc))
-            delete_score_factor(event_candidate, "kilonova_score")
+            update_score_factor(candidate, "kilonova_skip_reason", str(exc))
+            delete_score_factor(candidate, "kilonova_score")
 
 
     if params.phot_method.metric:
-
-        ## photometry scoring
-        # no need for pre-GW photometry as KNe cannot begin pre-GW
-        allphot = _get_post_disc_phot(
-            target_id=target_id,
-            nonlocalized_event=nonlocalized_event,
-            t_pre=param_ranges["t_pre"],
-            t_post=param_ranges["t_post"],
-        )
         phot_score, lum, max_time, decay_rate, _, _ = _score_phot(
-            allphot=allphot,
+            allphot=postphot,
             target=target,
             nonlocalized_event=nonlocalized_event,
             param_ranges=params.phot_parameter,
             filt=OPTICAL_FILTS
         )
-        
+
         if lum is not None:
-            update_score_factor(event_candidate, "phot_peak_lum", lum.value)
+            update_score_factor(candidate, "phot_peak_lum", lum.value)
         else:
-            delete_score_factor(event_candidate, "phot_peak_lum")
-            
+            delete_score_factor(candidate, "phot_peak_lum")
+
         if max_time is not None:
-            update_score_factor(event_candidate, "phot_peak_time", max_time)
+            update_score_factor(candidate, "phot_peak_time", max_time)
         else:
-            delete_score_factor(event_candidate, "phot_peak_time")
+            delete_score_factor(candidate, "phot_peak_time")
 
         if decay_rate is not None:
-            update_score_factor(event_candidate, "phot_decay_rate", decay_rate)
+            update_score_factor(candidate, "phot_decay_rate", decay_rate)
         else:
-            delete_score_factor(event_candidate, "phot_decay_rate")
+            delete_score_factor(candidate, "phot_decay_rate")
 
 
     if params.phot_method.agn_flare:
-        prephot = _get_pre_disc_phot(
-            target_id=target.id,
-            nonlocalized_event=nonlocalized_event,
-            t_pre=param_ranges["t_pre"],
-        )
-        postphot = _get_post_disc_phot(
-            target_id=target_id,
-            nonlocalized_event=nonlocalized_event,
-            t_post=param_ranges["t_post"],
-            t_pre=param_ranges["t_pre"],
-        )
         ## photometric flare scoring
         baseline = fit_agn_baseline(
-            prephot, min_baseline_pts=param_ranges["min_baseline_pts"]
+            prephot, min_baseline_pts=params.phot_parameter.min_baseline_pts
         )
         for filt, entry in baseline.items():
-            update_score_factor(event_candidate, f"baseline_mag_{filt}", entry["mag"])
-            update_score_factor(event_candidate, f"baseline_std_{filt}", entry["std"])
+            update_score_factor(candidate, f"baseline_mag_{filt}", entry["mag"])
+            update_score_factor(candidate, f"baseline_std_{filt}", entry["std"])
 
         max_significance, flare_row = detect_flare(
             postphot, baseline,
-            corroboration_window_days=param_ranges["flare_corroboration_window_days"],
-            pair_max_gap_days=param_ranges["flare_pair_max_gap_days"],
+            corroboration_window_days=params.phot_parameter.flare_corroboration_window_days,
+            pair_max_gap_days=params.phot_parameter.flare_pair_max_gap_days,
         )
 
         agn_flare_score = None
@@ -246,15 +247,15 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
         if baseline and postphot is not None and len(postphot) and np.isfinite(max_significance):
             agn_flare_score = flare_confidence_score(
                 max_significance,
-                param_ranges["flare_sigma_thresh"],
+                params.phot_parameters.flare_sigma_thresh,
                 floor=PHOT_SCORE_MIN,
-                center_frac=param_ranges["flare_score_center_frac"],
-                width_frac=param_ranges["flare_score_width_frac"],
+                center_frac=params.phot_parameter.flare_score_center_frac,
+                width_frac=params.phot_parameter.flare_score_width_frac,
             )
-            update_score_factor(event_candidate, "agn_flare_score", agn_flare_score)
+            update_score_factor(candidate, "agn_flare_score", agn_flare_score)
         else:
             # not enough baseline, post-merger photometry, or post-merger nights
-            delete_score_factor(event_candidate, "agn_flare_score")
+            delete_score_factor(candidate, "agn_flare_score")
 
 
     if params.nuclear_offset_score:
@@ -271,17 +272,17 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
             )
 
         if offset_score is None:
-            delete_score_factor(event_candidate, "nuclear_offset_score")
+            delete_score_factor(candidate, "nuclear_offset_score")
         else:
-            update_score_factor(event_candidate, "nuclear_offset_score", offset_score)
-            
+            update_score_factor(candidate, "nuclear_offset_score", offset_score)
+
 
     if params.phot_method.predets_filter:
         # check for *reliable* predetections before time t_pre
         prephot = _get_pre_disc_phot(
-            target_id=target.id,
+            target_id=target_id,
             nonlocalized_event=nonlocalized_event,
-            t_pre=param_ranges["t_pre"],
+            t_pre=params.t_pre,
         )
         predet_score = params.score_controls.phot.match
         if prephot is not None and len(prephot):
@@ -296,10 +297,10 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
                 n_predets = [
                     0
                 ]  # this ValueError only happens when there aren't any predets
-            if any(v >= param_ranges["max_predets"] for v in n_predets):
+            if any(v >= params.phot_parameters.max_predets for v in n_predets):
                 predet_score = params.score_controls.phot.no_match
-        update_score_factor(event_candidate, "predetection_score", predet_score)
-        
+        update_score_factor(candidate, "predetection_score", predet_score)
+
 def vet_basic(
         target_id: int,
         days_ago_max: int = 200,
@@ -332,9 +333,9 @@ def vet_basic(
     2. MPC crossmatching
     3. AGN crossmatching
     4. Host association
-    
+
     PS and MPC crossmatches come early because may produce subscores of 0 or 1.
-    
+
     This should be called before any photometry vetting in the NLE-related
     vetting modules. That way we can reduce the code duplication between them!
     """
