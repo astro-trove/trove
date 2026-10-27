@@ -1,13 +1,15 @@
 {
     "name": "model-name",
+    "t_pre": 0,
+    "t_post": 25,
     "ps_crossmatch": true,
-    "query_phot": true,
     "mpc_crossmatch": true,
     "agn_crossmatch": true,
+    "nuclear_offset_score": false,
+    "classification_score": false,
     "host_association": true,
     "localization_score": true,
     "distance_score": true,
-    "knscorer_allowed": true,
     "score_controls": {
 	"agn": {
 	    "match": 0.1,
@@ -40,8 +42,6 @@
 	"peak_time": [0, 4],
 	"decay_rate": [-Infinity, -0.1],
 	"max_predets":3,
-	"t_pre": 0,
-	"t_post": 25,
 	"phot_score_snr_min": 5,
 	"min_time_separation": 0.0417,
 	"min_baseline_pts": 2,

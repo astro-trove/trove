@@ -30,8 +30,6 @@ class PhotParameterSchema(BaseModel):
     peak_time: Optional[List[float]] = None
     decay_rate: Optional[List[float]] = None
     max_predets: Optional[int] = None
-    t_pre: int
-    t_post: int
     phot_score_snr_min: int
     min_time_separation: Optional[Union[float,int]] = None
     min_baseline_pts: Optional[Union[float,int]] = None
@@ -43,14 +41,16 @@ class PhotParameterSchema(BaseModel):
 
 class TransientModelSchema(BaseModel):
     name: str
+    t_pre: int
+    t_post: int
     ps_crossmatch: bool
-    query_phot: bool
     mpc_crossmatch: bool
     agn_crossmatch: bool
     host_association: bool
+    nuclear_offset_score: bool
+    classification_score: bool
     localization_score: bool
     distance_score: bool
-    knscorer_allowed: bool
     score_controls: ScoreControlSchema
     phot_method: PhotMethodSchema
     phot_parameter: PhotParameterSchema

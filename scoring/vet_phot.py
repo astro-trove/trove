@@ -708,6 +708,114 @@ def find_public_phot(
     return created_new_tns_phot
 
 
+def detect_flare(
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
+    pair_max_gap_days: float = 0.0,
+):
+    # each night's peak corroborated significance, capped by its better adjacent observed
+    # night when one lies within pair_max_gap_days, and an isolated night counts as it is.
+    phot = _flare_significance_series(postphot, baseline, corroboration_window_days)
+    if phot is None:
+        return np.nan, None
+    night = np.floor(phot.mjd.to_numpy(dtype=float)) if "mjd" in phot.columns else np.arange(len(phot))
+    peaks = phot.significance_corroborated.groupby(night).idxmax()  # sorted by night
+    nights = peaks.index.to_numpy(dtype=float)
+    nightly = phot.significance_corroborated.loc[peaks].to_numpy()
+    best, limiting = -np.inf, 0
+    for i in range(len(nightly)):
+        near = [j for j in (i - 1, i + 1)
+                if 0 <= j < len(nightly) and abs(nights[j] - nights[i]) <= pair_max_gap_days]
+        j = max(near, key=lambda n: nightly[n]) if near else i
+        weaker = i if nightly[i] <= nightly[j] else j
+        if nightly[weaker] > best:
+            best, limiting = nightly[weaker], weaker
+    return float(best), phot.loc[peaks.iloc[limiting]]
+
+def _flare_significance_series(
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
+) -> Optional[pd.DataFrame]:
+    # Returns list of photometry points --> z-scores compared to pre-merger baseline
+    if postphot is None or not len(postphot) or not baseline:
+        return None
+
+    phot = postphot[~postphot.upperlimit]
+    phot = phot[phot["filter"].isin(baseline.keys())]
+    if not len(phot):
+        return None
+
+    # Adding photometry error with baseline's error in quadrature
+    # significance is just a z-score
+    significance = [
+        (baseline[row["filter"]]["mag"] - row.mag)
+        / np.sqrt(baseline[row["filter"]]["std"] ** 2 + row.magerr**2)
+        for _, row in phot.iterrows()
+    ]
+    phot = phot.assign(significance=significance)
+    return phot.assign(
+        significance_corroborated=_corroborated_significance(
+            phot, corroboration_window_days
+        )
+    )
+
+def _corroborated_significance(
+    phot: pd.DataFrame, window_days: float
+) -> np.ndarray:
+    sig = phot.significance.to_numpy(dtype=float)
+
+    times = None
+    for col in ("mjd", "dt"):
+        if col in phot.columns:
+            times = phot[col].to_numpy(dtype=float)
+            break
+    if times is None:
+        # Only hand-built frames reach this; real photometry always carries mjd.
+        return sig
+
+    filters = phot["filter"].to_numpy()
+    out = np.empty(sig.size, dtype=float)
+    for i in range(sig.size):
+        near = (filters == filters[i]) & (np.abs(times - times[i]) <= window_days)
+        out[i] = np.median(sig[near])
+    return out
+
+def _robust_scatter(mags: np.ndarray, errs: np.ndarray) -> Tuple[float, float]:
+    median_mag = float(np.median(mags))
+    # 1.4826 rescales the MAD to a Gaussian sigma for normally distributed data
+    robust_std = 1.4826 * float(np.median(np.abs(mags - median_mag)))
+    median_err = float(np.median(errs))
+    return max(robust_std, median_err), median_err
+
+
+def fit_agn_baseline(
+    prephot: Optional[pd.DataFrame], min_baseline_pts: int = 2,
+) -> dict:
+    # baseline has keys of filters, and the values are a dictionary that
+    # includes the median magnitude, and a measure of the deviation of points
+    # which is photometric errors or adjusted-MAD
+    baseline = {}
+    # prephot is all of the photometry data before GW detection
+    if prephot is None or not len(prephot):
+        return baseline
+
+    phot = prephot[~prephot.upperlimit]
+    for filt, group in phot.groupby("filter"):
+        mags = group.mag.to_numpy(dtype=float)
+        if len(mags) < min_baseline_pts:
+            continue
+        median_mag = float(np.median(mags))
+        robust_std, median_err = _robust_scatter(
+            mags, group.magerr.to_numpy(dtype=float)
+        )
+        baseline[filt] = dict(
+            mag=median_mag, std=robust_std, n=int(len(mags)), median_err=median_err,
+        )
+    return baseline
+
+
 def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     if allphot is None:  # this is if there is no photometry
