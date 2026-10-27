@@ -1,7 +1,7 @@
 """
 Some config variables for vetting that are used in multiple places
 """
-from .em_models.util import MODEL_BY_NAME
+from .em_models.util import MODELS_BY_NAME
 
 VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
     "basic":("basic", "Basic Vetting"),
@@ -21,8 +21,8 @@ VETTING_FORM_INITIALS = {
 
 DETECTION_HORIZON_DEFAULTS = { # time horizon (min, max) for first detections, dependent on NLE
     "": (0, 10), # if NLE most likely class not known, 0, 10
-    "BNS": MODEL_BY_NAME["KN"].detection_horizon,
-    "NSBH": MODEL_BY_NAME["KN"].detection_horizon,
-    "SSM": MODEL_BY_NAME["KN-in-SN"].detection_horizon,
-    "BBH": MODEL_BY_NAME["AGN-flare"].detection_horizon,
+    "BNS": MODELS_BY_NAME["KN"].detection_horizon,
+    "NSBH": MODELS_BY_NAME["KN"].detection_horizon,
+    "SSM": MODELS_BY_NAME["KN-in-SN"].detection_horizon,
+    "BBH": MODELS_BY_NAME["AGN-flare"].detection_horizon,
 }

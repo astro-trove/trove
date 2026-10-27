@@ -43,6 +43,7 @@ class TransientModelSchema(BaseModel):
     name: str
     t_pre: int
     t_post: int
+    detection_horizon: List[float]
     ps_crossmatch: bool
     mpc_crossmatch: bool
     agn_crossmatch: bool

@@ -9,7 +9,9 @@ from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from tom_dataproducts.models import PhotometryReducedDatum
 
+from scoring.em_models.util import MODELS_BY_NAME
 from scoring.unified_scorer import score, vet_basic
+from scoring.util import get_possible_em_transients
 
 from custom_code.healpix_utils import create_candidates_from_targets
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
@@ -23,6 +25,9 @@ logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
 for handler in logger.handlers:
     handler.setFormatter(new_format)
+
+# an AGN flare can appear long after a BBH merger, so BBH events stay open this long
+AGN_FLARE_HORIZON_DAYS = MODELS_BY_NAME["AGN-flare"].detection_horizon[1]
 
 _target_hook_options = ContextVar('target_hook_options', default=None)
     
@@ -113,6 +118,8 @@ def vet_new_candidate(candidate, basic_results=None):
         return host_df.copy(), agn_df.copy(), keep_vetting
 
     for em_model in get_possible_em_transients(event_id):
+        if em_model not in MODELS_BY_NAME:
+            continue  # no scoring model implemented for this transient yet
         score(
             target_id=target_id,
             nonlocalized_event_name=event_id,

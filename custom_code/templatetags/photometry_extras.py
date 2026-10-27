@@ -151,15 +151,16 @@ def _decay_fit_trace(target, nonlocalized_event, t0):
 
 def _bbh_baseline_traces(target, nonlocalized_event, xmin, xmax, color_map, other_colors):
     # Shades a region of the median +/- range that gives the significance for the bbh-scoring
-    from scoring.vet_bbh import fit_agn_baseline, PARAM_RANGES as BBH_PARAMS
-    from scoring.vet_phot import _get_pre_disc_phot
+    from scoring.em_models.util import MODELS_BY_NAME
+    from scoring.vet_phot import _get_pre_disc_phot, fit_agn_baseline
+    bbh_model = MODELS_BY_NAME["AGN-flare"]
 
     try:
         prephot = _get_pre_disc_phot(
             target_id=target.id, nonlocalized_event=nonlocalized_event,
-            t_pre=BBH_PARAMS["t_pre"],
+            t_pre=bbh_model.t_pre,
         )
-        baseline = fit_agn_baseline(prephot, min_baseline_pts=BBH_PARAMS["min_baseline_pts"])
+        baseline = fit_agn_baseline(prephot, min_baseline_pts=bbh_model.phot_parameter.min_baseline_pts)
     except Exception:
         logger.exception(
             "Could not compute the BBH baseline overlay for %s / %s",

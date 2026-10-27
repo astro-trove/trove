@@ -18,14 +18,14 @@ from candidate_vetting.vet import (
     point_source_association,
     save_score_to_targetextra,
 )
-from tom_nonlocalizedevents.models import EventCandidate, EventSequence
+from tom_nonlocalizedevents.models import EventCandidate, EventSequence, NonLocalizedEvent
 from tom_targets.models import TargetExtra
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from trove_targets.models import Target
 
 from .dynamic_catalogs import UserGalaxy
-from .em_models.util import MODEL_BY_NAME
+from .em_models.util import MODELS_BY_NAME
 from .kilonova_scorer_helpers.util import (
     DT_MAX,
     KilonovaScoreUnavailable,
@@ -75,9 +75,9 @@ def score(
         **kwargs
 ):
 
-    params = MODEL_BY_NAME[em_model_name]
+    params = MODELS_BY_NAME[em_model_name]
     target = Target.objects.get(id=target_id)
-    nonlocalized_event = NonlocalizedEvent.objects.get(event_id=nonlocalized_event_name)
+    nonlocalized_event = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
     candidate = EventCandidate.objects.get(
         target=target,
         nonlocalizedevent=nonlocalized_event
@@ -94,7 +94,7 @@ def score(
             run_mpc=kwargs.pop("run_mpc", params.mpc_crossmatch),
             run_agn=kwargs.pop("run_agn", params.agn_crossmatch),
             run_ps=kwargs.pop("run_ps", params.ps_crossmatch),
-            run_host_association=kwargs.pop("host_association", params.host_association)
+            run_host_association=kwargs.pop("host_association", params.host_association),
             **kwargs
         )
     host_df, agn_df, keep_vetting = basic_results
@@ -108,16 +108,16 @@ def score(
     host_df = clean_host_df(host_df)
 
     if params.classification_score:
-        class_score = classification_score(target_id, params.name)
+        class_score = classification_score(target, params.name)
         if class_score == 0:
             return
 
 
     if params.agn_crossmatch:
         if len(agn_df):
-            agn_assoc_score = params.score_metrics.agn.match
+            agn_assoc_score = params.score_controls.agn.match
         else:
-            agn_assoc_score = params.score_metrics.agn.no_match
+            agn_assoc_score = params.score_controls.agn.no_match
         update_score_factor(candidate, "agn_score", agn_assoc_score)
 
 
@@ -134,9 +134,9 @@ def score(
             max_time = Time(gw_disc_date) + TimeDelta(params.t_post * u.day)
         else:  # just use current time
             max_time = Time.now()
-            skymap_score = skymap_association(
-                nonlocalized_event_name, target_id, max_time=max_time
-            )
+        skymap_score = skymap_association(
+            nonlocalized_event_name, target_id, max_time=max_time
+        )
         update_score_factor(candidate, "skymap_score", skymap_score)
 
         # the skymap and distance scores are only valid for one localization, so
@@ -214,7 +214,7 @@ def score(
             allphot=postphot,
             target=target,
             nonlocalized_event=nonlocalized_event,
-            param_ranges=params.phot_parameter,
+            param_ranges=params.phot_parameter.model_dump() | {"t_pre": params.t_pre, "t_post": params.t_post},
             filt=OPTICAL_FILTS
         )
 
@@ -254,7 +254,7 @@ def score(
         if baseline and postphot is not None and len(postphot) and np.isfinite(max_significance):
             agn_flare_score = flare_confidence_score(
                 max_significance,
-                params.phot_parameters.flare_sigma_thresh,
+                params.phot_parameter.flare_sigma_thresh,
                 floor=PHOT_SCORE_MIN,
                 center_frac=params.phot_parameter.flare_score_center_frac,
                 width_frac=params.phot_parameter.flare_score_width_frac,
@@ -304,7 +304,7 @@ def score(
                 n_predets = [
                     0
                 ]  # this ValueError only happens when there aren't any predets
-            if any(v >= params.phot_parameters.max_predets for v in n_predets):
+            if any(v >= params.phot_parameter.max_predets for v in n_predets):
                 predet_score = params.score_controls.phot.no_match
         update_score_factor(candidate, "predetection_score", predet_score)
 

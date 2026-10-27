@@ -100,7 +100,7 @@ def ps_counts_toward(transient, agn_score):
     """Whether ps_score enters `transient`'s score."""
     if transient not in PS_WAIVED_TRANSIENTS:
         return True
-    matched = AGN_FLARE_PARAM_RANGES["agn_match_score"]
+    matched = MODELS_BY_NAME["AGN-flare"].score_controls.agn.match
     return not (agn_score is not None and agn_score >= matched)
 
 
@@ -219,7 +219,6 @@ def get_possible_em_transients(event_id):
 
 def get_event_candidate_scores(
         event_candidates,
-        dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
         subscore_names=SUBSCORE_NAMES,
         agn_toggle=True,
         include_subscores=False,
@@ -313,7 +312,7 @@ def get_event_candidate_scores(
             # allowed parameter ranges for given transient
             if transient not in MODELS_BY_NAME:
                 continue # this is fine, some transient scoring algorithms aren't implemented yet
-            param_ranges = MODELS_BY_NAME[transient].phot_parameters.dict()
+            param_ranges = MODELS_BY_NAME[transient].phot_parameter.model_dump()
 
             # each vetting mode saves its score factors under its own EM model, and
             # model-independent factors are shared under "basic"; the model's own
