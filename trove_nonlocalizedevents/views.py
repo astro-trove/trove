@@ -1,55 +1,60 @@
 import json
+import logging
+from urllib.parse import urlparse
+
+from astropy.coordinates import SkyCoord
+from astropy.time import Time
 from django.conf import settings
-from django_filters.views import FilterView
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.cache import cache
 from django.core.paginator import Paginator
-from django.db.models import Min, Q
+from django.db import IntegrityError
+from django.db.models import Min, Prefetch, Q
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, QueryDict
 from django.shortcuts import redirect, render
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponse, QueryDict
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
-from django.views.generic.base import View
-from django.contrib import messages
-
-from trove_targets.models import Target
+from django.views.generic.base import RedirectView, View
+from django_filters.views import FilterView
+from tom_dataproducts.models import PhotometryReducedDatum
+from tom_nonlocalizedevents.models import EventCandidate, EventSequence, NonLocalizedEvent
 from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_targets.utils import cone_search_filter
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
-from trove_nonlocalizedevents.permissions import candidates_for_user
-import logging
 
+from custom_code.templatetags.skymap_extras import get_preferred_localization, skymap
 from scoring.models import ScoreFactor
-from scoring.util import (
-    get_agn_toggle,
-    get_event_candidate_scores,
-    get_last_vet_multi_run,
-    get_vet_multi_progress,
-    host_distances,
-    kilonova_scores_exist,
-    latest_score_factors,
-    most_likely_class_for_event,
-    set_agn_toggle,
-    KN_STYLE_CLASSES,
-    get_last_vet_per_candidate
-)
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
     get_phot_method,
     phot_method_label,
     toggle_phot_method,
 )
+from scoring.util import (
+    KN_STYLE_CLASSES,
+    get_agn_toggle,
+    get_event_candidate_scores,
+    get_last_vet_multi_run,
+    get_last_vet_per_candidate,
+    get_vet_multi_progress,
+    host_distances,
+    kilonova_scores_exist,
+    latest_score_factors,
+    most_likely_class_for_event,
+    set_agn_toggle,
+)
+from trove_nonlocalizedevents.permissions import (
+    candidates_for_user,
+    nonlocalizedevents_for_user
+)
+from trove_targets.models import Target
+
+from .filters import GWFilter, NeutrinoFilter
+from .forms import CreateEventCandidateFromNLEForm, EventCandidateSearchForm, GWFormHelper, NeutrinoFormHelper
+
 logger = logging.getLogger(__name__)
-from tom_dataproducts.models import PhotometryReducedDatum
-from custom_code.templatetags.skymap_extras import skymap, get_preferred_localization
-
-from astropy.coordinates import SkyCoord
-from astropy.time import Time
-
-from .forms import EventCandidateSearchForm, CreateEventCandidateFromNLEForm
-
 
 #: How long a scored candidate list is held for. A "Vet All" run rewrites those
 #: scores continuously, so while one is going it is held for less.
@@ -693,7 +698,7 @@ class TogglePhotMethodCacheView(LoginRequiredMixin, View):
         logger.info("Photometry scoring method switched to %r", new_val)
 
         nle_id = request.GET.get("nonlocalizedevent")
-        # the cached scored list was built displaying the other method's factor, 
+        # the cached scored list was built displaying the other method's factor,
         # so it has to go or the page keeps showing the
         # old numbers under the new label
         url = reverse("custom_code:event-candidates")
@@ -775,3 +780,168 @@ def vet_all_cooldown_notice(request):
         "select some subset of candidates to vet."
     )
     return redirect(request.META.get('HTTP_REFERER', '/'))
+
+class NonLocalizedEventListView(FilterView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    model = NonLocalizedEvent
+    paginate_by = 100
+
+    def get_filterset(self, filterset_class):
+        kwargs = self.get_filterset_kwargs(filterset_class)
+        filterset = filterset_class(**kwargs)
+        filterset.form.helper = self.formhelper_class()
+        return filterset
+
+    def get_queryset(self):
+        # '-created' is most recent first
+        qs = NonLocalizedEvent.objects.order_by('-created')
+        return qs
+
+
+class GWListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/gw_list.html'
+    filterset_class = GWFilter
+    formhelper_class = GWFormHelper
+
+    def get_queryset(self):
+        # each row reads the newest sequence several times; prefetching it and
+        # reading the cache via `last_sequence` takes this page from ~795 queries to 2
+        qs = (NonLocalizedEvent.objects.filter(event_type='GW')
+              .prefetch_related(Prefetch(
+                  'sequences',
+                  queryset=EventSequence.objects.select_related('localization')
+                                                .order_by('sequence_id')))
+              .order_by('-event_id'))
+        try:
+            search_str = self.kwargs["search_str"] # TRY to find a search string
+            qs = qs.filter(event_id__icontains=search_str).order_by('-event_id')
+        except KeyError:
+            pass
+        return qs
+
+
+# class GWListSearchView(GWListView):
+#     """
+#     GWListView but with filtering by event ID through search_name
+#     """
+#     template_name = 'tom_nonlocalizedevents/gw_list.html'
+#     filterset_class = GWFilter
+#     formhelper_class = GWFormHelper
+
+#     def get_queryset(self):
+#         search_name = self.kwargs["search_name"]
+#         qs = super().get_queryset().filter(event_id__icontains=search_name)
+#         return qs
+
+
+class GRBListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/grb_list.html'
+
+    def get_queryset(self):
+        qs = NonLocalizedEvent.objects.filter(event_type='GRB').order_by('-created')
+        return qs
+
+
+class NeutrinoListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/neutrino_list.html'
+    filterset_class = NeutrinoFilter
+    formhelper_class = NeutrinoFormHelper
+
+    def get_queryset(self):
+        qs = NonLocalizedEvent.objects.filter(event_type='NU').order_by('-created')
+        return qs
+
+
+class UnknownListView(NonLocalizedEventListView):
+    """
+    Unadorned Django ListView subclass for NonLocalizedEvent model.
+    """
+    template_name = 'tom_nonlocalizedevents/unknown_list.html'
+
+    def get_queryset(self):
+        qs = NonLocalizedEvent.objects.filter(event_type='UNK').order_by('-created')
+        return qs
+
+
+class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
+    """
+    View that handles the association of a target with a NonLocalizedEvent on a button press
+    """
+    def get(self, request, *args, **kwargs):
+        """
+        Method that handles the GET requests for this view.
+        """
+        nonlocalizedevent = NonLocalizedEvent.objects.get(event_id=self.kwargs['event_id'])
+        target = Target.objects.get(id=self.kwargs['target_id'])
+        viability_reason = f'added from candidates list by {self.request.user.first_name}'
+
+        # (target, nonlocalizedevent) is unique, so linking a target that is
+        # already a candidate used to raise IntegrityError and return a 500.
+        try:
+            _, created = EventCandidate.objects.get_or_create(
+                nonlocalizedevent=nonlocalizedevent, target=target,
+                defaults={'viability_reason': viability_reason})
+        except IntegrityError:
+            created = False  # two submits raced; the other one made the link
+
+        if created:
+            # imported here to keep custom_code.views out of an import cycle
+            from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
+
+            invalidate_scored_candidates_cache(nonlocalizedevent.id)
+            # the page they came from may have had filters on, which is a
+            # cache key of its own and would otherwise still be stale
+            referer_query = urlparse(self.get_redirect_url()).query
+            if referer_query:
+                invalidate_scored_candidates_cache(QueryDict(referer_query))
+            messages.success(request, f'Linked {target.name} to {nonlocalizedevent.event_id}.')
+        else:
+            messages.info(request, f'{target.name} is already a candidate of '
+                                   f'{nonlocalizedevent.event_id}.')
+
+        return HttpResponseRedirect(self.get_redirect_url())
+
+    def get_redirect_url(self):
+        """
+        Returns redirect URL as specified in the HTTP_REFERER field of the request.
+
+        :returns: referer
+        :rtype: str
+        """
+        referer = self.request.META.get('HTTP_REFERER', '/')
+        return referer
+
+
+class GWNonLocalizedEventOrTargetNameSearchView(RedirectView):
+    """
+    View for searching by nonlocalized event **or** target name. If only a
+    single GW NLE match, pulls up the candidate list for that GW NLE. If
+    multiple matches, pulls up the page with a list of GW NLEs, filtered by
+    the string. If no NLE matches, searches instead for targets.
+    """
+
+    def get(self, request, *args, **kwargs):
+        search_str = request.GET.get("name").strip()
+        all_gw_nles = nonlocalizedevents_for_user(request.user, NonLocalizedEvent.objects.filter(event_type="GW"))
+        gw_nles = all_gw_nles.filter(event_id__icontains=search_str,
+                                     event_type="GW")
+        try:
+            nle = gw_nles.get()
+        except NonLocalizedEvent.MultipleObjectsReturned as exc:
+            print(exc)
+            return HttpResponseRedirect(reverse('custom_code:gw-list-search', kwargs={"search_str":search_str}))
+        except NonLocalizedEvent.DoesNotExist:
+            return HttpResponseRedirect(reverse('custom_code:search', kwargs={"search_str":search_str}))
+
+        return HttpResponseRedirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
