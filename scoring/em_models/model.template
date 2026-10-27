@@ -2,6 +2,7 @@
     "name": "model-name",
     "t_pre": 0,
     "t_post": 25,
+    "detection_horizon": [0,10],
     "ps_crossmatch": true,
     "mpc_crossmatch": true,
     "agn_crossmatch": true,

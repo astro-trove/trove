@@ -28,11 +28,8 @@ from trove_targets.models import Target
 from .models import ScoreFactor
 from .scoring import classification_score, cosmo, mpc_score_from_match
 from .tasks import async_vet
-from .vet_bbh import PARAM_RANGES as AGN_FLARE_PARAM_RANGES
-from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
-from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
 from .vet_phot import PHOT_SCORE_MIN
-from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
+from .em_models.util import MODELS_BY_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -42,20 +39,9 @@ logger = logging.getLogger(__name__)
 # loop below and its candidates come back unsorted.
 TRANSIENTS = ["KN", "KN-in-SN", "super-KN", "SN", "TDE", "AGN-flare"]
 
-DICT_TRANSIENTS_PARAM_RANGES = {
-    "KN": KN_PARAM_RANGES,
-    "KN-in-SN": KN_IN_SN_PARAM_RANGES,
-    "super-KN": SUPER_KN_PARAM_RANGES,
-    "AGN-flare": AGN_FLARE_PARAM_RANGES,
-}
-
 MIN_PROBABILITY_FOR_TRANSIENT = 0.01
 
-# ScoreFactor key holding KilonovaSCORER's photometry factor, written by
-# `vet_kn` when the viewer's `phot_method` toggle is on KilonovaSCORER
 KILONOVA_SCORE_KEY = "kilonova_score"
-
-# why KilonovaSCORER could not score a candidate, written by `vet_kn` in place of score
 KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
 
 # session key for the AGN toggle, which decides whether `agn_score` counts
@@ -325,9 +311,9 @@ def get_event_candidate_scores(
         # now for EM transient/model specific scores
         for transient in transients:
             # allowed parameter ranges for given transient
-            if transient not in dict_transients_param_ranges:
+            if transient not in MODELS_BY_NAME:
                 continue # this is fine, some transient scoring algorithms aren't implemented yet
-            param_ranges = dict_transients_param_ranges[transient]
+            param_ranges = MODELS_BY_NAME[transient].phot_parameters.dict()
 
             # each vetting mode saves its score factors under its own EM model, and
             # model-independent factors are shared under "basic"; the model's own
