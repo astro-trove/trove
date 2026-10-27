@@ -7,6 +7,7 @@ from tom_nonlocalizedevents.models import EventCandidate, EventLocalization, Sky
 from tom_nonlocalizedevents.healpix_utils import sa_engine, SaSkymapTile, uniq_to_bigintrange
 from tom_nonlocalizedevents.healpix_utils import update_all_credible_region_percents_for_candidates
 from trove_targets.models import Target
+from trove_targets.healpix_utils import SaTarget
 import numpy as np
 from scipy.stats import multivariate_normal
 from ligo.skymap.moc import bayestar_adaptive_grid
@@ -22,12 +23,6 @@ logger = logging.getLogger(__name__)
 CREDIBLE_REGION_PROBABILITIES = sorted(json.loads(settings.CREDIBLE_REGION_PROBABILITIES), reverse=True)
 
 Base = declarative_base()
-
-
-class SaTarget(Base):
-    __tablename__ = 'trove_targets_target'
-    basetarget_ptr_id = sa.Column(sa.Integer, primary_key=True)
-    healpix = sa.Column(sa.BigInteger)
 
 def get_target_ids_in_prob_credible_region(
         eventsequence,

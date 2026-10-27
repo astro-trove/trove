@@ -15,7 +15,7 @@ from django_tasks import task
 from tom_dataproducts.tasks import atlas_query
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 
-from custom_code.healpix_utils import (
+from trove_nonlocalizedevents.healpix_utils import (
     create_candidates_from_targets,
     get_target_ids_in_prob_credible_region,
 )

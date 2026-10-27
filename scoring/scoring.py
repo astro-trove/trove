@@ -31,10 +31,10 @@ from tom_nonlocalizedevents.models import EventLocalization, NonLocalizedEvent
 from tom_targets.models import TargetExtra
 
 from trove_targets.models import Target
+from trove_targets.healpix_utils import SaTarget
 
 from .distance_helpers import hybrid_distance_score
 from .dynamic_catalogs import UserGalaxy
-from .healpix_utils import SaTarget
 from .models import CatalogWriteCounters, ScoreFactor, UserGalaxyQ3C
 from .tasks import async_mpc
 from .vet_phot import PHOT_SCORE_MIN

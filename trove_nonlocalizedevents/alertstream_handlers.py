@@ -62,99 +62,6 @@ ALERT_TEXT_EP = """Einstein Probe trigger <{target_link}|{{target.name}}>
  — <{nle_link}|Localization>
 """
 
-ALERT_TEXT_INTRO = """{{most_likely_class}} {{seq.event_subtype}} v{{seq.sequence_id}}
-{{nle.event_id}} ({{significance}})
-{{time}}
-1/FAR = {{inverse_far}}
-"""
-
-ALERT_TEXT_LOCALIZATION = """Distance = {{distance}}
-50% Area = {{area_50}}
-90% Area = {{area_90}}
-"""
-
-ALERT_TEXT_EXTERNAL_COINCIDENCE = """
-Coincident with {{observatory}} {{search}}
-GCN Notice {{gcn_notice_id}}
-Δt = {{time_difference:.2f}} s
-1/FAR (time) = {{inverse_far_time}}
-1/FAR (time + pos.) = {{inverse_far_time_pos}}
-Distance (comb.) = {{distance_external}}
-50% Area (comb.) = {{area_50_external}}
-90% Area (comb.) = {{area_90_external}}
-"""
-
-ALERT_TEXT_CLASSIFICATION = """Has NS = {{HasNS:.0%}}
-Has Mass Gap = {{HasMassGap:.0%}}
-Has Remnant = {{HasRemnant:.0%}}
-BNS = {{BNS:.0%}}
-NSBH = {{NSBH:.0%}}
-BBH = {{BBH:.0%}}
-Terrestrial = {{Terrestrial:.0%}}
-"""
-
-# links for Slack
-ALERT_LINKS = (
-    "<{nle_link}|{service}> <{{nle.hermes_url}}|Hermes> "
-    "<{{nle.gracedb_url}}|GraceDB> <{{nle.treasuremap_url}}|Treasure Map>"
-)
-
-ALERT_TEXT_RETRACTION = "{{most_likely_class}} {{nle.event_id}} {{nle.state}}"
-
-ALERT_TEXT_BURST = (
-    ALERT_TEXT_INTRO
-    + """50% Area = {{seq.localization.area_50:.0f}} deg²
-90% Area = {{seq.localization.area_90:.0f}} deg²
-Duration = {{duration_ms:.0f}} ms
-Frequency = {{central_frequency:.0f}} Hz
-"""
-    + ALERT_LINKS
-)
-
-ALERT_TEXT_SSM = (
-    ALERT_TEXT_INTRO
-    + ALERT_TEXT_LOCALIZATION
-    + """Has NS = {{HasNS:.0%}}
-Has Mass Gap = {{HasMassGap:.0%}}
-Has SSM = {{HasSSM:.0%}}
-"""
-    + ALERT_LINKS
-)
-
-ALERT_TEXT = [  # index = number of localizations available
-    ALERT_TEXT_INTRO + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
-    ALERT_TEXT_INTRO + ALERT_TEXT_LOCALIZATION + ALERT_TEXT_CLASSIFICATION + ALERT_LINKS,
-    ALERT_TEXT_INTRO
-    + ALERT_TEXT_LOCALIZATION
-    + ALERT_TEXT_CLASSIFICATION
-    + ALERT_TEXT_EXTERNAL_COINCIDENCE
-    + ALERT_LINKS,
-]
-
-# slack_ep = WebClient(settings.SLACK_TOKEN_EP)
-# slack_gw = [WebClient(token) for token in settings.SLACK_TOKENS_GW]
-
-
-def vet_or_post_error(
-    target,
-    # slack_client,
-    # channel,
-    **kwargs,
-):
-    try:
-        target.save()  # to do coordinate conversions
-        _, tns_query_status = target_post_save(target, created=True, **kwargs)
-        if tns_query_status is not None:
-            logger.warning(tns_query_status)
-            # slack_client.chat_postMessage(channel=channel, text=tns_query_status)
-
-        mjd_now = Time.now().mjd
-        atlas_query.enqueue(mjd_now - 20.0, mjd_now, target.id, "atlas_photometry")
-
-    except Exception as e:
-        logger.error("".join(traceback.format_exception(e)))
-        # slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
-
 def calculate_credible_region(skymap, localization, probability=0.9):
     t0 = time.time()
     """store the credible region contour for skymap plotting"""
@@ -179,19 +86,6 @@ def calculate_credible_region(skymap, localization, probability=0.9):
     dt = time.time() - t0
     logger.info(f"Calculated skymap contours in {dt:.0f} s")
 
-
-def pick_slack_channel(seq):
-    is_test_alert = seq.nonlocalizedevent.event_id.startswith("M")
-    is_significant = seq.details["significant"]
-    is_burst = seq.details["group"] == "Burst"
-    has_ns = (
-        seq.details["properties"].get("HasNS", 0.0) >= 0.01
-        or seq.details["classification"].get("BNS", 0.0) >= 0.01
-        or seq.details["classification"].get("NSBH", 0.0) >= 0.01
-    )
-    return is_test_alert, is_significant, is_burst, has_ns
-
-
 def prepare_and_send_alerts(nle, seq):
     localizations = []
     try:
@@ -202,53 +96,9 @@ def prepare_and_send_alerts(nle, seq):
                 localizations.append(seq.localization)
             if seq.external_coincidence is not None and seq.external_coincidence.localization is not None:
                 localizations.append(seq.external_coincidence.localization)
-        is_test_alert, is_significant, is_burst, has_ns = pick_slack_channel(seq)
-        format_kwargs = {
-            "nle": nle,
-            "seq": seq,
-            "most_likely_class": get_most_likely_class(seq.details),
-            "inverse_far": format_inverse_far(seq.details["far"]),
-            "significance": "significant" if is_significant else "subthreshold",
-        }
-        format_kwargs.update(seq.details["properties"])
-        format_kwargs.update(seq.details["classification"])
-        format_kwargs.update(seq.details)
-        if nle.state == "RETRACTED":
-            alert_text = ALERT_TEXT_RETRACTION
-        elif is_burst:
-            alert_text = ALERT_TEXT_BURST
-            format_kwargs["duration_ms"] = seq.details["duration"] * 1000.0
-        else:
-            if seq.details["search"] == "SSM":
-                alert_text = ALERT_TEXT_SSM
-            else:
-                alert_text = ALERT_TEXT[len(localizations)]
-            if localizations:
-                format_kwargs["distance"] = format_distance(localizations[0])
-                format_kwargs["area_50"] = format_area(localizations[0].area_50)
-                format_kwargs["area_90"] = format_area(localizations[0].area_90)
-            if len(localizations) > 1:
-                format_kwargs.update(seq.external_coincidence.details)
-                format_kwargs["inverse_far_time"] = format_inverse_far(format_kwargs["time_coincidence_far"])
-                format_kwargs["inverse_far_time_pos"] = format_inverse_far(
-                    format_kwargs["time_sky_position_coincidence_far"]
-                )
-                format_kwargs["distance_external"] = format_distance(localizations[1])
-                format_kwargs["area_50_external"] = format_area(localizations[1].area_50)
-                format_kwargs["area_90_external"] = format_area(localizations[1].area_90)
     except Exception as e:
         logger.error(f"Could not parse GW alert: {e}")
-        alert_text = f"Received a GW alert that could not be parsed. Check GraceDB: {nle.gracedb_url}"
-        format_kwargs = {}
-        is_test_alert = nle.event_id.startswith("M")
-        is_significant = False
-        is_burst = False
-        has_ns = False
-    if is_significant and not is_burst and has_ns:
-        at = "here" if nle.state == "RETRACTED" else "channel"
-    else:
-        at = None
-
+    
     return localizations
 
 
@@ -528,100 +378,3 @@ def handle_antares_stream_async(locus, lookback_days_nle=10):
         dump_alert_and_send_error(alert_finite, exc)
 
 
-@task(queue_name="antares", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)
-def handle_antares_stream_task(*args, **kwargs):
-    """Just a django tasks Task wrapper on handle_antares_stream, this way
-    we can still execute the antares alert stream handling serially"""
-    handle_antares_stream(*args, **kwargs)
-    
-
-def handle_antares_stream(alert, cone_search_radius_arcsec=2.0, lookback_days_nle=10, event_id=None, verbose=False):
-    try:
-        data_service = AntaresDataService()
-
-        # json serialize the locus object, if needed
-        if isinstance(alert, Locus):
-            alert = data_service.serialize_locus(None, alert)
-        
-        # check for existing targets within 2"
-        target_matches = cone_search_filter(
-                Target.objects.all(),
-                alert["ra"],
-                alert["dec"],
-                cone_search_radius_arcsec / 3600.0,
-            ).order_by("separation")
-        if verbose:
-            logger.info(
-                f"Targets within {cone_search_radius_arcsec:.1f} arcsec: {target_matches.count()}"
-            )
-        target = target_matches.first()
-        if target:
-            # add new aliases from the alert
-            _add_aliases(target, alert)
-            with target_hook_options(skip_vetting=True):
-                target.save()
-        else:
-            # then this target does not exist, so we create it from scratch
-            # data_service.to_target also saves the target, and will execute the
-            # target_post_save function as a hook (see the configuration in settings.py)
-            #
-            # BUT, we need to fake it and not actually run any of the vetting yet
-            # because we want to wait to update some other fields (e.g., photometry)
-            # from the alert
-            # updating these fields can only happen *after* the target has been
-            # created and saved
-            with target_hook_options(skip_vetting=True):
-                target = data_service.to_target(alert) # this also adds aliases
-
-        # add new photometry from the alert
-        data_service.to_reduced_datums(target, alert["reduced_datums"])
-                    
-        # now run target post save for real and do the vetting we need to do
-        target_post_save(
-            target,
-            created=True,
-            lookback_days_nle=10,
-            known_associated_nle_id=event_id,
-            query_atlas_fp=_should_run_atlas(alert),
-            query_tns_phot=False,
-            query_antares_phot=False,
-            run_mpc=False # these are filtered out by ANTARES
-        )
-        
-    except Exception:
-        exc = traceback.format_exc()
-        logger.error(exc)
-        dump_alert_and_send_error(alert, exc)
-            
-def dump_alert_and_send_error(
-    alert, exc, dump_dir="antares-alert-errors"
-):
-    """
-    we don't want this *ever* to crash, just log the error, send it as a slack message, and dump the alert to a json file
-    """
-    os.makedirs(dump_dir, exist_ok=True)
-    dump_path = f"{dump_dir}/{uuid.uuid4()}.json"
-    with open(dump_path, "w") as f:
-        json.dump(alert, f, indent=4)
-
-def _should_run_atlas(alert, limit=19.7):
-    """
-    Check if this alert is bright enough to make running ATLAS FP worth it
-
-    The limiting magnitude of ATLAS c and o filters is 19.7
-    (https://fallingstar.com/specifications.php)
-    """
-    mag = sorted(
-        alert["reduced_datums"]["photometry"],
-        key=lambda x : x["ant_mjd"]
-    )[-1]["ant_mag"]
-    return mag < limit
-
-def _add_aliases(target, alert):
-    # add any aliases from the alert
-    for alias_name in alert.get("aliases", []):
-        alias = TargetName(name=alias_name, target=target)
-        try:
-            alias.save()
-        except IntegrityError:
-            logger.info(f"{alias} already exists, skipping and not saving")
