@@ -1,7 +1,8 @@
 """
 Unit tests for Django management commands.
 
-These test the management commands in custom_code/management/commands/.
+These test the management commands in custom_code/management/commands/
+and scoring/management/commands/.
 """
 import pytest
 from unittest.mock import MagicMock, patch
@@ -265,3 +266,30 @@ class TestQueryANTARESgw:
         test_locus = next(loci)
         assert "locus_id" in test_locus.__dict__
         assert test_locus.locus_id == "ANT2018ftkss"
+
+
+class TestScoringSmokeTestCommand:
+    """Tests for the scoring app's test_scoring management command"""
+
+    def _run(self, *args, transients=("KN", "KN-in-SN", "TDE"), target_ids=(1, 2)):
+        from django.core.management import call_command
+        from scoring.management.commands import test_scoring
+
+        with patch.object(test_scoring, "NonLocalizedEvent"), \
+                patch.object(test_scoring, "EventCandidate") as EventCandidate, \
+                patch.object(test_scoring, "get_possible_em_transients", return_value=list(transients)), \
+                patch.object(test_scoring, "score") as score:
+            EventCandidate.objects.filter.return_value.values_list.return_value = list(target_ids)
+            call_command("test_scoring", *args, stdout=MagicMock())
+        return [(c.args[0], c.args[1], c.kwargs["em_model_name"]) for c in score.call_args_list]
+
+    def test_scores_every_candidate_with_every_possible_model(self):
+        calls = self._run("--event", "S250206dm")
+        # TDE has no scoring model, so it is skipped
+        assert calls == [
+            (1, "S250206dm", "KN"), (1, "S250206dm", "KN-in-SN"),
+            (2, "S250206dm", "KN"), (2, "S250206dm", "KN-in-SN"),
+        ]
+
+    def test_one_target_and_model(self):
+        assert self._run("5", "--model", "AGN-flare") == [(5, "S250208ad", "AGN-flare")]
