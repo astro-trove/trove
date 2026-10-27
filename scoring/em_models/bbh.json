@@ -1,0 +1,50 @@
+{
+    "name": "AGN-flare",
+    "t_pre": 0,
+    "t_post": 400,
+    "detection_horizon": [0,400],
+    "ps_crossmatch": false,
+    "mpc_crossmatch": true,
+    "agn_crossmatch": true,
+    "nuclear_offset_score": true,
+    "classification_score": true,
+    "host_association": true,
+    "localization_score": true,
+    "distance_score": true,
+    "score_controls": {
+	"agn": {
+	    "match": 1,
+	    "no_match": 0.1
+	},
+	"ps": {
+	    "match": 0,
+	    "no_match": 1
+	},
+	"mpc": {
+	    "match": 0,
+	    "no_match": 1
+	},
+	"phot": {
+	    "match": 1,
+	    "no_match": 0.1
+	}
+    },
+    "phot_method": {
+	"knscorer": false,
+	"metric": false,
+	"agn_flare": true,
+	"lum_max": false,
+	"decay_rate": false,
+	"rise_time": false,
+	"predets_filter": false
+    },
+    "phot_parameter": {
+	"phot_score_snr_min": 5,
+	"min_baseline_pts": 2,
+	"flare_sigma_thresh": 3.25,
+	"flare_pair_max_gap_days": 5.0,
+	"flare_corroboration_window_days": 0.5,
+	"flare_score_center_frac": 1.0,
+	"flare_score_width_frac": 0.25
+    }
+}

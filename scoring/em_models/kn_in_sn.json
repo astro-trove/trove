@@ -1,0 +1,49 @@
+{
+    "name": "KN-in-SN",
+    "t_pre": -1,
+    "t_post": 100,
+    "detection_horizon": [-1,10],
+    "ps_crossmatch": true,
+    "mpc_crossmatch": true,
+    "agn_crossmatch": true,
+    "nuclear_offset_score": false,
+    "classification_score": false,
+    "host_association": true,
+    "localization_score": true,
+    "distance_score": true,
+    "score_controls": {
+	"agn": {
+	    "match": 0.1,
+	    "no_match": 1
+	},
+	"ps": {
+	    "match": 0,
+	    "no_match": 1
+	},
+	"mpc": {
+	    "match": 0,
+	    "no_match": 1
+	},
+	"phot": {
+	    "match": 1,
+	    "no_match": 0.1
+	}
+    },
+    "phot_method": {
+	"knscorer": true,
+	"metric": true,
+	"agn_flare": true,
+	"lum_max": true,
+	"decay_rate": true,
+	"rise_time": true,
+	"predets_filter": true
+    },
+    "phot_parameter": {
+	"lum_max": [5e41, 1e44],
+	"peak_time": [0, 35],
+	"decay_rate": [-0.1, 2.0],
+	"max_predets":3,
+	"phot_score_snr_min": 5,
+	"min_time_separation": 0.0417
+    }
+}
