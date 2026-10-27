@@ -66,13 +66,22 @@ from .vet_phot import (
 
 logger = logging.getLogger(__name__)
 
-def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=None, **kwargs):
+def score(
+        target_id: int,
+        nonlocalized_event_name: str,
+        em_model_name: str,
+        basic_results:tuple=None,
+        phot_method:str="metrics",
+        **kwargs
+):
 
     params = MODEL_BY_NAME[em_model_name]
-    target = candidate.target
-    target_id = target.id
-    nonlocalized_event = candidate.nonlocalizedevent
-    nonlocalized_event_name = nonlocalized_event.event_id
+    target = Target.objects.get(id=target_id)
+    nonlocalized_event = NonlocalizedEvent.objects.get(event_id=nonlocalized_event_name)
+    candidate = EventCandidate.objects.get(
+        target=target,
+        nonlocalizedevent=nonlocalized_event
+    )
     nle_eventseq = localization_sequence_from_name(nonlocalized_event.event_id)
     nle_type = get_most_likely_class(nle_eventseq.details)
 
@@ -179,7 +188,7 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
         t_pre=params.t_pre,
     )
 
-    if params.phot_method.knscorer:
+    if params.phot_method.knscorer and phot_method=="kilonovascorer":
         try:
             phot_score = kilonova_score_candidate(
                 target_id=target_id,
@@ -200,7 +209,7 @@ def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=Non
             delete_score_factor(candidate, "kilonova_score")
 
 
-    if params.phot_method.metric:
+    if params.phot_method.metric and phot_method=="metrics":
         phot_score, lum, max_time, decay_rate, _, _ = _score_phot(
             allphot=postphot,
             target=target,

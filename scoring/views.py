@@ -33,7 +33,7 @@ from custom_code.templatetags.target_list_extras import galaxy_table
 from scoring.util import get_possible_em_transients
 from trove_targets.models import Target
 
-from .config import DETECTION_HORIZON_DEFAULTS, FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES, VETTING_FORM_INITIALS
+from .config import DETECTION_HORIZON_DEFAULTS, VETTING_FORM_CHOICES, VETTING_FORM_INITIALS
 from .dynamic_catalogs import UserGalaxy
 from .forms import NonLocalizedEventAssociateTargetsForm, RedshiftUpdateForm, VettingChoiceForm
 from .phot_method import (
@@ -46,7 +46,7 @@ from .phot_method import (
 )
 from .tasks import associate_targets_with_nle_async, vet_multi_async
 from .util import get_vet_multi_progress, most_likely_class_for_event
-from .vet_basic import vet_basic
+from .unified_scorer import vet_basic, score
 from .vet_phot import find_public_phot
 
 logger = logging.getLogger(__name__)
@@ -205,7 +205,6 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         )
 
         # then run the vetting
-        vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
         if vetting_mode == "basic":
             vet_basic(target.id, stop_on_zero=False)
             messages.info(request, "Ran basic vetting.")
@@ -220,7 +219,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             phot_method = (_clean_phot_method(request.GET.get("phot_method"))
                            or get_phot_method(request))
             extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
-            vetting_func(target.id, nonlocalized_event_name, **extra)
+            score(target.id, nonlocalized_event_name, vetting_mode, **extra)
             label = (f" using {PHOT_METHOD_LABELS[phot_method]} for scoring photometry"
                      if extra else "")
             messages.info(request, f"Ran vetting in {vetting_mode} mode{label}.")
@@ -358,8 +357,8 @@ class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
             vetting_modes = [v for v, _ in vetting_choices]
             vetting_modes.remove("basic")  # no need to re-run basic vetting
             for vm in vetting_modes:
-                FORM_CHOICE_FUNC_MAP[vm](
-                    target_id=pk, nonlocalized_event_name=nle.event_id
+                score(
+                    target_id=pk, nonlocalized_event_name=nle.event_id, em_model_name=vm
                 )
             messages.info(
                 self.request,

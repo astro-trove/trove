@@ -24,6 +24,7 @@ from trove_targets.models import Target
 logger = logging.getLogger(__name__)
 
 from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
+from scoring.unified_scorer import vet_basic, score
 
 ## tasks
 async_atlas_query = atlas_query.using(
@@ -46,20 +47,20 @@ def async_vet(
     phot_method: str = None,
     *args, **kwargs
 ) -> None:
-    from .config import (
-        FORM_CHOICE_FUNC_MAP,
-    )  # import within function to avoid circular import error
-
+    
     # Adds KN scoring for vet all and vetting individual candidates
     extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
 
     if vetting_mode == "basic":
         for ti in target_ids:
-            FORM_CHOICE_FUNC_MAP[vetting_mode](target_id=ti)
+            vet_basic(target_id=ti)
     else:
         for ti in target_ids:
-            FORM_CHOICE_FUNC_MAP[vetting_mode](
-                target_id=ti, nonlocalized_event_name=nle_event_id, **extra
+            score(
+                target_id=ti,
+                nonlocalized_event_name=nle_event_id,
+                em_model_name=vetting_mode,
+                **extra
             )
 
 @task(queue_name="associate_targets", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)

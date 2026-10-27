@@ -327,7 +327,6 @@ def get_event_candidate_scores(
                 if subscore_key in sf_dict
             }
 
-            # removed ps_score because if it is a vet_bbh() call, then ps_score of 0
             # might just be because AGN is in the point source catalogue
             subscore_no_phot = (
                 math.prod([sf_dict[key] for key in sf_dict

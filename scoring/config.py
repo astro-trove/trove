@@ -1,7 +1,6 @@
 """
 Some config variables for vetting that are used in multiple places
 """
-from .unified_scorer import vet_basic, score
 from .em_models.util import MODEL_BY_NAME
 
 VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
