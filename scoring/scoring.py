@@ -3,6 +3,7 @@ import json
 import logging
 import time
 from datetime import timezone
+from typing import Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,7 @@ from candidate_vetting.vet import (
 )
 from django.conf import settings
 from django.db.models import Count, Max
+from scipy.stats import norm
 from sqlalchemy.orm import Session
 from tom_nonlocalizedevents.healpix_utils import (
     SaSkymapTile,
@@ -35,8 +37,13 @@ from .dynamic_catalogs import UserGalaxy
 from .healpix_utils import SaTarget
 from .models import CatalogWriteCounters, ScoreFactor, UserGalaxyQ3C
 from .tasks import async_mpc
+from .vet_phot import PHOT_SCORE_MIN
 
 logger = logging.getLogger(__name__)
+
+
+NUCLEAR_SCALE_KPC = 0.5
+ASTROMETRIC_PRECISION_ARCSEC = 2.0
 
 # built from, so we can tell whether it is still current
 HOST_GALAXY_CACHE_KEY = "Host Galaxies Cache Key"

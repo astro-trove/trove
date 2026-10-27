@@ -75,7 +75,7 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
     ```
 
     - With optional paramaters
-    
+
     ```
     curl -X 'GET' \
     'https://datatrove.as.arizona.edu/api/score/S251112cm?candidate_names=S251112cm_X78,AT2025adht' \

@@ -303,7 +303,7 @@ def estimate_max_find_decay_rate(
     PARAMETERS
     ---------
     dt_days: Iterable[float]
-        A list/array of the days since the GW discovery. 
+        A list/array of the days since the GW discovery.
     mag: Iterable[float]
         A list/array of the magnitudes since the GW discovery
     magerr: Iterable[float]
@@ -397,7 +397,7 @@ def estimate_max_find_decay_rate(
         # RuntimeError if it doesn't converge; ValueError if the model
         # produced a non-finite residual (belt-and-suspenders -- the dt > 0
         # filter above should already rule this out for these two models)
-        pl_popt, pl_pcov = None, None
+        pl_popt, _pl_pcov = None, None
 
     broken_fits = {}
     if n_epochs > bpl_nparams + 2:
@@ -493,7 +493,7 @@ def estimate_max_find_decay_rate(
 def _mag_to_flux(mag, magerr=None):
     """
     Convert AB magnitude to flux in W/m^2/Hz.
-    
+
     For AB magnitudes: flux (Jy) = 10^((8.9 - mag) / 2.5)
     1 Jy = 1e-26 W/m^2/Hz
     """

@@ -32,6 +32,7 @@ from .kilonova_scorer_helpers.util import (
     kilonova_score_candidate,
 )
 from .scoring import (
+    ASTROMETRIC_PRECISION_ARCSEC,
     HOST_GALAXY_CACHE_KEY,
     _agn_nucleus_row,
     _cached_host_df,
@@ -64,9 +65,6 @@ from .vet_phot import (
 )
 
 logger = logging.getLogger(__name__)
-
-NUCLEAR_SCALE_KPC = 0.5
-ASTROMETRIC_PRECISION_ARCSEC = 2.0
 
 def score(candidate: EventCandidate, em_model_name: str, basic_results:tuple=None, **kwargs):
 
