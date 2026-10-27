@@ -46,7 +46,6 @@ TOM_NAME = "TROVE"
 INSTALLED_APPS = TOMTOOLKIT_INSTALLED_APPS + [
     "tom_alertstreams",
     "tom_nonlocalizedevents",
-    "custom_code",
     "candidate_vetting",
     "trove_targets",
     "trove_nonlocalizedevents",

@@ -79,7 +79,6 @@ jobs:
         run: |
           python -c "import django; print(f'Django {django.VERSION}')"
           python -c "import trove_tom; print('trove_tom imported successfully')"
-          python -c "import custom_code; print('custom_code imported successfully')"
           python -c "import candidate_vetting; print('candidate_vetting imported successfully')"
           python -c "import KilonovaScorer; print('KilonovaScorer', getattr(KilonovaScorer, '__version__', '?'), 'imported successfully')"
           python -c "from KilonovaScorer.core2 import kilonovascorer_v3, binned_stats_cumulative_ptail; from KilonovaScorer.utils import compute_abs_mag_samples; print('KilonovaScorer API present')"
