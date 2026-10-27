@@ -2,13 +2,16 @@
 Some common functions used in multiple places throughout the app
 """
 
+import json
+import logging
+import math
+import time
 from collections import namedtuple
 from datetime import timedelta
-import json
-import math
-import logging
+
 from astropy import units as u
 from astropy.units import Quantity
+from candidate_vetting.vet import localization_sequence_from_name
 from django.db import DatabaseError
 from django.db.models import Count, F, FloatField, Max, Min, Q, Window
 from django.db.models.functions import Cast, RowNumber
@@ -17,23 +20,19 @@ from django.utils.dateparse import parse_datetime
 from django_tasks import ResultStatus
 from django_tasks.backends.database.models import DBTaskResult
 from tom_nonlocalizedevents.models import NonLocalizedEvent
-from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_targets.models import Target
 
-from candidate_vetting.vet import localization_sequence_from_name
-
+from .models import ScoreFactor
 from .scoring import classification_score, cosmo, mpc_score_from_match
-from .vet_phot import PHOT_SCORE_MIN
+from .tasks import async_vet
+from .vet_bbh import PARAM_RANGES as AGN_FLARE_PARAM_RANGES
 from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
 from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
+from .vet_phot import PHOT_SCORE_MIN
 from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
-from .vet_bbh import PARAM_RANGES as AGN_FLARE_PARAM_RANGES
-from .models import ScoreFactor
-from .tasks import async_vet
-
-import time
 
 logger = logging.getLogger(__name__)
 
@@ -196,7 +195,7 @@ def get_possible_em_transients(event_id):
         return []
 
     details = nle_eventseq.details
-    transients = []    
+    transients = []
 
     # we can now build the transients list of potential EM counterparts
     if not details:
@@ -208,7 +207,7 @@ def get_possible_em_transients(event_id):
             if details["properties"].get(key, 0) > MIN_PROBABILITY_FOR_TRANSIENT:
                 transients.append("KN")
                 break
-        
+
         has_ssm = details["properties"].get("HasSSM", 0)
         if has_ssm > MIN_PROBABILITY_FOR_TRANSIENT:
             transients += ["KN", "KN-in-SN", "super-KN"]
@@ -268,11 +267,11 @@ def get_event_candidate_scores(
     # which transient types to consider?
     if not len(event_candidates_list):
         return []
-    
+
     transients = get_possible_em_transients(
         event_candidates_list[0].nonlocalizedevent.event_id
     )
-    
+
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
 
@@ -304,7 +303,7 @@ def get_event_candidate_scores(
 
         if include_subscores:
             ec.subscores = {}
-        
+
         # get all 'subscores' (sometimes actually calculated values)
         # for object, keyed by the EM model whose vetting saved them
         sf_by_model = score_factors_by_ec.get(ec.id, {})
@@ -364,11 +363,11 @@ def get_event_candidate_scores(
             agn_factor = (agn_score if agn_score is not None
                           and agn_counts_toward(transient, agn_toggle) else 1)
             ps_factor = ps_score if ps_counts_toward(transient, agn_score) else 1
-            
+
             # handle the classification score, which changes based on the expected
             # EM transient
             class_score = classification_score(ec.target, transient)
-            
+
             # val_dict is keyed with the "_score" suffix the display labels use
             phot_subscores = {
                 _phot_score_key(subscore_key): _check_phot_val(
@@ -382,7 +381,7 @@ def get_event_candidate_scores(
             other_subscores = dict(
                 classification_score = class_score
             )
-            
+
             if include_subscores:
                 ec.subscores[transient] = phot_subscores | other_subscores
 
@@ -630,7 +629,7 @@ def get_vet_multi_progress(nonlocalizedevent_id):
         )
     except DatabaseError:
         # the progress notice is never worth taking the candidate list down for
-        logger.exception("Could not read Vet All / Vet Selected progress for %s", 
+        logger.exception("Could not read Vet All / Vet Selected progress for %s",
                          nle.event_id)
         return None
 

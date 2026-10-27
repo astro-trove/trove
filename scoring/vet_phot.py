@@ -3,32 +3,32 @@ Some general functions useful for vetting photometry
 """
 
 import logging
-from typing import Tuple, Optional, Iterable
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Iterable, Optional, Tuple
 
-from astropy.time import Time
-from astropy.stats import akaike_info_criterion_lsq as info_crit
-from astropy import units as u
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
-
-from django.conf import settings
-from django.core.exceptions import FieldError
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
-from tom_dataproducts.models import PhotometryReducedDatum
-from tom_antares.antares import AntaresDataService
-from trove_targets.models import Target
+from astropy import units as u
+from astropy.stats import akaike_info_criterion_lsq as info_crit
+from astropy.time import Time
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
-from .tasks import async_atlas_query
-from .scoring import get_eventcandidate_default_distance
+from django.conf import settings
+from scipy.optimize import curve_fit
+from tom_antares.antares import AntaresDataService
+from tom_dataproducts.models import PhotometryReducedDatum
+from tom_nonlocalizedevents.models import EventSequence, NonLocalizedEvent
+
 from custom_code.templatetags.photometry_extras import error_to_snr
+from trove_targets.models import Target
+
+from .scoring import get_eventcandidate_default_distance
+from .tasks import async_atlas_query
 
 logger = logging.getLogger(__name__)
 
 FILTER_PRIORITY_ORDER = ["r", "g", "V", "R", "G"]
 
-# common optical filters + ATLAS o,c + other misc optical survey filters 
+# common optical filters + ATLAS o,c + other misc optical survey filters
 OPTICAL_FILTS = [
     # SDSS ugrizy
     "u"
@@ -37,7 +37,7 @@ OPTICAL_FILTS = [
     "i",
     "z",
     "y",
-    
+
     # Johnson-Cousins
     "U",
     "B",
@@ -53,7 +53,7 @@ OPTICAL_FILTS = [
     "G", # GAIA G
     "w", # Pan-STARRS wide
 ]
-    
+
 PHOT_SCORE_MIN = 0.1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
@@ -488,7 +488,7 @@ def estimate_max_find_decay_rate(
     decay_rate = -mag_slope_per_dex
 
     return model, best_fit_params, max_time, decay_rate
-    
+
 
 def _mag_to_flux(mag, magerr=None):
     """
@@ -499,7 +499,7 @@ def _mag_to_flux(mag, magerr=None):
     """
     flux_jy = 10**((8.9 - mag) / 2.5)
     flux = flux_jy * 1e-26
-    
+
     if magerr is not None:
         dflux = np.abs(flux * magerr * np.log(10) / 2.5)
         return flux, dflux
@@ -547,13 +547,13 @@ def compute_peak_lum(
         return None
 
     flux, dflux = _mag_to_flux(mag, magerr)
-    
+
     fluxmax_idx = np.argmax(flux)
     fluxmax = flux[fluxmax_idx]
     if consider_err:
         fluxmax += 3 * dflux[fluxmax_idx]
     filtermax = filters[fluxmax_idx]
-    
+
     fluxmax = fluxmax * u.Unit("W/m^2/Hz")
     lummax = _flux_to_lum(fluxmax, lumdist).to("erg/s/Hz")
 
@@ -647,13 +647,13 @@ def find_public_phot(
         data_service = AntaresDataService()
         data = data_service.query_reduced_data(target)
         data_service.to_reduced_datums(target, data)
-        
+
     # in some cases, we won't want to query ATLAS FP because it isn't constraining
     # for dim transients in LSST alerts
     if not query_atlas_fp:
         logger.info("Skipping ATLAS FP query, as requested")
         return created_new_tns_phot
-        
+
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
     atlas_data = target.photometryreduceddatum_set.filter(
@@ -665,7 +665,7 @@ def find_public_phot(
     )
     if atlas_data.count():  # if this is true there is existing ATLAS data
         last_atlas_point = atlas_data.order_by("timestamp").last()
-        
+
         now = datetime.now(tz=timezone.utc)
         if last_atlas_point.timestamp < now - timedelta(days=forced_phot_tol):
             # then we should only query ATLAS for this target for forced photometry
@@ -681,14 +681,14 @@ def find_public_phot(
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
-            
+
     if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
         logger.info(
             "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
             "photometry for %s", target.name
         )
         query_atlas = False
-        
+
     if query_atlas:
         print(
             "Asynchronously obtaining ATLAS forced photometry with "

@@ -1,52 +1,40 @@
 import importlib.metadata
 import json
 import logging
-import warnings
 import time
 from datetime import timezone
 
-from .models import ScoreFactor, CatalogWriteCounters, UserGalaxyQ3C
-from .dynamic_catalogs import UserGalaxy
-from .healpix_utils import SaTarget
-from .distance_helpers import hybrid_distance_score
-from .vet_phot import find_public_phot
-from .tasks import async_mpc
-
+import numpy as np
+import pandas as pd
+import sqlalchemy as sa
+from astropy import units as u
+from astropy.time import Time
 from candidate_vetting.vet import (
     GALAXY_CATALOGS,
     HOST_ASSOC_RADIUS,
     HOST_DF_COLMAP_INVERSE,
     PCC_THRESHOLD,
-    point_source_association,
-    host_association,
-    agn_association_2d,
-    save_score_to_targetextra,
     run_mpc,
 )
-
-import numpy as np
-import pandas as pd
-
-import sqlalchemy as sa
+from django.conf import settings
+from django.db.models import Count, Max
 from sqlalchemy.orm import Session
 from tom_nonlocalizedevents.healpix_utils import (
-    sa_engine,
     SaSkymapTile,
     # uniq_to_bigintrange,
     # update_all_credible_region_percents_for_candidates
+    sa_engine,
 )
-
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventLocalization
+from tom_nonlocalizedevents.models import EventLocalization, NonLocalizedEvent
 from tom_targets.models import TargetExtra
-
-from astropy import units as u
-from astropy.time import Time
 
 from trove_targets.models import Target
-from tom_targets.models import TargetExtra
 
-from django.conf import settings
-from django.db.models import Count, Max
+from .distance_helpers import hybrid_distance_score
+from .dynamic_catalogs import UserGalaxy
+from .healpix_utils import SaTarget
+from .models import CatalogWriteCounters, ScoreFactor, UserGalaxyQ3C
+from .tasks import async_mpc
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +324,7 @@ def _host_used_for_distance_scoring(host_df, target_id, nonlocalized_event_name)
         host_name = host_name,
         host_catalog = host_catalog.value if host_catalog else None
     )
-    
+
     host_name = factors.get("host_name")
     if not host_name or host_name == "None":
         return None
@@ -484,13 +472,13 @@ def classification_score(
         # TODO: When implementing neutrino vetting we should be more careful about
         #       removing TDEs here!!
         return 0
-    
+
     elif (
             (clean_class.startswith("SN") or clean_class.startswith("SLSN")) and
             expected_em_transient not in {"KN-in-SN", "super-KN"}
     ):
         # for KN and AGN flares we don't want to include SN or SLSN, for KN-in-SN or
-        # superKN they could *maybe* be a counterpart 
+        # superKN they could *maybe* be a counterpart
         return 0
 
     # if neither of those cases are matched we can just return 1
@@ -636,7 +624,7 @@ def _minor_planet_score(
     try:
         run_mpc(target.id)
     except Exception as e:
-        # I was having a few errors with this, so wrapped it in a try/except, 
+        # I was having a few errors with this, so wrapped it in a try/except,
         # but possibly unnecessary
         logger.warning(f"MPC lookup failed for {target.name}, skipping it: {e}")
         return None
@@ -709,6 +697,7 @@ def projected_offset_kpc(offset_arcsec: float, angular_diameter_distance_mpc: fl
 
 def _host_rows(target) -> list:
     import json
+
     from tom_targets.models import TargetExtra
 
     extra = TargetExtra.objects.filter(target_id=target.id, key="Host Galaxies").first()

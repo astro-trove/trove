@@ -1,17 +1,16 @@
 from django.urls import path
+from tom_common.api_router import SharedAPIRootRouter
 
 from .views import (
-    TargetVettingView,
-    TargetVettingFormView,
-    TargetVettingSelectedFormView,
-    TargetVettingAllFormView,
+    NonLocalizedEventAssociateTargetsFormView,
     TargetFPView,
     TargetRedshiftUpdateFormView,
+    TargetVettingAllFormView,
+    TargetVettingFormView,
+    TargetVettingSelectedFormView,
+    TargetVettingView,
     VettingMethodsPartialView,
-    NonLocalizedEventAssociateTargetsFormView,
 )
-
-from tom_common.api_router import SharedAPIRootRouter
 
 router = SharedAPIRootRouter()
 
@@ -19,13 +18,13 @@ app_name = "scoring"
 
 urlpatterns = [
     path(
-        "targets/<int:pk>/vet/<vetting_mode>/", 
-        TargetVettingView.as_view(), 
+        "targets/<int:pk>/vet/<vetting_mode>/",
+        TargetVettingView.as_view(),
         name="vet"
     ),
     path(
-        "targets/<int:pk>/vetchoice/", 
-        TargetVettingFormView.as_view(), 
+        "targets/<int:pk>/vetchoice/",
+        TargetVettingFormView.as_view(),
         name="vet_form"
     ),
     path(
@@ -33,8 +32,8 @@ urlpatterns = [
         VettingMethodsPartialView.as_view(),
         name="vet_methods",
     ),
-    path("targets/<int:pk>/checknewphot/", 
-         TargetFPView.as_view(), 
+    path("targets/<int:pk>/checknewphot/",
+         TargetFPView.as_view(),
          name="checknewphot"),
     path(
         "targets/<int:pk>/updatez/",
@@ -52,8 +51,8 @@ urlpatterns = [
         name="vet_all_form",
     ),
     path(
-         "eventcandidates/?nonlocalizedevent=<int:pk>/associatetargetschoice/", 
-         NonLocalizedEventAssociateTargetsFormView.as_view(), 
+         "eventcandidates/?nonlocalizedevent=<int:pk>/associatetargetschoice/",
+         NonLocalizedEventAssociateTargetsFormView.as_view(),
          name="nle_associate_targets_form"
     ),
 

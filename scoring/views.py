@@ -2,65 +2,53 @@
 Page views for candidate vetting
 """
 
-import numpy as np
+import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-from django.core.cache import cache
-from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views import View
-from django.views.generic.base import RedirectView
-from django.views.generic.edit import FormView
-from django.http import HttpResponseRedirect, HttpResponseForbidden, QueryDict
-from django.urls import reverse
-from django.shortcuts import redirect, render
-from dal import autocomplete
-
-from trove_targets.models import Target
-from tom_nonlocalizedevents.models import (
-    EventCandidate,
-    NonLocalizedEvent,
-    EventLocalization,
-)
-
+import numpy as np
+from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
 from candidate_vetting.vet import (
     GALAXY_CATALOGS,
     host_association,
     localization_sequence_from_name,
 )
-from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
-
-from .forms import (VettingChoiceForm,
-                    RedshiftUpdateForm,
-                    NonLocalizedEventAssociateTargetsForm
-                    )
-from .config import (FORM_CHOICE_FUNC_MAP,
-                     VETTING_FORM_CHOICES,
-                     VETTING_FORM_INITIALS,
-                     DETECTION_HORIZON_DEFAULTS
-                     )
-from .tasks import vet_multi_async, associate_targets_with_nle_async
-from .phot_method import (
-    KILONOVASCORER_VETTING_MODE,
-    PHOT_METHOD_CHOICES,
-    PHOT_METHOD_METRICS,
-    PHOT_METHOD_KILONOVASCORER,
-    PHOT_METHOD_LABELS,
-    get_phot_method,
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.cache import cache
+from django.http import HttpResponseRedirect, QueryDict
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.views import View
+from django.views.generic.base import RedirectView
+from django.views.generic.edit import FormView
+from tom_nonlocalizedevents.models import (
+    EventCandidate,
+    NonLocalizedEvent,
 )
-from .util import get_vet_multi_progress, most_likely_class_for_event
-from .vet_basic import vet_basic
-from .vet_phot import find_public_phot
-from .dynamic_catalogs import UserGalaxy
 
 from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from custom_code.templatetags.target_list_extras import galaxy_table
-
 from scoring.util import get_possible_em_transients
+from trove_targets.models import Target
 
-import logging
+from .config import DETECTION_HORIZON_DEFAULTS, FORM_CHOICE_FUNC_MAP, VETTING_FORM_CHOICES, VETTING_FORM_INITIALS
+from .dynamic_catalogs import UserGalaxy
+from .forms import NonLocalizedEventAssociateTargetsForm, RedshiftUpdateForm, VettingChoiceForm
+from .phot_method import (
+    KILONOVASCORER_VETTING_MODE,
+    PHOT_METHOD_CHOICES,
+    PHOT_METHOD_KILONOVASCORER,
+    PHOT_METHOD_LABELS,
+    PHOT_METHOD_METRICS,
+    get_phot_method,
+)
+from .tasks import associate_targets_with_nle_async, vet_multi_async
+from .util import get_vet_multi_progress, most_likely_class_for_event
+from .vet_basic import vet_basic
+from .vet_phot import find_public_phot
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,7 +91,7 @@ def _vetting_method_fields(form, event_id, request):
             cls, VETTING_FORM_INITIALS[""]
         )
     return _phot_method_field(form, request)
-  
+
 
 def _phot_method_field(form, request):
     """
@@ -435,8 +423,8 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
                 scoped = scoped.filter(target__name__icontains=target_name)
             # the distance cut is not a queryset filter, so apply it the same way
             # the table does or "select all" vets rows the table did not show
-            from trove_nonlocalizedevents.views import _as_float, within_max_distance
             from scoring.util import host_distances
+            from trove_nonlocalizedevents.views import _as_float, within_max_distance
 
             distance_max = _as_float(params.get("distance_max"))
             if distance_max is not None:

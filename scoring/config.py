@@ -2,10 +2,10 @@
 Some config variables for vetting that are used in multiple places
 """
 from .vet_basic import vet_basic
+from .vet_bbh import AGN_FLARE_HORIZON_DAYS, vet_bbh
 from .vet_kn import vet_kn
 from .vet_kn_in_sn import vet_kn_in_sn
 from .vet_super_kn import vet_super_kn
-from .vet_bbh import vet_bbh, AGN_FLARE_HORIZON_DAYS
 
 VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
     "basic":("basic", "Basic Vetting"),

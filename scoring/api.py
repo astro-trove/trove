@@ -1,8 +1,11 @@
 import math
+
 from ninja import Router
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
+
 from trove_targets.models import Target
+
 from .util import get_event_candidate_scores
 
 router = Router()
@@ -89,7 +92,7 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
     ```
 
     """
-    
+
     # get the event candidates associated with this NLE
     ecs = EventCandidate.objects.filter(
         nonlocalizedevent__event_id = nle_name
@@ -100,8 +103,8 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
 
     if candidate_names is not None:
         ecs = ecs.filter(target__name__in = candidate_names.split(","))
-        
-    return _compute_scores(ecs) 
+
+    return _compute_scores(ecs)
 
 @router.get("/{nle_name}/cone_search")
 def get_scores_from_cone_search(request, nle_name:str, ra:float, dec:float, radius:float=2):
@@ -136,7 +139,7 @@ def get_scores_from_cone_search(request, nle_name:str, ra:float, dec:float, radi
     -H 'Authorization: Bearer <api_token>'
     ```
     """
-    
+
     # convert the radius to degrees
     radius_deg = radius / 3600.
 
