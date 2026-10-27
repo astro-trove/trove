@@ -64,7 +64,7 @@ def spectroscopy_for_target(context, target, dataproduct=None):
     return {
         'target': target,
         'products': datums,
-        'plot': pio.to_html(fig, full_html=False)
+        'plot': pio.to_html(fig, full_html=False, include_plotlyjs=False)
     }
 
 

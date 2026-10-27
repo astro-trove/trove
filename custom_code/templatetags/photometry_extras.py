@@ -444,7 +444,7 @@ def photometry_for_target(context, target, width=900, height=600, background=Non
 
     return {
         'target': target,
-        'plot': pio.to_html(fig, full_html=False, div_id='photometry_plot')
+        'plot': pio.to_html(fig, full_html=False, div_id='photometry_plot', include_plotlyjs=False)
     }
 
 @register.inclusion_tag('tom_dataproducts/partials/photometry_datalist_for_target.html', takes_context=True)
