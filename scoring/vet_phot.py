@@ -21,7 +21,6 @@ from tom_nonlocalizedevents.models import EventSequence, NonLocalizedEvent
 from custom_code.templatetags.photometry_extras import error_to_snr
 from trove_targets.models import Target
 
-from .scoring import get_eventcandidate_default_distance
 from .tasks import async_atlas_query
 
 logger = logging.getLogger(__name__)
@@ -847,6 +846,10 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # if we've made it to this point we have at least one detection so
     # we can calculate the luminosity
+    from .scoring import (  # import within function to avoid circular import error
+        get_eventcandidate_default_distance,
+    )
+
     dist, _ = get_eventcandidate_default_distance(
         target.id, nonlocalized_event.event_id
     )

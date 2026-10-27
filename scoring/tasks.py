@@ -24,7 +24,6 @@ from trove_targets.models import Target
 logger = logging.getLogger(__name__)
 
 from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
-from scoring.unified_scorer import vet_basic, score
 
 ## tasks
 async_atlas_query = atlas_query.using(
@@ -47,7 +46,11 @@ def async_vet(
     phot_method: str = None,
     *args, **kwargs
 ) -> None:
-    
+    from .unified_scorer import (  # import within function to avoid circular import error
+        score,
+        vet_basic,
+    )
+
     # Adds KN scoring for vet all and vetting individual candidates
     extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
 
