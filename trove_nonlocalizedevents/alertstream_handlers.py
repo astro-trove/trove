@@ -32,11 +32,7 @@ from astropy.table import Table
 from astropy.time import Time
 import astropy_healpix as ah
 
-from .hooks import (
-    target_post_save,
-    target_hook_options,
-    associate_targets_with_nle
-)
+from .hooks import associate_targets_with_nle
 from .templatetags.nonlocalizedevent_extras import (
     format_inverse_far,
     format_distance,
@@ -51,6 +47,7 @@ from scoring.config import DETECTION_HORIZON_DEFAULTS, VETTING_FORM_INITIALS
 from scoring.models import ScoreFactor
 from scoring.scoring import _localization_from_name
 from scoring.tasks import vet_multi_async
+from trove_targets.alertstream_handlers import vet_or_post_error
 from trove_targets.models import Target
 
 import logging
@@ -366,15 +363,3 @@ def handle_icecube_alert(alert):
             calculate_credible_region(skymap, localization)
 
     logger.info(f"Finished processing alert for {nonlocalizedevent.event_id}")
-
-def handle_antares_stream_async(locus, lookback_days_nle=10):
-    data_service = AntaresDataService()
-    try:
-        alert_finite = data_service.serialize_locus(None, locus)
-        handle_antares_stream_task.enqueue(alert_finite, lookback_days_nle=lookback_days_nle)
-        logger.debug(f"sent {locus.locus_id} to queue")
-    except Exception:
-        exc = traceback.format_exc()
-        dump_alert_and_send_error(alert_finite, exc)
-
-

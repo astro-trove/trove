@@ -14,6 +14,7 @@ from scoring.unified_scorer import score, vet_basic
 from scoring.util import get_possible_em_transients
 
 from trove_nonlocalizedevents.healpix_utils import create_candidates_from_targets
+from trove_nonlocalizedevents.hooks import associate_nle_with_target, vet_new_candidate
 from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from trove_targets.models import Target
 from astropy.time import Time, TimezoneInfo

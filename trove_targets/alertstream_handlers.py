@@ -35,16 +35,7 @@ import astropy_healpix as ah
 from .hooks import (
     target_post_save,
     target_hook_options,
-    associate_targets_with_nle
 )
-from .templatetags.nonlocalizedevent_extras import (
-    format_inverse_far,
-    format_distance,
-    format_area,
-    get_most_likely_class,
-)
-from .healpix_utils import create_elliptical_localization
-from .models import CredibleRegionContour
 
 from candidate_vetting.vet import localization_sequence_from_name
 from scoring.config import DETECTION_HORIZON_DEFAULTS, VETTING_FORM_INITIALS
@@ -174,3 +165,14 @@ def _add_aliases(target, alert):
             alias.save()
         except IntegrityError:
             logger.info(f"{alias} already exists, skipping and not saving")
+
+
+def handle_antares_stream_async(locus, lookback_days_nle=10):
+    data_service = AntaresDataService()
+    try:
+        alert_finite = data_service.serialize_locus(None, locus)
+        handle_antares_stream_task.enqueue(alert_finite, lookback_days_nle=lookback_days_nle)
+        logger.debug(f"sent {locus.locus_id} to queue")
+    except Exception:
+        exc = traceback.format_exc()
+        dump_alert_and_send_error(alert_finite, exc)
