@@ -23,7 +23,7 @@ from tom_targets.permissions import targets_for_user
 from tom_targets.views import TargetCreateView, TargetListView
 from tom_targets.views import TargetNameSearchView as OldTargetNameSearchView
 
-from custom_code.templatetags.target_extras import split_name
+from trove_targets.templatetags.target_extras import split_name
 from trove_targets.models import Target
 
 from .filters import TroveTargetListFilterSet
