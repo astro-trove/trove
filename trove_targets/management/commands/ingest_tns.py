@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.db import connection
 from trove_targets.models import Target
 from tom_targets.models import BaseTarget
-from custom_code.alertstream_handlers import vet_or_post_error
+from trove_targets.alertstream_handlers import vet_or_post_error
 from datetime import datetime, timedelta
 from candidate_vetting.models import TnsQ3C
 

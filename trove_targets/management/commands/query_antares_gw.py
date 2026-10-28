@@ -14,11 +14,11 @@ from tom_antares.antares import AntaresDataService
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.models import TargetName
 
-from custom_code.alertstream_handlers import (
+from trove_targets.alertstream_handlers import (
     handle_antares_stream,
     handle_antares_stream_async
 )
-from custom_code.hooks import get_active_nonlocalizedevents
+from trove_nonlocalizedevents.hooks import get_active_nonlocalizedevents
 
 import logging
 logger = logging.getLogger(__name__)

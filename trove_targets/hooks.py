@@ -13,8 +13,8 @@ from scoring.em_models.util import MODELS_BY_NAME
 from scoring.unified_scorer import score, vet_basic
 from scoring.util import get_possible_em_transients
 
-from custom_code.healpix_utils import create_candidates_from_targets
-from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_nonlocalizedevents.healpix_utils import create_candidates_from_targets
+from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from trove_targets.models import Target
 from astropy.time import Time, TimezoneInfo
 from astropy.coordinates import SkyCoord
