@@ -19,12 +19,12 @@ from .api import api
 
 urlpatterns = [
     path("targets/", include("trove_targets.urls", namespace="trove_targets")),
-    path("", include("tom_common.urls")),
-    path("", include("scoring.urls")),
     path(
         "",
         include("trove_nonlocalizedevents.urls", namespace="trove_nonlocalizedevents"),
     ),
+    path("", include("tom_common.urls")),
+    path("", include("scoring.urls")),
     path(
         "nonlocalizedevents/",
         include("tom_nonlocalizedevents.urls", namespace="nonlocalizedevents"),
