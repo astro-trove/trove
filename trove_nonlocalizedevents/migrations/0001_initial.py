@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('tom_nonlocalizedevents', '0021_alter_eventcandidate_target'),
+        ('tom_nonlocalizedevents', '0020_eventsequence_hermes_message_id'),
     ]
 
     operations = [
