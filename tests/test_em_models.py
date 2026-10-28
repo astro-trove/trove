@@ -38,7 +38,7 @@ class TestEMModelFiles:
         assert list(DETECTION_HORIZON_DEFAULTS["BBH"]) == [0, 400]
 
     def test_agn_flare_horizon_matches_bbh_model(self):
-        from custom_code.hooks import AGN_FLARE_HORIZON_DAYS
+        from trove_nonlocalizedevents.hooks import AGN_FLARE_HORIZON_DAYS
         from scoring.em_models.util import MODELS_BY_NAME
 
         assert AGN_FLARE_HORIZON_DAYS == MODELS_BY_NAME["AGN-flare"].detection_horizon[1] == 400

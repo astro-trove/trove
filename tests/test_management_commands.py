@@ -1,7 +1,7 @@
 """
 Unit tests for Django management commands.
 
-These test the management commands in custom_code/management/commands/
+These test the management commands in trove_targets/management/commands/
 and scoring/management/commands/.
 """
 import pytest
@@ -254,7 +254,7 @@ class TestQueryANTARESgw:
     # CI has no database, so stub out the TargetName lookup of existing ANT* names,
     # and mock the ANTARES client so we test our query rather than their live results
     def _query(self):
-        from custom_code.management.commands import query_antares_gw
+        from trove_targets.management.commands import query_antares_gw
 
         with patch.object(query_antares_gw, "get_current_ant_candidate_names",
                           return_value=["ANT2020old"]) as mock_names, \

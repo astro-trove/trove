@@ -369,7 +369,7 @@ class TestNewCandidateVetting:
         ([], []),
     ])
     def test_scores_each_possible_em_model(self, transients, expected_models):
-        from custom_code import hooks
+        from trove_nonlocalizedevents import hooks
 
         cand = MagicMock()
         cand.target.id, cand.nonlocalizedevent.event_id = 1, "S250208ad"
@@ -384,7 +384,7 @@ class TestNewCandidateVetting:
 
     def test_each_model_gets_fresh_basic_results(self):
         import pandas as pd
-        from custom_code import hooks
+        from trove_nonlocalizedevents import hooks
 
         cand = MagicMock()
         cand.target.id, cand.nonlocalizedevent.event_id = 1, "S250208ad"
