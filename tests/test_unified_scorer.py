@@ -42,7 +42,7 @@ def scorer():
         classification_score=MagicMock(return_value=1),
         _get_pre_disc_phot=MagicMock(return_value=None),
         _get_post_disc_phot=MagicMock(return_value=postphot),
-        _score_phot=MagicMock(return_value=(0.5, MagicMock(value=1e42), 2.0, -0.3, None, None)),
+        _score_phot=MagicMock(return_value=(0.5, 1e42, 2.0, -0.3, None, None)),
         kilonova_score_candidate=MagicMock(return_value=0.7),
         fit_agn_baseline=MagicMock(return_value={"g": {"mag": 19.0, "std": 0.1}}),
         detect_flare=MagicMock(return_value=(5.0, postphot.iloc[0])),
