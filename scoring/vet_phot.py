@@ -557,7 +557,7 @@ def compute_peak_lum(
     lummax = _flux_to_lum(fluxmax, lumdist).to("erg/s/Hz")
 
     freq_eff = FILTER_EFF_FREQ.get(filtermax, 5.0e14 * u.Hz)
-    nu_lummax = (freq_eff * lummax).to("erg/s")
+    nu_lummax = (freq_eff * lummax).to("erg/s").value
     return nu_lummax
 
 
@@ -643,10 +643,13 @@ def find_public_phot(
     # check ANTARES for new ZTF and LSST photometry from alerts
     if query_antares_phot:
         logger.info("Checking ANTARES for new photometry")
-        data_service = AntaresDataService()
-        data = data_service.query_reduced_data(target)
-        data_service.to_reduced_datums(target, data)
-
+        try:
+            data_service = AntaresDataService()
+            data = data_service.query_reduced_data(target)
+            data_service.to_reduced_datums(target, data)
+        except Exception as exc:
+            logger.error(exc)
+            
     # in some cases, we won't want to query ATLAS FP because it isn't constraining
     # for dim transients in LSST alerts
     if not query_atlas_fp:

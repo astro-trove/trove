@@ -219,7 +219,7 @@ def score(
         )
 
         if lum is not None:
-            update_score_factor(candidate, "phot_peak_lum", lum.value)
+            update_score_factor(candidate, "phot_peak_lum", lum)
         else:
             delete_score_factor(candidate, "phot_peak_lum")
 
