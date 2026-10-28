@@ -33,9 +33,6 @@
 	"knscorer": true,
 	"metric": true,
 	"agn_flare": false,
-	"lum_max": true,
-	"decay_rate": true,
-	"rise_time": true,
 	"predets_filter": true
     },
     "phot_parameter": {

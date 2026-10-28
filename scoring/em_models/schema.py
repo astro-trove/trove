@@ -20,9 +20,6 @@ class PhotMethodSchema(BaseModel):
     knscorer: bool
     metric: bool
     agn_flare: bool
-    lum_max: bool
-    decay_rate: bool
-    rise_time: bool
     predets_filter: bool
 
 class PhotParameterSchema(BaseModel):

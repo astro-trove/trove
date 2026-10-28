@@ -30,12 +30,9 @@
 	}
     },
     "phot_method": {
-	"knscorer": true,
+	"knscorer": false,
 	"metric": true,
-	"agn_flare": true,
-	"lum_max": true,
-	"decay_rate": true,
-	"rise_time": true,
+	"agn_flare": false,
 	"predets_filter": true
     },
     "phot_parameter": {
