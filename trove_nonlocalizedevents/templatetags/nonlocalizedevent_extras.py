@@ -1,7 +1,7 @@
 from django import template
 from django.db.models import Max, Count
 from tom_nonlocalizedevents.models import NonLocalizedEvent
-from custom_code.templatetags.skymap_extras import get_preferred_localization
+from trove_nonlocalizedevents.templatetags.skymap_extras import get_preferred_localization
 import math
 from trove_nonlocalizedevents.permissions import nonlocalizedevents_for_user
 

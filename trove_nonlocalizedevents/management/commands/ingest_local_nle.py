@@ -53,7 +53,7 @@ from django.db import connection
 
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 
-from custom_code.nle_ingestion import (
+from trove_nonlocalizedevents.nle_ingestion import (
     GRACEDB_BASE_URL,
     GRACEDB_PRODUCTION_QUERY,
     GRACEDB_SIGNIFICANT_QUERY,

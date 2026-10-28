@@ -29,7 +29,7 @@ from hop.models import JSONBlob
 from ligo.skymap.bayestar import derasterize
 from ligo.skymap.io import write_sky_map
 
-from custom_code.alertstream_handlers import handle_message_and_send_alerts
+from trove_nonlocalizedevents.alertstream_handlers import handle_message_and_send_alerts
 
 logger = logging.getLogger(__name__)
 

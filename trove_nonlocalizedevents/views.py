@@ -24,7 +24,6 @@ from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_targets.utils import cone_search_filter
 
-from custom_code.templatetags.skymap_extras import get_preferred_localization, skymap
 from scoring.models import ScoreFactor
 from scoring.phot_method import (
     PHOT_METHOD_CHOICES,
@@ -49,6 +48,11 @@ from trove_nonlocalizedevents.permissions import (
     candidates_for_user,
     nonlocalizedevents_for_user
 )
+from trove_nonlocalizedevents.templatetags.skymap_extras import (
+    get_preferred_localization,
+    skymap
+)
+
 from trove_targets.models import Target
 
 from .filters import GWFilter, NeutrinoFilter
@@ -164,7 +168,6 @@ def filter_candidates(qs, get):
     """
 
     # first detection == earliest photometry point, as in
-    # custom_code.hooks.associate_targets_with_nle
     after = _as_date(get.get("first_det_after"))
     before = _as_date(get.get("first_det_before"))
     if after or before:
@@ -505,7 +508,7 @@ class EventCandidateCreateFromNLEView(LoginRequiredMixin, View):
 
             # Redirect to the create-candidate view
             return redirect(
-                "custom_code:create-candidate",
+                "trove_nonlocalizedevents:create-candidate",
                 event_id=event_id,
                 target_id=target_id,
             )
@@ -683,9 +686,9 @@ class ToggleAgnCacheView(LoginRequiredMixin, View):
             params = {"nonlocalizedevent": nle_id}
             return redirect(_return_to(
                 request,
-                reverse("custom_code:event-candidates") + "?" + urlencode(params),
+                reverse("trove_nonlocalizedevents:event-candidates") + "?" + urlencode(params),
             ))
-        return redirect(_return_to(request, reverse("custom_code:event-candidates")))
+        return redirect(_return_to(request, reverse("trove_nonlocalizedevents:event-candidates")))
 
 
 class TogglePhotMethodCacheView(LoginRequiredMixin, View):
@@ -701,7 +704,7 @@ class TogglePhotMethodCacheView(LoginRequiredMixin, View):
         # the cached scored list was built displaying the other method's factor,
         # so it has to go or the page keeps showing the
         # old numbers under the new label
-        url = reverse("custom_code:event-candidates")
+        url = reverse("trove_nonlocalizedevents:event-candidates")
         params = {}
         if nle_id:
             params["nonlocalizedevent"] = nle_id
@@ -733,7 +736,7 @@ class RefreshCandidateList(LoginRequiredMixin, View):
 
         # send the user back to the list they were looking at, filters and all
         query_string = request.GET.urlencode()
-        url = reverse("custom_code:event-candidates")
+        url = reverse("trove_nonlocalizedevents:event-candidates")
         if query_string:
             url += f"?{query_string}"
         return redirect(url)
@@ -756,7 +759,7 @@ class VetMultiProgressPartialView(View):
         # wants the candidate list, so send them there rather than showing them
         # a stray notice on a blank page.
         if not getattr(request, "htmx", False):
-            url = reverse("custom_code:event-candidates")
+            url = reverse("trove_nonlocalizedevents:event-candidates")
             if nle_id:
                 url += f"?nonlocalizedevent={nle_id}"
             return redirect(url)
@@ -896,7 +899,6 @@ class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
             created = False  # two submits raced; the other one made the link
 
         if created:
-            # imported here to keep custom_code.views out of an import cycle
             from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
 
             invalidate_scored_candidates_cache(nonlocalizedevent.id)
@@ -940,8 +942,8 @@ class GWNonLocalizedEventOrTargetNameSearchView(RedirectView):
             nle = gw_nles.get()
         except NonLocalizedEvent.MultipleObjectsReturned as exc:
             print(exc)
-            return HttpResponseRedirect(reverse('custom_code:gw-list-search', kwargs={"search_str":search_str}))
+            return HttpResponseRedirect(reverse('trove_nonlocalizedevents:gw-list-search', kwargs={"search_str":search_str}))
         except NonLocalizedEvent.DoesNotExist:
-            return HttpResponseRedirect(reverse('custom_code:search', kwargs={"search_str":search_str}))
+            return HttpResponseRedirect(reverse('trove_nonlocalizedevents:search', kwargs={"search_str":search_str}))
 
         return HttpResponseRedirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")

@@ -4,7 +4,7 @@
 
 <div class="row">
   <div class="col">
-    <form action="{% url 'custom_code:event-candidates' %}" method="get" class="form" hx-get="{% url 'custom_code:event-candidates' %}" hx-target="#candidate-results" hx-push-url="true">
+    <form action="{% url 'trove_nonlocalizedevents:event-candidates' %}" method="get" class="form" hx-get="{% url 'trove_nonlocalizedevents:event-candidates' %}" hx-target="#candidate-results" hx-push-url="true">
       {# these come from clean(), which bootstrap_field cannot render #}
       {% if eventcandidate_filter_form.non_field_errors %}
         <div class="alert alert-warning py-2 mb-2">
@@ -19,7 +19,7 @@
         <button type="submit" class="btn btn-primary">
           Filter
         </button>
-        <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-get="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-target="#candidate-results" hx-push-url="true" class="btn btn-secondary" title="Reset">
+        <a href="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-get="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}" hx-target="#candidate-results" hx-push-url="true" class="btn btn-secondary" title="Reset">
           Reset
         </a>
       </div>
@@ -33,8 +33,8 @@
           <span id="more-filters-caret">{% if filters_active %}&#9650;{% else %}&#9660;{% endif %}</span>
         </button>
         <button type="submit" class="btn btn-primary">Filter</button>
-        <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
-           hx-get="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+        <a href="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+           hx-get="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
            hx-target="#candidate-results" hx-push-url="true"
            class="btn btn-secondary" title="Reset">Reset</a>
       </div>

@@ -8,10 +8,10 @@ from django.conf import settings
 from tom_nonlocalizedevents.models import NonLocalizedEvent 
 
 from trove_targets.models import Target
-from custom_code.healpix_utils import (
+from trove_nonlocalizedevents.healpix_utils import (
     get_target_ids_in_prob_credible_region,
     create_candidates_from_targets,
-    )
+)
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
