@@ -28,8 +28,8 @@ urlpatterns = [
         TroveTargetListView.as_view(),
         name="targetlist"
     ),
-    path('targets/<int:pk>/report/', TargetReportView.as_view(), name='report'),
-    path('targets/<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
-    path('targets/search/<str:search_str>', TargetNameSearchView.as_view(), name='search'),
+    path('<int:pk>/report/', TargetReportView.as_view(), name='report'),
+    path('<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
+    path('search/<str:search_str>', TargetNameSearchView.as_view(), name='search'),
 
 ]

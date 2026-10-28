@@ -22,39 +22,39 @@ from trove_nonlocalizedevents.views import EventCandidateListView
 app_name = "trove_nonlocalizedevents"
 
 urlpatterns = [
-    path("generate-report/", generate_report, name="generate-report"),
+    path("trove_nonlocalizedevents/generate-report/", generate_report, name="generate-report"),
     path(
-        "create-eventcandidate-from-nle/",
+        "trove_nonlocalizedevents/create-eventcandidate-from-nle/",
         EventCandidateCreateFromNLEView.as_view(),
         name="eventcandidate-create-from-form",
     ),
     path(
-        "toggle-agn-cache/",
+        "trove_nonlocalizedevents/toggle-agn-cache/",
         ToggleAgnCacheView.as_view(),
         name="toggle-agn-cache",
     ),
     path(
-        "toggle-phot-method/",
+        "trove_nonlocalizedevents/toggle-phot-method/",
         TogglePhotMethodCacheView.as_view(),
         name="toggle-phot-method",
     ),
     path(
-        "refresh-candidate-list",
+        "trove_nonlocalizedevents/refresh-candidate-list",
         RefreshCandidateList.as_view(),
         name="refresh-candidate-list"
     ),
     path(
-        "skymap/",
+        "trove_nonlocalizedevents/skymap/",
         SkymapPartialView.as_view(),
         name="skymap"
     ),
     path(
-        "vet-multi-progress/",
+        "trove_nonlocalizedevents/vet-multi-progress/",
         VetMultiProgressPartialView.as_view(),
         name="vet-multi-progress"
     ),
     path(
-        'vet-all-cooldown/',
+        'trove_nonlocalizedevents/vet-all-cooldown/',
         vet_all_cooldown_notice,
         name='vet_all_cooldown_notice'
     ),

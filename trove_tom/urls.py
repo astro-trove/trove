@@ -22,7 +22,7 @@ urlpatterns = [
     path("", include("tom_common.urls")),
     path("", include("scoring.urls")),
     path(
-        "trove_nonlocalizedevents/",
+        "",
         include("trove_nonlocalizedevents.urls", namespace="trove_nonlocalizedevents"),
     ),
     path(
