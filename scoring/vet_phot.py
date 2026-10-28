@@ -18,7 +18,7 @@ from tom_antares.antares import AntaresDataService
 from tom_dataproducts.models import PhotometryReducedDatum
 from tom_nonlocalizedevents.models import EventSequence, NonLocalizedEvent
 
-from custom_code.templatetags.photometry_extras import error_to_snr
+from trove_targets.templatetags.photometry_extras import error_to_snr
 from trove_targets.models import Target
 
 from .tasks import async_atlas_query

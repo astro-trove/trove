@@ -28,8 +28,8 @@ from tom_nonlocalizedevents.models import (
     NonLocalizedEvent,
 )
 
-from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
-from custom_code.templatetags.target_list_extras import galaxy_table
+from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_nonlocalizedevents.templatetags.target_list_extras import galaxy_table
 from scoring.util import get_possible_em_transients
 from trove_targets.models import Target
 

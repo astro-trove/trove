@@ -21,7 +21,7 @@ from candidate_vetting.vet import (
 from tom_nonlocalizedevents.models import EventCandidate, EventSequence, NonLocalizedEvent
 from tom_targets.models import TargetExtra
 
-from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from trove_targets.models import Target
 
 from .dynamic_catalogs import UserGalaxy

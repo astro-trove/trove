@@ -22,7 +22,7 @@ from django_tasks.backends.database.models import DBTaskResult
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 from tom_targets.models import TargetExtra
 
-from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
 from trove_targets.models import Target
 
 from .models import ScoreFactor
