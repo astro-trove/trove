@@ -12,8 +12,6 @@ class SubScoreControlSchema(BaseModel):
 
 class ScoreControlSchema(BaseModel):
     agn: SubScoreControlSchema
-    ps: SubScoreControlSchema
-    mpc: SubScoreControlSchema
     phot: SubScoreControlSchema
 
 class PhotMethodSchema(BaseModel):
