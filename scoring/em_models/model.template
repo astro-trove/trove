@@ -16,14 +16,6 @@
 	    "match": 0.1,
 	    "no_match": 1
 	},
-	"ps": {
-	    "match": 0,
-	    "no_match": 1
-	},
-	"mpc": {
-	    "match": 0,
-	    "no_match": 1
-	},
 	"phot": {
 	    "match": 1,
 	    "no_match": 0.1
@@ -33,9 +25,6 @@
 	"knscorer": true,
 	"metric": true,
 	"agn_flare": true,
-	"lum_max": true,
-	"decay_rate": true,
-	"rise_time": true,
 	"predets_filter": true
     },
     "phot_parameter": {
