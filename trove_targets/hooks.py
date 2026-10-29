@@ -1,26 +1,17 @@
 import logging
-from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from contextvars import ContextVar
 
 from django.db import transaction
-from django.db.models import Min
 from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from tom_dataproducts.models import PhotometryReducedDatum
 
-from scoring.em_models.util import MODELS_BY_NAME
-from scoring.unified_scorer import score, vet_basic
-from scoring.util import get_possible_em_transients
+from scoring.unified_scorer import vet_basic
 
 from trove_nonlocalizedevents.healpix_utils import create_candidates_from_targets
 from trove_nonlocalizedevents.hooks import associate_nle_with_target, vet_new_candidate
-from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
-from trove_targets.models import Target
 from astropy.time import Time, TimezoneInfo
-from astropy.coordinates import SkyCoord
-from astroquery.ipac.irsa.irsa_dust import IrsaDust
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
