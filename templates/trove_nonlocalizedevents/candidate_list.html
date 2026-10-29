@@ -60,6 +60,12 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 </div>
 <br><br>
 {% if request.user.is_authenticated %}
+  <form id="export-csv-form"
+        method="post"
+        action="{% url 'trove_nonlocalizedevents:generate-selected-candidates-csv' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}">
+    {% csrf_token %}
+    <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
+  </form>
   <div class="d-flex flex-wrap gap-2">
       <button type="button" class="btn btn-secondary btn-lg"
               id="export-selected-btn"
@@ -67,12 +73,7 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
               onclick="openCsvDownload()">
         Export Selected (<span id="export-selected-count">0</span>)
       </button>
-      <form id="export-csv-form"
-            method="post"
-            action="{% url 'trove_nonlocalizedevents:generate-selected-candidates-csv' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}">
-        {% csrf_token %}
-        <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
-      </form>
+
       <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
               id="vet-selected-btn" title="Run vetting for selected candidates">
         Vet Selected (<span id="vet-selected-count">0</span>)
@@ -100,17 +101,17 @@ Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
 <div class="d-flex flex-wrap gap-2">
   <h5>Superuser Buttons</h5>
 </div>
+<form id="dissociate-selected"
+      method="post"
+      action="{% url 'scoring:dissociate_selected' request.GET.nonlocalizedevent %}">
+  {% csrf_token %}
+</form>
 <div class="d-flex flex-wrap gap-2">
   <a href="{% url 'scoring:nle_associate_targets_form' request.GET.nonlocalizedevent %}" title="Associate new targets with the event" class="btn btn-success btn-lg">Associate New Targets</a>
   <button type="button" class="btn btn-danger btn-lg"
           id="dissociate-selected-btn" title="Dissociate selected candidates">
     Dissociate Selected Candidates (<span id="dissociate-selected-count">0</span>)
   </button>
-  <form id="dissociate-selected"
-        method="post"
-        action="{% url 'scoring:dissociate_selected' request.GET.nonlocalizedevent %}">
-    {% csrf_token %}
-  </form>
   <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
 {% endif %}
 </div>
