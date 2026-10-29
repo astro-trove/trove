@@ -1,16 +1,17 @@
 from django.core.exceptions import ValidationError
 from django.forms import (
-    Form,
+    CharField,
     ChoiceField,
     FloatField,
-    CharField,
     BooleanField,
+    Form,
     # RadioSelect,
-    Select
+    Select,
 )
 
 from .dynamic_catalogs import find_galaxy
 from .phot_method import KILONOVASCORER_VETTING_MODE, PHOT_METHOD_METRICS
+
 
 class VettingChoiceForm(Form):
     # Only shown when the page the user came from named no event. Choices and
@@ -55,7 +56,7 @@ class VettingChoiceForm(Form):
                     f"Pick an event to run {submitted} vetting against."
                 )
         return cleaned
-    
+
 class RedshiftUpdateForm(Form):
     host_galaxy_id = ChoiceField(
         choices = [], # these are specified in the view
@@ -69,10 +70,10 @@ class RedshiftUpdateForm(Form):
     )
 
     z = FloatField(label="Redshift")
-    z_err = FloatField(label="Redshift uncertainty [default 0.001]", 
+    z_err = FloatField(label="Redshift uncertainty [default 0.001]",
                        required=False,
     )
-    
+
     submitter = CharField(label="Submitter")
 
     def clean(self):

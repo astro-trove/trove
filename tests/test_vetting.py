@@ -360,19 +360,42 @@ class TestAtlasForcedPhotParsing:
 
 
 class TestNewCandidateVetting:
-    """A newly associated candidate is vetted for its own event's class."""
+    """A newly associated candidate is scored with every EM model possible for its event."""
 
-    @pytest.mark.parametrize("nle_class, bbh_runs", [("BBH", True), ("NSBH", False), (None, False)])
-    def test_bbh_candidates_get_agn_flare_vetting_only(self, nle_class, bbh_runs):
-        from custom_code import hooks
+    @pytest.mark.parametrize("transients, expected_models", [
+        (["AGN-flare"], ["AGN-flare"]),
+        (["KN", "KN-in-SN", "super-KN"], ["KN", "KN-in-SN", "super-KN"]),
+        (["AGN-flare", "TDE"], ["AGN-flare"]),  # TDE has no scoring model yet
+        ([], []),
+    ])
+    def test_scores_each_possible_em_model(self, transients, expected_models):
+        from trove_nonlocalizedevents import hooks
 
         cand = MagicMock()
         cand.target.id, cand.nonlocalizedevent.event_id = 1, "S250208ad"
-        with patch.object(hooks, "get_most_likely_class", return_value=nle_class), \
-                patch.object(hooks, "vet_bbh") as vet_bbh, patch.object(hooks, "vet_kn") as vet_kn, \
-                patch.object(hooks, "vet_kn_in_sn") as vet_kn_in_sn, \
-                patch.object(hooks, "vet_super_kn") as vet_super_kn:
+        with patch.object(hooks, "get_possible_em_transients", return_value=transients), \
+                patch.object(hooks, "score") as score:
             hooks.vet_new_candidate(cand)
-        assert vet_bbh.called is bbh_runs
-        for kn_vetter in (vet_kn, vet_kn_in_sn, vet_super_kn):
-            assert kn_vetter.called is not bbh_runs
+        assert [c.kwargs["em_model_name"] for c in score.call_args_list] == expected_models
+        for c in score.call_args_list:
+            assert c.kwargs["target_id"] == 1
+            assert c.kwargs["nonlocalized_event_name"] == "S250208ad"
+            assert c.kwargs["basic_results"] is None
+
+    def test_each_model_gets_fresh_basic_results(self):
+        import pandas as pd
+        from trove_nonlocalizedevents import hooks
+
+        cand = MagicMock()
+        cand.target.id, cand.nonlocalizedevent.event_id = 1, "S250208ad"
+        host_df, agn_df = pd.DataFrame({"name": ["g1"]}), pd.DataFrame({"name": ["a1"]})
+        with patch.object(hooks, "get_possible_em_transients", return_value=["KN", "KN-in-SN"]), \
+                patch.object(hooks, "score") as score:
+            hooks.vet_new_candidate(cand, basic_results=(host_df, agn_df, True))
+
+        passed = [c.kwargs["basic_results"] for c in score.call_args_list]
+        assert len(passed) == 2
+        # each mode gets its own copies, so one can't modify another's dataframes
+        assert passed[0][0] is not passed[1][0] and passed[0][0] is not host_df
+        assert passed[0][1] is not passed[1][1] and passed[0][1] is not agn_df
+        assert all(p[0].equals(host_df) and p[1].equals(agn_df) and p[2] for p in passed)

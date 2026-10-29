@@ -18,14 +18,13 @@ from django.urls import path, include
 from .api import api
 
 urlpatterns = [
-    path("", include("custom_code.urls")),
     path("targets/", include("trove_targets.urls", namespace="trove_targets")),
-    path("", include("tom_common.urls")),
-    path("", include("scoring.urls")),
     path(
-        "trove_nonlocalizedevents/",
+        "",
         include("trove_nonlocalizedevents.urls", namespace="trove_nonlocalizedevents"),
     ),
+    path("", include("tom_common.urls")),
+    path("", include("scoring.urls")),
     path(
         "nonlocalizedevents/",
         include("tom_nonlocalizedevents.urls", namespace="nonlocalizedevents"),

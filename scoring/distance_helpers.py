@@ -15,7 +15,7 @@ def normalization_prefactor(mean_gw, sigma_gw, mean_cand, sigma_cand_neg, sigma_
 
 def a(sigma_gw, sigma_cand):
     return 1/sigma_gw**2 + 1/sigma_cand**2
-        
+
 def b(mean_gw, sigma_gw, mean_cand, sigma_cand):
     return mean_gw/sigma_gw**2 + mean_cand/sigma_cand**2
 

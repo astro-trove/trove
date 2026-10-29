@@ -1,0 +1,635 @@
+"""
+Some functions for accessing the EventCandidate table inside a django template
+"""
+
+import numpy as np
+from collections import OrderedDict
+from decimal import Decimal, InvalidOperation
+from functools import partial
+from django import template
+from django.core.cache import cache
+from django.template.defaultfilters import linebreaks
+from django.conf import settings
+from django.utils.html import escape
+from django.utils.safestring import mark_safe
+from trove_targets.models import Target
+from tom_targets.models import TargetExtra
+from scoring.models import ScoreFactor
+from scoring.scoring import mpc_score_from_match
+from scoring.util import (
+    agn_counts_toward,
+    get_agn_toggle as _get_agn_toggle,
+    get_event_candidate_scores as _get_event_candidate_scores,
+    get_last_multi_vetting as _get_last_vetting,
+    get_target_score as _get_target_score,
+    host_distances,
+    kilonova_scores_exist,
+    latest_score_factors,
+    most_likely_class_for_event,
+    KILONOVA_SCORE_KEY,
+    KN_STYLE_CLASSES,
+    MPC_KEYS,
+    TARGETEXTRA_KEYS,
+)
+from tom_nonlocalizedevents.models import NonLocalizedEvent
+from scoring.phot_method import (
+    get_phot_method as _get_phot_method,
+    phot_method_label as _phot_method_label,
+)
+
+register = template.Library()
+
+
+@register.simple_tag(takes_context=True)
+def get_agn_toggle(context):
+    """This viewer's agn_toggle flag, from their session."""
+    return _get_agn_toggle(context["request"])
+
+
+@register.simple_tag(takes_context=True)
+def get_phot_method(context):
+    """
+    Which photometry scorer Vet All will use: ``trove`` or ``kilonova``.
+    """
+    return _get_phot_method(context["request"])
+
+
+@register.simple_tag(takes_context=True)
+def get_phot_method_label(context):
+    """``TROVE`` or ``KilonovaSCORER`` — what the toggle button displays."""
+    return _phot_method_label(request=context["request"])
+
+
+@register.simple_tag
+def get_event_candidate_scores(*args, **kwargs):
+    """A wrapper on the imported _get_event_candidate_scores, but registered as a tag"""
+    return _get_event_candidate_scores(*args, **kwargs)
+
+@register.simple_tag
+def get_target_score(*args, **kwargs):
+    """A wrapper on the imported _get_target_score, but registered as a tag"""
+    return _get_target_score(*args, **kwargs)
+
+@register.simple_tag(takes_context=True)
+def vet_all_is_allowed(context):
+    """Is the Vet All button enabled, or is this event within its cooldown?
+
+    True when nothing has run recently. ``VetAllView.form_valid`` sets
+    ``VETTING_COOLDOWN_KEY_<nle_id>`` for ``VETTING_COOLDOWN_PERIOD`` (1 hour)
+    when the button is used, so the presence of that key IS the cooldown.
+
+    This used to compute the key and then fall off the end of the function,
+    returning None. None is falsy, so the template took every event to be on
+    cooldown permanently and the button was greyed out for good -- with no
+    cooldown actually set anywhere.
+    """
+    request = context['request']
+    nle_id = request.GET.get('nonlocalizedevent')
+    if not nle_id:
+        # No event in scope, so nothing to rate-limit. Returning True also
+        # avoids `KEY + "_" + None`, which raises TypeError and would take the
+        # whole page down rather than just disabling a button.
+        return True
+    cooldown_cache_key = settings.VETTING_COOLDOWN_KEY + "_" + str(nle_id)
+    return not cache.get(cooldown_cache_key)
+
+def _event_classes_in_scope(context, target_id=None):
+    """Classifications of the events the scoring-adjustments panel applies to:
+    every event `target_id` is a candidate for on a target's page, else the
+    ``?nonlocalizedevent=`` event on the candidate list. Empty when no event is
+    in scope.
+
+    ``?nonlocalizedevent=`` carries the numeric pk on the candidate-list page
+    but the string ``event_id`` on a target's own detail page, so both are
+    accepted.
+    """
+    if target_id is not None:
+        event_ids = set(
+            NonLocalizedEvent.objects.filter(candidates__target_id=target_id)
+            .values_list("event_id", flat=True)
+        )
+        if event_ids:
+            return {most_likely_class_for_event(eid) for eid in event_ids}
+
+    nle_id = context["request"].GET.get("nonlocalizedevent")
+    if not nle_id:
+        return set()
+    lookup = {"id": nle_id} if str(nle_id).isdigit() else {"event_id": nle_id}
+    nle = NonLocalizedEvent.objects.filter(**lookup).first()
+    return {most_likely_class_for_event(nle.event_id)} if nle else set()
+
+
+@register.inclusion_tag("scoring/partials/scoring_toggles.html", takes_context=True)
+def scoring_toggles(context, target_id=None):
+    from scoring.phot_method import PHOT_METHOD_KILONOVASCORER
+
+    # Locked on light curve metrics until there is a KilonovaSCORER score to
+    # switch to: per candidate on the target page, per event on the list. The
+    # list with no event in scope has nothing to gate on, so stays unlocked.
+    request = context["request"]
+    nle_id = request.GET.get("nonlocalizedevent", "")
+    if target_id:
+        kilonova_locked = not kilonova_scores_exist(target_id=target_id)
+    elif nle_id.isdigit():
+        kilonova_locked = not kilonova_scores_exist(nonlocalizedevent_id=int(nle_id))
+    else:
+        kilonova_locked = False
+
+    # KN-style scoring adjustments (AGN sub-score is disqualifying for KNe, and
+    # only the "KN" transient type can use KilonovaSCORER) don't mean anything for
+    # a BBH/AGN-flare event. Shown when ANY event in scope is KN-style, so a
+    # candidate on both a BBH and a KN-style event keeps the panel whichever
+    # event is selected. Fails open when no event in scope can be classified.
+    classes = _event_classes_in_scope(context, target_id)
+    if classes and not any(c is None or c in KN_STYLE_CLASSES for c in classes):
+        return {"show": False}
+
+    return {
+        "show": True,
+        "agn_toggle": get_agn_toggle(context),
+        "is_kilonova": get_phot_method(context) == PHOT_METHOD_KILONOVASCORER and not kilonova_locked,
+        "kilonova_locked": kilonova_locked,
+        "next": request.get_full_path(),
+    }
+
+
+@register.inclusion_tag("scoring/partials/last_vet_multi_card.html")
+def last_vet_multi_card(target_id):
+    """Card showing when a Vet All / Vet Selected run last covered this candidate."""
+    return {"last_vet_multi": _get_last_vetting(target_id)}
+
+
+@register.simple_tag(takes_context=True)
+def display_score_details(context, target_id):
+    request = context["request"]
+    nle_requested = request.GET.get("nonlocalizedevent")
+    
+    if target_id is None:
+        return "Target ID is None!"
+    
+    target = Target.objects.get(id=target_id)
+
+    keymap = OrderedDict(
+        ps_score=("Point Source Associated?", _bool_format_yesno),
+        mpc_score=("Minor Planet Center Object Associated?", _bool_format_yesno),
+        mpc_match_name=("Minor Planet Center Match Name", _str_format),
+        mpc_match_date=("Minor Planet Center Match Date", _str_format),
+        mpc_match_sep=('Minor Planet Center Match Separation (")', partial(_float_format, unit='"')),
+        skymap_score=("Localization Score", _float_format),
+        host_distance_score=("Distance Score", _float_format),
+        host_name=("Host Galaxy used for Distance", _str_int_format),
+        host_catalog=("Host Galaxy Source Catalog", _str_format),
+        agn_score=(AGN_SCORE_LABEL, partial(_float_format, precision=1)),
+        agn_flare_score=("AGN Flare Score", partial(_float_format, precision=2)),
+        nuclear_offset_score=("Nuclear Offset Score", partial(_float_format, precision=2)),
+        phot_peak_lum=("Maximum Luminosity", partial(_sci_format, unit="erg/s")),
+        phot_peak_time=(
+            "Rise Time",
+            partial(_float_format, unit="days"),
+        ),
+        phot_decay_rate=(
+            "Light Curve Slope (positive is brightening)",
+            partial(_float_format, unit="mag/day"),
+        ),
+        predetection_score=(
+            "Score from Pre-Detections",
+            partial(_float_format, precision=1),
+        ),
+        phot_peak_lum_score=("Score from Maximum Luminosity", partial(_float_format, precision=1)),
+        phot_peak_time_score=(
+            "Score from Rise Time",
+            partial(_float_format, precision=1),
+        ),
+        phot_decay_rate_score=(
+            "Score from Light Curve Slope",
+            partial(_float_format, precision=1),
+        ),
+        classification_score=("Classification Score", _str_int_format),
+        kilonova_score=(
+            "KilonovaSCORER Photometry Score",
+            partial(_float_format, precision=2),
+        ),
+        kilonova_skip_reason=(
+            "KilonovaSCORER: Could not score",
+            _str_format,
+        ),
+    )
+    
+    order = list(keymap.keys())
+
+    def label_and_format(key):
+        return keymap.get(key) or (key, _float_format)
+
+    # basic scores/details
+    te = dict(
+        TargetExtra.objects.filter(target_id=target_id, key__in=TARGETEXTRA_KEYS)
+        .values_list("key", "value")
+    )
+    basic_score_details = [(key, te[key]) for key in ("ps_score",) if key in te]
+    # derived the way scoring derives it, from the MPC match vet_basic stored;
+    # a ScoreFactor copy would be one row per event and could be stale
+    if "mpc_match_name" in te:
+        mpc_score = mpc_score_from_match(te["mpc_match_name"])
+        basic_score_details.append(("mpc_score", mpc_score))
+        # match details only for a match; with none, a sep or date can only
+        # be left over from an earlier check
+        if mpc_score == 0:
+            basic_score_details += [(key, te[key]) for key in MPC_KEYS if key in te]
+
+    # NLE-specific scores/details
+    score_details = []
+    for event_candidate in target.eventcandidate_set.all():
+        sf_set = latest_score_factors(event_candidate.scorefactor_set.exclude(
+            key__in=TARGETEXTRA_KEYS
+            # exclude keys in TargetExtra + mpc_score
+            + ["mpc_score", "localization_id"]
+        ))
+
+        sf_set = sorted(
+            sf_set,
+            key=lambda sf: (order.index(sf.key) if sf.key in order else len(order),
+                            sf.key),
+        )
+        score_details.append(sf_set)
+
+    # the distance each of this target's candidates was scored against, read
+    # back out of the host galaxy vetting recorded -- one batch for every card
+    distances = host_distances(target.eventcandidate_set.all())
+
+    # Build structured data instead of strings
+    cards = []
+
+    # Basic Score Details Card
+    basic_card = {
+        "title": "Basic Scores (Not Event-Specific)",
+        "details": []
+    }
+    for key, raw_value in basic_score_details:
+        label, fmter = label_and_format(key)
+        basic_card["details"].append({
+            "label": label,
+            "value": _safe_format(raw_value, fmter),
+        })
+    
+    cards.append(basic_card)
+
+    # Event Cards
+    for queryset in score_details:
+        event_name = None
+        event_card = None
+        values = {sf.key: sf.value for sf in queryset}
+        for score_factor in queryset:
+            ec = score_factor.event_candidate
+            nle = ec.nonlocalizedevent
+            
+            # Create new card if we encounter a new event
+            if event_name != str(nle):
+                if event_card:
+                    cards.append(event_card)
+
+                event_name = nle.event_id
+                event_card = {
+                    "title": event_name,
+                    "ec": ec,
+                    "details": []
+                }
+
+            # "basic" factors belong in every model's subtab, the rest only in
+            # the subtab of the EM model whose vetting saved them
+            only = None if score_factor.em_model == "basic" else score_factor.em_model
+
+            # one "median ± scatter" row per band
+            if score_factor.key.startswith("baseline_std_"):
+                continue
+            if score_factor.key.startswith("baseline_mag_"):
+                filt = score_factor.key[len("baseline_mag_"):]
+                event_card["details"].append({
+                    "key": score_factor.key,
+                    "label": f"AGN baseline ({filt}-band)",
+                    "value": _baseline_format(
+                        score_factor.value, values.get(f"baseline_std_{filt}")
+                    ),
+                    "timestamp":score_factor.timestamp,
+                    "text": False,
+                    "only": only,
+                })
+                continue
+
+            label, fmter = label_and_format(score_factor.key)
+            numeric = fmter not in (_str_format, _str_int_format)
+            value = _safe_format(score_factor.value, fmter)
+            
+            event_card["details"].append(
+                {
+                    "key": score_factor.key,
+                    "label": label,
+                    "value": value,
+                    # a sentence, not a number: the value column is nowrap so
+                    # that figures stay on one line, which sent the skip reason
+                    # off the edge of the card instead of wrapping
+                    "timestamp":score_factor.timestamp,
+                    "text": not numeric,
+                    "only": only,
+            })
+            if score_factor.key == "host_distance_score":
+                # host_distance_score is written whenever distance scoring ran, so
+                # it is the one row the distance can reliably sit beside
+                event_card["details"].append({
+                    "key": "host_distance",
+                    "label": "Distance",
+                    "value": host_distance_cell(distances.get(ec.id), unit=True),
+                    "timestamp":score_factor.timestamp,
+                    "text": False,
+                    "only": None,
+                })
+            if score_factor.key == "predetection_score":
+                event_card["details"].append({
+                    "key": "predetected",
+                    "label": "Pre-detected?",
+                    "timestamp":score_factor.timestamp,
+                    "value": _safe_format(score_factor.value, _predetected_yesno),
+                    "text": False,
+                    "only": only,
+                })
+        
+        if event_card:
+            cards.append(event_card)
+
+    # Render cards as HTML
+    # Separate basic card from event cards
+    basic_card = cards[0]  # First card is always "Basic Score Details"
+    event_cards = cards[1:]  # Rest are event cards
+
+    # Render basic card
+    html = '<div class="score-details-wrapper">\n'
+    html += '  <div class="score-card">\n'
+    html += f'    <div class="score-card-header">{basic_card["title"]}</div>\n'
+    html += '    <table class="score-card-content-basic" style="width: 98%; table-layout: fixed;">\n'
+    html += '      <colgroup>\n'
+    html += '        <col style="width: 58%;">\n'
+    html += '        <col style="width: 40%;">\n'
+    html += '      </colgroup>\n'
+    html += '      <tbody>\n'
+    
+    for detail in basic_card["details"]:
+        html += '        <tr class="detail-row">\n'
+        html += f'          <td class="detail-label" style="padding: 6px 8px;">{detail["label"]}</td>\n'
+        html += f'          <td class="detail-value" style="padding: 6px 8px;">{detail["value"]}</td>\n'
+        html += '        </tr>\n'
+    
+    html += '      </tbody>\n'
+    html += '    </table>\n'
+    html += '  </div>\n'
+    
+    # Render event tabs and cards
+    if event_cards:
+        html += '  <div class="event-tabs-container">\n'
+        html += '    <div class="event-tabs">\n'
+        for idx, card in enumerate(event_cards):
+            ec = card["ec"]
+            if nle_requested is None:
+                active_class = 'active' if idx == 0 else ''
+            else:
+                active_class = 'active' if nle_requested==ec.nonlocalizedevent.event_id else ''
+                
+            html += f'      <button class="event-tab {active_class}" data-tab="{idx}">{card["title"]}</button>\n'
+        html += '    </div>\n'
+        
+        html += '    <div class="event-cards">\n'
+        for idx, card in enumerate(event_cards):
+            ec = card.pop("ec")
+            # Was left at the default, so this page scored as though AGN were
+            # always on while the candidate list scored with the toggle -- one
+            # candidate, two numbers. Also lets the AGN row say truthfully
+            # whether it fed the score.
+            agn_toggle = get_agn_toggle(context)
+            phot_method = get_phot_method(context)
+            ec_score_details = _get_event_candidate_scores(
+                [ec],
+                include_subscores=True,
+                agn_toggle=agn_toggle,
+                phot_method=phot_method,
+            )[0]
+            ec_scores = ec_score_details.score
+            ec_subscores = ec_score_details.subscores
+            # Which photometry factor actually fed the overall score. Taken
+            # from `phot_source` rather than the viewer's toggle, because a
+            # candidate KilonovaSCORER could not score falls back to the TROVE
+            # product even while the toggle says KilonovaSCORER -- and the
+            # highlight has to follow what was really used.
+            kn_is_active = getattr(ec_score_details, "phot_source", "metrics") == "kilonovascorer"
+
+            score_details = card["details"]
+
+            # setup the "event" card tab content
+            display_class = 'active' if idx == 0 else 'hidden'
+            html += f'      <div class="event-card {display_class}" data-tab-content="{idx}">\n'    
+
+            # add "subtabs" for the different types of scores
+            html += '        <div class="event-subtabs-container">\n'
+            html += '          <div class="event-subtabs">\n'
+            label_idx_map = {}
+            for jdx, (label, score) in enumerate(ec_scores.items()):
+                active_class = 'active' if jdx == 0 else ''
+                html += f'            <button class="event-subtab {active_class}" data-subtab="{idx}-{jdx}">{label} = {score:.2f}</button>\n'
+                label_idx_map[label] = f"{idx}-{jdx}"
+                
+            html += '          </div>\n'
+
+            html += '          <div class="event-cards">\n'
+            for kdx, (em_transient_score_label, idxlabel) in enumerate(label_idx_map.items()): 
+                em_transient_type = em_transient_score_label.split(" ")[0]
+                
+                active_subclass = ""
+                if not kdx:
+                    active_subclass = "active"
+                
+                html += f'            <div class="event-subtab-content {active_subclass}" data-subtab-content="{idxlabel}">\n'
+                # then add the content with the score details
+                # first the more general scores (2D, Distance, AGN, etc.) that don't change
+                # per transient model 
+                # one row per key so if any sub-score is computed on the fly (classification_score), it will not 
+                # be duplicated with a previous version of it.
+                rows = {
+                    detail["key"]: detail for detail in score_details
+                    if not detail.get("only") or detail["only"] == em_transient_type
+                }
+                for key, subscore in ec_subscores.get(em_transient_type, {}).items():
+                    label, fmter = label_and_format(key)
+                    rows[key] = {
+                        "key": key,
+                        "label": label,
+                        "value": _safe_format(subscore, fmter),
+                        "score": True
+                    }
+
+                html += '              <table class="score-card-content-filled">\n'
+                html += '                <tbody>\n'
+                for detail in rows.values():
+                    if not _is_score_row(detail): 
+                        continue
+                    row_class = _factor_row_class(
+                        detail["label"], em_transient_type, kn_is_active, agn_toggle
+                    )
+                    value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
+                    html += f'                <tr class="{row_class}">\n'
+                    html += f'                  <td class="detail-label">{detail["label"]}</td>\n'
+                    if "timestamp" in detail:
+                        html += f'                  <td class="detail-label" style="color: #00000075;">{detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S %Z")}</td>\n'
+                    else:
+                        html += '                  <td class="detail-label"></td>\n' # empty cell
+                    html += f'                  <td class="{value_class}">{detail["value"]}</td>\n'
+                    html += '                </tr>\n'
+                html += '                </tbody>\n'
+                html += '              </table>\n'
+                
+                # then the score details (max lum., etc.)
+                html += '              <table class="score-card-content">\n'
+                html += '                <tbody>\n'
+                for detail in rows.values():
+                    if _is_score_row(detail): 
+                        continue
+                    value_class = "detail-value detail-value-text" if detail.get("text") else "detail-value"
+                    html += '                <tr class="detail-row">\n'
+                    html += f'                  <td class="detail-label">{detail["label"]}</td>\n'
+                    if "timestamp" in detail:
+                        html += f'                  <td class="detail-label" style="color: #00000075;">{detail["timestamp"].strftime("%Y-%m-%d %H:%M:%S %Z")}</td>\n'
+                    else:
+                        html += '                  <td class="detail-label"></td>\n' # empty-cell
+
+                    html += f'                  <td class="{value_class}">{detail["value"]}</td>\n'
+                    html += '                </tr>\n'
+                html += '              </tbody>\n'
+                html += '            </table>\n'
+                html += '          </div>\n'  # Close the current subtab-content panel
+            html += '          </div>\n'
+            html += '        </div>\n'
+            html += '      </div>\n'
+        html += '    </div>\n'
+        html += '  </div>\n'
+    html += '</div>\n'
+    return mark_safe(html)
+
+
+# alternatives to one another: exactly one group feeds the overall score, and
+# which one is the whole point of the photometry toggle.
+_KILONOVA_FACTOR_LABELS = {"KilonovaSCORER Photometry Score"}
+_TROVE_FACTOR_LABELS = {
+    "Score from Maximum Luminosity",
+    "Score from Rise Time",
+    "Score from Light Curve Slope",
+}
+
+
+AGN_SCORE_LABEL = "AGN Association Score"
+
+
+def _is_score_row(detail):
+    # computed subscores are always scores, whatever their label says
+    return detail.get("score") or "Score" in detail["label"]
+
+
+# formatting
+def _baseline_format(mag, std):
+    """`vet_bbh`'s AGN baseline for one band: median mag ± its scatter,
+    max(1.4826 * MAD, median photometric error)."""
+    try:
+        text = f"{float(mag):.2f}"
+        return text if std is None else f"{text} ± {float(std):.2f}"
+    except (TypeError, ValueError):
+        return str(mag)
+
+
+def _safe_format(value, fmter):
+    # names/IDs are text even when they look numeric; float() would round a long ID
+    if fmter in (_str_format, _str_int_format):
+        return fmter(value)
+    for candidate in (lambda: fmter(float(value)), lambda: fmter(value)):
+        try:
+            return candidate()
+        except (TypeError, ValueError):
+            continue
+    return str(value)
+
+
+def _factor_row_class(label, transient, kn_is_active, agn_toggle=True):
+    if label in _KILONOVA_FACTOR_LABELS:
+        live = kn_is_active and transient == "KN"
+    elif label in _TROVE_FACTOR_LABELS:
+        live = not (kn_is_active and transient == "KN")
+    elif label == AGN_SCORE_LABEL:
+        live = agn_counts_toward(transient, agn_toggle)
+    else:
+        return "detail-row"
+    return "detail-row factor-active" if live else "detail-row factor-inactive"
+
+
+def _float_format(flt, unit="", precision=2):
+    return f"{flt:.{precision}f} {unit}"
+
+def _sci_format(flt, unit=""):
+    prefactor, power = f"{flt:.2e}".split("e")
+    if power[0] == "+":
+        power = power[1:]
+    return f"{prefactor} x 10<sup>{power}</sup> {unit}"
+
+def _bool_format(flt):
+    return int(flt) 
+
+def _bool_format_yesno(flt):
+    return "No" if bool(flt) else "Yes"
+
+def _predetected_yesno(flt):
+    # predetection_score is below 1 only when the predetection penalty applied
+    return "Yes" if flt < 1 else "No"
+  
+def _str_int_format(s):
+    # Decimal, not float: IDs above 2**53 must keep every digit
+    try:
+        d = Decimal(str(s).strip())
+    except InvalidOperation:
+        return str(s)
+    if d.is_finite() and d == d.to_integral_value():
+        return str(int(d))
+    return str(s)
+
+def _str_format(s):
+    return str(s)
+
+
+@register.filter
+def host_distance_cell(dist, unit=False):
+    """A host distance with its uncertainty, to one decimal place.
+
+    One place, and `+`/`-` for bounds that differ, is how the host galaxy table
+    beside it shows the same numbers.
+    """
+    if dist is None or dist.distance is None:
+        return "\u2014"
+    mpc = "&nbsp;Mpc" if unit else ""
+    neg, pos = dist.neg_err, dist.pos_err
+    shown = f"{dist.distance:.1f}"
+    if neg is None or pos is None:
+        return mark_safe(f"{shown}{mpc}")
+    if neg == pos:
+        return mark_safe(f"{shown} &plusmn; {pos:.1f}{mpc}")
+    sup_uni = f"<sup>+{pos:.1f}</sup>"
+    sub_uni = f"<sub>-{neg:.1f}</sub>"
+    return mark_safe(f"{shown}<span class='supsubdist'>{sub_uni}{sup_uni}</span>&nbsp;&nbsp;{mpc}")
+
+
+@register.filter
+def lookup(mapping, key):
+    """One value out of a dict, for templates that need a variable key."""
+    if not mapping:
+        return None
+    return mapping.get(key)
+
+
+@register.simple_tag
+def query_replace(request, key, value):
+    """This page's query string with one parameter replaced."""
+    params = request.GET.copy()
+    params[key] = value
+    params.pop("page", None)
+    return params.urlencode()

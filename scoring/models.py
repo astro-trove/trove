@@ -10,13 +10,13 @@ class ScoreFactor(models.Model):
     value = models.CharField(max_length=200)
     timestamp = models.DateTimeField(auto_now_add=True)
     em_model = models.CharField(max_length=200)
-    
+
     class Meta:
         get_latest_by = "timestamp"
         indexes = [
             models.Index(fields=["event_candidate", "key", "em_model", "-timestamp"]),
         ]
-        
+
 ## catalog of user-provided host galaxies
 class UserGalaxyQ3C(models.Model):
     id = models.AutoField(primary_key=True)

@@ -6,27 +6,24 @@ Asynchronous tasks for (1) querying public services that takes a long time,
 import logging
 import time
 from datetime import datetime, timedelta
-import numpy as np
 
-from django_tasks import task
+import numpy as np
+from candidate_vetting.vet import run_mpc
 from django.conf import settings
 from django.utils import timezone
-
+from django_tasks import task
 from tom_dataproducts.tasks import atlas_query
-from candidate_vetting.vet import run_mpc
-
-from custom_code.healpix_utils import (
-    get_target_ids_in_prob_credible_region,
-    create_candidates_from_targets,
-    )
-from trove_targets.models import Target
-
 from tom_nonlocalizedevents.models import NonLocalizedEvent
+
+from trove_nonlocalizedevents.healpix_utils import (
+    create_candidates_from_targets,
+    get_target_ids_in_prob_credible_region,
+)
+from trove_targets.models import Target
 
 logger = logging.getLogger(__name__)
 
 from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
-
 
 ## tasks
 async_atlas_query = atlas_query.using(
@@ -49,20 +46,24 @@ def async_vet(
     phot_method: str = None,
     *args, **kwargs
 ) -> None:
-    from .config import (
-        FORM_CHOICE_FUNC_MAP,
-    )  # import within function to avoid circular import error
+    from .unified_scorer import (  # import within function to avoid circular import error
+        score,
+        vet_basic,
+    )
 
     # Adds KN scoring for vet all and vetting individual candidates
     extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
 
     if vetting_mode == "basic":
         for ti in target_ids:
-            FORM_CHOICE_FUNC_MAP[vetting_mode](target_id=ti)
+            vet_basic(target_id=ti)
     else:
         for ti in target_ids:
-            FORM_CHOICE_FUNC_MAP[vetting_mode](
-                target_id=ti, nonlocalized_event_name=nle_event_id, **extra
+            score(
+                target_id=ti,
+                nonlocalized_event_name=nle_event_id,
+                em_model_name=vetting_mode,
+                **extra
             )
 
 @task(queue_name="associate_targets", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)
@@ -126,8 +127,8 @@ def async_associate_targets_nle(
                 logger.info("New eventcandidate created")
             else:
                 logger.info("Eventcandidate already exists")
-    
-    
+
+
 ## functions which enqueue tasks
 def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
                   started_by=None, run_kind="all") -> None:
@@ -147,7 +148,7 @@ def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
             try:
                 d, _ = get_eventcandidate_default_distance(ec.target_id, nle.event_id)
                 return float(d) if np.isfinite(d) and d > 0 else float("inf")
-            except Exception: 
+            except Exception:
                 return float("inf")
 
         t0 = time.time()

@@ -51,7 +51,6 @@ Issues = "https://github.com/astro-trove/trove/issues"
 [tool.setuptools]
 packages = [
     "trove_tom",
-    "custom_code",
     "scoring",
     "scoring.kilonova_scorer_helpers",
     "trove_nonlocalizedevents",

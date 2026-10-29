@@ -2,67 +2,68 @@
 Page views for candidate vetting
 """
 
-import numpy as np
+import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
+import numpy as np
 
-from django.core.cache import cache
-from django.conf import settings
-from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views import View
-from django.views.generic.base import RedirectView
-from django.views.generic.edit import FormView
-from django.http import HttpResponseRedirect, HttpResponseForbidden, QueryDict
-from django.urls import reverse
-from django.shortcuts import redirect, render
-from dal import autocomplete
-
-from trove_targets.models import Target
-from tom_nonlocalizedevents.models import (
-    EventCandidate,
-    NonLocalizedEvent,
-    EventLocalization,
-)
-
+from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
 from candidate_vetting.vet import (
     GALAXY_CATALOGS,
     host_association,
     localization_sequence_from_name,
 )
-from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
+
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.cache import cache
+from django.http import HttpResponseRedirect, QueryDict
+from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.views import View
+from django.views.generic.base import RedirectView
+from django.views.generic.edit import FormView
+
+from tom_nonlocalizedevents.models import (
+    EventCandidate,
+    NonLocalizedEvent,
+)
 
 from .forms import (VettingChoiceForm,
                     RedshiftUpdateForm,
                     NonLocalizedEventAssociateTargetsForm,
                     DissociateSelectedTargetsForm,
                     )
-from .config import (FORM_CHOICE_FUNC_MAP,
-                     VETTING_FORM_CHOICES,
+from .config import (VETTING_FORM_CHOICES,
                      VETTING_FORM_INITIALS,
                      DETECTION_HORIZON_DEFAULTS
                      )
-from .tasks import vet_multi_async, associate_targets_with_nle_async
+from .dynamic_catalogs import UserGalaxy
 from .phot_method import (
     KILONOVASCORER_VETTING_MODE,
     PHOT_METHOD_CHOICES,
-    PHOT_METHOD_METRICS,
     PHOT_METHOD_KILONOVASCORER,
     PHOT_METHOD_LABELS,
+    PHOT_METHOD_METRICS,
     get_phot_method,
 )
-from .util import get_vet_multi_progress, most_likely_class_for_event
-from .vet_basic import vet_basic
+from .tasks import vet_multi_async, associate_targets_with_nle_async
+from .unified_scorer import vet_basic, score
+from .util import (
+    get_vet_multi_progress, 
+    most_likely_class_for_event,
+    get_possible_em_transients,
+)
 from .vet_phot import find_public_phot
-from .dynamic_catalogs import UserGalaxy
 
-from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
-from custom_code.templatetags.target_list_extras import galaxy_table
+from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_targets.templatetags.target_list_extras import galaxy_table
+from trove_targets.models import Target
 
-from scoring.util import get_possible_em_transients
 
-import logging
 logger = logging.getLogger(__name__)
+
 
 
 def resolve_event_id(value):
@@ -104,7 +105,7 @@ def _vetting_method_fields(form, event_id, request):
             cls, VETTING_FORM_INITIALS[""]
         )
     return _phot_method_field(form, request)
-  
+
 
 def _phot_method_field(form, request):
     """
@@ -218,7 +219,6 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
         )
 
         # then run the vetting
-        vetting_func = FORM_CHOICE_FUNC_MAP[vetting_mode]
         if vetting_mode == "basic":
             vet_basic(target.id, stop_on_zero=False)
             messages.info(request, "Ran basic vetting.")
@@ -233,7 +233,7 @@ class TargetVettingView(LoginRequiredMixin, RedirectView):
             phot_method = (_clean_phot_method(request.GET.get("phot_method"))
                            or get_phot_method(request))
             extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
-            vetting_func(target.id, nonlocalized_event_name, **extra)
+            score(target.id, nonlocalized_event_name, vetting_mode, **extra)
             label = (f" using {PHOT_METHOD_LABELS[phot_method]} for scoring photometry"
                      if extra else "")
             messages.info(request, f"Ran vetting in {vetting_mode} mode{label}.")
@@ -371,8 +371,8 @@ class TargetRedshiftUpdateFormView(LoginRequiredMixin, FormView):
             vetting_modes = [v for v, _ in vetting_choices]
             vetting_modes.remove("basic")  # no need to re-run basic vetting
             for vm in vetting_modes:
-                FORM_CHOICE_FUNC_MAP[vm](
-                    target_id=pk, nonlocalized_event_name=nle.event_id
+                score(
+                    target_id=pk, nonlocalized_event_name=nle.event_id, em_model_name=vm
                 )
             messages.info(
                 self.request,
@@ -431,8 +431,8 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
                 scoped = scoped.filter(target__name__icontains=target_name)
             # the distance cut is not a queryset filter, so apply it the same way
             # the table does or "select all" vets rows the table did not show
-            from trove_nonlocalizedevents.views import _as_float, within_max_distance
             from scoring.util import host_distances
+            from trove_nonlocalizedevents.views import _as_float, within_max_distance
 
             distance_max = _as_float(params.get("distance_max"))
             if distance_max is not None:
@@ -501,15 +501,14 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
 
         # imported here to keep scoring.views out of an import cycle
         from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
-
         invalidate_scored_candidates_cache(str(nle.id))
-        messages.info(
-            self.request,
-            f"Vetting {len(candidates)} selected candidate"
-            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} vetting mode and "
-            f"{PHOT_METHOD_LABELS[phot_method]} for photometry vetting. "
-            "This takes a few seconds per candidate; check back shortly.",
-        )
+
+        # send a message and return
+        message = f"Vetting {len(candidates)} selected candidate"
+        message += f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} vetting mode"
+        message += f" and using {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. " if phot_method else ". "
+        message += "This takes a few seconds per candidate; check back shortly."
+        messages.info(self.request, message)
         return back
 
 
@@ -593,14 +592,13 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
 
         # imported here to keep scoring.views out of an import cycle
         from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
-
         invalidate_scored_candidates_cache(str(nle.id))
-        messages.info(
-            self.request,
-            f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} vetting "
-            f"mode and {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. This "
-            "takes a few seconds per candidate; check back shortly.",
-        )
+
+        # send a message and return
+        message = f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} vetting mode"
+        message += f" and using {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. " if phot_method else ". "
+        message += "This takes a few seconds per candidate; check back shortly."
+        messages.info(self.request, message)
         return back
 
 

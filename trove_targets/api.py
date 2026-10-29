@@ -6,8 +6,8 @@ from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
 from trove_targets.models import Target
 from tom_targets.models import TargetName
-from custom_code.hooks import target_hook_options
-from custom_code.tasks import async_target_post_save
+from trove_targets.hooks import target_hook_options
+from trove_targets.tasks import async_target_post_save
 from tom_dataproducts.models import PhotometryReducedDatum
 
 router = Router()

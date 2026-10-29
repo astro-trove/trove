@@ -16,16 +16,16 @@
     <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown">Events</a>
     <ul class="dropdown-menu">
         <li class="dropdown-item">
-            <a class="nav-link" href="{% url 'custom_code:gw-list' %}?prefix=S&state=ACTIVE&inv_far_min=0.5" style="color:black">Gravitational Waves</a>
+            <a class="nav-link" href="{% url 'trove_nonlocalizedevents:gw-list' %}?prefix=S&state=ACTIVE&inv_far_min=0.5" style="color:black">Gravitational Waves</a>
         </li>
         <li class="dropdown-item disabled">
-            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:neutrino-list' %}" style="color:gray">Neutrinos</a>
+            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'trove_nonlocalizedevents:neutrino-list' %}" style="color:gray">Neutrinos</a>
         </li>
         <li class="dropdown-item disabled">
-            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:grb-list' %}" style="color:gray">&gamma;-ray Bursts</a>
+            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'trove_nonlocalizedevents:grb-list' %}" style="color:gray">&gamma;-ray Bursts</a>
         </li>
         <li class="dropdown-item disabled">
-            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'custom_code:unknown-list' %}" style="color:gray">X-ray Transients</a>
+            <a class="nav-link" aria-disabled="true" tabindex="-1" onclick="event.preventDefault();" href="{% url 'trove_nonlocalizedevents:unknown-list' %}" style="color:gray">X-ray Transients</a>
         </li>
     </ul>
 </li>
