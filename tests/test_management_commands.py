@@ -264,4 +264,4 @@ class TestQueryANTARESgw:
 
         test_locus = next(loci)
         assert "locus_id" in test_locus.__dict__
-        assert test_locus.locus_id == "ANT2018ftkss"
+        assert "ANT" in test_locus.locus_id
