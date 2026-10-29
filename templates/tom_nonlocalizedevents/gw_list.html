@@ -57,7 +57,7 @@
       <tr>
       {% endif %}
         <td>
-            <a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a>
+            <a href="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a>
             {% if event.state == "RETRACTED" %}
                 <span title="retracted">&#x274c;</span> {# red X emoji #}
             {% elif seq.event_subtype != "PRELIMINARY" %}

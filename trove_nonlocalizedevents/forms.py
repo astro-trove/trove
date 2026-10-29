@@ -1,3 +1,7 @@
+from datetime import datetime
+import json
+import os
+
 from django import forms
 from django.urls import reverse
 
@@ -5,6 +9,53 @@ from tom_nonlocalizedevents.models import EventCandidate
 from trove_targets.models import Target
 
 from dal import autocomplete
+
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout, Row, Column, Submit, HTML
+from crispy_forms.bootstrap import AppendedText, PrependedAppendedText
+
+
+class GWFormHelper(FormHelper):
+    layout = Layout(
+            # event name first and on its own row: searching for a known event
+            # is the most common reason to touch this form
+            Row(
+                Column('event_id', css_class='col-md-6'),
+                Column('source_type', css_class='col-md-3'),
+                Column('prefix', css_class='col-md-3'),
+            ),
+            Row(
+                Column('status'),
+                Column(PrependedAppendedText('inv_far_min', '>', 'yr')),
+                Column(PrependedAppendedText('distance_max', '<', 'Mpc')),
+                Column(PrependedAppendedText('has_ns_min', '>', '%')),
+                Column(PrependedAppendedText('has_remnant_min', '>', '%')),
+                Column(PrependedAppendedText('has_massgap_min', '>', '%')),
+                Column(PrependedAppendedText('has_ssm_min', '>', '%')),
+            ),
+        )
+    # the Filter/Reset buttons are rendered by the template, on the same line as
+    # the paginator, so they are not repeated here
+    form_tag = False
+
+
+class NeutrinoFormHelper(FormHelper):
+    layout = Layout(
+            Row(
+                Column('notice_type'),
+                Column(PrependedAppendedText('inv_far_min', '>', 'yr')),
+                Column(PrependedAppendedText('energy_min', '>', 'TeV')),
+                Column(PrependedAppendedText('signalness_min', '>', '%')),
+                Column('time'),
+            ),
+            Row(
+                Column(
+                    Submit('submit', 'Filter'),
+                    HTML('<a href="{{ request.path }}" class="btn btn-secondary" title="Reset">Reset</a>'),
+                    css_class='text-right',
+                )
+            )
+        )
 
 
 class EventCandidateSearchForm(forms.Form):

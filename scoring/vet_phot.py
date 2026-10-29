@@ -3,32 +3,31 @@ Some general functions useful for vetting photometry
 """
 
 import logging
-from typing import Tuple, Optional, Iterable
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Iterable, Optional, Tuple
 
-from astropy.time import Time
-from astropy.stats import akaike_info_criterion_lsq as info_crit
-from astropy import units as u
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
-
-from django.conf import settings
-from django.core.exceptions import FieldError
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
-from tom_dataproducts.models import PhotometryReducedDatum
-from tom_antares.antares import AntaresDataService
-from trove_targets.models import Target
+from astropy import units as u
+from astropy.stats import akaike_info_criterion_lsq as info_crit
+from astropy.time import Time
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
+from django.conf import settings
+from scipy.optimize import curve_fit
+from tom_antares.antares import AntaresDataService
+from tom_dataproducts.models import PhotometryReducedDatum
+from tom_nonlocalizedevents.models import EventSequence, NonLocalizedEvent
+
+from trove_targets.templatetags.photometry_extras import error_to_snr
+from trove_targets.models import Target
+
 from .tasks import async_atlas_query
-from .scoring import get_eventcandidate_default_distance
-from custom_code.templatetags.photometry_extras import error_to_snr
 
 logger = logging.getLogger(__name__)
 
 FILTER_PRIORITY_ORDER = ["r", "g", "V", "R", "G"]
 
-# common optical filters + ATLAS o,c + other misc optical survey filters 
+# common optical filters + ATLAS o,c + other misc optical survey filters
 OPTICAL_FILTS = [
     # SDSS ugrizy
     "u"
@@ -37,7 +36,7 @@ OPTICAL_FILTS = [
     "i",
     "z",
     "y",
-    
+
     # Johnson-Cousins
     "U",
     "B",
@@ -53,7 +52,7 @@ OPTICAL_FILTS = [
     "G", # GAIA G
     "w", # Pan-STARRS wide
 ]
-    
+
 PHOT_SCORE_MIN = 0.1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
@@ -303,7 +302,7 @@ def estimate_max_find_decay_rate(
     PARAMETERS
     ---------
     dt_days: Iterable[float]
-        A list/array of the days since the GW discovery. 
+        A list/array of the days since the GW discovery.
     mag: Iterable[float]
         A list/array of the magnitudes since the GW discovery
     magerr: Iterable[float]
@@ -397,7 +396,7 @@ def estimate_max_find_decay_rate(
         # RuntimeError if it doesn't converge; ValueError if the model
         # produced a non-finite residual (belt-and-suspenders -- the dt > 0
         # filter above should already rule this out for these two models)
-        pl_popt, pl_pcov = None, None
+        pl_popt, _pl_pcov = None, None
 
     broken_fits = {}
     if n_epochs > bpl_nparams + 2:
@@ -488,18 +487,18 @@ def estimate_max_find_decay_rate(
     decay_rate = -mag_slope_per_dex
 
     return model, best_fit_params, max_time, decay_rate
-    
+
 
 def _mag_to_flux(mag, magerr=None):
     """
     Convert AB magnitude to flux in W/m^2/Hz.
-    
+
     For AB magnitudes: flux (Jy) = 10^((8.9 - mag) / 2.5)
     1 Jy = 1e-26 W/m^2/Hz
     """
     flux_jy = 10**((8.9 - mag) / 2.5)
     flux = flux_jy * 1e-26
-    
+
     if magerr is not None:
         dflux = np.abs(flux * magerr * np.log(10) / 2.5)
         return flux, dflux
@@ -547,18 +546,18 @@ def compute_peak_lum(
         return None
 
     flux, dflux = _mag_to_flux(mag, magerr)
-    
+
     fluxmax_idx = np.argmax(flux)
     fluxmax = flux[fluxmax_idx]
     if consider_err:
         fluxmax += 3 * dflux[fluxmax_idx]
     filtermax = filters[fluxmax_idx]
-    
+
     fluxmax = fluxmax * u.Unit("W/m^2/Hz")
     lummax = _flux_to_lum(fluxmax, lumdist).to("erg/s/Hz")
 
     freq_eff = FILTER_EFF_FREQ.get(filtermax, 5.0e14 * u.Hz)
-    nu_lummax = (freq_eff * lummax).to("erg/s")
+    nu_lummax = (freq_eff * lummax).to("erg/s").value
     return nu_lummax
 
 
@@ -644,16 +643,19 @@ def find_public_phot(
     # check ANTARES for new ZTF and LSST photometry from alerts
     if query_antares_phot:
         logger.info("Checking ANTARES for new photometry")
-        data_service = AntaresDataService()
-        data = data_service.query_reduced_data(target)
-        data_service.to_reduced_datums(target, data)
-        
+        try:
+            data_service = AntaresDataService()
+            data = data_service.query_reduced_data(target)
+            data_service.to_reduced_datums(target, data)
+        except Exception as exc:
+            logger.error(exc)
+            
     # in some cases, we won't want to query ATLAS FP because it isn't constraining
     # for dim transients in LSST alerts
     if not query_atlas_fp:
         logger.info("Skipping ATLAS FP query, as requested")
         return created_new_tns_phot
-        
+
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
     atlas_data = target.photometryreduceddatum_set.filter(
@@ -665,7 +667,7 @@ def find_public_phot(
     )
     if atlas_data.count():  # if this is true there is existing ATLAS data
         last_atlas_point = atlas_data.order_by("timestamp").last()
-        
+
         now = datetime.now(tz=timezone.utc)
         if last_atlas_point.timestamp < now - timedelta(days=forced_phot_tol):
             # then we should only query ATLAS for this target for forced photometry
@@ -681,14 +683,14 @@ def find_public_phot(
         else:
             # Then we have already queried ATLAS for this target in the past forced_phot_tol days
             query_atlas = False
-            
+
     if query_atlas and getattr(settings, "SKIP_ATLAS_FORCED_PHOT", False):
         logger.info(
             "SKIP_ATLAS_FORCED_PHOT is set -- not queuing ATLAS forced "
             "photometry for %s", target.name
         )
         query_atlas = False
-        
+
     if query_atlas:
         print(
             "Asynchronously obtaining ATLAS forced photometry with "
@@ -706,6 +708,114 @@ def find_public_phot(
         )
 
     return created_new_tns_phot
+
+
+def detect_flare(
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
+    pair_max_gap_days: float = 0.0,
+):
+    # each night's peak corroborated significance, capped by its better adjacent observed
+    # night when one lies within pair_max_gap_days, and an isolated night counts as it is.
+    phot = _flare_significance_series(postphot, baseline, corroboration_window_days)
+    if phot is None:
+        return np.nan, None
+    night = np.floor(phot.mjd.to_numpy(dtype=float)) if "mjd" in phot.columns else np.arange(len(phot))
+    peaks = phot.significance_corroborated.groupby(night).idxmax()  # sorted by night
+    nights = peaks.index.to_numpy(dtype=float)
+    nightly = phot.significance_corroborated.loc[peaks].to_numpy()
+    best, limiting = -np.inf, 0
+    for i in range(len(nightly)):
+        near = [j for j in (i - 1, i + 1)
+                if 0 <= j < len(nightly) and abs(nights[j] - nights[i]) <= pair_max_gap_days]
+        j = max(near, key=lambda n: nightly[n]) if near else i
+        weaker = i if nightly[i] <= nightly[j] else j
+        if nightly[weaker] > best:
+            best, limiting = nightly[weaker], weaker
+    return float(best), phot.loc[peaks.iloc[limiting]]
+
+def _flare_significance_series(
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
+) -> Optional[pd.DataFrame]:
+    # Returns list of photometry points --> z-scores compared to pre-merger baseline
+    if postphot is None or not len(postphot) or not baseline:
+        return None
+
+    phot = postphot[~postphot.upperlimit]
+    phot = phot[phot["filter"].isin(baseline.keys())]
+    if not len(phot):
+        return None
+
+    # Adding photometry error with baseline's error in quadrature
+    # significance is just a z-score
+    significance = [
+        (baseline[row["filter"]]["mag"] - row.mag)
+        / np.sqrt(baseline[row["filter"]]["std"] ** 2 + row.magerr**2)
+        for _, row in phot.iterrows()
+    ]
+    phot = phot.assign(significance=significance)
+    return phot.assign(
+        significance_corroborated=_corroborated_significance(
+            phot, corroboration_window_days
+        )
+    )
+
+def _corroborated_significance(
+    phot: pd.DataFrame, window_days: float
+) -> np.ndarray:
+    sig = phot.significance.to_numpy(dtype=float)
+
+    times = None
+    for col in ("mjd", "dt"):
+        if col in phot.columns:
+            times = phot[col].to_numpy(dtype=float)
+            break
+    if times is None:
+        # Only hand-built frames reach this; real photometry always carries mjd.
+        return sig
+
+    filters = phot["filter"].to_numpy()
+    out = np.empty(sig.size, dtype=float)
+    for i in range(sig.size):
+        near = (filters == filters[i]) & (np.abs(times - times[i]) <= window_days)
+        out[i] = np.median(sig[near])
+    return out
+
+def _robust_scatter(mags: np.ndarray, errs: np.ndarray) -> Tuple[float, float]:
+    median_mag = float(np.median(mags))
+    # 1.4826 rescales the MAD to a Gaussian sigma for normally distributed data
+    robust_std = 1.4826 * float(np.median(np.abs(mags - median_mag)))
+    median_err = float(np.median(errs))
+    return max(robust_std, median_err), median_err
+
+
+def fit_agn_baseline(
+    prephot: Optional[pd.DataFrame], min_baseline_pts: int = 2,
+) -> dict:
+    # baseline has keys of filters, and the values are a dictionary that
+    # includes the median magnitude, and a measure of the deviation of points
+    # which is photometric errors or adjusted-MAD
+    baseline = {}
+    # prephot is all of the photometry data before GW detection
+    if prephot is None or not len(prephot):
+        return baseline
+
+    phot = prephot[~prephot.upperlimit]
+    for filt, group in phot.groupby("filter"):
+        mags = group.mag.to_numpy(dtype=float)
+        if len(mags) < min_baseline_pts:
+            continue
+        median_mag = float(np.median(mags))
+        robust_std, median_err = _robust_scatter(
+            mags, group.magerr.to_numpy(dtype=float)
+        )
+        baseline[filt] = dict(
+            mag=median_mag, std=robust_std, n=int(len(mags)), median_err=median_err,
+        )
+    return baseline
 
 
 def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
@@ -739,6 +849,10 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # if we've made it to this point we have at least one detection so
     # we can calculate the luminosity
+    from .scoring import (  # import within function to avoid circular import error
+        get_eventcandidate_default_distance,
+    )
+
     dist, _ = get_eventcandidate_default_distance(
         target.id, nonlocalized_event.event_id
     )

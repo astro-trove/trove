@@ -15,7 +15,7 @@ The FITS header `OBJECT` is `G298107`; the alert fixture uses superevent id **`G
 
 ```bash
 python manage.py shell -c "
-from custom_code.nle_ingestion import upload_local_nle
+from trove_nonlocalizedevents.nle_ingestion import upload_local_nle
 upload_local_nle('tests/data/GW170817-update.json', 'tests/data/GW170817-bayestar.fits.gz')
 "
 ```

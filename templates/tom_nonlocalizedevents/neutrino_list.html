@@ -33,7 +33,7 @@
       {% else %}
       <tr>
       {% endif %}
-        <td><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a></td>
+        <td><a href="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent={{ event.id }}" target="_blank">{{ event.event_id }}</a></td>
         <td>{{ event.sequences.last.details.notice_type|title }}</td>
         <td>{{ event.sequences.last.details.far|format_inverse_far_yr }}</td>
         <td>{{ event.sequences.last.details.energy|floatformat:0 }}</td>

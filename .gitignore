@@ -32,4 +32,5 @@ build/
 trove.egg-info/
 .claude/
 *.json
+!scoring/em_models/*.json
 .dustmapsrc

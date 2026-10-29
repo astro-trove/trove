@@ -1,11 +1,7 @@
 """
 Some config variables for vetting that are used in multiple places
 """
-from .vet_basic import vet_basic
-from .vet_kn import vet_kn
-from .vet_kn_in_sn import vet_kn_in_sn
-from .vet_super_kn import vet_super_kn
-from .vet_bbh import vet_bbh, AGN_FLARE_HORIZON_DAYS
+from .em_models.util import MODELS_BY_NAME
 
 VETTING_FORM_CHOICES = { # these tuples are (value to save, value to show)
     "basic":("basic", "Basic Vetting"),
@@ -23,18 +19,10 @@ VETTING_FORM_INITIALS = {
     "BBH":("AGN-flare", "Transient: BBH-induced AGN Flare"),
     }
 
-FORM_CHOICE_FUNC_MAP = { # this should have the same keys as the first value in the tuples in the VETTING_FORM_CHOICES variable!
-    "basic":vet_basic,
-    "KN":vet_kn,
-    "KN-in-SN":vet_kn_in_sn,
-    "super-KN":vet_super_kn,
-    "AGN-flare":vet_bbh,
-}
-
 DETECTION_HORIZON_DEFAULTS = { # time horizon (min, max) for first detections, dependent on NLE
     "": (0, 10), # if NLE most likely class not known, 0, 10
-    "BNS": (0, 10),
-    "NSBH": (0, 10),
-    "SSM": (-1, 10),
-    "BBH": (0, AGN_FLARE_HORIZON_DAYS),
+    "BNS": MODELS_BY_NAME["KN"].detection_horizon,
+    "NSBH": MODELS_BY_NAME["KN"].detection_horizon,
+    "SSM": MODELS_BY_NAME["KN-in-SN"].detection_horizon,
+    "BBH": MODELS_BY_NAME["AGN-flare"].detection_horizon,
 }

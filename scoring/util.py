@@ -2,13 +2,16 @@
 Some common functions used in multiple places throughout the app
 """
 
+import json
+import logging
+import math
+import time
 from collections import namedtuple
 from datetime import timedelta
-import json
-import math
-import logging
+
 from astropy import units as u
 from astropy.units import Quantity
+from candidate_vetting.vet import localization_sequence_from_name
 from django.db import DatabaseError
 from django.db.models import Count, F, FloatField, Max, Min, Q, Window
 from django.db.models.functions import Cast, RowNumber
@@ -17,23 +20,16 @@ from django.utils.dateparse import parse_datetime
 from django_tasks import ResultStatus
 from django_tasks.backends.database.models import DBTaskResult
 from tom_nonlocalizedevents.models import NonLocalizedEvent
-from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 
-from custom_code.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_targets.models import Target
 
-from candidate_vetting.vet import localization_sequence_from_name
-
-from .scoring import classification_score, cosmo, mpc_score_from_match
-from .vet_phot import PHOT_SCORE_MIN
-from .vet_kn import PARAM_RANGES as KN_PARAM_RANGES
-from .vet_kn_in_sn import PARAM_RANGES as KN_IN_SN_PARAM_RANGES
-from .vet_super_kn import PARAM_RANGES as SUPER_KN_PARAM_RANGES
-from .vet_bbh import PARAM_RANGES as AGN_FLARE_PARAM_RANGES
 from .models import ScoreFactor
+from .scoring import classification_score, cosmo, mpc_score_from_match
 from .tasks import async_vet
-
-import time
+from .vet_phot import PHOT_SCORE_MIN
+from .em_models.util import MODELS_BY_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -43,20 +39,9 @@ logger = logging.getLogger(__name__)
 # loop below and its candidates come back unsorted.
 TRANSIENTS = ["KN", "KN-in-SN", "super-KN", "SN", "TDE", "AGN-flare"]
 
-DICT_TRANSIENTS_PARAM_RANGES = {
-    "KN": KN_PARAM_RANGES,
-    "KN-in-SN": KN_IN_SN_PARAM_RANGES,
-    "super-KN": SUPER_KN_PARAM_RANGES,
-    "AGN-flare": AGN_FLARE_PARAM_RANGES,
-}
-
 MIN_PROBABILITY_FOR_TRANSIENT = 0.01
 
-# ScoreFactor key holding KilonovaSCORER's photometry factor, written by
-# `vet_kn` when the viewer's `phot_method` toggle is on KilonovaSCORER
 KILONOVA_SCORE_KEY = "kilonova_score"
-
-# why KilonovaSCORER could not score a candidate, written by `vet_kn` in place of score
 KILONOVA_SKIP_REASON_KEY = "kilonova_skip_reason"
 
 # session key for the AGN toggle, which decides whether `agn_score` counts
@@ -115,7 +100,7 @@ def ps_counts_toward(transient, agn_score):
     """Whether ps_score enters `transient`'s score."""
     if transient not in PS_WAIVED_TRANSIENTS:
         return True
-    matched = AGN_FLARE_PARAM_RANGES["agn_match_score"]
+    matched = MODELS_BY_NAME["AGN-flare"].score_controls.agn.match
     return not (agn_score is not None and agn_score >= matched)
 
 
@@ -196,7 +181,7 @@ def get_possible_em_transients(event_id):
         return []
 
     details = nle_eventseq.details
-    transients = []    
+    transients = []
 
     # we can now build the transients list of potential EM counterparts
     if not details:
@@ -208,7 +193,7 @@ def get_possible_em_transients(event_id):
             if details["properties"].get(key, 0) > MIN_PROBABILITY_FOR_TRANSIENT:
                 transients.append("KN")
                 break
-        
+
         has_ssm = details["properties"].get("HasSSM", 0)
         if has_ssm > MIN_PROBABILITY_FOR_TRANSIENT:
             transients += ["KN", "KN-in-SN", "super-KN"]
@@ -234,7 +219,6 @@ def get_possible_em_transients(event_id):
 
 def get_event_candidate_scores(
         event_candidates,
-        dict_transients_param_ranges=DICT_TRANSIENTS_PARAM_RANGES,
         subscore_names=SUBSCORE_NAMES,
         agn_toggle=True,
         include_subscores=False,
@@ -268,11 +252,11 @@ def get_event_candidate_scores(
     # which transient types to consider?
     if not len(event_candidates_list):
         return []
-    
+
     transients = get_possible_em_transients(
         event_candidates_list[0].nonlocalizedevent.event_id
     )
-    
+
     # Batch load all related data at once
     target_ids = [ec.target_id for ec in event_candidates_list]
 
@@ -304,7 +288,7 @@ def get_event_candidate_scores(
 
         if include_subscores:
             ec.subscores = {}
-        
+
         # get all 'subscores' (sometimes actually calculated values)
         # for object, keyed by the EM model whose vetting saved them
         sf_by_model = score_factors_by_ec.get(ec.id, {})
@@ -326,9 +310,9 @@ def get_event_candidate_scores(
         # now for EM transient/model specific scores
         for transient in transients:
             # allowed parameter ranges for given transient
-            if transient not in dict_transients_param_ranges:
+            if transient not in MODELS_BY_NAME:
                 continue # this is fine, some transient scoring algorithms aren't implemented yet
-            param_ranges = dict_transients_param_ranges[transient]
+            param_ranges = MODELS_BY_NAME[transient].phot_parameter.model_dump()
 
             # each vetting mode saves its score factors under its own EM model, and
             # model-independent factors are shared under "basic"; the model's own
@@ -342,7 +326,6 @@ def get_event_candidate_scores(
                 if subscore_key in sf_dict
             }
 
-            # removed ps_score because if it is a vet_bbh() call, then ps_score of 0
             # might just be because AGN is in the point source catalogue
             subscore_no_phot = (
                 math.prod([sf_dict[key] for key in sf_dict
@@ -364,11 +347,11 @@ def get_event_candidate_scores(
             agn_factor = (agn_score if agn_score is not None
                           and agn_counts_toward(transient, agn_toggle) else 1)
             ps_factor = ps_score if ps_counts_toward(transient, agn_score) else 1
-            
+
             # handle the classification score, which changes based on the expected
             # EM transient
             class_score = classification_score(ec.target, transient)
-            
+
             # val_dict is keyed with the "_score" suffix the display labels use
             phot_subscores = {
                 _phot_score_key(subscore_key): _check_phot_val(
@@ -382,7 +365,7 @@ def get_event_candidate_scores(
             other_subscores = dict(
                 classification_score = class_score
             )
-            
+
             if include_subscores:
                 ec.subscores[transient] = phot_subscores | other_subscores
 
@@ -630,7 +613,7 @@ def get_vet_multi_progress(nonlocalizedevent_id):
         )
     except DatabaseError:
         # the progress notice is never worth taking the candidate list down for
-        logger.exception("Could not read Vet All / Vet Selected progress for %s", 
+        logger.exception("Could not read Vet All / Vet Selected progress for %s",
                          nle.event_id)
         return None
 

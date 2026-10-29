@@ -3,13 +3,13 @@ Dynamic catalogs
 """
 
 from astropy import units as u
-
 from django.conf import settings
 
 cosmo = settings.COSMO
 
-from .models import UserGalaxyQ3C
 from candidate_vetting.public_catalogs.catalog import StaticCatalog
+
+from .models import UserGalaxyQ3C
 
 
 def find_galaxy(galaxies, host_galaxy_id, host_galaxy_source):

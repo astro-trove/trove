@@ -1,0 +1,38 @@
+{
+    "name": "KN",
+    "t_pre": 0,
+    "t_post": 25,
+    "detection_horizon": [0,10],
+    "ps_crossmatch": true,
+    "mpc_crossmatch": true,
+    "agn_crossmatch": true,
+    "nuclear_offset_score": false,
+    "classification_score": false,
+    "host_association": true,
+    "localization_score": true,
+    "distance_score": true,
+    "score_controls": {
+	"agn": {
+	    "match": 0.1,
+	    "no_match": 1
+	},
+	"phot": {
+	    "match": 1,
+	    "no_match": 0.1
+	}
+    },
+    "phot_method": {
+	"knscorer": true,
+	"metric": true,
+	"agn_flare": false,
+	"predets_filter": true
+    },
+    "phot_parameter": {
+	"lum_max": [0, 1e43],
+	"peak_time": [0, 4],
+	"decay_rate": [-Infinity, -0.1],
+	"max_predets":3,
+	"phot_score_snr_min": 5,
+	"min_time_separation": 0.0417
+    }
+}

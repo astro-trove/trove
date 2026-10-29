@@ -14,7 +14,7 @@ class TestSpectroscopyProcessor:
 
     def test_serialize_basic_spectrum(self):
         """Test serialization of a basic spectrum."""
-        from custom_code.processors.spectroscopy_processor import FiniteSpectrumSerializer
+        from trove_targets.processors.spectroscopy_processor import FiniteSpectrumSerializer
         import numpy as np
         
         serializer = FiniteSpectrumSerializer()
@@ -38,7 +38,7 @@ class TestConvertSpectrumUnits:
 
     def test_identity_conversion(self):
         """Test conversion when units already match defaults."""
-        from custom_code.processors.spectrum_reader import _convert_spectrum_units
+        from trove_targets.processors.spectrum_reader import _convert_spectrum_units
         
         wl = np.array([4000., 5000., 6000.])
         flux = np.array([1e-15, 2e-15, 1.5e-15])
@@ -51,7 +51,7 @@ class TestConvertSpectrumUnits:
 
     def test_angstroms_typo_correction(self):
         """Test correction of 'Angstroms' to 'Angstrom'."""
-        from custom_code.processors.spectrum_reader import _convert_spectrum_units
+        from trove_targets.processors.spectrum_reader import _convert_spectrum_units
         
         wl = np.array([4000., 5000., 6000.])
         flux = np.array([1e-15, 2e-15, 1.5e-15])
@@ -63,7 +63,7 @@ class TestConvertSpectrumUnits:
 
     def test_default_units_used(self):
         """Test that default units are used when header is empty."""
-        from custom_code.processors.spectrum_reader import _convert_spectrum_units
+        from trove_targets.processors.spectrum_reader import _convert_spectrum_units
         
         wl = np.array([4000., 5000., 6000.])
         flux = np.array([1e-15, 2e-15, 1.5e-15])
@@ -80,7 +80,7 @@ class TestParseDateFromHeader:
 
     def test_mjd_obs_keyword(self):
         """Test parsing MJD-OBS keyword."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_header
+        from trove_targets.processors.spectrum_reader import _parse_date_from_header
         
         hdr = {'MJD-OBS': 60000.5}
         date = _parse_date_from_header(hdr)
@@ -90,7 +90,7 @@ class TestParseDateFromHeader:
 
     def test_jd_keyword(self):
         """Test parsing JD keyword."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_header
+        from trove_targets.processors.spectrum_reader import _parse_date_from_header
         
         hdr = {'JD': 2460000.5}
         date = _parse_date_from_header(hdr)
@@ -100,7 +100,7 @@ class TestParseDateFromHeader:
 
     def test_date_obs_iso(self):
         """Test parsing DATE-OBS in ISO format."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_header
+        from trove_targets.processors.spectrum_reader import _parse_date_from_header
         
         hdr = {'DATE-OBS': '2024-01-15T12:30:00'}
         date = _parse_date_from_header(hdr)
@@ -110,7 +110,7 @@ class TestParseDateFromHeader:
 
     def test_empty_header(self):
         """Test handling of empty header."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_header
+        from trove_targets.processors.spectrum_reader import _parse_date_from_header
         
         hdr = {}
         date = _parse_date_from_header(hdr)
@@ -123,7 +123,7 @@ class TestParseDateFromFilename:
 
     def test_jd_in_filename(self):
         """Test parsing JD from filename."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_filename
+        from trove_targets.processors.spectrum_reader import _parse_date_from_filename
         
         filename = 'spectrum_2460000.5.fits'
         date = _parse_date_from_filename(filename)
@@ -133,7 +133,7 @@ class TestParseDateFromFilename:
 
     def test_mjd_in_filename(self):
         """Test parsing MJD from filename."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_filename
+        from trove_targets.processors.spectrum_reader import _parse_date_from_filename
         
         filename = 'spectrum_60000.5.txt'
         date = _parse_date_from_filename(filename)
@@ -143,7 +143,7 @@ class TestParseDateFromFilename:
 
     def test_iso_date_in_filename(self):
         """Test parsing ISO date from filename."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_filename
+        from trove_targets.processors.spectrum_reader import _parse_date_from_filename
         
         filename = 'spectrum_2024-01-15.fits'
         date = _parse_date_from_filename(filename)
@@ -152,7 +152,7 @@ class TestParseDateFromFilename:
 
     def test_tns_format_in_filename(self):
         """Test parsing TNS-style date from filename."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_filename
+        from trove_targets.processors.spectrum_reader import _parse_date_from_filename
         
         filename = 'AT2024abc_2024-01-15_12-30-00.txt'
         date = _parse_date_from_filename(filename)
@@ -161,7 +161,7 @@ class TestParseDateFromFilename:
 
     def test_no_date_in_filename(self):
         """Test handling of filename without date."""
-        from custom_code.processors.spectrum_reader import _parse_date_from_filename
+        from trove_targets.processors.spectrum_reader import _parse_date_from_filename
         
         filename = 'spectrum_data.fits'
         date = _parse_date_from_filename(filename)
@@ -174,7 +174,7 @@ class TestRemoveBadCards:
 
     def test_valid_header_unchanged(self):
         """Test that valid headers are unchanged."""
-        from custom_code.processors.spectrum_reader import _remove_bad_cards
+        from trove_targets.processors.spectrum_reader import _remove_bad_cards
         from astropy.io import fits
         
         hdr = fits.Header()
@@ -193,7 +193,7 @@ class TestReadAsciiSpectrum:
     def test_parse_header_comments(self):
         """Test parsing header comments from ASCII file."""
 
-        from custom_code.processors.spectrum_reader import _read_ascii_spectrum
+        from trove_targets.processors.spectrum_reader import _read_ascii_spectrum
         
         with patch('astropy.io.ascii.read') as mock_read:
             mock_table = MagicMock()
@@ -212,7 +212,7 @@ class TestReadJsonSpectrum:
 
     def test_osc_format(self):
         """Test reading Open Astronomy Catalog JSON format."""
-        from custom_code.processors.spectrum_reader import _read_json_spectrum
+        from trove_targets.processors.spectrum_reader import _read_json_spectrum
         
         osc_data = {
             'test_object': {
@@ -235,7 +235,7 @@ class TestReadJsonSpectrum:
 
     def test_empty_spectra(self):
         """Test handling of empty spectra list."""
-        from custom_code.processors.spectrum_reader import _read_json_spectrum
+        from trove_targets.processors.spectrum_reader import _read_json_spectrum
         
         osc_data = {'test_object': {'spectra': []}}
         
@@ -251,9 +251,9 @@ class TestReadspec:
 
     def test_telescope_extraction(self):
         """Test telescope name extraction from header."""
-        from custom_code.processors.spectrum_reader import readspec
+        from trove_targets.processors.spectrum_reader import readspec
         
-        with patch('custom_code.processors.spectrum_reader._read_fits_spectrum') as mock_read:
+        with patch('trove_targets.processors.spectrum_reader._read_fits_spectrum') as mock_read:
             mock_read.return_value = (
                 np.array([4000., 5000., 6000.]),
                 np.array([1e-15, 2e-15, 1.5e-15]),
@@ -267,9 +267,9 @@ class TestReadspec:
 
     def test_instrument_fallback(self):
         """Test instrument name extraction with fallback keywords."""
-        from custom_code.processors.spectrum_reader import readspec
+        from trove_targets.processors.spectrum_reader import readspec
         
-        with patch('custom_code.processors.spectrum_reader._read_fits_spectrum') as mock_read:
+        with patch('trove_targets.processors.spectrum_reader._read_fits_spectrum') as mock_read:
             mock_read.return_value = (
                 np.array([4000., 5000., 6000.]),
                 np.array([1e-15, 2e-15, 1.5e-15]),
@@ -283,9 +283,9 @@ class TestReadspec:
 
     def test_return_header_option(self):
         """Test return_header=True returns header."""
-        from custom_code.processors.spectrum_reader import readspec
+        from trove_targets.processors.spectrum_reader import readspec
         
-        with patch('custom_code.processors.spectrum_reader._read_fits_spectrum') as mock_read:
+        with patch('trove_targets.processors.spectrum_reader._read_fits_spectrum') as mock_read:
             mock_read.return_value = (
                 np.array([4000., 5000., 6000.]),
                 np.array([1e-15, 2e-15, 1.5e-15]),
@@ -303,9 +303,9 @@ class TestVectorizedPerformance:
 
     def test_wavelength_array_is_numpy(self):
         """Test that wavelength is returned as numpy array."""
-        from custom_code.processors.spectrum_reader import readspec
+        from trove_targets.processors.spectrum_reader import readspec
         
-        with patch('custom_code.processors.spectrum_reader._read_fits_spectrum') as mock_read:
+        with patch('trove_targets.processors.spectrum_reader._read_fits_spectrum') as mock_read:
             mock_read.return_value = (
                 np.array([4000., 5000., 6000.]),
                 np.array([1e-15, 2e-15, 1.5e-15]),
@@ -319,7 +319,7 @@ class TestVectorizedPerformance:
 
     def test_large_array_handling(self):
         """Test handling of large arrays (vectorization check)."""
-        from custom_code.processors.spectrum_reader import _convert_spectrum_units
+        from trove_targets.processors.spectrum_reader import _convert_spectrum_units
         
         n_points = 10000
         wl = np.linspace(3000, 10000, n_points)
