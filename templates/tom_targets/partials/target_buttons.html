@@ -1,7 +1,7 @@
 {% load targets_extras target_extras %}
 {% with target.name|split_name as name %}
     {% if name.tns_objname %}
-        <a href="{% url 'custom_code:classify' pk=target.id %}" title="Classify target on TNS" class="btn btn-secondary">Classify</a>
+        <a href="{% url 'trove_targets:classify' pk=target.id %}" title="Classify target on TNS" class="btn btn-secondary">Classify</a>
     {% else %}
         {% comment %}
         {% if request.user.is_superuser %}
