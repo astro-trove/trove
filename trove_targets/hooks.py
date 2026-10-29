@@ -116,18 +116,6 @@ def target_post_save(
     tns_query_status = None
     logger.info("Target post save hook: %s created: %s vetting %s", target, created, not skip_vetting)
     if created and not skip_vetting:
-        if target.extra_fields.get("MW E(B-V)") is None:
-            coord = SkyCoord(target.ra, target.dec, unit="deg")
-            try:
-                mwebv = IrsaDust.get_query_table(
-                    coord, section="ebv"
-                )["ext SandF ref"][0]
-            except Exception as e:
-                logger.error(f"Error querying IRSA dust for {target.name}")
-            else:
-                update_or_create_target_extra(target, "MW E(B-V)", mwebv)
-                messages.append(f"MW E(B-V) set to {mwebv:.4f}")
-
         # do the "basic" vetting (PS, MPC, Host association)
         # a new target needs its host / AGN tables for the target page even if
         # its point source or MPC score has already zeroed it, same as a user
