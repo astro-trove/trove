@@ -492,15 +492,14 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
 
         # imported here to keep scoring.views out of an import cycle
         from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
-
         invalidate_scored_candidates_cache(str(nle.id))
-        messages.info(
-            self.request,
-            f"Vetting {len(candidates)} selected candidate"
-            f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} vetting mode and "
-            f"{PHOT_METHOD_LABELS[phot_method]} for photometry vetting. "
-            "This takes a few seconds per candidate; check back shortly.",
-        )
+
+        # send a message and return
+        message = f"Vetting {len(candidates)} selected candidate"
+        message += f"{'' if len(candidates) == 1 else 's'} in {vetting_mode} vetting mode"
+        message += f" and using {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. " if phot_method else ". "
+        message += "This takes a few seconds per candidate; check back shortly."
+        messages.info(self.request, message)
         return back
 
 
@@ -584,14 +583,13 @@ class TargetVettingAllFormView(LoginRequiredMixin, FormView):
 
         # imported here to keep scoring.views out of an import cycle
         from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
-
         invalidate_scored_candidates_cache(str(nle.id))
-        messages.info(
-            self.request,
-            f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} vetting "
-            f"and {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. This "
-            "takes a few seconds per candidate; check back shortly.",
-        )
+
+        # send a message and return
+        message = f"Vetting {len(candidates)} (ALL) candidates in {vetting_mode} vetting mode"
+        message += f" and using {PHOT_METHOD_LABELS[phot_method]} for photometry vetting. " if phot_method else ". "
+        message += "This takes a few seconds per candidate; check back shortly."
+        messages.info(self.request, message)
         return back
 
 
