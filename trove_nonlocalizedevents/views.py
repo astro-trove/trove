@@ -944,6 +944,6 @@ class GWNonLocalizedEventOrTargetNameSearchView(RedirectView):
             print(exc)
             return HttpResponseRedirect(reverse('trove_nonlocalizedevents:gw-list-search', kwargs={"search_str":search_str}))
         except NonLocalizedEvent.DoesNotExist:
-            return HttpResponseRedirect(reverse('trove_nonlocalizedevents:search', kwargs={"search_str":search_str}))
+            return HttpResponseRedirect(reverse('trove_targets:search', kwargs={"search_str":search_str}))
 
         return HttpResponseRedirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
