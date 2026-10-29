@@ -430,16 +430,16 @@ COSMO = FlatLambdaCDM(H0=69.6 * _u.km / _u.s / _u.Mpc, Tcmb0=2.725 * _u.K, Om0=0
 
 # dust maps for Milky Way extinction.
 # Never download at import time by default: Harvard Dataverse fetches are flaky in CI
-# and slow on first local run. Use an already-cached map if present; otherwise return 0.
+# and slow on first local run. Use an already-cached map if present; otherwise return None.
 # Opt in to downloading with FETCH_DUSTMAPS=1 (or force the noop with SKIP_DUSTMAP=1).
 def _dust_map_noop(*args):
-    return 0.0
+    return None
 
 
 def _load_dust_map():
     if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
         print(f"SKIP_DUSTMAP={SKIP_DUSTMAP} so we are skipping loading the dustmap "+
-              "and setting extinction to 0!")
+              "and setting extinction to None!")
         return _dust_map_noop
 
     # point dustmaps to the local version if the path is defined
