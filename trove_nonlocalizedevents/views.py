@@ -44,6 +44,8 @@ from scoring.util import (
     most_likely_class_for_event,
     set_agn_toggle,
 )
+from scoring.unified_scorer import score
+from scoring.views import methods_for_event
 from trove_nonlocalizedevents.permissions import (
     candidates_for_user,
     nonlocalizedevents_for_user
@@ -892,22 +894,33 @@ class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
         # (target, nonlocalizedevent) is unique, so linking a target that is
         # already a candidate used to raise IntegrityError and return a 500.
         try:
-            _, created = EventCandidate.objects.get_or_create(
+            ec, created = EventCandidate.objects.get_or_create(
                 nonlocalizedevent=nonlocalizedevent, target=target,
                 defaults={'viability_reason': viability_reason})
         except IntegrityError:
             created = False  # two submits raced; the other one made the link
 
         if created:
-            from trove_nonlocalizedevents.views import invalidate_scored_candidates_cache
-
             invalidate_scored_candidates_cache(nonlocalizedevent.id)
             # the page they came from may have had filters on, which is a
             # cache key of its own and would otherwise still be stale
             referer_query = urlparse(self.get_redirect_url()).query
             if referer_query:
                 invalidate_scored_candidates_cache(QueryDict(referer_query))
-            messages.success(request, f'Linked {target.name} to {nonlocalizedevent.event_id}.')
+            # perform vetting
+            vetting_choices = methods_for_event(nonlocalizedevent.event_id)[0]
+            vetting_modes = [v for v, _ in vetting_choices]
+            for vm in vetting_modes:
+                score(
+                    target_id=ec.target.id,
+                    nonlocalized_event_name=nonlocalizedevent.event_id,
+                    em_model_name=vm
+                )
+            messages.info(
+                self.request,
+                f"Linked {target.name} to {nonlocalizedevent.event_id} and "
+                + f"re-performed vetting in {', '.join(vetting_modes)} vetting mode(s).",
+            )
         else:
             messages.info(request, f'{target.name} is already a candidate of '
                                    f'{nonlocalizedevent.event_id}.')
