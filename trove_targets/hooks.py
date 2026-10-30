@@ -1,26 +1,17 @@
 import logging
-from datetime import datetime, timedelta, timezone
 from contextlib import contextmanager
 from contextvars import ContextVar
 
 from django.db import transaction
-from django.db.models import Min
 from tom_targets.models import TargetExtra
 from tom_nonlocalizedevents.models import NonLocalizedEvent, EventCandidate
 from tom_dataproducts.models import PhotometryReducedDatum
 
-from scoring.em_models.util import MODELS_BY_NAME
-from scoring.unified_scorer import score, vet_basic
-from scoring.util import get_possible_em_transients
+from scoring.unified_scorer import vet_basic
 
 from trove_nonlocalizedevents.healpix_utils import create_candidates_from_targets
 from trove_nonlocalizedevents.hooks import associate_nle_with_target, vet_new_candidate
-from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
-from trove_targets.models import Target
 from astropy.time import Time, TimezoneInfo
-from astropy.coordinates import SkyCoord
-from astroquery.ipac.irsa.irsa_dust import IrsaDust
-from django.conf import settings
 
 logger = logging.getLogger(__name__)
 new_format = logging.Formatter("[%(asctime)s] %(levelname)s : s%(message)s")
@@ -116,18 +107,6 @@ def target_post_save(
     tns_query_status = None
     logger.info("Target post save hook: %s created: %s vetting %s", target, created, not skip_vetting)
     if created and not skip_vetting:
-        if target.extra_fields.get("MW E(B-V)") is None:
-            coord = SkyCoord(target.ra, target.dec, unit="deg")
-            try:
-                mwebv = IrsaDust.get_query_table(
-                    coord, section="ebv"
-                )["ext SandF ref"][0]
-            except Exception as e:
-                logger.error(f"Error querying IRSA dust for {target.name}")
-            else:
-                update_or_create_target_extra(target, "MW E(B-V)", mwebv)
-                messages.append(f"MW E(B-V) set to {mwebv:.4f}")
-
         # do the "basic" vetting (PS, MPC, Host association)
         # a new target needs its host / AGN tables for the target page even if
         # its point source or MPC score has already zeroed it, same as a user

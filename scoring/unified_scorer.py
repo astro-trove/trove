@@ -75,6 +75,10 @@ def score(
         **kwargs
 ):
 
+    if em_model_name == "basic": # run basic vetting with defaults/kwargs
+        basic_results = vet_basic(target_id, **kwargs)
+        return
+
     params = MODELS_BY_NAME[em_model_name]
     target = Target.objects.get(id=target_id)
     nonlocalized_event = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)

@@ -428,53 +428,53 @@ TARGET_MODEL_CLASS = os.getenv("TARGET_MODEL_CLASS", "trove_targets.models.Targe
 COSMO = FlatLambdaCDM(H0=69.6 * _u.km / _u.s / _u.Mpc, Tcmb0=2.725 * _u.K, Om0=0.3)
 
 
-# dust maps for Milky Way extinction.
+## Dust maps for Milky Way extinction.
+# Opt in to downloading with FETCH_DUSTMAPS=1 or force the noop with SKIP_DUSTMAP=1.
 # Never download at import time by default: Harvard Dataverse fetches are flaky in CI
-# and slow on first local run. Use an already-cached map if present; otherwise return 0.
-# Opt in to downloading with FETCH_DUSTMAPS=1 (or force the noop with SKIP_DUSTMAP=1).
+# and slow on first local run
 def _dust_map_noop(*args):
-    return 0.0
-
+    return None
 
 def _load_dust_map():
+    with warnings.catch_warnings(action="ignore"):
+        from dustmaps import sfd
+    from dustmaps.config import config
+
+    os.environ.setdefault(
+        "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
+    )
+
+    # these parameters are not defined by default but may be set by the user
     if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
         print(f"SKIP_DUSTMAP={SKIP_DUSTMAP} so we are skipping loading the dustmap "+
-              "and setting extinction to 0!")
+              "and setting extinction to None!")
+        return _dust_map_noop
+    if os.getenv("FETCH_DUSTMAPS", "").lower() not in ("1", "true", "yes"):
+        print(f"FETCH_DUSTMAPS={FETCH_DUSTMAPS} so we are skipping loading the " +
+              "dustmap and setting extinction to 0!")
         return _dust_map_noop
 
     # point dustmaps to the local version if the path is defined
     if ("DUSTMAPS_DIR" in globals() or "DUSTMAPS_DIR" in locals()) and DUSTMAPS_DIR is not None:
-
         # some checks
         if not os.path.exists(DUSTMAPS_DIR):
             raise FileNotFoundError(f"DUSTMAPS_DIR is set in settings_local to {DUSTMAPS_DIR} which is a nonexistent directory!")
         if not os.path.exists(os.path.join(DUSTMAPS_DIR, "sfd")):
             raise FileNotFoundError(f"DUSTMAPS_DIR is set in settings_local to {DUSTMAPS_DIR} but the sfd subdirectory does not exist!")
-        
-        from dustmaps.config import config
-        config["data_dir"] = DUSTMAPS_DIR
 
+        # if the file exists, update the config
+        config["data_dir"] = DUSTMAPS_DIR
         print(f"Set the dustmaps directory to the local copy at {config['data_dir']}")
 
     else:
         print(f"DUSTMAPS_DIR is not set in settings_local, we will try to use cached "+
               "versions and if they don't exist try to download the SFD files from "+
               "dataverse...")
-        
-    os.environ.setdefault(
-        "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
-    )
-    with warnings.catch_warnings(action="ignore"):
-        from dustmaps import sfd
 
+    # fetch the dustmap
     try:
         sfd_query = sfd.SFDQuery()
     except FileNotFoundError:
-        if os.getenv("FETCH_DUSTMAPS", "").lower() not in ("1", "true", "yes"):
-            print(f"FETCH_DUSTMAPS={FETCH_DUSTMAPS} so we are skipping loading the " +
-                  "dustmap and setting extinction to 0!")
-            return _dust_map_noop
-        
         print("Trying to fetch the SFD dustmap from dataverse...")
         sfd.fetch()
         sfd_query = sfd.SFDQuery()
@@ -484,12 +484,13 @@ def _load_dust_map():
 
     return sf11
 
-
 try:
     DUST_MAP = _load_dust_map()
 except Exception as exc:
     print(f"loading the dustmap failed with {exc}. Skipping and setting extinction to 0!")
     DUST_MAP = _dust_map_noop
+
+
 COMMENTS_ENABLED = False
 
 TOM_REGISTRATION_STRATEGY = 'approval_required'
