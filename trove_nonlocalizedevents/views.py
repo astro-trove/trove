@@ -1,9 +1,13 @@
 import json
+import csv
+import io
+import numpy as np
 import logging
 from urllib.parse import urlparse
 
 from astropy.coordinates import SkyCoord
 from astropy.time import Time
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -11,18 +15,30 @@ from django.core.cache import cache
 from django.core.paginator import Paginator
 from django.db import IntegrityError
 from django.db.models import Min, Prefetch, Q
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, QueryDict
+from django.http import (
+    HttpResponse, 
+    HttpResponseRedirect, 
+    HttpResponseBadRequest, 
+    JsonResponse, 
+    QueryDict,
+)
+from django_filters.views import FilterView
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils.dateparse import parse_date
 from django.utils.http import url_has_allowed_host_and_scheme, urlencode
-from django.views.generic.base import RedirectView, View
-from django_filters.views import FilterView
+from django.views.generic.base import View, RedirectView
+from django.views.decorators.http import require_POST
+
 from tom_dataproducts.models import PhotometryReducedDatum
 from tom_nonlocalizedevents.models import EventCandidate, EventSequence, NonLocalizedEvent
+
 from tom_targets.models import TargetExtra
 from tom_targets.permissions import targets_for_user
 from tom_targets.utils import cone_search_filter
+
+from .filters import GWFilter, NeutrinoFilter
+from .forms import CreateEventCandidateFromNLEForm, EventCandidateSearchForm, GWFormHelper, NeutrinoFormHelper
 
 from scoring.models import ScoreFactor
 from scoring.phot_method import (
@@ -54,9 +70,6 @@ from trove_nonlocalizedevents.templatetags.skymap_extras import (
 )
 
 from trove_targets.models import Target
-
-from .filters import GWFilter, NeutrinoFilter
-from .forms import CreateEventCandidateFromNLEForm, EventCandidateSearchForm, GWFormHelper, NeutrinoFormHelper
 
 logger = logging.getLogger(__name__)
 
@@ -518,6 +531,7 @@ class EventCandidateCreateFromNLEView(LoginRequiredMixin, View):
 
 
 def generate_report(request):
+    """Generate a GCN describing the top candidates."""
     nle_id = request.GET.get("nonlocalizedevent")
     try:
         ncands = int(request.GET.get("n", 10))
@@ -533,16 +547,35 @@ def generate_report(request):
     nle_name = NonLocalizedEvent.objects.get(id=nle_id)
 
     text = f"""
-We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational wave (GW) event {nle_name} using the Multi-messenger Tool for Rapid Object Vetting and Examination (TROVE). We searched within the 95th percentile localization region for candidate optical counterparts in host galaxies at the approximate luminosity distance of {nle_name}. We further crossmatch to minor planet, point source, and AGN catalogs and rule out sources that do not appear photometrically similar to kilonova light curves. For additional details, see the vetting procedures described in N. Franz, et al., 2025, arXiv:2510.17104.
+We analyzed candidate counterparts to the LIGO/Virgo/KAGRA (LVK) gravitational wave 
+(GW) event {nle_name} using the Multi-messenger Tool for Rapid Object Vetting and 
+Examination (TROVE). We searched within the 95th percentile localization region for 
+candidate electromagnetic (EM) counterparts in host galaxies at the approximate 
+luminosity distance of {nle_name}. We further crossmatch to minor planet, point source, 
+and AGN catalogs and rule out sources that do not appear photometrically similar to 
+expected transients. For additional details, see the vetting procedures described in 
+N. Franz, et al., 2025 (ApJL 994, 2, L45) and N. Vieira et al., 2026 (ApJ 1007, 2, 116).
 
-Below, we report the top {ncands} candidates that remain viable after running our vetting procedure using publicly available information on all publicly reported sources, to date, on the Transient Name Server (TNS).  We include their TNS identifier, instrument with earliest detection, coordinates, cumulative probability at the coordinate location in the latest LVK map, most likely host redshift, joint GW luminosity distance and candidate redshift probability, most recent magnitude, epoch of that most recent magnitude, TROVE KN score. Candidates are ranked using a scoring procedure designed to identify kilonova counterparts to GW events (N. Franz, et al., 2025, arXiv:2510.17104). The reported candidates are not clearly identified as kilonovae.
+Below, we report the top {ncands} candidates that remain viable after running our 
+vetting procedure using publicly available information on all publicly reported 
+sources, to date, ingested from the Transient Name Server (TNS) or from the Rubin alert 
+stream via ANTARES. We include their TNS/ANTARES identifier, instrument with earliest 
+detection, coordinates, cumulative probability at the coordinate location in the latest 
+LVK map (localization score), most likely host redshift, joint GW luminosity distance 
+and candidate redshift probability (distance score), most recent magnitude, epoch of 
+that most recent magnitude, most recent >3sigma detection, time of that most 
+recent >3sigma detection, and TROVE score (kilonova 'KN', 'AGN-flare', 
+kilonova-in-supernova 'KN-in-SN', or super-kilonova 'super-KN', based on the type of 
+GW event and selecting the highest when multiple scores are computed). Candidates are 
+ranked using the scoring procedure designed to identify counterparts to GW events 
+(N. Franz, et al., 2025 and N. Vieira et al., 2026).
 
-| Name | Initial Detecting Instrument | RA [HMS] | Dec [DMS] | Localization Probability Contour | Most Likely Host-z | Joint Distance Probability | Most Recent Mag | Most Recent Mag Time [MJD] | TROVE Score |
-| :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
+| Name | RA [HMS] | Dec [DMS] | Initial Detecting Instrument | Localization Score | Most Likely Host-z | Distance Score | Most Recent Mag | Most Recent Mag Time [MJD] | Most Recent Det | Most Recent Det Time [MJD] |TROVE Score |
+| :------- | :------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: | -------: |"""
 
     subscore_keys_to_report = ["skymap_score", "host_distance_score"]
-
     lines = [text]
+
     for i, ec in enumerate(candidates, 1):
         if i > ncands:
             break
@@ -563,14 +596,14 @@ Below, we report the top {ncands} candidates that remain viable after running ou
         try:
             loc_prob = f"{float(sf.filter(key='skymap_score').first().value):.2f}"
         except AttributeError:
-            loc_prob = None
+            loc_prob = "-"
 
         try:
             host_score = (
                 f"{float(sf.filter(key='host_distance_score').first().value):.2f}"
             )
         except AttributeError:
-            host_score = None
+            host_score = "-"
 
         # get details of the best matching host galaxy
         try:
@@ -586,10 +619,11 @@ Below, we report the top {ncands} candidates that remain viable after running ou
 
             host_str = f"{float(host_info['z']):.3f} ({host_info['Source']} {host_info['z_type']})"
 
-        except (AttributeError, IndexError):
-            host_str = None
+        except (AttributeError, IndexError, TypeError):
+            host_str = "?"
+            host_score = "-" # catch case where a distance score of 1.0 is stored despite no host being known
 
-        # get photometry info
+        # first photometry point
         first_phot = PhotometryReducedDatum.objects.filter(
             target_id=t.id, brightness__isnull=False, brightness_error__isnull=False
         ).first()
@@ -601,45 +635,79 @@ Below, we report the top {ncands} candidates that remain viable after running ou
                 src_str_first = f"{src_first}; {first_phot.telescope} {first_phot.bandpass}"
             else:
                 src_str_first = f"{src_first}; {first_phot.bandpass}"
-            src_str_first = src_str_first.replace(
-                " (TNS)", ""
-            )  # strip (TNS) if present
+            src_str_first = src_str_first.replace(" (TNS)", "")  # strip " (TNS)" if present
+            src_str_first = src_str_first.replace("TNS; ", "")  # strip "TNS; " if present
         else:
-            src_str_first = None
+            src_str_first = "-"
 
+        # latest photometry point
         latest_phot = PhotometryReducedDatum.objects.filter(
             target_id=t.id
         ).order_by("timestamp").last()
         if latest_phot:
-            src_latest = latest_phot.source_name
-
+            src_latest_phot = latest_phot.source_name
             if latest_phot.instrument:
-                src_str_latest = f"({latest_phot.instrument} {latest_phot.bandpass}; {src_latest})"
+                src_str_latest_phot = f"({latest_phot.instrument} {latest_phot.bandpass}; {src_latest_phot})"
             elif latest_phot.telescope:
-                src_str_latest = f"({latest_phot.telescope} {latest_phot.bandpass}; {src_latest})"
+                src_str_latest_phot = f"({latest_phot.telescope} {latest_phot.bandpass}; {src_latest_phot})"
             else:
-                src_str_latest = f"({latest_phot.bandpass}; {src_latest})"
+                src_str_latest_phot = f"({latest_phot.bandpass}; {src_latest_phot})"
+            src_str_latest_phot = src_str_latest_phot.replace(" (TNS)", "") # strip " (TNS)" if present
+            src_str_latest_phot = src_str_latest_phot.replace("TNS; ", "") # strip "TNS; " if present
 
-            if latest_phot.brightness is not None:  # detection
-                phot_str_latest = (
-                    f"{latest_phot.brightness:.2f} +/- {latest_phot.brightness_error:.2f} {src_str_latest}"
-                )
+            if latest_phot.brightness_error is not None:  # detection
+                phot_str_latest_phot = f"{latest_phot.brightness:.2f} +/- {latest_phot.brightness_error:.2f} {src_str_latest_phot}"
             else:  # non-detection
-                phot_str_latest = f">{latest_phot.limit:.2f} {src_str_latest}"
+                phot_str_latest_phot = f">{latest_phot.limit:.2f} {src_str_latest_phot}"
 
-            epoch_latest = Time(latest_phot.timestamp).mjd
-            epoch_str_latest = f"{float(epoch_latest):.5f}"
+            epoch_latest_phot = Time(latest_phot.timestamp).mjd
+            epoch_str_latest_phot = f"{float(epoch_latest_phot):.5f}"
 
         else:
-            phot_str_latest = None
-            epoch_str_latest = None
-        # report whichever transient type this candidate scored best as -- for KN
-        # events that's (typically) "KN", but a BBH event's ec.score only ever has
-        # an "AGN-flare" key (see scoring/util.py's most_likely_class branching), so
-        # a hardcoded ec.score["KN"] would KeyError for every BBH candidate
+            phot_str_latest_phot = "-"
+            epoch_str_latest_phot = "-"
+
+        # latest photometry **detection**
+        latest_det = PhotometryReducedDatum.objects.filter(
+            target_id=t.id,
+            brightness_error__lte=2.5/np.log(10)/3, # >= 3sigma detection
+        ).order_by("timestamp").last()
+        if latest_det:
+            src_latest_det = latest_det.source_name
+            if latest_det.instrument:
+                src_str_latest_det = f"({latest_det.instrument} {latest_det.bandpass}; {src_latest_det})"
+            elif latest_det.telescope:
+                src_str_latest_det = f"({latest_det.telescope} {latest_det.bandpass}; {src_latest_det})"
+            else:
+                src_str_latest_det = f"({latest_det.bandpass}; {src_latest_det})"
+            src_str_latest_det = src_str_latest_det.replace(" (TNS)", "") # strip " (TNS)" if present
+            src_str_latest_det = src_str_latest_det.replace(" (TNS)", "") # strip "TNS; " if present
+
+            phot_str_latest_det = f"{latest_det.brightness:.2f} +/- {latest_det.brightness_error:.2f} {src_str_latest_det}"
+
+            epoch_latest_det = Time(latest_det.timestamp).mjd
+            epoch_str_latest_det = f"{float(epoch_latest_det):.5f}"
+
+        else:
+            phot_str_latest_det = "-"
+            epoch_str_latest_det = "-"
+
+        # report whichever transient type this candidate scored best as, and the type(s)
+        # of score(s) (KN, KN-in-SN, etc.)
         best_score = max(ec.score.values()) if ec.score else float("nan")
+        best_score_transients = [key for key, value in ec.score.items() if value == best_score] if ec.score else ""
+        best_score_transients_toprint = f" {best_score_transients}".replace(
+            "[","("
+        ).replace(
+            "]",")"
+        ).replace(
+            "'",""
+        )
+        best_score_toprint = f"{best_score:.2f}" + f" {best_score_transients_toprint}".replace("[","(").replace("]",")") if ec.score else "-"
+
+        # append lines
         lines.append(
-            f"| {t.name} | {src_str_first} | {ra} | {dec} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest} | {epoch_str_latest} | {best_score:.2f} |"
+            f"| {t.name} | {ra} | {dec} | {src_str_first} | {loc_prob} | {host_str} | {host_score} | {phot_str_latest_phot} | {epoch_str_latest_phot} | {phot_str_latest_det} | {epoch_str_latest_det} | {best_score_toprint} |"
         )
 
     lines.append(
@@ -648,6 +716,208 @@ We encourage additional follow up of these candidates to determine whether they 
     )
 
     return JsonResponse({"text": "\n".join(lines)})
+
+
+@require_POST
+def generate_selected_candidates_csv(request):
+    """Generate a CSV of the selected candidates."""
+
+    nle_id = request.GET.get("nonlocalizedevent")
+    nle_name = NonLocalizedEvent.objects.get(id=nle_id)
+
+    scoped = EventCandidate.objects.filter(
+        nonlocalizedevent_id=nle_id
+    ).select_related("target", "nonlocalizedevent")
+
+    if request.POST.get("select_all_matching"):
+        from trove_nonlocalizedevents.permissions import candidates_for_user
+        from trove_nonlocalizedevents.views import filter_candidates
+
+        params = QueryDict(request.POST.get("filters", ""))
+        scoped = filter_candidates(candidates_for_user(request.user, scoped), params)
+        target_name = params.get("target__name")
+        if target_name:
+            scoped = scoped.filter(target__name__icontains=target_name)
+
+        from trove_nonlocalizedevents.views import _as_float, within_max_distance
+        from scoring.util import host_distances
+
+        distance_max = _as_float(params.get("distance_max"))
+        if distance_max is not None:
+            scoped = list(scoped)
+            scoped = within_max_distance(scoped, host_distances(scoped), distance_max)
+    else:
+        selected_ids = request.POST.getlist("candidates")
+        if not selected_ids:
+            return HttpResponseBadRequest("No candidates selected.")
+        scoped = scoped.filter(id__in=selected_ids)
+
+    candidates = list(get_event_candidate_scores(scoped, agn_toggle=False))
+
+    subscore_keys_to_report = ["skymap_score", "host_distance_score"]
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "Name",
+        "RA [deg]",
+        "Dec [deg]",
+        "Initial Detecting Instrument",
+        "Localization Score",
+        "Most Likely Host z",
+        "Distance Score",
+        "Latest Mag Instrument",
+        "Latest Mag Time [MJD]",
+        "Latest Mag",
+        "Latest Mag Error",
+        "Latest >3sigma Mag Instrument",
+        "Latest >3sigma Mag Time [MJD]",
+        "Latest >3sigma Mag",
+        "Latest >3sigma Mag Error",
+        "Best TROVE Score",
+        "Best TROVE Score Transient Type",
+    ])
+
+    for ec in candidates:
+        t = ec.target
+        ra, dec = (
+            SkyCoord(t.ra, t.dec, unit="deg")
+            .to_string("decimal", precision=5)
+            .split(" ")
+        )
+
+        sf = latest_score_factors(ScoreFactor.objects.filter(
+            event_candidate=ec, key__in=subscore_keys_to_report
+        ))
+
+        try:
+            loc_prob = f"{float(sf.filter(key='skymap_score').first().value):.2f}"
+        except AttributeError:
+            loc_prob = None
+
+        try:
+            host_score = f"{float(sf.filter(key='host_distance_score').first().value):.2f}"
+        except AttributeError:
+            host_score = None
+
+        try:
+            host_info = json.loads(
+                TargetExtra.objects.filter(target_id=t.id, key="Host Galaxies")
+                .first()
+                .value
+            )
+            if isinstance(host_info, list):
+                host_info = host_info[0]
+            host_str = f"{float(host_info['z']):.3f} ({host_info['Source']} {host_info['z_type']})"
+        except (AttributeError, IndexError, TypeError):
+            host_str = None
+
+        # first photometry point
+        first_phot = PhotometryReducedDatum.objects.filter(
+            target_id=t.id, brightness__isnull=False, brightness_error__isnull=False
+        ).first()
+        if first_phot:
+            src_first = first_phot.source_name
+            if first_phot.instrument:
+                src_str_first = f"{src_first}; {first_phot.instrument} {first_phot.bandpass}"
+            elif first_phot.telescope:
+                src_str_first = f"{src_first}; {first_phot.telescope} {first_phot.bandpass}"
+            else:
+                src_str_first = f"{src_first}; {first_phot.bandpass}"
+            src_str_first = src_str_first.replace(" (TNS)", "") # strip " (TNS)" if present
+            src_str_first = src_str_first.replace("TNS; ", "") # strip "TNS; " if present
+        else:
+            src_str_first = None
+
+        # latest photometry point
+        latest_phot = PhotometryReducedDatum.objects.filter(
+            target_id=t.id
+        ).order_by("timestamp").last()
+        if latest_phot:
+            src_latest_phot = latest_phot.source_name
+            epoch_str_latest_phot = f"{float(Time(latest_phot.timestamp).mjd):.5f}"
+            if latest_phot.instrument:
+                src_str_latest_phot = f"{latest_phot.instrument} {latest_phot.bandpass}; {src_latest_phot}"
+            elif latest_phot.telescope:
+                src_str_latest_phot = f"{latest_phot.telescope} {latest_phot.bandpass}; {src_latest_phot}"
+            else:
+                src_str_latest_phot = f"{latest_phot.bandpass}; {src_latest_phot}"
+            if latest_phot.brightness is not None:
+                latest_phot_mag = f"{latest_phot.brightness:.2f}"
+                latest_phot_mag_err = f"{latest_phot.brightness_error:.2f}"
+            else:
+                latest_phot_mag = f"{latest_phot.limit:.2f}"
+                latest_phot_mag_err = "limit"
+            src_str_latest_phot = src_str_latest_phot.replace(" (TNS)", "") # strip " (TNS)" if present
+            src_str_latest_phot = src_str_latest_phot.replace("TNS; ", "") # strip "TNS; " if present
+        else:
+            src_str_latest_phot = None
+            epoch_str_latest_phot = None
+            latest_phot_mag = None
+            latest_phot_mag_err = None
+
+        # latest photometry **detection**
+        latest_det = PhotometryReducedDatum.objects.filter(
+            target_id=t.id,
+            brightness_error__lte=2.5/np.log(10)/3, # >= 3sigma detection
+        ).order_by("timestamp").last()
+        if latest_det:
+            src_latest_det = latest_det.source_name
+            epoch_str_latest_det = f"{float(Time(latest_det.timestamp).mjd):.5f}"
+            if latest_det.instrument:
+                src_str_latest_det = f"{latest_det.instrument} {latest_det.bandpass}; {src_latest_det}"
+            elif latest_det.telescope:
+                src_str_latest_det = f"{latest_det.telescope} {latest_det.bandpass}; {src_latest_det}"
+            else:
+                src_str_latest_det = f"{latest_det.bandpass}; {src_latest_det}"
+            latest_det_mag = f"{latest_det.brightness:.2f}"
+            latest_det_mag_err = f"{latest_det.brightness_error:.2f}"
+            src_str_latest_det = src_str_latest_det.replace(" (TNS)", "") # strip " (TNS)" if present
+            src_str_latest_det = src_str_latest_det.replace("TNS; ", "") # strip "TNS; " if present
+        else:
+            src_str_latest_det = None
+            epoch_str_latest_det = None
+            latest_det_mag = None
+            latest_det_mag_err = None
+
+        # report whichever transient type this candidate scored best as, and the type(s)
+        # of score(s) (KN, KN-in-SN, etc.)
+        best_score = max(ec.score.values()) if ec.score else float("nan")
+        best_score_transients = [key for key, value in ec.score.items() if value == best_score] if ec.score else None
+        best_score_transients_str = f" {best_score_transients}".replace(
+            "[",""
+        ).replace(
+            "]",""
+        ).replace(
+            "'",""
+        ).replace(
+            ",",";"
+        )
+
+        writer.writerow([
+            t.name,
+            ra,
+            dec,
+            src_str_first,
+            loc_prob,
+            host_str,
+            host_score,
+            src_str_latest_phot,
+            epoch_str_latest_phot,
+            latest_phot_mag,
+            latest_phot_mag_err,
+            src_str_latest_det,
+            epoch_str_latest_det,
+            latest_det_mag,
+            latest_det_mag_err,
+            f"{best_score:.2f}",
+            best_score_transients_str,
+        ])
+
+    response = HttpResponse(output.getvalue(), content_type="text/csv")
+    response["Content-Disposition"] = f'attachment; filename="trove_selected_candidates_{nle_name}.csv"'
+    return response
 
 
 def _return_to(request, fallback):
@@ -944,6 +1214,6 @@ class GWNonLocalizedEventOrTargetNameSearchView(RedirectView):
             print(exc)
             return HttpResponseRedirect(reverse('trove_nonlocalizedevents:gw-list-search', kwargs={"search_str":search_str}))
         except NonLocalizedEvent.DoesNotExist:
-            return HttpResponseRedirect(reverse('trove_nonlocalizedevents:search', kwargs={"search_str":search_str}))
+            return HttpResponseRedirect(reverse('trove_targets:search', kwargs={"search_str":search_str}))
 
         return HttpResponseRedirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
