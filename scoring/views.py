@@ -5,14 +5,15 @@ Page views for candidate vetting
 import logging
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
-
 import numpy as np
+
 from candidate_vetting.public_catalogs.phot_catalogs import ZTF_Forced_Phot
 from candidate_vetting.vet import (
     GALAXY_CATALOGS,
     host_association,
     localization_sequence_from_name,
 )
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -23,19 +24,22 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic.base import RedirectView
 from django.views.generic.edit import FormView
+
 from tom_nonlocalizedevents.models import (
     EventCandidate,
     NonLocalizedEvent,
 )
 
-from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
-from trove_targets.templatetags.target_list_extras import galaxy_table
-from scoring.util import get_possible_em_transients
-from trove_targets.models import Target
-
-from .config import DETECTION_HORIZON_DEFAULTS, VETTING_FORM_CHOICES, VETTING_FORM_INITIALS
+from .forms import (VettingChoiceForm,
+                    RedshiftUpdateForm,
+                    NonLocalizedEventAssociateTargetsForm,
+                    DissociateSelectedTargetsForm,
+                    )
+from .config import (VETTING_FORM_CHOICES,
+                     VETTING_FORM_INITIALS,
+                     DETECTION_HORIZON_DEFAULTS
+                     )
 from .dynamic_catalogs import UserGalaxy
-from .forms import NonLocalizedEventAssociateTargetsForm, RedshiftUpdateForm, VettingChoiceForm
 from .phot_method import (
     KILONOVASCORER_VETTING_MODE,
     PHOT_METHOD_CHOICES,
@@ -44,12 +48,22 @@ from .phot_method import (
     PHOT_METHOD_METRICS,
     get_phot_method,
 )
-from .tasks import associate_targets_with_nle_async, vet_multi_async
-from .util import get_vet_multi_progress, most_likely_class_for_event
+from .tasks import vet_multi_async, associate_targets_with_nle_async
 from .unified_scorer import vet_basic, score
+from .util import (
+    get_vet_multi_progress, 
+    most_likely_class_for_event,
+    get_possible_em_transients,
+)
 from .vet_phot import find_public_phot
 
+from trove_nonlocalizedevents.templatetags.nonlocalizedevent_extras import get_most_likely_class
+from trove_targets.templatetags.target_list_extras import galaxy_table
+from trove_targets.models import Target
+
+
 logger = logging.getLogger(__name__)
+
 
 
 def resolve_event_id(value):
@@ -400,12 +414,7 @@ class TargetVettingSelectedFormView(LoginRequiredMixin, FormView):
         return self.request.POST.getlist("candidates")
 
     def candidates(self):
-        """The candidates to vet: the ticked rows, or every row matching the
-        filters when the user asked for all of them.
-
-        Checkboxes only reach the server for the page you can see, so "select
-        all" re-applies the table's own filters rather than posting 456 ids.
-        """
+        """Selected candidates"""
         scoped = EventCandidate.objects.filter(
             nonlocalizedevent_id=self.kwargs["pk"]
         ).select_related("target")
@@ -677,3 +686,83 @@ class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"
         )  # this redirects back to the NLE page
+
+
+class TargetDissociateSelectedFormView(LoginRequiredMixin, FormView):
+    """Dissociate selected candidates from the event."""
+
+    template_name = "scoring/dissociate_targets_form.html"
+    form_class = DissociateSelectedTargetsForm
+
+    def selected_ids(self):
+        return self.request.POST.getlist("candidates")
+
+
+    def candidates(self):
+        """Selected candidates"""
+        scoped = EventCandidate.objects.filter(
+            nonlocalizedevent_id=self.kwargs["pk"]
+        ).select_related("target")
+        if self.request.POST.get("select_all_matching"):
+            from trove_nonlocalizedevents.permissions import candidates_for_user
+            from trove_nonlocalizedevents.views import filter_candidates
+
+            params = QueryDict(self.request.POST.get("filters", ""))
+            scoped = filter_candidates(
+                candidates_for_user(self.request.user, scoped), params
+            )
+            target_name = params.get("target__name")
+            if target_name:
+                scoped = scoped.filter(target__name__icontains=target_name)
+            # the distance cut is not a queryset filter, so apply it the same way
+            # the table does or "select all" vets rows the table did not show
+            from trove_nonlocalizedevents.views import _as_float, within_max_distance
+            from scoring.util import host_distances
+
+            distance_max = _as_float(params.get("distance_max"))
+            if distance_max is not None:
+                scoped = list(scoped)
+                return within_max_distance(
+                    scoped, host_distances(scoped), distance_max)
+            return scoped
+        return scoped.filter(id__in=self.selected_ids())
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if (self.request.method == "POST"
+                and "confirm" not in self.request.POST):
+            kwargs.pop("data", None)
+            kwargs.pop("files", None)
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["selected_ids"] = self.selected_ids()
+        context["select_all_matching"] = self.request.POST.get("select_all_matching", "")
+        context["filters"] = self.request.POST.get("filters", "")
+        context["nle_event_id"] = NonLocalizedEvent.objects.get(id=self.kwargs["pk"]).event_id
+        return context
+
+    def post(self, request, *args, **kwargs):
+        if "confirm" not in request.POST:
+            return self.render_to_response(self.get_context_data(form=self.get_form()))
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        nle = NonLocalizedEvent.objects.get(id=self.kwargs["pk"])
+        candidates = list(self.candidates())
+        back = redirect(f"/eventcandidates/?nonlocalizedevent={nle.id}")
+        if not candidates:
+            messages.error(self.request, "No candidates were selected.")
+            return back
+
+        count = len(candidates)
+        EventCandidate.objects.filter(id__in=[c.id for c in candidates]).delete()
+
+        messages.info(
+            self.request,
+            f"Dissociated {count} selected candidate"
+            f"{'' if len(candidates) == 1 else 's'} from {nle.event_id}."
+            "You may need to refresh to see the dissociation reflected in the table.",
+        )
+        return back

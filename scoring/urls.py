@@ -10,6 +10,7 @@ from .views import (
     TargetVettingSelectedFormView,
     TargetVettingView,
     VettingMethodsPartialView,
+    TargetDissociateSelectedFormView,
 )
 
 router = SharedAPIRootRouter()
@@ -55,5 +56,9 @@ urlpatterns = [
          NonLocalizedEventAssociateTargetsFormView.as_view(),
          name="nle_associate_targets_form"
     ),
-
+    path(
+         "eventcandidates/?nonlocalizedevent=<int:pk>/dissociateselected/",
+         TargetDissociateSelectedFormView.as_view(),
+         name="dissociate_selected"
+    ),
 ]
