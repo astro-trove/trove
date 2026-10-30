@@ -916,7 +916,7 @@ class EventCandidateCreateView(LoginRequiredMixin, RedirectView):
                     nonlocalized_event_name=nonlocalizedevent.event_id,
                     em_model_name=vm
                 )
-            messages.info(
+            messages.success(
                 self.request,
                 f"Linked {target.name} to {nonlocalizedevent.event_id} and "
                 + f"re-performed vetting in {', '.join(vetting_modes)} vetting mode(s).",
