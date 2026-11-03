@@ -165,9 +165,14 @@ def score(
                 host_score, host_name, host_catalog = get_distance_score(
                     host_df, target_id, nonlocalized_event_name
                 )
-                update_score_factor(candidate, "host_distance_score", host_score)
-                update_score_factor(candidate, "host_name", host_name)
-                update_score_factor(candidate, "host_catalog", host_catalog)
+                if host_name and host_catalog: # if not None
+                    update_score_factor(candidate, "host_distance_score", host_score)
+                    update_score_factor(candidate, "host_name", host_name)
+                    update_score_factor(candidate, "host_catalog", host_catalog)
+                else:
+                    delete_score_factor(candidate, "host_distance_score")
+                    delete_score_factor(candidate, "host_name")
+                    delete_score_factor(candidate, "host_catalog")
 
         else:
             # if no target redshift is known and no hosts are found, we don't want
