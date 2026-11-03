@@ -415,11 +415,18 @@ def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
     """Computes the GW distance at the target_id healpix location"""
 
     localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
+
+    # pre-fetch healpix to ensure the UNIQ-decoded range check is used rather than
+    # raw @> check
+    with Session(sa_engine) as session:
+        healpix = session.execute(
+            sa.select(SaTarget.healpix).filter(SaTarget.basetarget_ptr_id == target_id)
+        ).scalar()
+
     # find the distance at the healpix
     query = sa.select(SaSkymapTile.distance_mean, SaSkymapTile.distance_std).filter(
-        SaTarget.basetarget_ptr_id == target_id,
         SaSkymapTile.localization_id == localization.id,
-        SaSkymapTile.tile.contains(SaTarget.healpix),
+        SaSkymapTile.tile.contains(healpix),
     )
 
     # execute the query
