@@ -438,11 +438,12 @@ def _dust_map_noop(*args):
 def _load_dust_map():
     with warnings.catch_warnings(action="ignore"):
         from dustmaps import sfd
-    from dustmaps.config import config
 
     os.environ.setdefault(
         "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
     )
+
+    from dustmaps.config import config
 
     # these parameters are not defined by default but may be set by the user
     if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
