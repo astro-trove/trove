@@ -28,7 +28,6 @@
 	"predets_filter": false
     },
     "phot_parameter": {
-	"phot_score_snr_min": 5,
 	"min_baseline_pts": 2,
 	"flare_sigma_thresh": 3.25,
 	"flare_pair_max_gap_days": 5.0,

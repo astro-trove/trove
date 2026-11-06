@@ -25,7 +25,7 @@ class PhotParameterSchema(BaseModel):
     peak_time: Optional[List[float]] = None
     decay_rate: Optional[List[float]] = None
     max_predets: Optional[int] = None
-    phot_score_snr_min: int
+    phot_score_snr_min: Optional[int] = None
     min_time_separation: Optional[Union[float,int]] = None
     min_baseline_pts: Optional[Union[float,int]] = None
     flare_sigma_thresh: Optional[Union[float,int]] = None
