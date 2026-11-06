@@ -172,23 +172,21 @@ def _flux_to_lum(flux, lumdist):
     """convert flux to lum. Everything should be astropy quantities"""
     return 4 * np.pi * lumdist**2 * flux
 
-def _mean_decline(popt, t_data, window=None):
+def _mean_decline(popt, mag_slope_per_dex, t_data, window=None):
     """
     Mean decline rate (mag/day, positive = fading) from the late-time
-    power-law index alpha (F ∝ t^-alpha), averaged from peak to a later time.
+    slope d(mag)/d(log10 t), averaged from peak to a later time.
 
-    popt   : (a1, a2, peak_mag, peak_time) from the fit
-    t_data : times of the fitted data (days), used for the valid range
-    window : days after peak to average over; None = to the last data point
+    popt              : (a1, a2, peak_mag, peak_time) from the fit
+    mag_slope_per_dex : late-time d(mag)/d(log10 t) of the selected model,
+                        positive = fading
+    t_data            : times of the fitted data (days), used for the valid range
+    window            : days after peak to average over; None = to the last data point
     """
     # robustly unpack popt with different models
-    alpha_dex = popt[0]
     t_pk = 0
     if len(popt)>2:
         t_pk = popt[-1]
-
-    # put alpha_dex in magnitude space
-    alpha = -0.4 * alpha_dex
 
     # compute a starting time for the window
     t_start = max(t_pk, np.nanmin(t_data[t_data > 0]))
@@ -199,7 +197,7 @@ def _mean_decline(popt, t_data, window=None):
     if t_end <= t_pk:
         raise ValueError("Peak is at the end of the data; no decline to measure.")
 
-    return 2.5 * alpha * np.log10(t_end / t_start) / (t_end - t_start)
+    return mag_slope_per_dex * np.log10(t_end / t_start) / (t_end - t_start)
 
 def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataFrame:
     """
@@ -522,7 +520,7 @@ def estimate_max_find_decay_rate(
     ] + t_pre  # need to use min here b/s magnitudes are backwards; shift back to dt frame
 
     # convert the power law index to mag/day
-    decay_rate = _mean_decline(best_fit_params, xtest) 
+    decay_rate = _mean_decline(best_fit_params, mag_slope_per_dex, xtest)
 
     # the fit was done in dt - t_pre; return a model that takes dt directly
     def model_dt(x, *p, _m=model):
