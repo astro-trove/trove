@@ -113,6 +113,16 @@ def _powerlaw(x, a, y0):
     return y0 - a * np.log10(x)
 
 
+def _log10_sum_powers(x, a1, a2, x0):
+    """Stable log10((x/x0)**-a1 + (x/x0)**-a2).
+
+    Evaluated via logaddexp so large exponents or extreme x/x0 (which the
+    optimizer can step into) don't overflow to inf / underflow to log10(0).
+    """
+    lnu = np.log(x / x0)
+    return np.logaddexp(-a1 * lnu, -a2 * lnu) / np.log(10)
+
+
 def _broken_powerlaw_concave_down(x, a1, a2, y0, x0):
     """Smoothly broken powerlaw, CONCAVE DOWN branch. Original TROVE model.
 
@@ -123,7 +133,7 @@ def _broken_powerlaw_concave_down(x, a1, a2, y0, x0):
     `log10(sum of powers of u)` is concave up in log10(u), so negating it
     makes this CONCAVE DOWN in the (log10 t, mag) plane.
     """
-    return y0 - np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+    return y0 - _log10_sum_powers(x, a1, a2, x0)
 
 
 def _broken_powerlaw_concave_up(x, a1, a2, y0, x0):
@@ -131,7 +141,7 @@ def _broken_powerlaw_concave_up(x, a1, a2, y0, x0):
 
         mag = y0 + log10(u**-a1 + u**-a2)
     """
-    return y0 + np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+    return y0 + _log10_sum_powers(x, a1, a2, x0)
 
 
 def _ordered(base):
@@ -374,7 +384,8 @@ def estimate_max_find_decay_rate(
             "window, before fitting",
             n_dropped_domain,
         )
-    dt_days_tofit = dt_days[_in_domain]
+    # models are in log(t), so fit in time since t_pre (> 0 by the filter above)
+    dt_days_tofit = dt_days[_in_domain] - t_pre
     mag_tofit = mag[_in_domain]
     magerr_tofit = magerr[_in_domain]
 
@@ -510,12 +521,16 @@ def estimate_max_find_decay_rate(
     ytest = model(xtest, *best_fit_params)
     max_time = xtest[
         np.argmin(ytest)
-    ]  # need to use min here b/s magnitudes are backwards
+    ] + t_pre  # need to use min here b/s magnitudes are backwards; shift back to dt frame
 
     # convert the power law index to mag/day
     decay_rate = _mean_decline(best_fit_params, xtest) 
 
-    return model, best_fit_params, max_time, decay_rate
+    # the fit was done in dt - t_pre; return a model that takes dt directly
+    def model_dt(x, *p, _m=model):
+        return _m(np.asarray(x, dtype=float) - t_pre, *p)
+
+    return model_dt, best_fit_params, max_time, decay_rate
 
 
 def _mag_to_flux(mag, magerr=None):
