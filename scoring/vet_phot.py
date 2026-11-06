@@ -25,20 +25,18 @@ from .tasks import async_atlas_query
 
 logger = logging.getLogger(__name__)
 
-FILTER_PRIORITY_ORDER = ["r", "g", "V", "R", "G"]
+FILTER_PRIORITY_ORDER = [
+    "r", "g", "o", "c", "w", "V", "R", "G", "i", "I", "B"
+]
 
 # common optical filters + ATLAS o,c + other misc optical survey filters
 OPTICAL_FILTS = [
     # SDSS ugrizy
-    "u"
     "g",
     "r",
     "i",
-    "z",
-    "y",
 
     # Johnson-Cousins
-    "U",
     "B",
     "V",
     "R",
