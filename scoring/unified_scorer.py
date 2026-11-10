@@ -80,6 +80,10 @@ def score(
         return
 
     params = MODELS_BY_NAME[em_model_name]
+    for key in kwargs.keys():
+        if key in params.__dict__.keys():
+            setattr(params, key, kwargs[key])
+
     target = Target.objects.get(id=target_id)
     nonlocalized_event = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
     candidate = EventCandidate.objects.get(
@@ -331,7 +335,8 @@ def vet_basic(
         run_mpc: bool = True,
         run_ps: bool = True,
         run_agn: bool = True,
-        run_host_association: bool = True
+        run_host_association: bool = True,
+        **kwargs
 ):
     """Run the NLE-independent vetting for a target and return
     (`host_df`, `agn_df`, `keep_vetting`). `keep_vetting` is False when PS or
