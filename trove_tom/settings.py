@@ -401,8 +401,7 @@ ALERT_STREAMS = [
             'API_SECRET': ANTARES_API_SECRET,
             'GROUP': ANTARES_GROUP_ID,
             'TOPIC_HANDLERS': {
-                # this is just for now, so we can test the alert stream handling
-                'in_passta_nearby_transients': 'trove_targets.alertstream_handlers.handle_antares_stream_async',
+                'gw_em_candidates': 'trove_targets.alertstream_handlers.handle_antares_stream_async',
             }
         },
     }
