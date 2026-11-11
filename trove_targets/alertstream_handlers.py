@@ -57,10 +57,7 @@ def vet_or_post_error(
     try:
         with target_hook_options(created=True, **kwargs):
             target.save()  # to do coordinate conversions
-        if tns_query_status is not None:
-            logger.warning(tns_query_status)
-            # slack_client.chat_postMessage(channel=channel, text=tns_query_status)
-            
+                    
     except Exception as e:
         logger.error("".join(traceback.format_exception(e)))
         # slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
