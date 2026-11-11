@@ -33,6 +33,7 @@
 	"decay_rate": [-Infinity, -0.1],
 	"max_predets":3,
 	"phot_score_snr_min": 3,
-	"min_time_separation": 0.0417
+	"min_time_separation": 0.0417,
+	"overlap_k":3.0
     }
 }
