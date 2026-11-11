@@ -92,7 +92,7 @@ MPC_KEYS = [
 # its AGN association
 AGN_TOGGLE_TRANSIENTS = {"KN", "KN-in-SN", "super-KN"}
 
-PS_WAIVED_TRANSIENTS = {"AGN-flare"}
+PS_WAIVED_TRANSIENTS = {}
 
 KN_STYLE_CLASSES = {"SSM", "MassGap", "Terrestrial", "BNS", "NSBH", "SGRB", "LGRB", "FXT"}
 
