@@ -254,6 +254,11 @@ TARGET_TYPE = "SIDEREAL"
 
 FACILITIES = {}
 
+try:
+    ATLAS_CALLBACK_URL
+except NameError:
+    ATLAS_CALLBACK_URL = None
+
 SINGLE_TARGET_DATA_SERVICES = {
     "ATLAS": {
         "class": "trove_targets.atlas.CustomAtlasForcedPhotometryService",
