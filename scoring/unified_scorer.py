@@ -209,7 +209,8 @@ def score(
                 candidate_name=target.name,
                 allphot=postphot,
                 t_post=np.nanmin([params.t_post, DT_MAX]),
-                overlap_k=3.0,
+                phot_score_snr_min=params.phot_parameter.phot_score_snr_min,
+                overlap_k=params.phot_parameter.overlap_k,
             )
             update_score_factor(candidate, "kilonova_score", phot_score)
             delete_score_factor(candidate, "kilonova_skip_reason")
@@ -320,6 +321,7 @@ def score(
             if any(v >= params.phot_parameter.max_predets for v in n_predets):
                 predet_score = params.score_controls.phot.no_match
         update_score_factor(candidate, "predetection_score", predet_score)
+
 
 def vet_basic(
         target_id: int,
