@@ -1,6 +1,7 @@
 import numpy as np
 from datetime import datetime, timedelta
 import logging
+from tqdm import tqdm
 
 from django.core.management.base import BaseCommand
 from django.conf import settings
@@ -64,7 +65,7 @@ class Command(BaseCommand):
 
     def handle(self, 
                nle_id, 
-               prob=0.95, 
+               prob=settings.SKYMAP_PROB_CONTOUR,
                first_det_tmin=-1,
                first_det_tmax=10,
                snr_min=5, 
@@ -81,11 +82,11 @@ class Command(BaseCommand):
 
         # get targets within the localization region
         logger.info("Getting targets in the "+
-                    f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
+                    f"{prob*100:.0f}% localization "+
                     f"region of {nle.event_id}")
         tids = get_target_ids_in_prob_credible_region(
             seq,
-            prob=settings.SKYMAP_PROB_CONTOUR,
+            prob=prob,
             tdelta=first_det_tmin)
         tids_ls = list(tids)
         tids_ls = [tid[0] for tid in tids_ls]
@@ -95,7 +96,7 @@ class Command(BaseCommand):
 
         # loop through targets
         new_candidates = []
-        for target in targets:
+        for target in tqdm(targets):
             logger.info(f"\n{target.name}")
             
             # if excluding based on first detection's SNR...
@@ -134,7 +135,7 @@ class Command(BaseCommand):
                 # attempt to create the eventcandidate
                 new_cand = create_candidates_from_targets(
                     seq,
-                    prob=settings.SKYMAP_PROB_CONTOUR,
+                    prob=prob,
                     target_ids=[target.id])
                 if len(new_cand):
                     logger.info("New eventcandidate created")
