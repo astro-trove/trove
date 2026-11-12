@@ -55,6 +55,7 @@ from .vet_phot import (
     OPTICAL_FILTS,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
+    FORCEDPHOT_SNR_THRESHOLD,
     _get_post_disc_phot,
     _get_pre_disc_phot,
     _score_phot,
@@ -188,7 +189,7 @@ def score(
             delete_score_factor(candidate, "host_name")
             delete_score_factor(candidate, "host_catalog")
 
-
+    # get photometry
     prephot = _get_pre_disc_phot(
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
@@ -200,6 +201,28 @@ def score(
         t_post=params.t_post,
         t_pre=params.t_pre,
     )
+
+    # only use SNR > FORCEDPHOT_SNR_THRESHOLD ATLAS / ZTF FP for scoring
+    prephot = prephot[~(
+        (
+            (prephot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(prephot.snr)
+        ) & (
+            (prephot.telescope == "ATLAS") |
+            (prephot.telescope == "ATLAS FP") |
+            (prephot.telescope == "ZTF FP")
+        )
+    )
+    ]
+    postphot = postphot[~(
+        (
+            (postphot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(postphot.snr)
+        ) & (
+            (postphot.telescope == "ATLAS") |
+            (postphot.telescope == "ATLAS FP") |
+            (postphot.telescope == "ZTF FP")
+        )
+    )
+    ]
 
     if params.phot_method.knscorer and phot_method=="kilonovascorer":
         try:

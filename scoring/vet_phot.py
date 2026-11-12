@@ -57,6 +57,9 @@ PHOT_SCORE_MIN = 0.1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
 )
+FORCEDPHOT_SNR_THRESHOLD = (
+    5 # require a S/N of 5 for ATLAS/ZTF FP to be considered real
+)
 
 FILTER_EFF_FREQ = {
     'u': 8.468e14 * u.Hz,
