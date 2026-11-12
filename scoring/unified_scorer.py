@@ -203,26 +203,28 @@ def score(
     )
 
     # only use SNR > FORCEDPHOT_SNR_THRESHOLD ATLAS / ZTF FP for scoring
-    prephot = prephot[~(
-        (
-            (prephot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(prephot.snr)
-        ) & (
-            (prephot.telescope == "ATLAS") |
-            (prephot.telescope == "ATLAS FP") |
-            (prephot.telescope == "ZTF FP")
+    if type(prephot) != type(None): # if we found any pre photometry to begin with
+        prephot = prephot[~(
+            (
+                (prephot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(prephot.snr)
+            ) & (
+                (prephot.telescope == "ATLAS") |
+                (prephot.telescope == "ATLAS FP") |
+                (prephot.telescope == "ZTF FP")
+            )
         )
-    )
-    ]
-    postphot = postphot[~(
-        (
-            (postphot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(postphot.snr)
-        ) & (
-            (postphot.telescope == "ATLAS") |
-            (postphot.telescope == "ATLAS FP") |
-            (postphot.telescope == "ZTF FP")
+        ]
+    if type(postphot) != type(None): # if we found any post photometry to begin with
+        postphot = postphot[~(
+            (
+                (postphot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(postphot.snr)
+            ) & (
+                (postphot.telescope == "ATLAS") |
+                (postphot.telescope == "ATLAS FP") |
+                (postphot.telescope == "ZTF FP")
+            )
         )
-    )
-    ]
+        ]
 
     if params.phot_method.knscorer and phot_method=="kilonovascorer":
         try:
