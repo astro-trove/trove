@@ -129,7 +129,7 @@ class Command(BaseCommand):
             )
             .order_by("name")
         )
-        target_ids = targets.values_list("id", flate=True)
+        target_ids = targets.values_list("id", flat=True)
         logger.info(f"Found {len(target_ids)} targets")
 
         # loop through targets
