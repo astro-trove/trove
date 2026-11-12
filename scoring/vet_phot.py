@@ -659,6 +659,17 @@ def find_public_phot(
         logger.info("Skipping ATLAS FP query, as requested")
         return created_new_tns_phot
 
+    # apply same logic as above for **any** transient for which the latest >5-sigma
+    # detection is too dim for ATLAS FP to be constraining
+    latest_det = target.photometryreduceddatum_set.filter(
+        brightness_error__lte=2.5/np.log(10)/FORCEDPHOT_SNR_THRESHOLD
+    ).latest()
+    if latest_det.brightness > settings.ATLAS_FORCEDPHOT_LIMITINGMAG:
+        logger.info("Skipping ATLAS FP query as latest >5sigma detection "
+                    f"{latest_det.brightness:.2f} ± {latest_det.brightness_error:.2f} "
+                    "suggests ATLAS FP will not be constraining")
+        return created_new_tns_phot
+
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
     atlas_data = target.photometryreduceddatum_set.filter(
