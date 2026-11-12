@@ -117,10 +117,11 @@ def async_associate_targets_nle(
         )
         .order_by("name")
     )
-    
+
+    target_ids = targets.values_list("id", flat=True)
     # build + issue logger message
     logger_msg = (
-        f"Found {len(targets)} created after {det_window_start}, with first "+
+        f"Found {len(target_ids)} created after {det_window_start}, with first "+
         f"detection within the [{det_window_start}, {det_window_end}] window"
     )
     if snr_min > 0:
@@ -129,24 +130,11 @@ def async_associate_targets_nle(
     logger.info(logger_msg)
 
     # loop through targets
-    new_candidates = []
-    for target in targets:
-        logger.info(f"\n{target.name}")
-        logger.info(f"First qualifying detection: {target.first_qualifying_det}\n")
-
-        # attempt to create the eventcandidate
-        new_cand = create_candidates_from_targets(
-            seq,
-            prob=settings.SKYMAP_PROB_CONTOUR,
-            target_ids=[target.id])
-        if new_cand:
-            new_candidates.append(new_cand)
-            logger.info("New eventcandidate created")
-        else:
-            logger.info("Eventcandidate already exists")
-    
-    logger.info(f"\nLinked {len(new_candidates)} candidates to event {nle.event_id}")
-
+    new_candidates = create_candidates_from_targets(
+        seq,
+        prob=settings.SKYMAP_PROB_CONTOUR,
+        target_ids=target_ids
+    )
 
 ## task which itself enqueues tasks
 @task(queue_name="spawn_associate_targets", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)

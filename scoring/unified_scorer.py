@@ -84,7 +84,7 @@ def score(
     for key in kwargs.keys():
         if key in params.__dict__.keys():
             setattr(params, key, kwargs[key])
-
+    
     target = Target.objects.get(id=target_id)
     nonlocalized_event = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
     candidate = EventCandidate.objects.get(
@@ -203,7 +203,7 @@ def score(
     )
 
     # only use SNR > FORCEDPHOT_SNR_THRESHOLD ATLAS / ZTF FP for scoring
-    if type(prephot) != type(None): # if we found any pre photometry to begin with
+    if prephot is not None: # if we found any pre photometry to begin with
         prephot = prephot[~(
             (
                 (prephot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(prephot.snr)
@@ -214,7 +214,7 @@ def score(
             )
         )
         ]
-    if type(postphot) != type(None): # if we found any post photometry to begin with
+    if postphot is not None: # if we found any post photometry to begin with
         postphot = postphot[~(
             (
                 (postphot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(postphot.snr)

@@ -1,7 +1,6 @@
 import numpy as np
 from datetime import datetime, timedelta
 import logging
-from tqdm import tqdm
 
 from django.core.management.base import BaseCommand
 from django.conf import settings
@@ -130,25 +129,15 @@ class Command(BaseCommand):
             )
             .order_by("name")
         )
-        logger.info(f"Found {len(targets)} targets")
+        target_ids = targets.values_list("id", flate=True)
+        logger.info(f"Found {len(target_ids)} targets")
 
         # loop through targets
-        new_candidates = []
-        for target in tqdm(targets):
-            logger.info(f"\n{target.name}")
-            logger.info(f"First qualifying detection: {target.first_qualifying_det}\n")
-
-            # attempt to create the eventcandidate
-            new_cand = create_candidates_from_targets(
-                seq,
-                prob=prob,
-                target_ids=[target.id])
-            if new_cand:
-                logger.info("New eventcandidate created\n")
-                new_candidates.append(new_cand)
-            else:
-                logger.info("Eventcandidate already exists\n")
-                    
+        new_candidates = create_candidates_from_targets(
+            seq,
+            prob=prob,
+            target_ids=target_ids
+        )                    
         logger.info(f"\nLinked {len(new_candidates)} candidates to event {nle.event_id}")
         
         return
