@@ -273,8 +273,8 @@ class Command(BaseCommand):
             cursor.execute(
                 """
                 --STEP 4: add all other unmatched TNS transients to the targets table (removing duplicate names)
-                INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme)
-                SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, ''
+                INSERT INTO tom_targets_basetarget (name, type, created, modified, permissions, ra, dec, epoch, scheme, shared_by, shared_from)
+                SELECT CONCAT(name_prefix, name), 'SIDEREAL', NOW(), NOW(), 'PUBLIC', ra, declination, 2000, '', '', ''
                 FROM tns_q3c
                 WHERE name_prefix != 'FRB'
                       AND name != '2023hzc' AND name != '2026pmf' -- skip duplicates in the TNS: AT2016jlf, AT2026pme

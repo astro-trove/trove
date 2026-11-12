@@ -246,11 +246,17 @@ TARGET_TYPE = "SIDEREAL"
 
 FACILITIES = {}
 
+try:
+    ATLAS_CALLBACK_URL
+except NameError:
+    ATLAS_CALLBACK_URL = None
+
 SINGLE_TARGET_DATA_SERVICES = {
     "ATLAS": {
         "class": "trove_targets.atlas.CustomAtlasForcedPhotometryService",
         "url": "https://fallingstar-data.com/forcedphot",
         "api_key": os.getenv("ATLAS_FORCED_PHOTOMETRY_API_KEY", ATLAS_API_KEY),
+        "callback_url": ATLAS_CALLBACK_URL, 
     },
 }
 
@@ -394,8 +400,7 @@ ALERT_STREAMS = [
             'API_SECRET': ANTARES_API_SECRET,
             'GROUP': ANTARES_GROUP_ID,
             'TOPIC_HANDLERS': {
-                # this is just for now, so we can test the alert stream handling
-                'in_passta_nearby_transients': 'trove_targets.alertstream_handlers.handle_antares_stream_async',
+                'gw_em_candidates': 'trove_targets.alertstream_handlers.handle_antares_stream_async',
             }
         },
     }

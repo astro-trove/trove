@@ -3,7 +3,7 @@
     "t_pre": 0,
     "t_post": 400,
     "detection_horizon": [0,400],
-    "ps_crossmatch": false,
+    "ps_crossmatch": true,
     "mpc_crossmatch": true,
     "agn_crossmatch": true,
     "nuclear_offset_score": true,

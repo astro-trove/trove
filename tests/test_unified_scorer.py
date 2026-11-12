@@ -95,7 +95,7 @@ class TestScoreEarlyExit:
 
         kwargs = mocks["vet_basic"].call_args.kwargs
         # AGN-flare waives point source matching, an AGN is often in the PS catalogs
-        assert kwargs["run_ps"] is False
+        assert kwargs["run_ps"] is True
         assert kwargs["run_mpc"] is True
         assert kwargs["run_agn"] is True
         assert kwargs["run_host_association"] is True

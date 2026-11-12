@@ -399,3 +399,36 @@ class TestNewCandidateVetting:
         assert passed[0][0] is not passed[1][0] and passed[0][0] is not host_df
         assert passed[0][1] is not passed[1][1] and passed[0][1] is not agn_df
         assert all(p[0].equals(host_df) and p[1].equals(agn_df) and p[2] for p in passed)
+
+
+
+class TestDecayRateSign:
+    """The decay rate is positive for a fading light curve, whichever
+    model the AIC picks."""
+
+    @pytest.mark.parametrize(
+        "model_name, label, params",
+        [
+            # mag = 20 + log10(t)
+            ("_powerlaw", "powerlaw", (-1.0, 20.0)),
+            # fades, decelerating
+            ("_broken_powerlaw_concave_down", "broken_concave_down", (1.0, 4.0, 20.0, 2.0)),
+            # rises, then fades
+            ("_broken_powerlaw_concave_up", "broken_concave_up", (-1.0, 2.0, 20.0, 2.0)),
+        ],
+    )
+    def test_fading_light_curve_has_positive_decay_rate(self, model_name, label, params, caplog):
+        from scoring import vet_phot
+
+        t = np.linspace(0.5, 15, 40)
+        mag = getattr(vet_phot, model_name)(t, *params)
+        magerr = np.full_like(t, 0.01)
+
+        with caplog.at_level("INFO", logger=vet_phot.logger.name):
+            _, _, _, decay_rate = vet_phot.estimate_max_find_decay_rate(
+                t, mag, magerr, t_pre=0, t_post=25
+            )
+
+        # make sure the AIC actually picked the model under test
+        assert f"Model selected: {label} " in caplog.text
+        assert decay_rate > 0

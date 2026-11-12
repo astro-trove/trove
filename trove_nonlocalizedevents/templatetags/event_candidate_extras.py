@@ -188,7 +188,7 @@ def display_score_details(context, target_id):
             partial(_float_format, unit="days"),
         ),
         phot_decay_rate=(
-            "Light Curve Slope (positive is brightening)",
+            "Light Curve Slope",
             partial(_float_format, unit="mag/day"),
         ),
         predetection_score=(

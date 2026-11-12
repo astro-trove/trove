@@ -63,13 +63,13 @@ class TestEMModelFiles:
         for key in ("lum_max", "peak_time", "decay_rate", "max_predets", "min_time_separation"):
             assert getattr(model.phot_parameter, key) is not None, key
 
-    def test_ps_waived_for_agn_flare_only_on_agn_match(self):
+    def test_ps_used_for_all(self):
         from scoring.util import ps_counts_toward
 
         assert ps_counts_toward("KN", agn_score=1.0)
         assert ps_counts_toward("AGN-flare", agn_score=None)
         assert ps_counts_toward("AGN-flare", agn_score=0.1)
-        assert not ps_counts_toward("AGN-flare", agn_score=1.0)
+        assert ps_counts_toward("AGN-flare", agn_score=1.0)
 
 
 class TestTransientModelSchema:
