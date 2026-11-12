@@ -55,6 +55,7 @@ from .vet_phot import (
     OPTICAL_FILTS,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
+    FORCEDPHOT_SNR_THRESHOLD,
     _get_post_disc_phot,
     _get_pre_disc_phot,
     _score_phot,
@@ -80,6 +81,10 @@ def score(
         return
 
     params = MODELS_BY_NAME[em_model_name]
+    for key in kwargs.keys():
+        if key in params.__dict__.keys():
+            setattr(params, key, kwargs[key])
+    
     target = Target.objects.get(id=target_id)
     nonlocalized_event = NonLocalizedEvent.objects.get(event_id=nonlocalized_event_name)
     candidate = EventCandidate.objects.get(
@@ -184,7 +189,7 @@ def score(
             delete_score_factor(candidate, "host_name")
             delete_score_factor(candidate, "host_catalog")
 
-
+    # get photometry
     prephot = _get_pre_disc_phot(
         target_id=target_id,
         nonlocalized_event=nonlocalized_event,
@@ -197,6 +202,30 @@ def score(
         t_pre=params.t_pre,
     )
 
+    # only use SNR > FORCEDPHOT_SNR_THRESHOLD ATLAS / ZTF FP for scoring
+    if prephot is not None: # if we found any pre photometry to begin with
+        prephot = prephot[~(
+            (
+                (prephot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(prephot.snr)
+            ) & (
+                (prephot.telescope == "ATLAS") |
+                (prephot.telescope == "ATLAS FP") |
+                (prephot.telescope == "ZTF FP")
+            )
+        )
+        ]
+    if postphot is not None: # if we found any post photometry to begin with
+        postphot = postphot[~(
+            (
+                (postphot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(postphot.snr)
+            ) & (
+                (postphot.telescope == "ATLAS") |
+                (postphot.telescope == "ATLAS FP") |
+                (postphot.telescope == "ZTF FP")
+            )
+        )
+        ]
+
     if params.phot_method.knscorer and phot_method=="kilonovascorer":
         try:
             phot_score = kilonova_score_candidate(
@@ -205,7 +234,8 @@ def score(
                 candidate_name=target.name,
                 allphot=postphot,
                 t_post=np.nanmin([params.t_post, DT_MAX]),
-                overlap_k=3.0,
+                phot_score_snr_min=params.phot_parameter.phot_score_snr_min,
+                overlap_k=params.phot_parameter.overlap_k,
             )
             update_score_factor(candidate, "kilonova_score", phot_score)
             delete_score_factor(candidate, "kilonova_skip_reason")
@@ -317,6 +347,7 @@ def score(
                 predet_score = params.score_controls.phot.no_match
         update_score_factor(candidate, "predetection_score", predet_score)
 
+
 def vet_basic(
         target_id: int,
         days_ago_max: int = 200,
@@ -331,7 +362,8 @@ def vet_basic(
         run_mpc: bool = True,
         run_ps: bool = True,
         run_agn: bool = True,
-        run_host_association: bool = True
+        run_host_association: bool = True,
+        **kwargs
 ):
     """Run the NLE-independent vetting for a target and return
     (`host_df`, `agn_df`, `keep_vetting`). `keep_vetting` is False when PS or

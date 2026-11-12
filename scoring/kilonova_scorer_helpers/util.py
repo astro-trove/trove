@@ -9,46 +9,49 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import union_categoricals
 
+from .grid_db import scoreable_grids
+
+from . import survey_band
+
+from scoring.scoring import get_eventcandidate_default_distance
+from scoring.vet_phot import _get_post_disc_phot
+
+from KilonovaScorer.core2 import (
+    binned_stats_cumulative_ptail,
+    kilonovascorer_v3,
+)
+from KilonovaScorer.utils import compute_abs_mag_samples
+
 logger = logging.getLogger(__name__)
 
-DEFAULT_DISTANCE_MPC = 259.0
 
-# Finer at smaller distances because that is likely where the GW events will
-# be most populated
+# finer at smaller distances where the GW events will be most populated
 RUNG_LADDER_MPC = (
     25.0, 50.0, 75.0, 100.0, 125.0, 150.0, 175.0, 200.0, 225.0, 250.0,
     300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0, 1000.0,
 )
 
 MAX_DISTANCE_MPC = 1000.0
-
-DT_MIN, DT_MAX = 0.0, 30.0
-
-DEFAULT_MAGERR = 2.5 / (3.0 * np.log(10.0))
-
+DT_MIN, DT_MAX = 0.0, 15.0
+DEFAULT_SNR_MIN = 3.0
 DEFAULT_OVERLAP_K = 3.0
 
 # the scorer's time-bin width (d); also how far past t_post the grid is loaded
 TIME_BIN_WIDTH = 0.2
 
+
+# constants for the grid
 _GRID_CACHE: "OrderedDict[tuple, Optional[pd.DataFrame]]" = OrderedDict()
-GRID_CACHE_MAX_BYTES = int(os.environ.get("TROVE_GRID_CACHE_BYTES") or 1_500_000_000)
 _GRID_CACHE_BYTES = 0
-
-
-#: (name, distance_mpc) for every grid that can actually be scored against,
-#: nearest-distance lookup table for `grid_for_distance`. Cached because it is a
-#: single-query inventory of a handful of rows and a worker scores hundreds of
-#: candidates. Held for the life of the process, so a worker must be
-#: restarted to pick up a newly ingested rung.
+GRID_CACHE_MAX_BYTES = int(os.environ.get("TROVE_GRID_CACHE_BYTES") or 1_500_000_000)
+# (name, distance_mpc) for every grid that can actually be scored against
 _GRID_INVENTORY: "list[tuple[str, float]] | None" = None
+
 
 def _grid_inventory():
     global _GRID_INVENTORY
     if _GRID_INVENTORY is not None:
         return _GRID_INVENTORY
-
-    from .grid_db import scoreable_grids
 
     try:
         rungs = scoreable_grids()
@@ -87,20 +90,6 @@ def _restrict_to_ladder(inv):
                     len(inv), len(reduced),
                     ", ".join(f"{d:.0f} Mpc" for _, d in reduced))
     return reduced
-
-
-def grid_for_distance(dist_mpc: float) -> str:
-    inv = _grid_inventory()
-    if not inv:
-        raise KilonovaScoreUnavailable(
-            "no simulation grid in the store spans the scored window"
-        )
-    name, _ = min(inv, key=lambda t: abs(t[1] - float(dist_mpc)))
-    return name
-
-
-def default_grid() -> str:
-    return grid_for_distance(DEFAULT_DISTANCE_MPC)
 
 
 def _frame_bytes(df: Optional[pd.DataFrame]) -> int:
@@ -187,29 +176,72 @@ def _scalar_dist_err(dist_err) -> float:
     return float(arr.max())
 
 
+def _cumulative_factor(results: pd.DataFrame) -> float:
+    if results is None or not len(results):
+        raise KilonovaScoreUnavailable("scorer returned no per-epoch rows")
+
+    if "running_survivors_n" in results.columns and (results["running_survivors_n"] == 0).any():
+        logger.info("ABC chain empty -- no simulation is consistent with every "
+                    "epoch; flooring the score to 0")
+        return 0.0
+
+    try:
+        cum = binned_stats_cumulative_ptail(results)
+    except (KeyError, ValueError) as exc:
+        raise KilonovaScoreUnavailable(
+            f"scorer could not combine the epochs ({type(exc).__name__}: {exc})"
+        ) from exc
+    if not len(cum) or "running_mean" not in cum.columns:
+        raise KilonovaScoreUnavailable("no cumulative score in the scorer output")
+
+    value = float(cum["running_mean"].iloc[-1])
+    if not np.isfinite(value):
+        # The package's inverse-variance update divides by zero when every
+        # p_tail_std is 0. A NaN factor would multiply TROVE's whole score to
+        # NaN, which is strictly worse than the rejection it represents.
+        logger.info("Cumulative score is NaN -- reading total rejection as 0.0")
+        return 0.0
+    return float(np.clip(value, 0.0, 1.0))
+
+
 class KilonovaScoreUnavailable(RuntimeError):
     """Raised when the candidate cannot be scored at all (no grid, no distance,
-    no usable photometry). Distinct from *scoring to zero*, which is a result."""
+    or no usable photometry). Distinct from *scoring to zero*, which is a result."""
 
 
-def build_data_obs(phot: pd.DataFrame, dist_mpc: float, dist_err_mpc: float) -> pd.DataFrame:
-    from KilonovaScorer.utils import compute_abs_mag_samples
+def grid_for_distance(dist_mpc: float) -> str:
+    """Return grid to score against for given distance."""
+    inv = _grid_inventory()
+    if not inv:
+        raise KilonovaScoreUnavailable(
+            "no simulation grid in the store spans the scored window"
+        )
+    name, _ = min(inv, key=lambda t: abs(t[1] - float(dist_mpc)))
+    return name
+
+
+def build_data_obs(
+        phot: pd.DataFrame,
+        phot_score_snr_min: float,
+        dist_mpc: float,
+        dist_err_mpc: float,
+) -> pd.DataFrame:
+    """Build dataframe of observations to be assessed in scoring."""
 
     det = phot[~phot["upperlimit"].astype(bool)].copy()
     det = det[det["dt"] >= DT_MIN]
+    det = det[det["magerr"] <= 2.5 / np.log(10) / phot_score_snr_min]
+
     if det.empty:
         return det.assign(filter_mapped=None, time_after_gw=None,
                           absolute_magnitude=None, absolute_magnitude_error=None)
 
     magerr = pd.to_numeric(det["magerr"], errors="coerce").to_numpy(float)
-    magerr = np.where(np.isfinite(magerr) & (magerr > 0), magerr, DEFAULT_MAGERR)
 
     abs_mag, abs_err = compute_abs_mag_samples(
         pd.to_numeric(det["mag"], errors="coerce").to_numpy(float),
         magerr, dist_mpc=float(dist_mpc), dist_err_mpc=float(dist_err_mpc),
     )
-    
-    from . import survey_band
 
     scope = det["telescope"].astype(str) if "telescope" in det.columns else ""
     mapped = [survey_band(t, f) for t, f in
@@ -240,51 +272,20 @@ def build_data_obs(phot: pd.DataFrame, dist_mpc: float, dist_err_mpc: float) -> 
     return out
 
 
-def _cumulative_factor(results: pd.DataFrame) -> float:
-    from KilonovaScorer.core2 import binned_stats_cumulative_ptail
-
-    if results is None or not len(results):
-        raise KilonovaScoreUnavailable("scorer returned no per-epoch rows")
-    
-    if "running_survivors_n" in results.columns and (results["running_survivors_n"] == 0).any():
-        logger.info("ABC chain empty -- no simulation is consistent with every "
-                    "epoch; flooring the score to 0")
-        return 0.0
-
-    try:
-        cum = binned_stats_cumulative_ptail(results)
-    except (KeyError, ValueError) as exc:
-        raise KilonovaScoreUnavailable(
-            f"scorer could not combine the epochs ({type(exc).__name__}: {exc})"
-        ) from exc
-    if not len(cum) or "running_mean" not in cum.columns:
-        raise KilonovaScoreUnavailable("no cumulative score in the scorer output")
-
-    value = float(cum["running_mean"].iloc[-1])
-    if not np.isfinite(value):
-        # The package's inverse-variance update divides by zero when every
-        # p_tail_std is 0. A NaN factor would multiply TROVE's whole score to
-        # NaN, which is strictly worse than the rejection it represents.
-        logger.info("Cumulative score is NaN -- reading total rejection as 0.0")
-        return 0.0
-    return float(np.clip(value, 0.0, 1.0))
-
-
 def kilonova_score_candidate(
     target_id: int,
     nonlocalized_event,
     candidate_name: Optional[str] = None,
     allphot = None,
     t_post: Optional[float] = DT_MAX,
+    phot_score_snr_min: Optional[float] = DEFAULT_SNR_MIN,
     overlap_k: Optional[float] = DEFAULT_OVERLAP_K,
 ) -> float:
-
-    from scoring.scoring import get_eventcandidate_default_distance
-    from scoring.vet_phot import _get_post_disc_phot
-    from KilonovaScorer.core2 import kilonovascorer_v3
+    """Main function for applying KilonovaSCORER to score a candidate."""
 
     event_id = getattr(nonlocalized_event, "event_id", nonlocalized_event)
 
+    # get relevant distances to convert mags to absolute mags
     dist_mpc, dist_err_mpc = get_eventcandidate_default_distance(target_id, event_id)
     if not np.isfinite(dist_mpc) or dist_mpc <= 0:
         raise KilonovaScoreUnavailable(f"no usable distance for target {target_id}")
@@ -307,6 +308,7 @@ def kilonova_score_candidate(
     grid = grid_for_distance(dist_mpc)
     logger.debug("target %s at %.0f Mpc -> grid %s", target_id, dist_mpc, grid)
 
+    # get the photometry we'll be comparing against
     if allphot is None:
         phot = _get_post_disc_phot(target_id=target_id,
                                    nonlocalized_event=nonlocalized_event,
@@ -317,21 +319,21 @@ def kilonova_score_candidate(
     if phot is None or not len(phot):
         raise KilonovaScoreUnavailable(f"No photometry for target {target_id}")
 
-    data_obs = build_data_obs(phot, dist_mpc, dist_err_mpc)
+    data_obs = build_data_obs(phot, phot_score_snr_min, dist_mpc, dist_err_mpc)
     if not len(data_obs):
         raise KilonovaScoreUnavailable(
             f"No detections within {DT_MIN:g}-{t_post:g} days for target {target_id}")
 
+    # finally, load the grid of simulations
     bands = tuple(sorted(set(data_obs["filter_mapped"])))
-
     grid_df = _load_grid_cached(grid, bands, DT_MIN, t_post + TIME_BIN_WIDTH)
-    # Only the bands this candidate actually has; a band with no simulations
-    # would make the package iterate over an empty frame.
+    # load only the bands this candidate actually has
     usable = tuple(b for b in bands if (grid_df["filter_mapped"] == b).any())
     if not usable:
         raise KilonovaScoreUnavailable(
             f"None of the candidate's bands {bands} are in grid {grid}")
 
+    # score!
     results, _summary = kilonovascorer_v3(
         data_obs[data_obs["filter_mapped"].isin(usable)],
         grid_df,

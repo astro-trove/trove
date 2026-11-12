@@ -57,6 +57,9 @@ PHOT_SCORE_MIN = 0.1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
 )
+FORCEDPHOT_SNR_THRESHOLD = (
+    5 # require a S/N of 5 for ATLAS/ZTF FP to be considered real
+)
 
 FILTER_EFF_FREQ = {
     'u': 8.468e14 * u.Hz,
@@ -654,6 +657,22 @@ def find_public_phot(
     # for dim transients in LSST alerts
     if not query_atlas_fp:
         logger.info("Skipping ATLAS FP query, as requested")
+        return created_new_tns_phot
+
+    # apply same logic as above for **any** transient for which the latest >5-sigma
+    # detection is too dim for ATLAS FP to be constraining
+    fp_sig_dets = target.photometryreduceddatum_set.filter(
+        brightness_error__lte=2.5/np.log(10)/FORCEDPHOT_SNR_THRESHOLD
+    )
+    if fp_sig_dets.exists():
+        latest_det = fp_sig_dets.latest()
+    else:
+        return created_new_tns_phot
+    
+    if latest_det.brightness > settings.ATLAS_FORCEDPHOT_LIMITINGMAG:
+        logger.info("Skipping ATLAS FP query as latest >5sigma detection "
+                    f"{latest_det.brightness:.2f} ± {latest_det.brightness_error:.2f} "
+                    "suggests ATLAS FP will not be constraining")
         return created_new_tns_phot
 
     # query ATLAS for new forced photometry

@@ -32,7 +32,7 @@
 	"peak_time": [10, 70],
 	"decay_rate": [-Infinity, Infinity],
 	"max_predets":3,
-	"phot_score_snr_min": 5,
+	"phot_score_snr_min": 3,
 	"min_time_separation": 0.0417
     }
 }

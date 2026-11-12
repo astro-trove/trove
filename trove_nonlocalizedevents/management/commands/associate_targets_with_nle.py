@@ -4,8 +4,10 @@ import logging
 
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.db.models import OuterRef, Subquery
 
-from tom_nonlocalizedevents.models import NonLocalizedEvent 
+from tom_nonlocalizedevents.models import NonLocalizedEvent
+from tom_dataproducts.models import PhotometryReducedDatum
 
 from trove_targets.models import Target
 from trove_nonlocalizedevents.healpix_utils import (
@@ -64,13 +66,13 @@ class Command(BaseCommand):
 
     def handle(self, 
                nle_id, 
-               prob=0.95, 
+               prob=settings.SKYMAP_PROB_CONTOUR,
                first_det_tmin=-1,
                first_det_tmax=10,
                snr_min=5, 
                **kwargs):
         
-        # get the specific NLE and NLE time
+        # get the specific NLE and NLE time, detection window
         nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
         seq = nle.sequences.last()
         try:
@@ -79,69 +81,63 @@ class Command(BaseCommand):
             nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
         logger.info(f"\nNLE is {nle}, NLE sequence time is {nle_time}")
 
-        # get targets within the localization region
-        logger.info("Getting targets in the "+
-                    f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
-                    f"region of {nle.event_id}")
+        det_window_start = nle_time + timedelta(days=first_det_tmin)
+        det_window_end   = nle_time + timedelta(days=first_det_tmax)
+
+        # get targets within the localization region, created after det_window_start,
+        # with first detection within [det_window_start, det_window_end], and
+        # (optionally) with first detection SNR above some threshold
+        logger_msg = (
+            f"Getting targets in the {prob*100:.0f}% localization region of "+
+            f"{nle.event_id}, created after {det_window_start}, with first "+
+            f"detection within the [{det_window_start}, {det_window_end}] window"
+        )
+        if snr_min > 0:
+            logger_msg += f" and with first detection SNR > {snr_min}"
+        logger_msg += "\n"
+        logger.info(logger_msg)
         tids = get_target_ids_in_prob_credible_region(
             seq,
-            prob=settings.SKYMAP_PROB_CONTOUR,
+            prob=prob,
             tdelta=first_det_tmin)
-        tids_ls = list(tids)
-        tids_ls = [tid[0] for tid in tids_ls]
-        targets = Target.objects.filter(id__in=tids_ls,
-                                        created__gte=nle_time+timedelta(first_det_tmin)).order_by("name")
-        logger.info(f"Found {len(targets)} targets")
+        tids_ls = [tid[0] for tid in list(tids)]
+
+        # query for non-zero mags/mag errors
+        phot_qs = PhotometryReducedDatum.objects.filter(
+            target=OuterRef("pk"),
+            brightness__isnull=False,
+            brightness_error__isnull=False,
+        )
+        # add on filter for SNR
+        if snr_min > 0:
+            brightness_error_max = 2.5/np.log(10)/snr_min
+            phot_qs = phot_qs.filter(brightness_error__lte=brightness_error_max)
+        # subquery for getting the first detection
+        first_det_subquery = Subquery(
+            phot_qs.order_by("timestamp").values("timestamp")[:1]
+        )
+        # combine all the queries
+        targets = (
+            Target.objects
+            .filter(
+                id__in=tids_ls,
+            )
+            .annotate(first_qualifying_det=first_det_subquery)
+            .filter(
+                first_qualifying_det__gt=det_window_start,
+                first_qualifying_det__lt=det_window_end,
+            )
+            .order_by("name")
+        )
+        target_ids = targets.values_list("id", flat=True)
+        logger.info(f"Found {len(target_ids)} targets")
 
         # loop through targets
-        new_candidates = []
-        for target in targets:
-            logger.info(f"\n{target.name}")
-            
-            # if excluding based on first detection's SNR...
-            # ...is first detection >= SNR minimum?
-            if snr_min > 0:
-                first_det = target.photometryreduceddatum_set.filter(
-                    brightness__isnull=False,
-                    brightness_error__isnull=False,
-                    brightness_error__lte=2.5/np.log(10)/snr_min).order_by("timestamp").first()
-                # is first detection >= SNR threshold?
-                if first_det:
-                    logger.info(f"First non-limit, SNR >= {snr_min} detection: {first_det.timestamp}")
-                else:
-                    logger.info(f"No SNR >= {snr_min} detections, skipping")
-                    continue
-            else:
-                first_det = target.photometryreduceddatum_set.filter(
-                    brightness__isnull=False,
-                    brightness_error__isnull=False).order_by("timestamp").first()
-
-            # is first detection within prescribed time window?
-            if not(
-                first_det.timestamp > nle_time + timedelta(days=first_det_tmin)  and
-                first_det.timestamp < nle_time + timedelta(days=first_det_tmax)
-                ):
-                logger.info("First detection is outside of "+
-                            f"{nle_time + timedelta(days=first_det_tmin)} to "+
-                            f"{nle_time + timedelta(days=first_det_tmax)} "+
-                            "time window")
-                continue
-            else:
-                logger.info("First detection is within "+
-                            f"{nle_time + timedelta(days=first_det_tmin)} to "+
-                            f"{nle_time + timedelta(days=first_det_tmax)} "+
-                            "time window")
-                # attempt to create the eventcandidate
-                new_cand = create_candidates_from_targets(
-                    seq,
-                    prob=settings.SKYMAP_PROB_CONTOUR,
-                    target_ids=[target.id])
-                if len(new_cand):
-                    logger.info("New eventcandidate created")
-                    new_candidates.append(new_cand)
-                else:
-                    logger.info("Eventcandidate already exists")
-                    
+        new_candidates = create_candidates_from_targets(
+            seq,
+            prob=prob,
+            target_ids=target_ids
+        )                    
         logger.info(f"\nLinked {len(new_candidates)} candidates to event {nle.event_id}")
         
         return
