@@ -1,6 +1,6 @@
 """
 Asynchronous tasks for (1) querying public services that takes a long time,
-(2) vetting all candidates, (3) associating targets with NLEs
+(2) vetting all candidates, and (3) associating targets with NLEs.
 """
 
 import logging
@@ -21,9 +21,9 @@ from trove_nonlocalizedevents.healpix_utils import (
 )
 from trove_targets.models import Target
 
-logger = logging.getLogger(__name__)
-
 from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
+
+logger = logging.getLogger(__name__)
 
 ## tasks
 async_atlas_query = atlas_query.using(
@@ -44,12 +44,11 @@ def async_vet(
     nle_event_id: str,
     vetting_mode: str,
     phot_method: str = None,
-    *args, **kwargs
+    *args, **kwargs,
 ) -> None:
-    from .unified_scorer import (  # import within function to avoid circular import error
-        score,
-        vet_basic,
-    )
+
+    # import within function to avoid circular import error
+    from .unified_scorer import score, vet_basic
 
     # Adds KN scoring for vet all and vetting individual candidates
     extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
@@ -73,7 +72,7 @@ def async_associate_targets_nle(
     first_det_tmin: float,
     first_det_tmax: float,
     snr_min: float,
-    *args, **kwargs
+    *args, **kwargs,
 ) -> None:
 
     nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
@@ -129,9 +128,60 @@ def async_associate_targets_nle(
                 logger.info("Eventcandidate already exists")
 
 
+## task which itself enqueues tasks
+@task(queue_name="spawn_associate_targets", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)
+def spawn_async_associate_targets_nle(
+        nle_id: str,
+        first_det_tmin: float,
+        first_det_tmax: float,
+        snr_min: float,
+        *args, **kwargs,
+) -> None:
+    """Asychronously attempt to associate targets with an NLE, if they pass criteria"""
+    # get NLE sequence
+    nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
+    seq = nle.sequences.last()
+    try:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
+    except ValueError:
+        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
+
+    # get targets within the localization region
+    # this first step can be time-consuming, so we put it in this async task...
+    logger.info("Getting targets in the "+
+                f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
+                f"region of {nle.event_id}")
+    tids = get_target_ids_in_prob_credible_region(
+        seq,
+        prob=settings.SKYMAP_PROB_CONTOUR,
+        tdelta=first_det_tmin,
+    )
+    tids_ls = list(tids)
+    tids_ls = [tid[0] for tid in tids_ls]
+    targets = Target.objects.filter(id__in=tids_ls,
+                                    created__gte=nle_time+timedelta(first_det_tmin)).order_by("name")
+    logger.info(f"Found {len(targets)} targets")
+
+    # ... which itself spawns new tasks
+    # enqueue tasks for each target
+    async_associate_targets_nle.enqueue(
+        target_ids=[target.id for target in targets],
+        nle_id=nle.id,
+        first_det_tmin=first_det_tmin,
+        first_det_tmax=first_det_tmax,
+        snr_min=snr_min
+    )
+
+
 ## functions which enqueue tasks
-def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
-                  started_by=None, run_kind="all") -> None:
+def vet_multi_async(
+        eventcandidates,
+        nle,
+        vetting_mode,
+        phot_method=None,
+        started_by=None,
+        run_kind="all",
+) -> None:
     """`run_kind` records which button started the run; the progress cards
     report on any of them."""
     ecs = list(eventcandidates)
@@ -167,42 +217,17 @@ def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
             run_kind=run_kind,
         )
 
-def associate_targets_with_nle_async(
+def associate_targets_with_nle_async_spawn(
         nle,
         first_det_tmin,
         first_det_tmax,
         snr_min
 ) -> None:
-    """
-    Asychronously attempt to associate targets with an NLE, if they pass
-    certain criteria
-    """
-    # get NLE sequence
-    seq = nle.sequences.last()
-    try:
-        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
-    except ValueError:
-        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
-
-    # get targets within the localization region
-    logger.info("Getting targets in the "+
-                f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
-                f"region of {nle.event_id}")
-    tids = get_target_ids_in_prob_credible_region(
-        seq,
-        prob=settings.SKYMAP_PROB_CONTOUR,
-        tdelta=first_det_tmin)
-    tids_ls = list(tids)
-    tids_ls = [tid[0] for tid in tids_ls]
-    targets = Target.objects.filter(id__in=tids_ls,
-                                    created__gte=nle_time+timedelta(first_det_tmin)).order_by("name")
-    logger.info(f"Found {len(targets)} targets")
-
-    # associate, asyncronously!
-    async_associate_targets_nle.enqueue(
-        target_ids=[target.id for target in targets],
-        nle_id=nle.id,
-        first_det_tmin=first_det_tmin,
-        first_det_tmax=first_det_tmax,
-        snr_min=snr_min
+    """Wrapper-esque function which enqueues a task which then itself enqueues (spawns)
+    tasks for associating targets with an NLE."""
+    spawn_async_associate_targets_nle.enqueue(
+            nle.id,
+            first_det_tmin,
+            first_det_tmax,
+            snr_min,
     )

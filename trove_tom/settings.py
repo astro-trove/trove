@@ -103,6 +103,7 @@ TASKS = {
             "mpc",
             "atlas_fphot",
             "vet_multi",
+            "spawn_associate_targets",
             "associate_targets",
             "target_post_save",
             "antares",
