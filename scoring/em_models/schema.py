@@ -29,7 +29,6 @@ class PhotParameterSchema(BaseModel):
     overlap_k: Optional[Union[float,int]] = None
     min_time_separation: Optional[Union[float,int]] = None
     min_baseline_pts: Optional[Union[float,int]] = None
-    min_baseline_pts: Optional[Union[float,int]] = None
     flare_sigma_thresh: Optional[Union[float,int]] = None
     flare_pair_max_gap_days: Optional[Union[float,int]] = None
     flare_corroboration_window_days: Optional[Union[float,int]] = None
