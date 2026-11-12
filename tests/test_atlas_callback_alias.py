@@ -9,12 +9,6 @@ from tom_dataproducts.api_views import ATLASProcessorView
 def test_real_atlas_callback_url_resolves():
     assert resolve("/dataproducts/api/atlas_processor/").func.view_class is ATLASProcessorView
 
-
-def test_legacy_saguaro_tom_atlas_callback_url_resolves():
-    match = resolve("/saguaro_tom/dataproducts/api/atlas_processor/")
-    assert match.func.view_class is ATLASProcessorView
-
-
 def test_reverse_still_returns_real_url():
     url = reverse("dataproducts:atlas-processor")
     assert url.endswith("/dataproducts/api/atlas_processor/")

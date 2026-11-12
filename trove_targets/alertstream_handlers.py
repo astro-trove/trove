@@ -138,9 +138,9 @@ def dump_alert_and_send_error(
     with open(dump_path, "w") as f:
         json.dump(alert, f, indent=4)
 
-def _should_run_atlas(alert, limit=19.7):
+def _should_run_atlas(alert, limit=settings.ATLAS_FORCEDPHOT_LIMITINGMAG):
     """
-    Check if this alert is bright enough to make running ATLAS FP worth it
+    Check if this ANTARES alert is bright enough to make running ATLAS FP worth it
 
     The limiting magnitude of ATLAS c and o filters is 19.7
     (https://fallingstar.com/specifications.php)

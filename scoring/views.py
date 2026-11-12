@@ -48,7 +48,7 @@ from .phot_method import (
     PHOT_METHOD_METRICS,
     get_phot_method,
 )
-from .tasks import vet_multi_async, associate_targets_with_nle_async
+from .tasks import vet_multi_async, associate_targets_with_nle_async_spawn
 from .unified_scorer import vet_basic, score
 from .util import (
     get_vet_multi_progress, 
@@ -681,7 +681,12 @@ class NonLocalizedEventAssociateTargetsFormView(LoginRequiredMixin, FormView):
             )
 
         # run the association asynchronously
-        associate_targets_with_nle_async(nle, first_det_tmin, first_det_tmax, snr_min)
+        associate_targets_with_nle_async_spawn(
+            nle,
+            first_det_tmin,
+            first_det_tmax,
+            snr_min
+        )
 
         return redirect(
             f"/eventcandidates/?nonlocalizedevent={nle.id}"

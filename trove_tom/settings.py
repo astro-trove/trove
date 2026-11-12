@@ -28,19 +28,14 @@ from django.utils import timezone as _timezone
 if not hasattr(_timezone, "utc"):
     _timezone.utc = _datetime.timezone.utc
 
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
-
 ALLOWED_HOSTS = [ALLOWED_HOST, "localhost", "127.0.0.1"]
 
-
-# Application definition
-
+# Application definition & installed apps
 TOM_NAME = "TROVE"
 
 INSTALLED_APPS = TOMTOOLKIT_INSTALLED_APPS + [
@@ -108,6 +103,7 @@ TASKS = {
             "mpc",
             "atlas_fphot",
             "vet_multi",
+            "spawn_associate_targets",
             "associate_targets",
             "target_post_save",
             "antares",
@@ -115,7 +111,8 @@ TASKS = {
     }
 }
 
-# lets a dev machine that shares the database keep its tasks away from the deployed
+
+# Lets a dev machine that shares the database keep its tasks away from the deployed
 # workers, e.g. TROVE_TASK_BACKEND=local (run db_worker with --backend local too)
 TASK_BACKEND = os.getenv("TROVE_TASK_BACKEND") or "default"
 if TASK_BACKEND != "default":
@@ -172,7 +169,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -199,7 +195,6 @@ AUTHENTICATION_BACKENDS = TOMTOOLKIT_AUTHENTICATION_BACKENDS + [
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
@@ -216,7 +211,6 @@ DATE_FORMAT = "Y-m-d"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
-
 WHITENOISE_STATIC_PREFIX = "/static/"  # TODO: delete this when whitenoise Issue #271 is resolved
 STATIC_URL = FORCE_SCRIPT_NAME + "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "_static")
@@ -237,14 +231,12 @@ LOGGING = {
 
 # Caching
 # https://docs.djangoproject.com/en/dev/topics/cache/#filesystem-caching
-
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
         "LOCATION": tempfile.gettempdir(),
     }
 }
-
 # cache keys
 VETTING_COOLDOWN_KEY = "vetting_all_button_cooldown"
 VETTING_COOLDOWN_PERIOD = 7200  # 2 hours in seconds
@@ -268,8 +260,9 @@ SINGLE_TARGET_DATA_SERVICES = {
     },
 }
 
-# Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
-# longer be valid, and may cause issues unless the offending records are modified.
+# Define the valid data product types for your TOM. Be careful when removing items, as
+# previously valid types will no longer be valid, and may cause issues unless the
+# offending records are modified.
 DATA_PRODUCT_TYPES = {
     "photometry": ("photometry", "Photometry"),
     "fits_file": ("fits_file", "FITS File"),
@@ -433,8 +426,7 @@ TARGET_MODEL_CLASS = os.getenv("TARGET_MODEL_CLASS", "trove_targets.models.Targe
 # Choose a consistent cosmology
 COSMO = FlatLambdaCDM(H0=69.6 * _u.km / _u.s / _u.Mpc, Tcmb0=2.725 * _u.K, Om0=0.3)
 
-
-## Dust maps for Milky Way extinction.
+# Dust maps for Milky Way extinction.
 # Opt in to downloading with FETCH_DUSTMAPS=1 or force the noop with SKIP_DUSTMAP=1.
 # Never download at import time by default: Harvard Dataverse fetches are flaky in CI
 # and slow on first local run
@@ -444,11 +436,12 @@ def _dust_map_noop(*args):
 def _load_dust_map():
     with warnings.catch_warnings(action="ignore"):
         from dustmaps import sfd
-    from dustmaps.config import config
 
     os.environ.setdefault(
         "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
     )
+
+    from dustmaps.config import config
 
     # these parameters are not defined by default but may be set by the user
     if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
@@ -496,29 +489,31 @@ except Exception as exc:
     print(f"loading the dustmap failed with {exc}. Skipping and setting extinction to 0!")
     DUST_MAP = _dust_map_noop
 
-
-COMMENTS_ENABLED = False
-
+# Registration and emails
 TOM_REGISTRATION_STRATEGY = 'approval_required'
-
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_USE_TLS = True  # this is needed for gmail, other services may vary
 EMAIL_USE_SSL = False  # this is needed for gmail, other services may vary
 
+# Limit for ATLAS forced photomery
+# The limiting magnitude of ATLAS c and o filters is 19.7
+# (https://fallingstar.com/specifications.php)
+ATLAS_FORCEDPHOT_LIMITINGMAG = 19.7
 
-# for ZTF forced photometry, we need to save the logs to a temporary directory
+# For ZTF forced photometry, we need to save the logs to a temporary directory
 ZTFTMPDIR = os.path.join(os.getcwd(), "ztf-forced-phot-logs")
 
-# set some priority level variables for queue prioritization
+# Priority level variables for queue prioritization
 PRIORITY_HIGH = 100
 PRIORITY_MID = 10
 PRIORITY_LOW = 0
 
-# skymap probability contour within which we may consider a target and nonlocalized event associated
+# Skymap probability contour within which we may consider a target and nonlocalized event associated
 SKYMAP_PROB_CONTOUR = 0.95
 
-# max number of candidates a user can vet at once
+# Max number of candidates a user can vet at once
 MAX_USER_VETTING_SELECTED_CANDIDATES = 20
 
-
+# Misc (TODO: put these under some more informative heading than 'Misc')
+COMMENTS_ENABLED = False
 SHOW_PAGINATION_INFO = False
