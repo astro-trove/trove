@@ -768,6 +768,7 @@ def generate_selected_candidates_csv(request):
         "Initial Detecting Instrument",
         "Localization Score",
         "Most Likely Host z",
+        "Most Likely Host z Source",
         "Distance Score",
         "Latest Mag Instrument",
         "Latest Mag Time [MJD]",
@@ -811,9 +812,11 @@ def generate_selected_candidates_csv(request):
             )
             if isinstance(host_info, list):
                 host_info = host_info[0]
-            host_str = f"{float(host_info['z']):.3f} ({host_info['Source']} {host_info['z_type']})"
+            host_z_str = f"{float(host_info['z']):.3f}"
+            host_source_str = f"{host_info['Source']} {host_info['z_type']}"
         except (AttributeError, IndexError, TypeError):
-            host_str = None
+            host_z_str = None
+            host_source_str = None
 
         # first photometry point
         first_phot = PhotometryReducedDatum.objects.filter(
@@ -903,7 +906,8 @@ def generate_selected_candidates_csv(request):
             dec,
             src_str_first,
             loc_prob,
-            host_str,
+            host_z_str,
+            host_source_str,
             host_score,
             src_str_latest_phot,
             epoch_str_latest_phot,
