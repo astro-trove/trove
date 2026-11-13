@@ -1,4 +1,5 @@
 import os
+import mimetypes
 from django.views.generic import TemplateView
 from django.http import FileResponse, Http404
 from django.conf import settings
@@ -34,5 +35,9 @@ class DocsView(TemplateView):
         if not os.path.isfile(file_path):
             raise Http404("Documentation page not found")
 
-        # Serve the file
-        return FileResponse(open(file_path, "rb"))
+        # Guess the correct MIME type from the file extension
+        content_type, _ = mimetypes.guess_type(file_path)
+        content_type = content_type or "application/octet-stream"
+
+	# Serve the file
+        return FileResponse(open(file_path, "rb"), content_type=content_type)
