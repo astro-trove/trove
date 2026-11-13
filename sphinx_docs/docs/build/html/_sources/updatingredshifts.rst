@@ -13,29 +13,29 @@ campaign, and combing through GCNs can be a pain. We try to make this process mo
 streamlined.
 
 We'll walk through an example here. Imagine we're curious about target 
-AT2025alpk and its association with GW event S251112cm. Here is the page for 
+AT2025adks and its association with GW event S251112cm. Here is the page for 
 the target:
 
-.. image:: hostredshiftimg/0_AT2025alpk_before.png
+.. image:: hostredshiftimg/0_AT2025adks_before.png
 
 |
 
 When the candidate was first vetted, it was associated with galaxy 
-J233413.14-240417.7, with a photometric redshift of 0.07 ± 0.04. Because 
-S251112cm lies at 93 Mpc (z ~ 0.02), the distance score for AT2025alpk is 
+J011512.84-474115.7, with a photometric redshift of 0.07 ± 0.04. Because 
+S251112cm lies at 93 Mpc (z ~ 0.02), the distance score for AT2025adks is 
 quite low. 
 
-You notice that the galaxy also has a redshift in PS1 STRM. You find this galaxy 
+You notice that the galaxy also has a redshift in LS DR10. You find this galaxy 
 promising, so you add a comment letting the community know you're pursuing it.
 
-.. image:: hostredshiftimg/1_AT2025alpk_commented.png
+.. image:: hostredshiftimg/1_AT2025adks_commented.png
 
 |
 
-Later, you obtain a spectroscopic redshift of 0.021 ± 0.001 ! Clicking "Update Host z" 
+Later, you obtain a spectroscopic redshift of 0.023 ± 0.002 ! Clicking "Update Host z" 
 on the candidate's page, you submit the following measurement: 
 
-.. image:: hostredshiftimg/2_AT2025alpk_updatez.png
+.. image:: hostredshiftimg/2_AT2025adks_updatez.png
 
 |
 
@@ -45,10 +45,11 @@ That galaxy will be assigned a "user spec-z" for its distance type, which has hi
 priority for use in distance scoring after a direct measurement of the distance to the 
 candidate. Finally, the candidate will be re-vet. When the page finishes reloading:
 
-.. image:: hostredshiftimg/3_AT2025alpk_after.png
+.. image:: hostredshiftimg/3_AT2025adks_after.png
 
 |
 
-The galaxy whose redshift you measured is now designated the most likely host, 
-and the distance score is much higher because you found that the galaxy is at exactly 
-the right distance!
+The galaxy whose redshift you measured is now included in the galaxy table and is 
+designated the most likely host. The distance score is much higher because you found 
+that the galaxy is at exactly the right distance, and now the rest of the community 
+knows that this is an excellent candidate worth following up on.
