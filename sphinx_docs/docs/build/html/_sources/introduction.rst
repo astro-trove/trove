@@ -17,7 +17,7 @@ Quickstart
 
 Getting Additional Help
 -----------------------
-- Join our `Slack workspace <https://join.slack.com/t/astrotrove/shared_invite/zt-4fgc3msme-31VxfdBs_HYYcMpBJ0_UrQ>`_ and ask questions there!
-- Check out our `publications <citations.html>`_, including a paper detailing the infrastructure and features in version 1.0 of TROVE. 
+- Check out our `publications <citations.html>`_, including a paper detailing the infrastructure and features in version 1.0 of TROVE! 
 - See the `FAQ & Glossary <faq.html>`_ page for some frequently asked questions and a glossary of common terms!
+- Join our `Slack workspace <https://join.slack.com/t/astrotrove/shared_invite/zt-4fgc3msme-31VxfdBs_HYYcMpBJ0_UrQ>`_ and ask questions there!
 - Open a `GitHub issue <https://github.com/astro-trove/trove/issues>`_!
