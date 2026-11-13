@@ -8,6 +8,7 @@ from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import numpy as np
 import pytest
 
 
@@ -28,8 +29,15 @@ def scorer():
     def _update(event_candidate, key, value, em_model):
         written[key] = value
 
-    postphot = pd.DataFrame({"mjd": [60000.0], "mag": [18.0], "magerr": [0.1],
-                             "filter": ["g"], "upperlimit": [False]})
+    postphot = pd.DataFrame({
+        "mjd": [60000.0], 
+        "mag": [18.0], 
+        "magerr": [0.1], 
+        "telescope":["TROVE"],
+        "filter": ["g"], 
+        "upperlimit": [False], 
+        "snr":[2.5/np.log(10)/0.1]}
+    )
     mocks = dict(
         _update_score_factor=MagicMock(side_effect=_update),
         delete_score_factor=MagicMock(),
@@ -87,7 +95,7 @@ class TestScoreEarlyExit:
 
         kwargs = mocks["vet_basic"].call_args.kwargs
         # AGN-flare waives point source matching, an AGN is often in the PS catalogs
-        assert kwargs["run_ps"] is False
+        assert kwargs["run_ps"] is True
         assert kwargs["run_mpc"] is True
         assert kwargs["run_agn"] is True
         assert kwargs["run_host_association"] is True

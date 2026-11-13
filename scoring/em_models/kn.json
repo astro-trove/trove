@@ -30,9 +30,10 @@
     "phot_parameter": {
 	"lum_max": [0, 1e43],
 	"peak_time": [0, 4],
-	"decay_rate": [-Infinity, -0.1],
+	"decay_rate": [0.1, Infinity],
 	"max_predets":3,
-	"phot_score_snr_min": 5,
-	"min_time_separation": 0.0417
+	"phot_score_snr_min": 3,
+	"min_time_separation": 0.0417,
+	"overlap_k":3.0
     }
 }

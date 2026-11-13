@@ -55,15 +55,9 @@ def vet_or_post_error(
     **kwargs,
 ):
     try:
-        target.save()  # to do coordinate conversions
-        _, tns_query_status = target_post_save(target, created=True, **kwargs)
-        if tns_query_status is not None:
-            logger.warning(tns_query_status)
-            # slack_client.chat_postMessage(channel=channel, text=tns_query_status)
-
-        mjd_now = Time.now().mjd
-        atlas_query.enqueue(mjd_now - 20.0, mjd_now, target.id, "atlas_photometry")
-
+        with target_hook_options(created=True, **kwargs):
+            target.save()  # to do coordinate conversions
+                    
     except Exception as e:
         logger.error("".join(traceback.format_exception(e)))
         # slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')
@@ -144,9 +138,9 @@ def dump_alert_and_send_error(
     with open(dump_path, "w") as f:
         json.dump(alert, f, indent=4)
 
-def _should_run_atlas(alert, limit=19.7):
+def _should_run_atlas(alert, limit=settings.ATLAS_FORCEDPHOT_LIMITINGMAG):
     """
-    Check if this alert is bright enough to make running ATLAS FP worth it
+    Check if this ANTARES alert is bright enough to make running ATLAS FP worth it
 
     The limiting magnitude of ATLAS c and o filters is 19.7
     (https://fallingstar.com/specifications.php)

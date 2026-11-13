@@ -3,7 +3,7 @@
     "t_pre": 0,
     "t_post": 400,
     "detection_horizon": [0,400],
-    "ps_crossmatch": false,
+    "ps_crossmatch": true,
     "mpc_crossmatch": true,
     "agn_crossmatch": true,
     "nuclear_offset_score": true,
@@ -28,7 +28,7 @@
 	"predets_filter": false
     },
     "phot_parameter": {
-	"phot_score_snr_min": 5,
+	"phot_score_snr_min": 3,
 	"min_baseline_pts": 2,
 	"flare_sigma_thresh": 3.25,
 	"flare_pair_max_gap_days": 5.0,

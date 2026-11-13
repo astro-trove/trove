@@ -1,6 +1,6 @@
 """
 Asynchronous tasks for (1) querying public services that takes a long time,
-(2) vetting all candidates, (3) associating targets with NLEs
+(2) vetting all candidates, and (3) associating targets with NLEs.
 """
 
 import logging
@@ -10,8 +10,11 @@ from datetime import datetime, timedelta
 import numpy as np
 from candidate_vetting.vet import run_mpc
 from django.conf import settings
+from django.db.models import OuterRef, Subquery
 from django.utils import timezone
 from django_tasks import task
+
+from tom_dataproducts.models import PhotometryReducedDatum
 from tom_dataproducts.tasks import atlas_query
 from tom_nonlocalizedevents.models import NonLocalizedEvent
 
@@ -21,9 +24,9 @@ from trove_nonlocalizedevents.healpix_utils import (
 )
 from trove_targets.models import Target
 
-logger = logging.getLogger(__name__)
-
 from scoring.phot_method import PHOT_METHOD_KILONOVASCORER, get_phot_method
+
+logger = logging.getLogger(__name__)
 
 ## tasks
 async_atlas_query = atlas_query.using(
@@ -44,12 +47,11 @@ def async_vet(
     nle_event_id: str,
     vetting_mode: str,
     phot_method: str = None,
-    *args, **kwargs
+    *args, **kwargs,
 ) -> None:
-    from .unified_scorer import (  # import within function to avoid circular import error
-        score,
-        vet_basic,
-    )
+
+    # import within function to avoid circular import error
+    from .unified_scorer import score, vet_basic
 
     # Adds KN scoring for vet all and vetting individual candidates
     extra = {"phot_method": phot_method} if vetting_mode == "KN" and phot_method else {}
@@ -73,7 +75,7 @@ def async_associate_targets_nle(
     first_det_tmin: float,
     first_det_tmax: float,
     snr_min: float,
-    *args, **kwargs
+    *args, **kwargs,
 ) -> None:
 
     nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
@@ -82,56 +84,105 @@ def async_associate_targets_nle(
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
     except ValueError:
         nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
-    for ti in target_ids:
-        target = Target.objects.filter(id=ti)[0]
-        logger.info(f"\n{target.name}")
 
-        # if excluding based on first detection's SNR...
-        # ...is first detection >= SNR minimum?
-        if snr_min > 0:
-            first_det = target.photometryreduceddatum_set.filter(
-                brightness__isnull=False,
-                brightness_error__isnull=False,
-                brightness_error__lte=2.5/np.log(10)/snr_min).order_by("timestamp").first()
-            if first_det:
-                logger.info(f"First non-limit, SNR >= {snr_min} detection: {first_det.timestamp}")
-            else:
-                logger.info(f"No SNR >= {snr_min} detections, skipping")
-                return
-        else:
-            first_det = target.photometryreduceddatum_set.filter(
-                brightness__isnull=False,
-                brightness_error__isnull=False).order_by("timestamp").first()
+    logger.info(f"\nNLE is {nle}, NLE sequence time is {nle_time}")
 
-        # is first detection within prescribed time window?
-        if not(
-            first_det.timestamp > nle_time + timedelta(days=first_det_tmin)  and
-            first_det.timestamp < nle_time + timedelta(days=first_det_tmax)
-            ):
-            logger.info("First detection is outside of "+
-                        f"{nle_time + timedelta(days=first_det_tmin)} to "+
-                        f"{nle_time + timedelta(days=first_det_tmax)} "+
-                        "time window")
-            return
-        else:
-            logger.info("First detection is within "+
-                        f"{nle_time + timedelta(days=first_det_tmin)} to "+
-                        f"{nle_time + timedelta(days=first_det_tmax)} "+
-                        "time window")
-            # attempt to create the eventcandidate
-            new_cand = create_candidates_from_targets(
-                seq,
-                prob=settings.SKYMAP_PROB_CONTOUR,
-                target_ids=[target.id])
-            if len(new_cand):
-                logger.info("New eventcandidate created")
-            else:
-                logger.info("Eventcandidate already exists")
+    det_window_start = nle_time + timedelta(days=first_det_tmin)
+    det_window_end   = nle_time + timedelta(days=first_det_tmax)       
+
+    # query for non-zero mags/mag errors
+    phot_qs = PhotometryReducedDatum.objects.filter(
+        target=OuterRef("pk"),
+        brightness__isnull=False,
+        brightness_error__isnull=False,
+    )
+    # add on filter for SNR
+    if snr_min > 0:
+        brightness_error_max = 2.5/np.log(10)/snr_min
+        phot_qs = phot_qs.filter(brightness_error__lte=brightness_error_max)
+    # subquery for getting the first detection
+    first_det_subquery = Subquery(
+        phot_qs.order_by("timestamp").values("timestamp")[:1]
+    )
+    # combine all the queries
+    targets = (
+        Target.objects
+        .filter(
+            id__in=target_ids,
+        )
+        .annotate(first_qualifying_det=first_det_subquery)
+        .filter(
+            first_qualifying_det__gt=det_window_start,
+            first_qualifying_det__lt=det_window_end,
+        )
+        .order_by("name")
+    )
+
+    target_ids = targets.values_list("id", flat=True)
+    # build + issue logger message
+    logger_msg = (
+        f"Found {len(target_ids)} created after {det_window_start}, with first "+
+        f"detection within the [{det_window_start}, {det_window_end}] window"
+    )
+    if snr_min > 0:
+        logger_msg += f" and with first detection SNR > {snr_min}"
+    logger_msg += "\n"
+    logger.info(logger_msg)
+
+    # loop through targets
+    new_candidates = create_candidates_from_targets(
+        seq,
+        prob=settings.SKYMAP_PROB_CONTOUR,
+        target_ids=target_ids
+    )
+
+## task which itself enqueues tasks
+@task(queue_name="spawn_associate_targets", priority=settings.PRIORITY_HIGH, backend=settings.TASK_BACKEND)
+def spawn_async_associate_targets_nle(
+        nle_id: str,
+        first_det_tmin: float,
+        first_det_tmax: float,
+        snr_min: float,
+        *args, **kwargs,
+) -> None:
+    """Asychronously attempt to associate targets with an NLE, if they pass criteria"""
+    # get NLE sequence
+    nle = NonLocalizedEvent.objects.filter(id=nle_id)[0]
+    seq = nle.sequences.last()
+
+    # get targets within the localization region
+    # this first step can be time-consuming, so we put it in this async task...
+    logger.info("Getting targets in the "+
+                f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
+                f"region of {nle.event_id}")
+    tids = get_target_ids_in_prob_credible_region(
+        seq,
+        prob=settings.SKYMAP_PROB_CONTOUR,
+        tdelta=first_det_tmin,
+    )
+    tids_ls = [tid[0] for tid in list(tids)]
+    logger.info(f"Found {len(tids_ls)} targets in localization region")
+
+    # ... which itself spawns new tasks
+    # enqueue tasks for each target
+    async_associate_targets_nle.enqueue(
+        target_ids=tids_ls,
+        nle_id=nle.id,
+        first_det_tmin=first_det_tmin,
+        first_det_tmax=first_det_tmax,
+        snr_min=snr_min
+    )
 
 
 ## functions which enqueue tasks
-def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
-                  started_by=None, run_kind="all") -> None:
+def vet_multi_async(
+        eventcandidates,
+        nle,
+        vetting_mode,
+        phot_method=None,
+        started_by=None,
+        run_kind="all",
+) -> None:
     """`run_kind` records which button started the run; the progress cards
     report on any of them."""
     ecs = list(eventcandidates)
@@ -167,42 +218,17 @@ def vet_multi_async(eventcandidates, nle, vetting_mode, phot_method=None,
             run_kind=run_kind,
         )
 
-def associate_targets_with_nle_async(
+def associate_targets_with_nle_async_spawn(
         nle,
         first_det_tmin,
         first_det_tmax,
         snr_min
 ) -> None:
-    """
-    Asychronously attempt to associate targets with an NLE, if they pass
-    certain criteria
-    """
-    # get NLE sequence
-    seq = nle.sequences.last()
-    try:
-        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f%z")
-    except ValueError:
-        nle_time = datetime.strptime(seq.details["time"], "%Y-%m-%dT%H:%M:%S.%f")
-
-    # get targets within the localization region
-    logger.info("Getting targets in the "+
-                f"{settings.SKYMAP_PROB_CONTOUR*100:.0f}% localization "+
-                f"region of {nle.event_id}")
-    tids = get_target_ids_in_prob_credible_region(
-        seq,
-        prob=settings.SKYMAP_PROB_CONTOUR,
-        tdelta=first_det_tmin)
-    tids_ls = list(tids)
-    tids_ls = [tid[0] for tid in tids_ls]
-    targets = Target.objects.filter(id__in=tids_ls,
-                                    created__gte=nle_time+timedelta(first_det_tmin)).order_by("name")
-    logger.info(f"Found {len(targets)} targets")
-
-    # associate, asyncronously!
-    async_associate_targets_nle.enqueue(
-        target_ids=[target.id for target in targets],
-        nle_id=nle.id,
-        first_det_tmin=first_det_tmin,
-        first_det_tmax=first_det_tmax,
-        snr_min=snr_min
+    """Wrapper-esque function which enqueues a task which then itself enqueues (spawns)
+    tasks for associating targets with an NLE."""
+    spawn_async_associate_targets_nle.enqueue(
+            nle.id,
+            first_det_tmin,
+            first_det_tmax,
+            snr_min,
     )

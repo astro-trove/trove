@@ -32,7 +32,4 @@ urlpatterns = [
     ),
     path("api/", api.urls),
     path("docs/", include("sphinx_docs.urls", namespace="sphinx_docs")),
-    # TEMPORARY: ATLAS jobs queued before the callback URL was fixed still post to the
-    # old /saguaro_tom/ prefix. Remove once no queued ATLAS jobs reference it.
-    path("saguaro_tom/dataproducts/api/atlas_processor/", ATLASProcessorView.as_view()),
 ]
