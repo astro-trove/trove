@@ -3,7 +3,10 @@ from .views import (
     CustomTargetCreateView,
     NLEAutocompleteView,
     TargetAutocompleteView,
-    TroveTargetListView
+    TroveTargetListView,
+    TargetReportView,
+    TargetClassifyView,
+    TargetNameSearchView
 )
 
 app_name = "trove_targets"
@@ -24,5 +27,9 @@ urlpatterns = [
         "",
         TroveTargetListView.as_view(),
         name="targetlist"
-    )
+    ),
+    path('<int:pk>/report/', TargetReportView.as_view(), name='report'),
+    path('<int:pk>/classify/', TargetClassifyView.as_view(), name='classify'),
+    path('search/<str:search_str>', TargetNameSearchView.as_view(), name='search'),
+
 ]

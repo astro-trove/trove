@@ -1,21 +1,22 @@
 {% extends 'tom_targets/partials/base.html' %}
-{% load comments bootstrap4 tom_common_extras targets_extras observation_extras dataproduct_extras target_list_extras photometry_extras cache target_extras spectroscopy_extras event_candidate_extras static %}
+{% load comments django_bootstrap5 tom_common_extras targets_extras observation_extras dataproduct_extras target_list_extras photometry_extras cache target_extras spectroscopy_extras event_candidate_extras static %}
+{% load dataservices_extras %}
 {% block title %}Target {{ object.name }}{% endblock %}
 {% block content %}
+{# loaded once here, rather than inlined by every plot (~4.5 MB each) #}
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
 
 {# Save the number of photometry points and spectra for later #}
 {% count_phot object as nphot %}
 {% count_spec object as nspec %}
 
+{# Count the number of comments for later #}
+{% get_comment_count for object as comment_count %}
+
 <div class="row">
   <div class="col-md-4">
     <div id="target-info">
       {% target_feature object %}
-      {% if object.future_observations %}
-      <div class="alert alert-success">
-        {{ object.future_observations|length }} upcoming observation{{ object.future_observations|pluralize }}
-      </div>
-      {% endif %}
       {% target_unknown_statuses object %}
       {% target_buttons object %}
       {% target_data object %}
@@ -29,20 +30,26 @@
   <div class="col-md-8">
     <ul class="nav nav-tabs" role="tablist" id="tabs">
       <li class="nav-item">
-        <a class="nav-link active" id="score-details-tab" href="#score-details" role="tab" data-toggle="tab"><h5>Score Details</h5></a>
+        <a class="nav-link active" id="score-details-tab" href="#score-details" role="tab" data-bs-toggle="tab"><h5>Score Details</h5></a>
       </li>
+
       {% if nphot %}
       <li class="nav-item">
-        <a class="nav-link" id="photometry-tab" href="#photometry" role="tab" data-toggle="tab"><h5>Photometry</h5></a>
+        <a class="nav-link" id="photometry-tab" href="#photometry" role="tab" data-bs-toggle="tab"><h5>Photometry</h5></a>
       </li>
       {% endif %}
       {% if nspec %}
       <li class="nav-item">
-        <a class="nav-link" id="spectroscopy-tab" href="#spectroscopy" role="tab" data-toggle="tab"><h5>Spectroscopy</h5></a>
+        <a class="nav-link" id="spectroscopy-tab" href="#spectroscopy" role="tab" data-bs-toggle="tab"><h5>Spectroscopy</h5></a>
+      </li>
+      {% endif %}
+      {% if request.user.is_superuser %}
+      <li class="nav-item">
+        <a class="nav-link" id="manage-data-tab" href="#manage-data" role="tab" data-bs-toggle="tab"><h5>Upload Data</h5></a>
       </li>
       {% endif %}
       <li class="nav-item">
-        <a class="nav-link" id="comments-tab" href="#comments" role="tab" data-toggle="tab"><h5>Comments</h5></a>
+        <a class="nav-link" id="comments-tab" href="#comments" role="tab" data-bs-toggle="tab"><h5>Comments ({{ comment_count }})</h5></a>
       </li>
     </ul>
     <div class="tab-content">
@@ -60,6 +67,9 @@
 	  <summary><h5 style="display:inline-block">Photometry Table</h5></summary>
 	  {% get_photometry_data object %}
 	</details>
+	</div>
+      <div class="tab-pane" id="manage-data">
+        {% upload_dataproduct object %}
       </div>
       <div class="tab-pane" id="spectroscopy">
 	{% spectroscopy_for_target target %}

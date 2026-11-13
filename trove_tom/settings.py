@@ -14,6 +14,7 @@ https://docs.djangoproject.com/en/2.1/ref/settings/
 from .settings_local import *
 import os
 import tempfile
+from tom_common.default_settings import *
 import datetime as _datetime
 from astropy.cosmology import FlatLambdaCDM
 from astropy import units as _u
@@ -27,53 +28,19 @@ from django.utils import timezone as _timezone
 if not hasattr(_timezone, "utc"):
     _timezone.utc = _datetime.timezone.utc
 
-
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
-
 ALLOWED_HOSTS = [ALLOWED_HOST, "localhost", "127.0.0.1"]
 
-
-# Application definition
-
+# Application definition & installed apps
 TOM_NAME = "TROVE"
 
-INSTALLED_APPS = [
-    "django.contrib.admin",
-    "django.contrib.auth",
-    "django.contrib.contenttypes",
-    "django.contrib.sessions",
-    "django.contrib.messages",
-    "whitenoise.runserver_nostatic",
-    "django.contrib.staticfiles",
-    "django.contrib.sites",
-    "django_extensions",
-    "guardian",
-    "tom_common",
-    "django_comments",
-    "bootstrap4",
-    "crispy_forms",
-    "crispy_bootstrap4",
-    "rest_framework",
-    "rest_framework.authtoken",
-    "django_filters",
-    "django_gravatar",
-    "tom_targets",
-    "tom_alerts",
-    "tom_catalogs",
-    "tom_observations",
-    "tom_dataproducts",
+INSTALLED_APPS = TOMTOOLKIT_INSTALLED_APPS + [
     "tom_alertstreams",
     "tom_nonlocalizedevents",
-    "tom_registration",
-    "webpack_loader",
-    "custom_code",
-    "django_tasks",
-    "django_tasks.backends.database",
     "candidate_vetting",
     "trove_targets",
     "trove_nonlocalizedevents",
@@ -82,12 +49,15 @@ INSTALLED_APPS = [
     "sphinx_docs",
     "dal",
     "dal_select2",
-    "django_tables2",
+
+    # Including tom_alerts is just to make sure the migrations work in production
+    # TODO: Remove in some future PR, after all three deployments have been migrated
+    "tom_alerts"
 ]
 
 SITE_ID = 1
 
-MIDDLEWARE = [
+MIDDLEWARE = TOMTOOLKIT_MIDDLEWARE + [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -100,7 +70,6 @@ MIDDLEWARE = [
     "tom_common.middleware.Raise403Middleware",
     "tom_common.middleware.ExternalServiceMiddleware",
     "tom_common.middleware.AuthStrategyMiddleware",
-    "tom_registration.middleware.RedirectAuthenticatedUsersFromRegisterMiddleware",
 ]
 
 ROOT_URLCONF = "trove_tom.urls"
@@ -121,17 +90,33 @@ TEMPLATES = [
     },
 ]
 
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap4"
-CRISPY_TEMPLATE_PACK = "bootstrap4"
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = "bootstrap5"
 
 WSGI_APPLICATION = "trove_tom.wsgi.application"
 
 TASKS = {
     "default": {
         "BACKEND": "django_tasks.backends.database.DatabaseBackend",
-        "QUEUES": ["default", "mpc", "atlas_fphot", "vet_all", "associate_targets"],
+        "QUEUES": [
+            "default",
+            "mpc",
+            "atlas_fphot",
+            "vet_multi",
+            "spawn_associate_targets",
+            "associate_targets",
+            "target_post_save",
+            "antares",
+        ],
     }
 }
+
+
+# Lets a dev machine that shares the database keep its tasks away from the deployed
+# workers, e.g. TROVE_TASK_BACKEND=local (run db_worker with --backend local too)
+TASK_BACKEND = os.getenv("TROVE_TASK_BACKEND") or "default"
+if TASK_BACKEND != "default":
+    TASKS[TASK_BACKEND] = TASKS["default"]
 
 # Database
 # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
@@ -184,7 +169,6 @@ DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 # Password validation
 # https://docs.djangoproject.com/en/2.1/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -204,14 +188,13 @@ LOGIN_URL = FORCE_SCRIPT_NAME + "/accounts/login/"
 LOGIN_REDIRECT_URL = FORCE_SCRIPT_NAME + "/"
 LOGOUT_REDIRECT_URL = FORCE_SCRIPT_NAME + "/"
 
-AUTHENTICATION_BACKENDS = (
+AUTHENTICATION_BACKENDS = TOMTOOLKIT_AUTHENTICATION_BACKENDS + [
     "django.contrib.auth.backends.AllowAllUsersModelBackend",
     "guardian.backends.ObjectPermissionBackend",
-)
+]
 
 # Internationalization
 # https://docs.djangoproject.com/en/2.1/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
 
 TIME_ZONE = "UTC"
@@ -228,7 +211,6 @@ DATE_FORMAT = "Y-m-d"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/2.1/howto/static-files/
-
 WHITENOISE_STATIC_PREFIX = "/static/"  # TODO: delete this when whitenoise Issue #271 is resolved
 STATIC_URL = FORCE_SCRIPT_NAME + "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "_static")
@@ -249,45 +231,49 @@ LOGGING = {
 
 # Caching
 # https://docs.djangoproject.com/en/dev/topics/cache/#filesystem-caching
-
 CACHES = {
     "default": {
         "BACKEND": "django.core.cache.backends.filebased.FileBasedCache",
         "LOCATION": tempfile.gettempdir(),
     }
 }
-
 # cache keys
 VETTING_COOLDOWN_KEY = "vetting_all_button_cooldown"
-VETTING_COOLDOWN_PERIOD = 3600  # 1 hour in seconds
+VETTING_COOLDOWN_PERIOD = 7200  # 2 hours in seconds
 
 # TOM Specific configuration
 TARGET_TYPE = "SIDEREAL"
 
 FACILITIES = {}
 
+try:
+    ATLAS_CALLBACK_URL
+except NameError:
+    ATLAS_CALLBACK_URL = None
+
 SINGLE_TARGET_DATA_SERVICES = {
     "ATLAS": {
-        "class": "custom_code.atlas.CustomAtlasForcedPhotometryService",
+        "class": "trove_targets.atlas.CustomAtlasForcedPhotometryService",
         "url": "https://fallingstar-data.com/forcedphot",
         "api_key": os.getenv("ATLAS_FORCED_PHOTOMETRY_API_KEY", ATLAS_API_KEY),
+        "callback_url": ATLAS_CALLBACK_URL, 
     },
 }
 
-# Define the valid data product types for your TOM. Be careful when removing items, as previously valid types will no
-# longer be valid, and may cause issues unless the offending records are modified.
+# Define the valid data product types for your TOM. Be careful when removing items, as
+# previously valid types will no longer be valid, and may cause issues unless the
+# offending records are modified.
 DATA_PRODUCT_TYPES = {
     "photometry": ("photometry", "Photometry"),
     "fits_file": ("fits_file", "FITS File"),
     "spectroscopy": ("spectroscopy", "Spectroscopy"),
-    "image_file": ("image_file", "Image File"),
     "atlas_photometry": ("atlas_photometry", "ATLAS Photometry"),
 }
 
 DATA_PROCESSORS = {
     "photometry": "tom_dataproducts.processors.photometry_processor.PhotometryProcessor",
-    "spectroscopy": "custom_code.processors.spectroscopy_processor.SpectroscopyProcessor",
-    # TODO: custom processor for ATLAS forced photometry
+    "spectroscopy": "trove_targets.processors.spectroscopy_processor.SpectroscopyProcessor",
+    'atlas_photometry': 'candidate_vetting.atlas.ClippedStackedAtlasProcessor',   
 }
 
 TOM_ALERT_CLASSES = [
@@ -356,7 +342,7 @@ TARGET_DEFAULT_PERMISSION = "PUBLIC"
 OPEN_URLS = ["/accounts/register/"]
 
 HOOKS = {
-    "target_post_save": "custom_code.hooks.target_post_save",
+    "target_post_save": "trove_targets.hooks.target_post_save",
     "observation_change_state": "tom_common.hooks.observation_change_state",
     "data_product_post_upload": "tom_dataproducts.hooks.data_product_post_upload",
     "data_product_post_save": "tom_dataproducts.hooks.data_product_post_save",
@@ -400,12 +386,24 @@ ALERT_STREAMS = [
             "USERNAME": os.getenv("SCIMMA_AUTH_USERNAME", SCIMMA_AUTH_USERNAME),
             "PASSWORD": os.getenv("SCIMMA_AUTH_PASSWORD", SCIMMA_AUTH_PASSWORD),
             "TOPIC_HANDLERS": {
-                "gcn.notices.einstein_probe.wxt.alert": "custom_code.alertstream_handlers.handle_einstein_probe_alert",
-                "igwn.gwalert": "custom_code.alertstream_handlers.handle_message_and_send_alerts",
+                "gcn.notices.einstein_probe.wxt.alert": "trove_nonlocalizedevents.alertstream_handlers.handle_einstein_probe_alert",
+                "igwn.gwalert": "trove_nonlocalizedevents.alertstream_handlers.handle_message_and_send_alerts",
                 "icecube.HE-tracks": "tom_alertstreams.alertstreams.hopskotch.alert_logger",
             },
         },
     },
+    {
+        'ACTIVE': True,
+        'NAME': 'tom_alertstreams.alertstreams.antares.AntaresAlertStream',
+        'OPTIONS': {
+            'API_KEY': ANTARES_API_KEY,
+            'API_SECRET': ANTARES_API_SECRET,
+            'GROUP': ANTARES_GROUP_ID,
+            'TOPIC_HANDLERS': {
+                'gw_em_candidates': 'trove_targets.alertstream_handlers.handle_antares_stream_async',
+            }
+        },
+    }
 ]
 
 VUE_FRONTEND_DIR_TOM_NONLOCAL = os.path.join(STATIC_ROOT, "tom_nonlocalizedevents/vue")
@@ -428,54 +426,54 @@ TARGET_MODEL_CLASS = os.getenv("TARGET_MODEL_CLASS", "trove_targets.models.Targe
 # Choose a consistent cosmology
 COSMO = FlatLambdaCDM(H0=69.6 * _u.km / _u.s / _u.Mpc, Tcmb0=2.725 * _u.K, Om0=0.3)
 
-
-# dust maps for Milky Way extinction.
+# Dust maps for Milky Way extinction.
+# Opt in to downloading with FETCH_DUSTMAPS=1 or force the noop with SKIP_DUSTMAP=1.
 # Never download at import time by default: Harvard Dataverse fetches are flaky in CI
-# and slow on first local run. Use an already-cached map if present; otherwise return 0.
-# Opt in to downloading with FETCH_DUSTMAPS=1 (or force the noop with SKIP_DUSTMAP=1).
+# and slow on first local run
 def _dust_map_noop(*args):
-    return 0.0
-
+    return None
 
 def _load_dust_map():
+    with warnings.catch_warnings(action="ignore"):
+        from dustmaps import sfd
+
+    os.environ.setdefault(
+        "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
+    )
+
+    from dustmaps.config import config
+
+    # these parameters are not defined by default but may be set by the user
     if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
         print(f"SKIP_DUSTMAP={SKIP_DUSTMAP} so we are skipping loading the dustmap "+
-              "and setting extinction to 0!")
+              "and setting extinction to None!")
+        return _dust_map_noop
+    if os.getenv("FETCH_DUSTMAPS", "").lower() not in ("1", "true", "yes"):
+        print(f"FETCH_DUSTMAPS={FETCH_DUSTMAPS} so we are skipping loading the " +
+              "dustmap and setting extinction to 0!")
         return _dust_map_noop
 
     # point dustmaps to the local version if the path is defined
     if ("DUSTMAPS_DIR" in globals() or "DUSTMAPS_DIR" in locals()) and DUSTMAPS_DIR is not None:
-
         # some checks
         if not os.path.exists(DUSTMAPS_DIR):
             raise FileNotFoundError(f"DUSTMAPS_DIR is set in settings_local to {DUSTMAPS_DIR} which is a nonexistent directory!")
         if not os.path.exists(os.path.join(DUSTMAPS_DIR, "sfd")):
             raise FileNotFoundError(f"DUSTMAPS_DIR is set in settings_local to {DUSTMAPS_DIR} but the sfd subdirectory does not exist!")
-        
-        from dustmaps.config import config
-        config["data_dir"] = DUSTMAPS_DIR
 
+        # if the file exists, update the config
+        config["data_dir"] = DUSTMAPS_DIR
         print(f"Set the dustmaps directory to the local copy at {config['data_dir']}")
 
     else:
         print(f"DUSTMAPS_DIR is not set in settings_local, we will try to use cached "+
               "versions and if they don't exist try to download the SFD files from "+
               "dataverse...")
-        
-    os.environ.setdefault(
-        "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
-    )
-    with warnings.catch_warnings(action="ignore"):
-        from dustmaps import sfd
 
+    # fetch the dustmap
     try:
         sfd_query = sfd.SFDQuery()
     except FileNotFoundError:
-        if os.getenv("FETCH_DUSTMAPS", "").lower() not in ("1", "true", "yes"):
-            print(f"FETCH_DUSTMAPS={FETCH_DUSTMAPS} so we are skipping loading the " +
-                  "dustmap and setting extinction to 0!")
-            return _dust_map_noop
-        
         print("Trying to fetch the SFD dustmap from dataverse...")
         sfd.fetch()
         sfd_query = sfd.SFDQuery()
@@ -485,36 +483,37 @@ def _load_dust_map():
 
     return sf11
 
-
 try:
     DUST_MAP = _load_dust_map()
 except Exception as exc:
     print(f"loading the dustmap failed with {exc}. Skipping and setting extinction to 0!")
     DUST_MAP = _dust_map_noop
-COMMENTS_ENABLED = False
 
-TOM_REGISTRATION = {
-    "REGISTRATION_AUTHENTICATION_BACKEND": "django.contrib.auth.backends.AllowAllUsersModelBackend",
-    "REGISTRATION_REDIRECT_PATTERN": "home",
-    "REGISTRATION_STRATEGY": "approval_required",
-    "SEND_APPROVAL_EMAILS": True,
-    "APPROVAL_SUBJECT": f"Congratulations!! Welcome to {TOM_NAME}!",
-}
+# Registration and emails
+TOM_REGISTRATION_STRATEGY = 'approval_required'
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_USE_TLS = True  # this is needed for gmail, other services may vary
 EMAIL_USE_SSL = False  # this is needed for gmail, other services may vary
 
+# Limit for ATLAS forced photomery
+# The limiting magnitude of ATLAS c and o filters is 19.7
+# (https://fallingstar.com/specifications.php)
+ATLAS_FORCEDPHOT_LIMITINGMAG = 19.7
 
-# for ZTF forced photometry, we need to save the logs to a temporary directory
+# For ZTF forced photometry, we need to save the logs to a temporary directory
 ZTFTMPDIR = os.path.join(os.getcwd(), "ztf-forced-phot-logs")
 
-# set some priority level variables for queue prioritization
+# Priority level variables for queue prioritization
 PRIORITY_HIGH = 100
 PRIORITY_MID = 10
 PRIORITY_LOW = 0
 
-# skymap probability contour within which we may consider a target and nonlocalized event associated
+# Skymap probability contour within which we may consider a target and nonlocalized event associated
 SKYMAP_PROB_CONTOUR = 0.95
 
+# Max number of candidates a user can vet at once
+MAX_USER_VETTING_SELECTED_CANDIDATES = 20
 
+# Misc (TODO: put these under some more informative heading than 'Misc')
+COMMENTS_ENABLED = False
 SHOW_PAGINATION_INFO = False

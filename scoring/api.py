@@ -1,8 +1,11 @@
 import math
+
 from ninja import Router
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
+
 from trove_targets.models import Target
+
 from .util import get_event_candidate_scores
 
 router = Router()
@@ -60,33 +63,36 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
     and (4) "score" (a dictionary of the scores, with keys for the type of scoring algorithm used).
 
     *Example*:
+
+    DON'T FORGET to change <api_token> to your API token, found on your TROVE user profile page!
+
     - Simple
     ```
     curl -X 'GET' \
-    'http:/localhost:8000/api/score/GW190814' \
+    'https://datatrove.as.arizona.edu/api/score/GW190814' \
     -H 'accept: */*' \
-    -u <username>:<password>
+    -H 'Authorization: Bearer <api_token>'
     ```
 
     - With optional paramaters
-    
+
     ```
     curl -X 'GET' \
-    'http://localhost:8000/api/score/S251112cm?candidate_names=S251112cm_X78,AT2025adht' \
+    'https://datatrove.as.arizona.edu/api/score/S251112cm?candidate_names=S251112cm_X78,AT2025adht' \
     -H 'accept: */*' \
-    -u <username>:<password>
+    -H 'Authorization: Bearer <api_token>'
     ```
 
     - For just one event
     ```
     curl -X 'GET' \
-    'http://localhost:8000/api/score/S251112cm?candidate_names=S251112cm_X78' \
+    'https://datatrove.as.arizona.edu/api/score/S251112cm?candidate_names=S251112cm_X78' \
     -H 'accept: */*' \
-    -u <username>:<password>
+    -H 'Authorization: Bearer <api_token>'
     ```
 
     """
-    
+
     # get the event candidates associated with this NLE
     ecs = EventCandidate.objects.filter(
         nonlocalizedevent__event_id = nle_name
@@ -97,8 +103,8 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
 
     if candidate_names is not None:
         ecs = ecs.filter(target__name__in = candidate_names.split(","))
-        
-    return _compute_scores(ecs) 
+
+    return _compute_scores(ecs)
 
 @router.get("/{nle_name}/cone_search")
 def get_scores_from_cone_search(request, nle_name:str, ra:float, dec:float, radius:float=2):
@@ -116,21 +122,24 @@ def get_scores_from_cone_search(request, nle_name:str, ra:float, dec:float, radi
     and (4) "score" (a dictionary of the scores, with keys for the type of scoring algorithm used).
 
     *Example*:
+
+    DON'T FORGET to change <api_token> to your API token, found on your TROVE user profile page!
+
     ```
     curl -X 'GET' \
-    'http://localhost:8000/api/score/S251112cm/cone_search?ra=147.47566&dec=0.616566666' \
+    'https://datatrove.as.arizona.edu/api/score/S251112cm/cone_search?ra=147.47566&dec=0.616566666' \
     -H 'accept: */*' \
-    -u <username>:<password>
+    -H 'Authorization: Bearer <api_token>'
     ```
     Or, to provide a search radius
     ```
     curl -X 'GET' \
-    'http://localhost:8000/api/score/S251112cm/cone_search?ra=147.475&dec=0.6165&radius=10' \
+    'https://datatrove.as.arizona.edu/api/score/S251112cm/cone_search?ra=147.475&dec=0.6165&radius=10' \
     -H 'accept: */*' \
-    -u <username>:<password>
+    -H 'Authorization: Bearer <api_token>'
     ```
     """
-    
+
     # convert the radius to degrees
     radius_deg = radius / 3600.
 

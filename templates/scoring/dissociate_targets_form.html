@@ -1,0 +1,166 @@
+{% extends 'tom_targets/partials/base.html' %}
+{% load crispy_forms_tags comments django_bootstrap5 static %}
+{% block title %}Dissociate Candidates{% endblock %}
+{% block content %}
+<style>
+    /* 1. Background styling - Using your blurred image logic from before */
+    body {
+        background-color: white; 
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        font-family: sans-serif;
+    }
+
+    /* 2. The Card: High contrast Dark Mode */
+    .dissociating-card {
+        /* Deep dark background so white text stands out perfectly */
+        background: rgba(20, 20, 25, 0.95); 
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        
+        /* Thin, bright border to define the card against the black BG */
+        border: 1px solid rgba(255, 255, 255, 0.2); 
+        border-radius: 12px;
+        padding: 40px;
+        width: 100%;
+        max-width: 450px;
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+        color: #FFFFFF; /* Pure white text for headers */
+    }
+
+    .dissociating-card h2 {
+        font-weight: 700;
+        margin-bottom: 25px;
+        text-align: center;
+        color: #fff;
+    }
+
+    /* 3. Form Labels: High contrast light gray/white */
+    .dissociating-card label {
+        color: #e0e0e0 !important; 
+        font-weight: 600;
+        font-size: 0.95rem;
+        margin-bottom: 8px;
+        display: block;
+    }
+
+    /* 4. Inputs: Pure black background with white text and bright borders */
+    .dissociating-card input:not([type="checkbox"]),
+    .dissociating-card select,
+    .dissociating-card textarea {
+        background: #000 !important;
+        border: 2px solid #444 !important; /* Thicker, darker border */
+        color: #fff !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+        width: 100%;
+        /* Bootstrap fixes a height that this padding then overflows, clipping
+           the top and bottom of the text. Let the content size the box. */
+        height: auto !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Highlight inputs when clicked */
+    .dissociating-card input:focus, 
+    .dissociating-card select:focus {
+        border-color: #e91e63 !important; /* Pink glow on focus */
+        outline: none;
+    }
+
+    /* 5. The "Submit" Button: Vivid Pink */
+    .btn-dissociate {
+        background: pink !important; 
+        color: black !important;
+        border: none;
+        padding: 14px;
+        border-radius: 8px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        transition: all 0.2s ease-in-out;
+        margin-top: 20px;
+        width: 100%;
+    }
+
+    .btn-dissociate:hover {
+        background: #ff4081 !important;
+        transform: scale(1.02);
+        box-shadow: 0 0 20px rgba(233, 30, 99, 0.5);
+    }
+
+    /* Warnings shown before dissociating is started */
+    .dissociating-warning {
+        background: rgba(255, 193, 7, 0.12);
+        border: 1px solid rgba(255, 193, 7, 0.6);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin-bottom: 20px;
+        color: #ffe6a1;
+        font-size: 0.85rem;
+        line-height: 1.45;
+    }
+
+    .dissociating-warning-active {
+        background: rgba(220, 53, 69, 0.15);
+        border-color: rgba(220, 53, 69, 0.7);
+        color: #ffc9cf;
+    }
+
+    /* Cancel Link */
+    .cancel-link {
+        display: block;
+        text-align: center;
+        margin-top: 20px;
+        color: #aaa;
+        text-decoration: none;
+        font-size: 0.85rem;
+    }
+    .cancel-link:hover {
+        color: #fff;
+    }
+</style>
+
+<div class="container d-flex justify-content-center">
+    <div class="dissociating-card">
+        <h2>Candidate Dissociation Page</h2>
+        <form action="" method="post">
+             <div class="dissociating-warning dissociating-warning-active">
+                 <strong>
+                     This will dissociate the {{ selected_ids|length }} selected 
+                     candidate(s) from the event {{ nle_event_id }}. This is a bit 
+                     cumbersome to undo.
+                     <br><br>
+                     It will not delete the target(s). 
+                     <br><br>
+                     Make sure you are absolutely certain you want to dissociate the 
+                     candidate(s).
+                 </strong>
+             </div>
+ 
+            {% csrf_token %}
+            {# the selection arrived with the table's POST, so it has to ride along #}
+            {% for candidate_id in selected_ids %}
+                <input type="hidden" name="candidates" value="{{ candidate_id }}">
+            {% endfor %}
+            
+            <input type="hidden" name="select_all_matching" value="{{ select_all_matching }}">
+            <input type="hidden" name="filters" value="{{ filters }}">
+            {% bootstrap_form_errors form type="non_fields" %}
+            {{ form|crispy }}
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary btn-dissociate">
+                    Dissociate Selected Candidates
+                </button>
+                <a href="{{ request.META.HTTP_REFERER }}" class="text-center mt-3 text-white-50 text-decoration-none small">
+                    Cancel and Return
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+<script src="{% static 'tom_common/js/htmx.min.js' %}"></script>
+{% endblock %}

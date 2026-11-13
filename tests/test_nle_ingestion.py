@@ -14,7 +14,7 @@ from ligo.skymap import moc
 from ligo.skymap.io import write_sky_map
 from tom_nonlocalizedevents.models import EventSequence, NonLocalizedEvent
 
-from custom_code.nle_ingestion import (
+from trove_nonlocalizedevents.nle_ingestion import (
     attach_skymap_to_alert,
     build_hop_message,
     decompress_fits_bytes,
@@ -126,7 +126,7 @@ class TestNleIngestionHelpers:
     def test_build_hop_message_wraps_alert_in_list(self, gw170817_alert):
         message = build_hop_message(gw170817_alert)
         assert isinstance(message, JSONBlob)
-        assert message.content[0]["superevent_id"] == "GW170817"
+        assert message.content["superevent_id"] == "GW170817"
 
     def test_load_skymap_bytes_decompresses_gzip(self):
         if not GW170817_SKYMAP.is_file():
@@ -180,8 +180,8 @@ class TestNleIngestionHelpers:
 
 
 class TestUploadLocalNle:
-    @patch("custom_code.nle_ingestion.handle_message_and_send_alerts")
-    @patch("custom_code.nle_ingestion.ensure_multiorder_skymap_bytes")
+    @patch("trove_nonlocalizedevents.nle_ingestion.handle_message_and_send_alerts")
+    @patch("trove_nonlocalizedevents.nle_ingestion.ensure_multiorder_skymap_bytes")
     def test_upload_local_nle_returns_handler_result(
         self,
         mock_convert,
@@ -201,13 +201,13 @@ class TestUploadLocalNle:
         mock_handle.assert_called_once()
         message = mock_handle.call_args.args[0]
         assert isinstance(message, JSONBlob)
-        alert = message.content[0]
+        alert = message.content
         assert alert["superevent_id"] == "GW170817"
         assert alert["event"]["skymap"] == tiny_multiorder_skymap_bytes
         assert mock_handle.call_args.args[1] is None
 
-    @patch("custom_code.nle_ingestion.ingest_local_igwn_alert")
-    @patch("custom_code.nle_ingestion.ensure_multiorder_skymap_bytes")
+    @patch("trove_nonlocalizedevents.nle_ingestion.ingest_local_igwn_alert")
+    @patch("trove_nonlocalizedevents.nle_ingestion.ensure_multiorder_skymap_bytes")
     def test_upload_local_nle_passes_converted_skymap_to_handler(
         self,
         mock_convert,
@@ -228,7 +228,7 @@ class TestUploadLocalNle:
         assert alert_passed["event"]["skymap"] == tiny_multiorder_skymap_bytes
 
 
-_CMD = "custom_code.management.commands.ingest_local_nle"
+_CMD = "trove_nonlocalizedevents.management.commands.ingest_local_nle"
 
 
 class TestIngestLocalNleExistenceCheck:
@@ -602,7 +602,7 @@ class TestIngestLocalNleGracedbAll:
     @patch(f"{_CMD}.connection")
     @patch(f"{_CMD}.iter_gracedb_superevents")
     def test_default_query_is_significant(self, mock_iter, mock_conn):
-        from custom_code.nle_ingestion import GRACEDB_SIGNIFICANT_QUERY
+        from trove_nonlocalizedevents.nle_ingestion import GRACEDB_SIGNIFICANT_QUERY
 
         mock_iter.return_value = []
         call_command("ingest_local_nle", "--gracedb-all", "--dry-run")
@@ -612,7 +612,7 @@ class TestIngestLocalNleGracedbAll:
     @patch(f"{_CMD}.connection")
     @patch(f"{_CMD}.iter_gracedb_superevents")
     def test_include_low_significance_uses_production_query(self, mock_iter, mock_conn):
-        from custom_code.nle_ingestion import GRACEDB_PRODUCTION_QUERY
+        from trove_nonlocalizedevents.nle_ingestion import GRACEDB_PRODUCTION_QUERY
 
         mock_iter.return_value = []
         call_command(
