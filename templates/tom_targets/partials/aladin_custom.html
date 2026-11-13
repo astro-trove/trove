@@ -1,5 +1,6 @@
 <!-- include Aladin Lite CSS file in the head section of your page -->
-<link rel="stylesheet" href="//aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css" />
+<!-- media="print" + onload keeps this stylesheet from blocking the rest of the page -->
+<link rel="stylesheet" href="//aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.css" media="print" onload="this.media='all'" />
 <!-- insert this snippet where you want Aladin Lite viewer to appear and after the loading of jQuery -->
 <!-- <h3>Survey View</h3> -->
 <div id="aladin-lite-div" style="width:300px;height:300px;"></div>
@@ -41,10 +42,12 @@
     </div>
   </form>
 </div>
-<script type="text/javascript" src="//aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js" charset="utf-8"></script>
 <script type="text/javascript">
 
-    let aladin = A.aladin('#aladin-lite-div', {
+    let aladin;
+
+    function initAladin() {
+    aladin = A.aladin('#aladin-lite-div', {
       survey: "P/DSS2/color",
       fov: getFovAsDegreesFromForm(),
       showReticle: false,
@@ -69,6 +72,17 @@
 	9,
 	{imgFormat: 'png'}
     );
+    }
+
+    // load Aladin Lite only after everything else on the page, so a slow or
+    // unreachable Aladin server can't hold up the rest of the content
+    window.addEventListener('load', function() {
+      const script = document.createElement('script');
+      script.src = '//aladin.u-strasbg.fr/AladinLite/api/v2/latest/aladin.min.js';
+      script.charset = 'utf-8';
+      script.onload = initAladin;
+      document.head.appendChild(script);
+    });
 
     function getScaleBarFromForm() {
       let size = Number($('#scale-bar-size').val());
@@ -148,12 +162,18 @@
     }
 
     function downloadImage() {
+      if (!aladin) {
+        return false;  // Aladin Lite hasn't loaded
+      }
       // Update the data that the link that was clicked will download
       $('#download-chart').attr('href', aladin.getViewDataURL());
       return true;
     }
 
     function updateFromForm(ra, dec, galaxyRas, galaxyDecs) {
+      if (!aladin) {
+        return;  // Aladin Lite hasn't loaded
+      }
       const fov = getFovAsDegreesFromForm();
       if (fov !== undefined) {
         aladin.setFov(fov);

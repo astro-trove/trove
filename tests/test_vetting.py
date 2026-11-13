@@ -1,7 +1,7 @@
 """
 Unit tests for candidate vetting functions.
 
-These test the pure logic functions in candidate_vetting/.
+These test the pure logic functions in candidate_vetting/ and scoring/.
 """
 
 import pytest
@@ -357,3 +357,78 @@ class TestAtlasForcedPhotParsing:
 
         assert result is not None
         assert isinstance(result, list)
+
+
+class TestNewCandidateVetting:
+    """A newly associated candidate is scored with every EM model possible for its event."""
+
+    @pytest.mark.parametrize("transients, expected_models", [
+        (["AGN-flare"], ["AGN-flare"]),
+        (["KN", "KN-in-SN", "super-KN"], ["KN", "KN-in-SN", "super-KN"]),
+        (["AGN-flare", "TDE"], ["AGN-flare"]),  # TDE has no scoring model yet
+        ([], []),
+    ])
+    def test_scores_each_possible_em_model(self, transients, expected_models):
+        from trove_nonlocalizedevents import hooks
+
+        cand = MagicMock()
+        cand.target.id, cand.nonlocalizedevent.event_id = 1, "S250208ad"
+        with patch.object(hooks, "get_possible_em_transients", return_value=transients), \
+                patch.object(hooks, "score") as score:
+            hooks.vet_new_candidate(cand)
+        assert [c.kwargs["em_model_name"] for c in score.call_args_list] == expected_models
+        for c in score.call_args_list:
+            assert c.kwargs["target_id"] == 1
+            assert c.kwargs["nonlocalized_event_name"] == "S250208ad"
+            assert c.kwargs["basic_results"] is None
+
+    def test_each_model_gets_fresh_basic_results(self):
+        import pandas as pd
+        from trove_nonlocalizedevents import hooks
+
+        cand = MagicMock()
+        cand.target.id, cand.nonlocalizedevent.event_id = 1, "S250208ad"
+        host_df, agn_df = pd.DataFrame({"name": ["g1"]}), pd.DataFrame({"name": ["a1"]})
+        with patch.object(hooks, "get_possible_em_transients", return_value=["KN", "KN-in-SN"]), \
+                patch.object(hooks, "score") as score:
+            hooks.vet_new_candidate(cand, basic_results=(host_df, agn_df, True))
+
+        passed = [c.kwargs["basic_results"] for c in score.call_args_list]
+        assert len(passed) == 2
+        # each mode gets its own copies, so one can't modify another's dataframes
+        assert passed[0][0] is not passed[1][0] and passed[0][0] is not host_df
+        assert passed[0][1] is not passed[1][1] and passed[0][1] is not agn_df
+        assert all(p[0].equals(host_df) and p[1].equals(agn_df) and p[2] for p in passed)
+
+
+
+class TestDecayRateSign:
+    """The decay rate is positive for a fading light curve, whichever
+    model the AIC picks."""
+
+    @pytest.mark.parametrize(
+        "model_name, label, params",
+        [
+            # mag = 20 + log10(t)
+            ("_powerlaw", "powerlaw", (-1.0, 20.0)),
+            # fades, decelerating
+            ("_broken_powerlaw_concave_down", "broken_concave_down", (1.0, 4.0, 20.0, 2.0)),
+            # rises, then fades
+            ("_broken_powerlaw_concave_up", "broken_concave_up", (-1.0, 2.0, 20.0, 2.0)),
+        ],
+    )
+    def test_fading_light_curve_has_positive_decay_rate(self, model_name, label, params, caplog):
+        from scoring import vet_phot
+
+        t = np.linspace(0.5, 15, 40)
+        mag = getattr(vet_phot, model_name)(t, *params)
+        magerr = np.full_like(t, 0.01)
+
+        with caplog.at_level("INFO", logger=vet_phot.logger.name):
+            _, _, _, decay_rate = vet_phot.estimate_max_find_decay_rate(
+                t, mag, magerr, t_pre=0, t_post=25
+            )
+
+        # make sure the AIC actually picked the model under test
+        assert f"Model selected: {label} " in caplog.text
+        assert decay_rate > 0

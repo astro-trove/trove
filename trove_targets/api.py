@@ -5,8 +5,10 @@ from ninja.orm import create_schema
 from tom_nonlocalizedevents.models import EventCandidate
 from tom_targets.utils import cone_search_filter
 from trove_targets.models import Target
-from custom_code.hooks import target_post_save
-from candidate_vetting.public_catalogs.util import create_phot
+from tom_targets.models import TargetName
+from trove_targets.hooks import target_hook_options
+from trove_targets.tasks import async_target_post_save
+from tom_dataproducts.models import PhotometryReducedDatum
 
 router = Router()
 
@@ -36,13 +38,27 @@ def _save_target(payload:UploadTargetSchema):
     del payload_dict["photometry"]
     phot = payload.photometry
     
-    # now save the target
-    target, _ = Target.objects.get_or_create(**payload_dict)
-    target.full_clean()
-    target.save()
-
-    # then save the photometry
+    # now save the target if it doesn't exist already
+    target = cone_search_filter(
+        Target.objects.all(),
+        payload_dict["ra"],
+        payload_dict["dec"],
+        2/3600, # radius, 2 arcsec converted to degrees
+    ).order_by("separation").first()
+    if target is None:
+        target = Target(**payload_dict)
+        target.full_clean(validate_unique=False)
+        with target_hook_options(skip_vetting=True):
+            target.save()
+    
+    # add the alias from this name, if needed
+    name = payload_dict["name"]
+    if name != target.name and not TargetName.objects.filter(name=name).exists():
+        target.aliases.create(name=name)
+    
+    # then save the photometry, if provided
     if phot is not None:
+        uploaded_phot = []
         for d in phot:
             d = d.dict(exclude_unset=True)
             jd = d.pop("jd")
@@ -54,16 +70,36 @@ def _save_target(payload:UploadTargetSchema):
                 timezone=TimezoneInfo()
             )
             source = d.pop("telescope")
+
+            value = {
+                "source_name":source,
+                "telescope":source,
+                "bandpass":d.get("filter"),
+            }
+            if "magnitude" in d:
+                value["brightness"] = d.pop("magnitude")
+            elif "limit" in d:
+                value["limit"] = d.pop("limit")
+
+            if "error" in d:
+                value["brightness_error"] = d.pop("error")
             
-            create_phot(
-                target = target,
-                time = time,
-                fluxdict = d,
-                source = source
+
+            uploaded_phot.append(
+                PhotometryReducedDatum(
+                    target=target,
+                    timestamp=time,
+                    **value
+                )
             )
-    
+            
+
+        PhotometryReducedDatum.objects.bulk_create(
+            uploaded_phot, ignore_conflicts=True
+        )
+                 
     # run the target post save hook
-    target_post_save(target, created=True)
+    async_target_post_save.enqueue(target.id)
 
     return target
 
@@ -75,12 +111,12 @@ def upload_target(request, payload: List[UploadTargetSchema]):
 
     *Example:*
 
-    DON'T FORGET to change <username> and <password> to your username and password! 
+    DON'T FORGET to change <api_token> to your API token, found on your TROVE user profile page!
     
     To upload a target without photometry
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json' -u <username>:<password>  -d '[
+    curl -X 'POST'   'https://datatrove.as.arizona.edu/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json' -H 'Authorization: Bearer <api_token>'  -d '[
       {
         "name": "test",
         "ra": 0,
@@ -92,7 +128,7 @@ def upload_target(request, payload: List[UploadTargetSchema]):
     To upload a target with photometry:
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -u <username>:<password>  -d '[
+    curl -X 'POST'   'https://datatrove.as.arizona.edu/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -H 'Authorization: Bearer <api_token>'  -d '[
       {
         "name": "test",
         "ra": 0,
@@ -119,7 +155,7 @@ def upload_target(request, payload: List[UploadTargetSchema]):
     To upload a new photometry point to an existing target 
 
     ```
-    curl -X 'POST'   'http://localhost:8000/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -u <username>:<password>  -d '[
+    curl -X 'POST'   'https://datatrove.as.arizona.edu/api/target/upload'   -H 'accept: */*'   -H 'Content-Type: application/json'  -H 'Authorization: Bearer <api_token>'  -d '[
       {
         "name": "test",
         "ra": 0,

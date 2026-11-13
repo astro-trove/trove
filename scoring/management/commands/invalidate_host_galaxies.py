@@ -20,7 +20,7 @@ from django.core.management.base import BaseCommand
 
 from tom_targets.models import TargetExtra
 
-from scoring.vet_basic import HOST_GALAXY_CACHE_KEY, invalidate_host_galaxy_cache
+from scoring.scoring import HOST_GALAXY_CACHE_KEY, invalidate_host_galaxy_cache
 
 logger = logging.getLogger(__name__)
 

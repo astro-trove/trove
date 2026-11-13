@@ -49,3 +49,7 @@ ZTF_INFO = { # Login info for sending requests to the ZTF forced photometry serv
     "user_password":""
 }
 DUSTMAPS_DIR=None # set to the local path for SFD dustmaps, or leave as 'None' to download from dataverse
+
+ANTARES_API_KEY = ""
+ANTARES_API_SECRET = ""
+ANTARES_GROUP_ID = ""

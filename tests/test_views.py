@@ -1,7 +1,7 @@
 """
 Unit tests for Django views with mocking.
 
-These test the views in custom_code/views.py, candidate_vetting/views.py, and 
+These test the views in trove_targets/views.py, candidate_vetting/views.py, and 
 related modules.
 """
 import pytest
@@ -101,7 +101,7 @@ class TestTNSReportGeneration:
 class TestHelperFunctions:
     """Tests for helper functions in views."""
 
-    @patch('custom_code.views.requests.post')
+    @patch('trove_targets.views.requests.post')
     def test_upload_files_mock(self, mock_post):
         """Test file upload function with mocked requests."""
         mock_post.return_value.status_code = 200

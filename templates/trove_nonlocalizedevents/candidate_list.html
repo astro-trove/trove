@@ -1,0 +1,170 @@
+<style>
+  .select2-container {
+    width: 100% !important;
+  }
+  .select2-selection {
+    height: auto !important;
+    min-height: 38px;
+    padding: 4px 8px;
+  }
+  .select2-selection__rendered {
+    line-height: 28px !important;
+  }
+  .loader {
+    width: 48px;
+    height: 48px;
+    border: 6px solid #e5e7eb;   /* light track */
+    border-top-color: #111827;  /* dark arc */
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
+{% extends 'tom_common/base.html' %}
+{% load static django_bootstrap5 crispy_forms_tags nonlocalizedevent_extras skymap_extras event_candidate_extras %}
+{% block title %}Candidates{% endblock %}
+{% block content %}
+
+{% vet_all_is_allowed as can_vet_all %}
+
+{% if request.GET.nonlocalizedevent %}
+<h1>
+Candidates for {{ request.GET.nonlocalizedevent|event_id_from_pk }}
+{% if request.GET.nonlocalizedevent|event_type_from_pk  == "GW" %}
+    <a href="{{ request.GET.nonlocalizedevent|gracedb_url_from_pk }}" target="_blank"><img src="https://gracedb.ligo.org/static/images/favicon.png" alt="GraceDB" title="GraceDB" class="icon" /></a>
+    <a href="{{ request.GET.nonlocalizedevent|treasuremap_url_from_pk }}" target="_blank"><img src="https://treasuremap.space/gwtm_logo.png" alt="Gravitational Wave Treasure Map" title="Gravitational Wave Treasure Map" class="icon" /></a>
+{% endif %}
+</h1>
+{% nonlocalizedevent_details %}
+<br></br>
+<div class="row">
+  <div class="col-md-12">
+    <div class="card">
+      <div id="skymap-collapse">
+        <div class="card-body"
+             id="skymap-body"
+             style="text-align:center; justify-content:center; align-items:center"
+             hx-get="{% url 'trove_nonlocalizedevents:skymap' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}"
+             hx-target="#skymap-body"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <div style="display:flex; justify-content:center; align-items:center">
+            <p class="loader"></p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<br><br>
+{% if request.user.is_authenticated %}
+  <form id="export-csv-form"
+        method="post"
+        action="{% url 'trove_nonlocalizedevents:generate-selected-candidates-csv' %}?nonlocalizedevent={{ request.GET.nonlocalizedevent }}">
+    {% csrf_token %}
+    <input type="hidden" name="filters" value="{{ request.GET.urlencode }}">
+  </form>
+  <div class="d-flex flex-wrap gap-2">
+      <button type="button" class="btn btn-secondary btn-lg"
+              id="export-selected-btn"
+              title="Export selected candidates as a CSV file"
+              onclick="openCsvDownload()">
+        Export Selected (<span id="export-selected-count">0</span>)
+      </button>
+
+      <button type="submit" form="vet-selected-form" class="btn btn-warning btn-lg"
+              id="vet-selected-btn" title="Run vetting for selected candidates">
+        Vet Selected (<span id="vet-selected-count">0</span>)
+      </button>
+      {% if can_vet_all or request.user.is_superuser %}
+      <a
+        href="{% url 'scoring:vet_all_form' request.GET.nonlocalizedevent %}"
+        title="Run vetting for all candidates"
+        class="btn btn-danger btn-lg">
+        Vet All
+      </a>
+      {% else %}
+      <a href="{% url 'trove_nonlocalizedevents:vet_all_cooldown_notice' %}"
+         class="btn btn-danger btn-lg"
+         style="opacity: 0.3;"
+         title="Vetting all candidates is not available because it was run recently"
+         onclick="document.getElementById('cooldown-msg').style.display='block'; return false;">
+        Vet All
+      </a>
+      {% endif %}
+  </div>
+{% endif %}
+{% if request.user.is_superuser %}
+<br>
+<div class="d-flex flex-wrap gap-2">
+  <h5>Superuser Buttons</h5>
+</div>
+<form id="dissociate-selected"
+      method="post"
+      action="{% url 'scoring:dissociate_selected' request.GET.nonlocalizedevent %}">
+  {% csrf_token %}
+</form>
+<div class="d-flex flex-wrap gap-2">
+  <a href="{% url 'scoring:nle_associate_targets_form' request.GET.nonlocalizedevent %}" title="Associate new targets with the event" class="btn btn-success btn-lg">Associate New Targets</a>
+  <button type="button" class="btn btn-danger btn-lg"
+          id="dissociate-selected-btn" title="Dissociate selected candidates">
+    Dissociate Selected Candidates (<span id="dissociate-selected-count">0</span>)
+  </button>
+  <a onclick="openSummaryModal()" title="Generate text to report to a GCN" class="btn btn-info btn-lg">Generate GCN</a>
+{% endif %}
+</div>
+<br><br>
+{% else %}
+<h1>Candidates</h1>
+{% endif %}
+
+<!-- Modal -->
+<div class="modal fade" id="summaryModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Candidate Summary</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <textarea id="summaryText" class="form-control" rows="15"></textarea>
+            </div>
+            <div class="modal-footer">
+	      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+	      <button type="button" id="copyBtn" class="btn btn-success" onclick="copyText()">
+                <i class="fa fa-copy"></i> Copy
+              </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'trove_nonlocalizedevents/candidate_form.html' %}
+
+<div id="candidate-table-container" hx-boost="true" hx-target="#candidate-results" hx-push-url="true" hx-history="false">
+  <div id="candidate-results">
+    {% include 'trove_nonlocalizedevents/candidate_table_body.html' %}
+  </div>
+</div>
+
+{% include 'trove_nonlocalizedevents/partials/last_vet_multi_card.html' %}
+
+{% endblock %}
+
+{% block javascript %}
+<script src="{% static 'tom_common/js/htmx.min.js' %}"></script>
+
+<script>
+document.getElementById('dissociate-selected-btn').addEventListener('click', function(e) {
+    e.preventDefault();
+    var form = document.getElementById('vet-selected-form');
+    var original = form.action;
+    form.action = "{% url 'scoring:dissociate_selected' request.GET.nonlocalizedevent %}";
+    form.submit();
+    form.action = original;
+});
+</script>
+
+{% endblock %}

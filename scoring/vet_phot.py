@@ -3,31 +3,60 @@ Some general functions useful for vetting photometry
 """
 
 import logging
-from typing import Tuple, Optional, Iterable
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Iterable, Optional, Tuple
 
-from astropy.time import Time
-from astropy.stats import akaike_info_criterion_lsq as info_crit
-from astropy import units as u
 import numpy as np
 import pandas as pd
-from scipy.optimize import curve_fit
-
-from django.conf import settings
-from tom_nonlocalizedevents.models import NonLocalizedEvent, EventSequence
-from tom_dataproducts.models import ReducedDatum
-from trove_targets.models import Target
+from astropy import units as u
+from astropy.stats import akaike_info_criterion_lsq as info_crit
+from astropy.time import Time
 from candidate_vetting.public_catalogs.phot_catalogs import TNS_Phot
+from django.conf import settings
+from scipy.optimize import curve_fit
+from tom_antares.antares import AntaresDataService
+from tom_dataproducts.models import PhotometryReducedDatum
+from tom_nonlocalizedevents.models import EventSequence, NonLocalizedEvent
+
+from trove_targets.templatetags.photometry_extras import error_to_snr
+from trove_targets.models import Target
+
 from .tasks import async_atlas_query
-from .scoring import get_eventcandidate_default_distance
-from custom_code.templatetags.photometry_extras import error_to_snr
 
 logger = logging.getLogger(__name__)
 
-FILTER_PRIORITY_ORDER = ["r", "g", "V", "R", "G"]
+FILTER_PRIORITY_ORDER = [
+    "r", "g", "o", "c", "w", "V", "R", "G", "i", "I", "B"
+]
+
+# common optical filters + ATLAS o,c + other misc optical survey filters
+OPTICAL_FILTS = [
+    # SDSS ugrizy
+    "g",
+    "r",
+    "i",
+
+    # Johnson-Cousins
+    "B",
+    "V",
+    "R",
+    "I",
+
+    # ATLAS
+    "o",
+    "c",
+
+    # other, misc
+    "G", # GAIA G
+    "w", # Pan-STARRS wide
+]
+
 PHOT_SCORE_MIN = 0.1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
+)
+FORCEDPHOT_SNR_THRESHOLD = (
+    5 # require a S/N of 5 for ATLAS/ZTF FP to be considered real
 )
 
 FILTER_EFF_FREQ = {
@@ -85,6 +114,16 @@ def _powerlaw(x, a, y0):
     return y0 - a * np.log10(x)
 
 
+def _log10_sum_powers(x, a1, a2, x0):
+    """Stable log10((x/x0)**-a1 + (x/x0)**-a2).
+
+    Evaluated via logaddexp so large exponents or extreme x/x0 (which the
+    optimizer can step into) don't overflow to inf / underflow to log10(0).
+    """
+    lnu = np.log(x / x0)
+    return np.logaddexp(-a1 * lnu, -a2 * lnu) / np.log(10)
+
+
 def _broken_powerlaw_concave_down(x, a1, a2, y0, x0):
     """Smoothly broken powerlaw, CONCAVE DOWN branch. Original TROVE model.
 
@@ -95,7 +134,7 @@ def _broken_powerlaw_concave_down(x, a1, a2, y0, x0):
     `log10(sum of powers of u)` is concave up in log10(u), so negating it
     makes this CONCAVE DOWN in the (log10 t, mag) plane.
     """
-    return y0 - np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+    return y0 - _log10_sum_powers(x, a1, a2, x0)
 
 
 def _broken_powerlaw_concave_up(x, a1, a2, y0, x0):
@@ -103,7 +142,7 @@ def _broken_powerlaw_concave_up(x, a1, a2, y0, x0):
 
         mag = y0 + log10(u**-a1 + u**-a2)
     """
-    return y0 + np.log10((x / x0) ** -a1 + (x / x0) ** -a2)
+    return y0 + _log10_sum_powers(x, a1, a2, x0)
 
 
 def _ordered(base):
@@ -136,6 +175,32 @@ def _flux_to_lum(flux, lumdist):
     """convert flux to lum. Everything should be astropy quantities"""
     return 4 * np.pi * lumdist**2 * flux
 
+def _mean_decline(popt, mag_slope_per_dex, t_data, window=None):
+    """
+    Mean decline rate (mag/day, positive = fading) from the late-time
+    slope d(mag)/d(log10 t), averaged from peak to a later time.
+
+    popt              : (a1, a2, peak_mag, peak_time) from the fit
+    mag_slope_per_dex : late-time d(mag)/d(log10 t) of the selected model,
+                        positive = fading
+    t_data            : times of the fitted data (days), used for the valid range
+    window            : days after peak to average over; None = to the last data point
+    """
+    # robustly unpack popt with different models
+    t_pk = 0
+    if len(popt)>2:
+        t_pk = popt[-1]
+
+    # compute a starting time for the window
+    t_start = max(t_pk, np.nanmin(t_data[t_data > 0]))
+    
+    # find t_end for comparing to t_pk
+    t_hi = np.nanmax(np.asarray(t_data, float))
+    t_end = t_hi if window is None else min(t_pk + window, t_hi)
+    if t_end <= t_pk:
+        raise ValueError("Peak is at the end of the data; no decline to measure.")
+
+    return mag_slope_per_dex * np.log10(t_end / t_start) / (t_end - t_start)
 
 def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataFrame:
     """
@@ -144,7 +209,7 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
     target = Target.objects.filter(id=target_id)[0]
 
     # get the photometry
-    phot = list(ReducedDatum.objects.filter(target=target, data_type="photometry"))
+    phot = list(PhotometryReducedDatum.objects.filter(target=target))
 
     # clean up the photometry
     fordf = dict(
@@ -163,8 +228,8 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
     for p in phot:
         if hasattr(p, "source_name"):
             fordf["telescope"].append(p.source_name)
-        elif "telescope" in p.value:
-            fordf["telescope"].append(p.value["telescope"])
+        elif p.telescope:
+            fordf["telescope"].append(p.telescope)
         else:
             fordf["telescope"].append("unknown")
 
@@ -172,20 +237,20 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
             continue
         fordf["mjd"].append(Time(p.timestamp).mjd)
 
-        if "filter" not in p.value:
+        if not p.bandpass:
             continue
-        fordf["filter"].append(p.value["filter"])
+        fordf["filter"].append(p.bandpass)
 
-        if "magnitude" in p.value:
-            fordf["mag"].append(p.value["magnitude"])
+        if p.brightness is not None:
+            fordf["mag"].append(p.brightness)
             fordf["upperlimit"].append(False)
-            if "error" in p.value:
-                fordf["magerr"].append(p.value["error"])
+            if p.brightness_error is not None:
+                fordf["magerr"].append(p.brightness_error)
             else:
                 fordf["magerr"].append(0)
-        elif "limit" in p.value:
+        elif p.limit is not None:
             fordf["upperlimit"].append(True)
-            fordf["mag"].append(p.value["limit"])
+            fordf["mag"].append(p.limit)
             fordf["magerr"].append(np.nan)
         else:
             continue
@@ -262,25 +327,25 @@ def estimate_max_find_decay_rate(
     dt_days: Iterable[float],
     mag: Iterable[float],
     magerr: Iterable[float],
-    max_decay_fit_time: Optional[int] = 25,
+    t_pre: Iterable[float],
+    t_post: Iterable[float],
     min_time_separation: Optional[float] = None,
 ) -> Tuple[float, float, float]:
     """
     Fit both a single and broken powerlaw to the data, compute AIC, and
     takes the "better" fit (lower AIC) and uses that to find an analytic time
-    of maximum and decay rate over peak_time -> max_decay_fit_time.
+    of maximum and decay rate over peak_time -> t_post
 
     PARAMETERS
     ---------
     dt_days: Iterable[float]
-        A list/array of the days since the GW discovery. 
+        A list/array of the days since the GW discovery.
     mag: Iterable[float]
         A list/array of the magnitudes since the GW discovery
     magerr: Iterable[float]
         A list/array of the magnitude errors since the GW discovery
-    max_decay_fit_time: float, optional
-        The maximum time after the GW discovery in days that we should fit the decay to.
-        The default is 25 days based on discussion from Rastinejad+2022.
+    t_pre, t_post: Iterable[float]
+        Start and end times for the window in which we fit photometry
     min_time_separation: float, optional
         Refuse the fit if `max(dt) - min(dt)` (over the de-duplicated points
         used for fitting) is below this many days.
@@ -304,8 +369,8 @@ def estimate_max_find_decay_rate(
     magerr = np.asarray(magerr, dtype=float)
 
     _in_domain = (
-        (dt_days > 0)
-        & (dt_days <= max_decay_fit_time)
+        (dt_days > t_pre)
+        & (dt_days <= t_post)
         & np.isfinite(mag)
         & np.isfinite(magerr)
         & (magerr > 0)
@@ -313,11 +378,13 @@ def estimate_max_find_decay_rate(
     n_dropped_domain = int((~_in_domain).sum())
     if n_dropped_domain:
         logger.info(
-            "Dropped %d photometry row(s) with dt <= 0, non-finite mag/magerr, "
-            "or magerr <= 0 before fitting",
+            "Dropped %d photometry row(s) with non-finite mag/magerr, "+
+            f"magerr <= 0, or dt outside of [{t_pre}, {t_post}] days time "+
+            "window, before fitting",
             n_dropped_domain,
         )
-    dt_days_tofit = dt_days[_in_domain]
+    # models are in log(t), so fit in time since t_pre (> 0 by the filter above)
+    dt_days_tofit = dt_days[_in_domain] - t_pre
     mag_tofit = mag[_in_domain]
     magerr_tofit = magerr[_in_domain]
 
@@ -339,7 +406,8 @@ def estimate_max_find_decay_rate(
     n_epochs = int(np.unique(dt_days_tofit).size)
     if n_epochs < 2:
         raise RuntimeError(
-            f"Only {n_epochs} distinct epoch(s) within {max_decay_fit_time}; "+
+            f"Only {n_epochs} distinct epoch(s) within "+
+            f"[{t_pre}, {t_post}] days; "+
             "decay rate is not determined by this data"
         )
 
@@ -366,7 +434,7 @@ def estimate_max_find_decay_rate(
         # RuntimeError if it doesn't converge; ValueError if the model
         # produced a non-finite residual (belt-and-suspenders -- the dt > 0
         # filter above should already rule this out for these two models)
-        pl_popt, pl_pcov = None, None
+        pl_popt, _pl_pcov = None, None
 
     broken_fits = {}
     if n_epochs > bpl_nparams + 2:
@@ -447,28 +515,33 @@ def estimate_max_find_decay_rate(
     # finally, compute the maximum time using a finely spaced array
     # from min -> max of the dt_days array
     xtest = np.linspace(
-        np.min(dt_days_tofit), np.max(dt_days_tofit), 100 * max_decay_fit_time
+        np.min(dt_days_tofit), np.max(dt_days_tofit), 100 * t_post
     )
     ytest = model(xtest, *best_fit_params)
     max_time = xtest[
         np.argmin(ytest)
-    ]  # need to use min here b/s magnitudes are backwards
+    ] + t_pre  # need to use min here b/s magnitudes are backwards; shift back to dt frame
 
-    decay_rate = -mag_slope_per_dex
+    # convert the power law index to mag/day
+    decay_rate = _mean_decline(best_fit_params, mag_slope_per_dex, xtest)
 
-    return model, best_fit_params, max_time, decay_rate
-    
+    # the fit was done in dt - t_pre; return a model that takes dt directly
+    def model_dt(x, *p, _m=model):
+        return _m(np.asarray(x, dtype=float) - t_pre, *p)
+
+    return model_dt, best_fit_params, max_time, decay_rate
+
 
 def _mag_to_flux(mag, magerr=None):
     """
     Convert AB magnitude to flux in W/m^2/Hz.
-    
+
     For AB magnitudes: flux (Jy) = 10^((8.9 - mag) / 2.5)
     1 Jy = 1e-26 W/m^2/Hz
     """
     flux_jy = 10**((8.9 - mag) / 2.5)
     flux = flux_jy * 1e-26
-    
+
     if magerr is not None:
         dflux = np.abs(flux * magerr * np.log(10) / 2.5)
         return flux, dflux
@@ -516,18 +589,18 @@ def compute_peak_lum(
         return None
 
     flux, dflux = _mag_to_flux(mag, magerr)
-    
+
     fluxmax_idx = np.argmax(flux)
     fluxmax = flux[fluxmax_idx]
     if consider_err:
         fluxmax += 3 * dflux[fluxmax_idx]
     filtermax = filters[fluxmax_idx]
-    
+
     fluxmax = fluxmax * u.Unit("W/m^2/Hz")
     lummax = _flux_to_lum(fluxmax, lumdist).to("erg/s/Hz")
 
     freq_eff = FILTER_EFF_FREQ.get(filtermax, 5.0e14 * u.Hz)
-    nu_lummax = (freq_eff * lummax).to("erg/s")
+    nu_lummax = (freq_eff * lummax).to("erg/s").value
     return nu_lummax
 
 
@@ -580,7 +653,8 @@ def get_predetection_stats(
 
 
 def find_public_phot(
-    target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100
+        target: Target, forced_phot_tol=1, days_ago_max=200, queue_priority=100,
+        query_atlas_fp=True, query_tns_phot=True, query_antares_phot=True
 ) -> None:
     """Query TNS, ATLAS Forced photometry, and other services for publicly available
     photometry. After querying for new photometry it will automatically add it to
@@ -605,12 +679,46 @@ def find_public_phot(
     """
 
     # check TNS for any new photometry
-    created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
+    created_new_tns_phot = False
+    if query_tns_phot:
+        created_new_tns_phot, tns_reply = TNS_Phot("tns").query(target, timelimit=10)
+
+    # check ANTARES for new ZTF and LSST photometry from alerts
+    if query_antares_phot:
+        logger.info("Checking ANTARES for new photometry")
+        try:
+            data_service = AntaresDataService()
+            data = data_service.query_reduced_data(target)
+            data_service.to_reduced_datums(target, data)
+        except Exception as exc:
+            logger.error(exc)
+            
+    # in some cases, we won't want to query ATLAS FP because it isn't constraining
+    # for dim transients in LSST alerts
+    if not query_atlas_fp:
+        logger.info("Skipping ATLAS FP query, as requested")
+        return created_new_tns_phot
+
+    # apply same logic as above for **any** transient for which the latest >5-sigma
+    # detection is too dim for ATLAS FP to be constraining
+    fp_sig_dets = target.photometryreduceddatum_set.filter(
+        brightness_error__lte=2.5/np.log(10)/FORCEDPHOT_SNR_THRESHOLD
+    )
+    if fp_sig_dets.exists():
+        latest_det = fp_sig_dets.latest()
+    else:
+        return created_new_tns_phot
+    
+    if latest_det.brightness > settings.ATLAS_FORCEDPHOT_LIMITINGMAG:
+        logger.info("Skipping ATLAS FP query as latest >5sigma detection "
+                    f"{latest_det.brightness:.2f} ± {latest_det.brightness_error:.2f} "
+                    "suggests ATLAS FP will not be constraining")
+        return created_new_tns_phot
 
     # query ATLAS for new forced photometry
     # get the most recent ATLAS forced photometry point
-    atlas_data = target.reduceddatum_set.filter(
-        data_type="photometry", source_name="ATLAS"
+    atlas_data = target.photometryreduceddatum_set.filter(
+        source_name__in=["ATLAS", "ATLAS FP"]
     )
     query_atlas = True
     days_ago = (
@@ -650,13 +758,123 @@ def find_public_phot(
         async_atlas_query.using(
             priority=queue_priority  # this sets the priority to whatever is passed in
         ).enqueue(
-            target.id,
-            days_ago=min(
+            min_date_mjd=Time.now().mjd-min(
                 days_ago_max, days_ago
             ),  # this min ensures we never query more than days_ago_max
+            max_date_mjd=Time.now().mjd,
+            target_id=target.id,
+            data_product_type="atlas_photometry"
         )
 
     return created_new_tns_phot
+
+
+def detect_flare(
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
+    pair_max_gap_days: float = 0.0,
+):
+    # each night's peak corroborated significance, capped by its better adjacent observed
+    # night when one lies within pair_max_gap_days, and an isolated night counts as it is.
+    phot = _flare_significance_series(postphot, baseline, corroboration_window_days)
+    if phot is None:
+        return np.nan, None
+    night = np.floor(phot.mjd.to_numpy(dtype=float)) if "mjd" in phot.columns else np.arange(len(phot))
+    peaks = phot.significance_corroborated.groupby(night).idxmax()  # sorted by night
+    nights = peaks.index.to_numpy(dtype=float)
+    nightly = phot.significance_corroborated.loc[peaks].to_numpy()
+    best, limiting = -np.inf, 0
+    for i in range(len(nightly)):
+        near = [j for j in (i - 1, i + 1)
+                if 0 <= j < len(nightly) and abs(nights[j] - nights[i]) <= pair_max_gap_days]
+        j = max(near, key=lambda n: nightly[n]) if near else i
+        weaker = i if nightly[i] <= nightly[j] else j
+        if nightly[weaker] > best:
+            best, limiting = nightly[weaker], weaker
+    return float(best), phot.loc[peaks.iloc[limiting]]
+
+def _flare_significance_series(
+    postphot: Optional[pd.DataFrame],
+    baseline: dict,
+    corroboration_window_days: float = 0.5,
+) -> Optional[pd.DataFrame]:
+    # Returns list of photometry points --> z-scores compared to pre-merger baseline
+    if postphot is None or not len(postphot) or not baseline:
+        return None
+
+    phot = postphot[~postphot.upperlimit]
+    phot = phot[phot["filter"].isin(baseline.keys())]
+    if not len(phot):
+        return None
+
+    # Adding photometry error with baseline's error in quadrature
+    # significance is just a z-score
+    significance = [
+        (baseline[row["filter"]]["mag"] - row.mag)
+        / np.sqrt(baseline[row["filter"]]["std"] ** 2 + row.magerr**2)
+        for _, row in phot.iterrows()
+    ]
+    phot = phot.assign(significance=significance)
+    return phot.assign(
+        significance_corroborated=_corroborated_significance(
+            phot, corroboration_window_days
+        )
+    )
+
+def _corroborated_significance(
+    phot: pd.DataFrame, window_days: float
+) -> np.ndarray:
+    sig = phot.significance.to_numpy(dtype=float)
+
+    times = None
+    for col in ("mjd", "dt"):
+        if col in phot.columns:
+            times = phot[col].to_numpy(dtype=float)
+            break
+    if times is None:
+        # Only hand-built frames reach this; real photometry always carries mjd.
+        return sig
+
+    filters = phot["filter"].to_numpy()
+    out = np.empty(sig.size, dtype=float)
+    for i in range(sig.size):
+        near = (filters == filters[i]) & (np.abs(times - times[i]) <= window_days)
+        out[i] = np.median(sig[near])
+    return out
+
+def _robust_scatter(mags: np.ndarray, errs: np.ndarray) -> Tuple[float, float]:
+    median_mag = float(np.median(mags))
+    # 1.4826 rescales the MAD to a Gaussian sigma for normally distributed data
+    robust_std = 1.4826 * float(np.median(np.abs(mags - median_mag)))
+    median_err = float(np.median(errs))
+    return max(robust_std, median_err), median_err
+
+
+def fit_agn_baseline(
+    prephot: Optional[pd.DataFrame], min_baseline_pts: int = 2,
+) -> dict:
+    # baseline has keys of filters, and the values are a dictionary that
+    # includes the median magnitude, and a measure of the deviation of points
+    # which is photometric errors or adjusted-MAD
+    baseline = {}
+    # prephot is all of the photometry data before GW detection
+    if prephot is None or not len(prephot):
+        return baseline
+
+    phot = prephot[~prephot.upperlimit]
+    for filt, group in phot.groupby("filter"):
+        mags = group.mag.to_numpy(dtype=float)
+        if len(mags) < min_baseline_pts:
+            continue
+        median_mag = float(np.median(mags))
+        robust_std, median_err = _robust_scatter(
+            mags, group.magerr.to_numpy(dtype=float)
+        )
+        baseline[filt] = dict(
+            mag=median_mag, std=robust_std, n=int(len(mags)), median_err=median_err,
+        )
+    return baseline
 
 
 def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
@@ -690,6 +908,10 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # if we've made it to this point we have at least one detection so
     # we can calculate the luminosity
+    from .scoring import (  # import within function to avoid circular import error
+        get_eventcandidate_default_distance,
+    )
+
     dist, _ = get_eventcandidate_default_distance(
         target.id, nonlocalized_event.event_id
     )
@@ -703,12 +925,8 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # then we can only do the next stuff if there is more than one photometry point
     # at this filter
-    # has to be at least 2 distinct EPOCHS before max_decay_fit_time to fit the
-    # powerlaw. Counting rows instead let a measurement ingested twice satisfy
-    # this and hand `estimate_max_find_decay_rate` a rank-deficient problem;
-    # that function now refuses such data as well, so this is the cheap guard
-    # and that one is the authoritative check.
-    _in_window = phot.dt[phot.dt < param_ranges["max_decay_fit_time"]]
+    # has to be at least 2 distinct EPOCHS before t_post to fit powerlaw
+    _in_window = phot.dt[phot.dt < param_ranges["t_post"]]
     if _in_window.nunique() > 1:
         # find the maximum and decay rate
         try:
@@ -717,7 +935,8 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                     phot.dt,
                     phot.mag,
                     phot.magerr,
-                    max_decay_fit_time=param_ranges["max_decay_fit_time"],
+                    t_pre=param_ranges["t_pre"],
+                    t_post=param_ranges["t_post"],
                     min_time_separation=param_ranges["min_time_separation"],
                 )
             )

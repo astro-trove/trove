@@ -37,7 +37,6 @@
             <img src="{% static 'img/trove_logo_small.jpeg' %}" style="flex:0 0 auto">
             <div style="flex:1 1 auto;">
                 <h1 style="text-align:justify flex: 1 1 auto"><b>Welcome to the TROVE!</b></h1>
-                <h4 style="text-align:justify flex: 1 1 auto"><b>[beta version]</b></h4>
             </div>
         </div>
     </div>
@@ -50,7 +49,7 @@
     <h5 style="text-align:justify">TROVE vets and scores candidate counterparts based on their position in a localization region, association with potential host galaxies, association with point sources, minor planets, or AGN, and photometric behavior. Candidates are ranked based on their score. High-scoring candidates are prime targets for photometric and spectroscopic follow-up!</h5>
     <br>
     {% endcomment %}
-    <h5 style="text-align:justify">TROVE is currently in <b>beta testing</b>. If you encounter an issue, please <a href="https://github.com/astro-trove/trove/issues/new" target="_blank">open an issue</a> on our Github.</h5>
+    <h5 style="text-align:justify">If you encounter an issue, please <a href="https://github.com/astro-trove/trove/issues/new" target="_blank">open an issue</a> on our Github.</h5>
     <br>
     <h5 style="text-align:justify"><b>What are you waiting for? Dive on in to the Treasure TROVE.</b></h5>
     <br>
@@ -58,7 +57,7 @@
     <!-- Documentation and Register buttons -->
     <div style="text-align:center">
       <a href="{% url 'sphinx_docs:docs' %}" target="_blank" title="Read the documentation!" class="btn btn-lg btn-info">📜 Documentation</a>
-      <a href="/accounts/register" target="_blank" title="Register for an account!" class="btn btn-lg btn-warning">🌐 Register</a>
+      <a href="/accounts/signup" target="_blank" title="Register for an account!" class="btn btn-lg btn-warning">🌐 Register</a>
     </div>
     <br>
 
@@ -100,9 +99,9 @@
       &nbsp;
       <div id="skymap-collapse">
         <div class="row align:center">
-          <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
-          <!-- <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div> -->
-          <div class="col-md-12"><a href="{% url 'custom_code:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving at least one subsolar mass compact object!</div>
+          <!-- <div class="col-md-12"><a href="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent=21962" target="_blank">GW170817</a>: The first and only multimessenger binary neutron star merger!</div> -->
+          <!-- <div class="col-md-12"><a href="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent=21085" target="_blank">GW190814</a>: A merger between a 23 solar-mass black hole and a 2.6 solar mass mystery object!</div> -->
+          <div class="col-md-12"><a href="{% url 'trove_nonlocalizedevents:event-candidates' %}?nonlocalizedevent=20113" target="_blank">S251112cm</a>: The first statistically significant candidate GW merger involving at least one subsolar mass compact object!</div>
         </div>
         <div class="card-body"
              id="skymap-body"

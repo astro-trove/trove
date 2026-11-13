@@ -4,6 +4,9 @@ from astropy.coordinates import SkyCoord
 from healpix_alchemy.constants import HPX
 from django.conf import settings
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 class Target(BaseTarget):
     classification = models.CharField(max_length=255, null=True, blank=True)
@@ -20,5 +23,7 @@ class Target(BaseTarget):
         self.galactic_lng = coord.galactic.l.deg
         self.galactic_lat = coord.galactic.b.deg
         self.healpix = HPX.skycoord_to_healpix(coord)
-        self.mwebv = settings.DUST_MAP(coord)
+        if self.mwebv is None or self.mwebv == 0:
+            self.mwebv = settings.DUST_MAP(coord)
+            logger.info(f"MW E(B-V) set to {self.mwebv}")
         super().save(*args, **kwargs)

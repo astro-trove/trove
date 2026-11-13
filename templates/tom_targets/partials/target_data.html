@@ -16,7 +16,6 @@
             <a href="https://antares.noirlab.edu/loci/lookup/{{ target_name }}" target="_blank"><img src="https://antares.noirlab.edu/favicon.ico" alt="ANTARES" title="ANTARES" class="icon" /></a>
             <a href="https://fink-portal.org/{{ target_name }}" target="_blank"><img src="https://fink-portal.org/assets/favicon.ico" alt="Fink" title="Fink" class="icon" /></a>
             <a href="https://lasair-ztf.lsst.ac.uk/objects/{{ target_name }}/" target="_blank"><img src="https://lasair-ztf.lsst.ac.uk/lasair/static/img/favicon/favicon.ico" alt="Lasair" title="Lasair" class="icon" /></a>
-            <a href="https://sand.as.arizona.edu/sassy/ztf_q3c/zoid/{{ target_name }}/" target="_blank"><img src="https://www.as.arizona.edu/favicon.ico" alt="SASSy" title="SASSy" class="icon" /></a>
         {% endif %}
         {% endwith %}
     </dd>
@@ -50,25 +49,25 @@
 <!-- This displays the target extras values -->
 <dl class="row">
   {% for key, value in target.as_dict.items %}
-  {% if key != 'name' and key != 'ra' and key != 'dec' and key != 'galactic_lng' and key != 'galactic_lat' and key != 'type' and key != 'epoch' and key != 'permissions' %}
-  {% if key == 'redshift' or key == 'mwebv' %}
-  {% if value is None or value == 'nan' or value == '' or value|isnan %}
-  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
-  <dd class="col-sm-6">---</dd>
-  {% else %}
-  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
-  <dd class="col-sm-6">{{ value|floatformat:4 }}</dd>
-  {% endif %}
-  {% elif key == 'classification' %}
-  {% if value is None or value == 'nan' or value == '' or value|isnan %}
-  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
-  <dd class="col-sm-6">---</dd>
-  {% else %}
-  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
-  <dd class="col-sm-6">{{ value|truncate_value_for_display }}</dd>
-  {% endif %}
-  {% endif %}
-  {% endif %}
+      {% if key != 'name' and key != 'ra' and key != 'dec' and key != 'galactic_lng' and key != 'galactic_lat' and key != 'type' and key != 'epoch' and key != 'permissions' %}
+          {% if key == 'redshift' or key == 'mwebv' %}
+              {% if value is None or value == 'nan' or value == '' or value|isnan %}
+                  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+                  <dd class="col-sm-6">---</dd>
+              {% else %}
+                  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+                  <dd class="col-sm-6">{{ value|floatformat:4 }}</dd>
+              {% endif %}
+          {% elif key == 'classification' %}
+              {% if value is None or value == 'nan' or value == '' or value|isnan %}
+                  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+                  <dd class="col-sm-6">---</dd>
+              {% else %}
+                  <dt class="col-sm-6" title="{% help_text target key %}">{% verbose_name target key %}</dt>
+                  <dd class="col-sm-6">{{ value|truncate_value_for_display }}</dd>
+              {% endif %}
+          {% endif %}
+      {% endif %}
   {% endfor %}
 </dl>
 

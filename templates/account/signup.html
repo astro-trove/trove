@@ -1,0 +1,32 @@
+{% extends 'tom_common/base.html' %}
+{% load django_bootstrap5 %}
+{% block title %}Sign up{% endblock %}
+{% block content %}
+<h2>Sign up</h2>
+<form action="{% url 'account_signup' %}" method="POST">
+{% csrf_token %}
+{% bootstrap_form form %}
+<div class="form-check mb-3">
+  <input
+    class="form-check-input"
+    type="checkbox"
+    id="terms_agreed"
+    name="terms_agreed"
+    value="1"
+    required
+  >
+  <label class="form-check-label" for="terms_agreed">
+    <b>I have read and agree to the 
+    <a href="https://astro-trove.github.io/rules/TROVE_Rules.pdf" target="_blank" rel="noopener">TROVE Rules</a>. 
+    I understand it applies to the TROVE website, API, comments, GitHub, meetings, and Slack. I will not share my password or API token.</b>
+
+  </label>
+</div>
+<div class="mb-3">
+  <button type="submit" class="btn btn-primary">
+    Register
+  </button>
+</div>
+</form>
+<hr/>
+{% endblock %}
