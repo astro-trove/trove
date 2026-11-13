@@ -22,7 +22,7 @@ the target:
 
 When the candidate was first vetted, it was associated with galaxy 
 J233413.14-240417.7, with a photometric redshift of 0.07 ± 0.04. Because 
-S251112cm lies at 93 Mpc (z ~ 0.02), the distance association score for AT2025alpk is 
+S251112cm lies at 93 Mpc (z ~ 0.02), the distance score for AT2025alpk is 
 quite low. 
 
 You notice that the galaxy also has a redshift in PS1 STRM. You find this galaxy 
@@ -32,7 +32,7 @@ promising, so you add a comment letting the community know you're pursuing it.
 
 |
 
-Later, you obtain a spectroscopic redshift o 0.021 ± 0.001 ! Clicking "Update Host z" 
+Later, you obtain a spectroscopic redshift of 0.021 ± 0.001 ! Clicking "Update Host z" 
 on the candidate's page, you submit the following measurement: 
 
 .. image:: hostredshiftimg/2_AT2025alpk_updatez.png
@@ -42,8 +42,8 @@ on the candidate's page, you submit the following measurement:
 Upon clicking Update Selected Galaxy Redshift, the selected galaxy will 
 essentially be duplicated in our database, *but*, with the redshift you provided! 
 That galaxy will be assigned a "user spec-z" for its distance type, which has highest 
-priority after a direct measurement of the distance to the candidate. Finally, 
-the candidate will be re-vet. When the page finishes reloading:
+priority for use in distance scoring after a direct measurement of the distance to the 
+candidate. Finally, the candidate will be re-vet. When the page finishes reloading:
 
 .. image:: hostredshiftimg/3_AT2025alpk_after.png
 

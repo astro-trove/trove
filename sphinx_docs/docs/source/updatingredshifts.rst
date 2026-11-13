@@ -42,8 +42,8 @@ on the candidate's page, you submit the following measurement:
 Upon clicking Update Selected Galaxy Redshift, the selected galaxy will 
 essentially be duplicated in our database, *but*, with the redshift you provided! 
 That galaxy will be assigned a "user spec-z" for its distance type, which has highest 
-priority after a direct measurement of the distance to the candidate. Finally, 
-the candidate will be re-vet. When the page finishes reloading:
+priority for use in distance scoring after a direct measurement of the distance to the 
+candidate. Finally, the candidate will be re-vet. When the page finishes reloading:
 
 .. image:: hostredshiftimg/3_AT2025alpk_after.png
 
