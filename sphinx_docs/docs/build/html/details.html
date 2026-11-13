@@ -46,7 +46,10 @@
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'details';</script>
+    <script src="_static/dynamic_urls.js?v=4324230a"></script>
     <link rel="canonical" href="https://datatrove.as.arizona.edu/details.html" />
     <link rel="icon" href="_static/favicon.ico"/>
     <link rel="index" title="Index" href="genindex.html" />
@@ -162,7 +165,7 @@
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ &amp; Glossary</a></li>
-<li class="toctree-l1"><a class="reference internal" href="citations.html">Citing TROVE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citations.html">Publications &amp; Citing TROVE</a></li>
 </ul>
 
     </div>
@@ -356,9 +359,9 @@
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#getting-started">Getting Started</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#viewing-nonlocalized-events">Viewing Nonlocalized Events</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-list-page">Target List Page</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-target-page">The Target Page</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#viewing-poorly-localized-nonlocalized-events">Viewing Poorly Localized (“Nonlocalized”) Events</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-candidate-table">Target / Candidate Table</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-candidate-page">Target / Candidate Page</a></li>
 </ul>
             </nav>
         </div>
@@ -374,100 +377,157 @@
 <h1>Web App Details<a class="headerlink" href="#web-app-details" title="Link to this heading">#</a></h1>
 <section id="getting-started">
 <h2>Getting Started<a class="headerlink" href="#getting-started" title="Link to this heading">#</a></h2>
-<p>TROVE is located at <a class="reference external" href="https://datatrove.as.arizona.edu">https://datatrove.as.arizona.edu</a>. When you first arrive at the page you will see the home page, with no
-content, and you should either register for an account or login. If you are registering for the first time, it may take 1-2
-days for your account to be approved by an administrator. If it has not been approved in that time, please post a help message in the
-Slack workspace.</p>
-<p>Before logging in the home page should look like the following, with no targets or comments shown:</p>
+<p>TROVE is located at <a class="reference external" href="https://datatrove.as.arizona.edu">https://datatrove.as.arizona.edu</a>. When you first arrive at the page
+you will see the home page, with no content, and you should either register for an
+account or login. If you are registering for the first time, it may take 1-2 days for
+your account to be approved by an administrator. If it has not been approved in that
+time, please post a help message in the Slack workspace.</p>
+<p>Before logging in the home page should look like the following, with little shown other
+than some recent events of interest:</p>
 <img alt="_images/home-loggedout.png" src="_images/home-loggedout.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>After logging in you should be able to see a list of targets and comments:</p>
+<p>After logging in you should be able to see more, including latest comments:</p>
 <img alt="_images/home-loggedin.png" src="_images/home-loggedin.png" />
-</section>
-<section id="viewing-nonlocalized-events">
-<h2>Viewing Nonlocalized Events<a class="headerlink" href="#viewing-nonlocalized-events" title="Link to this heading">#</a></h2>
-<p>A nonlocalized event (NLE)—sometimes more aptly termed a poorly localized event—is some astrophysical source with an
-uncertain position on the sky. These can be large uncertainties of tens to thousands of square degrees (e.g., gravitational waves)
-or tens of square arcminutes (e.g., fast X-ray transients.)</p>
-<p>First, click on the “Nonlocalized Events” tab dropdown in the navigation bar (navbar). From the dropdown menu, select
-“Gravitational Waves” to go the following page:</p>
-<img alt="_images/nle-gw.png" src="_images/nle-gw.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>On this page, you will see a list of all gravitational wave (GW) events that we have ingested into our database from the IGWN. By
-default, we filter the table to only include events with an false alarm rate (FAR) &lt; 0.5 per year (i.e., once per two years)
-(the recommendation from the International Gravitational-Wave Observatory Network, IGWN). You can adjust this FAR
-limit using the form at the top. There are also various other options that you are able to filter on using the form at the top
-of the page.</p>
-<p>From this table, you are able to access the candidates for a specific GW event by clicking on its name from the table. After
-clicking on a GW event you should see a page like:</p>
+<p>From here, take a look at the options in the navigation bar. The search bar at right
+can be used to search for either events or candidate counterparts to events.</p>
+</section>
+<section id="viewing-poorly-localized-nonlocalized-events">
+<h2>Viewing Poorly Localized (“Nonlocalized”) Events<a class="headerlink" href="#viewing-poorly-localized-nonlocalized-events" title="Link to this heading">#</a></h2>
+<p>A poorly localized event (PLE)—sometimes referred to as a nonlocalized event
+(NLE), for example within the TOMToolkit package—is some astrophysical source with an
+uncertain position on the sky. These can be large uncertainties of tens to thousands of
+square degrees (e.g., gravitational waves; GWs) or a few square arcminutes (e.g., fast
+X-ray transients; FXTs)</p>
+<p>First, click on the <strong>Events</strong> tab dropdown in the navigation bar. From the dropdown
+menu, select <strong>Gravitational Waves</strong> to go the following page:</p>
+<img alt="_images/ple-gw.png" src="_images/ple-gw.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>You’ll see a list of all GW events that we have ingested into our
+database. By default, we filter the table to only include events with an false alarm
+rate (FAR) &lt; 0.5 per year (i.e., once per two years; the recommendation from the
+International Gravitational-Wave Observatory Network IGWN). You can adjust this FAR
+limit using the form at the top. There are also various other options that you are able
+to filter on using the form at the top of the page.</p>
+<p>From this table, you are able to access the candidates for a specific GW event by
+clicking on its name from the table. After clicking on a GW event you should see a page
+like:</p>
 <img alt="_images/candidate-top.png" src="_images/candidate-top.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>This section shows (1) some basic information on the GW event and (2) a skymap with the candidates plotted on top of the
-GW localization.</p>
-<p>Scrolling down you should now see a table of the candidates ranked by score. For example:</p>
+<p>This section shows some basic information on the GW event and a skymap with the
+candidates plotted on top of the GW localization.</p>
+<p>Scrolling down, you should now see a table of the candidates ranked by score. For
+example:</p>
 <img alt="_images/candidate-table.png" src="_images/candidate-table.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>Depending on the type of event, you will see different types of scores in the “score” column. For a binary neutron star (BNS) merger
-or neutron star - black hole (NSBH) merger, only the kilonova (KN) score will be displayed. For a subsolar mass merger (SSM) event like
-S251112cm above, you’ll see KN, kilonova-in-supernova (KN-in-SN), and super-kilonova (super-KN) scores.</p>
-<p>At the top of this table you can search by candidate name and link new candidates if something is missing (although the candidates
-should be linked automatically!). To asynchronously rerun forced photometry and re-score everything, use the “Vet All” button.
-Note however that the scoring will take a few seconds per candidate, which can add up to ~minutes-hours for GW events with many
-candidates. Forced photometry will take ~hours-days. It is usually best practice to re-vet the candidates of interest.</p>
-<p>From this page, the normal workflow is to click on specific candidates and look at details. We will go into details about targets
-in the next two sections.</p>
-</section>
-<section id="target-list-page">
-<h2>Target List Page<a class="headerlink" href="#target-list-page" title="Link to this heading">#</a></h2>
-<p>In addition to accessing candidates via NLEs to which they are associated, we can also search for “Targets” which
-may or may not be associated with a nonlocalized event. This will look something like:</p>
-<img alt="_images/target-top.png" src="_images/target-top.png" />
+<p>Depending on the type of event, you will see different score columns. For a binary
+neutron star (BNS) merger or neutron star - black hole (NSBH) merger, only the kilonova
+(KN) score will be displayed. For a subsolar mass merger (SSM) event like S251112cm
+above, you’ll see KN, kilonova-in-supernova (KN-in-SN), and super-kilonova (super-KN)
+scores.</p>
+<p>You’ll immediately notice a few buttons:</p>
+<ul class="simple">
+<li><p>Export a CSV of selected candidates and their coordinates, latest detections,
+potential host galaxies, etc. by clicking <strong>Export Selected</strong>. This may be helpful for
+putting in target coordinates into some observing software for planning or executing
+observations.</p></li>
+<li><p>Submit a job to asynchronously vet and re-score selected candidates by clicking
+<strong>Vet Selected</strong>. You may vet up to 20 at once.</p></li>
+<li><p>Submit a job to asynchronously vet and re-score everything, use the <strong>Vet All</strong> button.
+Note however that the scoring will may take ~a second per candidate, which can add up
+to ~minutes-hours for GW events with many candidates. This button is therefore on a
+global cooldown for all users. Use <strong>Vet Selected</strong> instead whenever possible.</p></li>
+</ul>
+<p>You’ll also see some filters. The simplest filter is to filter by candidate name, but
+you can also filter by, e.g., the maximum distance you’re interested in:</p>
+<img alt="_images/candidate-table-filters.png" src="_images/candidate-table-filters.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>Scrolling down, you will see a table of targets with the most recently ingested, edited, and discovered targets near the top:</p>
+<p>In the right column above the table, there is also a box to search for a single
+candidate by name and associate it with the event—though candidates should be linked
+automatically!</p>
+<p>Finally, note also the toggle-able buttons for (1) including the AGN subscore in
+computing the overall score and (2) whether to use simple light curve metrics or
+<code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code> to compute the photometry subscore for kilonovae, when applicable.</p>
+<p>From this page, the normal workflow is to click on specific candidates and look at
+details. We will go into details about targets in the following sections.</p>
+</section>
+<section id="target-candidate-table">
+<h2>Target / Candidate Table<a class="headerlink" href="#target-candidate-table" title="Link to this heading">#</a></h2>
+<p>In addition to accessing candidates via the PLEs to which they are associated, we can
+also search for targets which may or may not be associated with an event. (We use the
+term target to generically refer to a well-localized astrophysical source, and
+candidate once that target has been associated with a PLE). From the navigation bar at
+top, clicking <strong>EM Candidates</strong> and selecting <strong>All Candidates</strong> from the dropdown menu,
+you will be led to the following page:</p>
 <img alt="_images/target-table.png" src="_images/target-table.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>From this page, just like on the candidate page, you can click individual targets and go to their page.</p>
+<p>Where you’ll see a table of targetss with the most recently ingested, edited, and
+discovered near the top. This table will indicate the first detection and distance to
+the target, if known, and any associated events. Just like on the event candidates
+page, there are useful filters to apply here as needed and you can click individual
+targets to go to their page.</p>
 </section>
-<section id="the-target-page">
-<h2>The Target Page<a class="headerlink" href="#the-target-page" title="Link to this heading">#</a></h2>
-<p>This page contains details of the targets themselves. When first coming to a target page it will look like:</p>
-<img alt="_images/target-host-table.png" src="_images/target-host-table.png" />
+<section id="target-candidate-page">
+<h2>Target / Candidate Page<a class="headerlink" href="#target-candidate-page" title="Link to this heading">#</a></h2>
+<p>This page contains the details of a single target (candidate, if associated with an
+event). You should see:</p>
+<img alt="_images/target.png" src="_images/target.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>Things like coordinates, name aliases, redshift (if known), and extinction are all shown on the left sidebar. At top,
-see buttons for:</p>
+<p>Things like coordinates, name aliases, redshift (if known), and extinction are all
+shown on the left sidebar. At top, see buttons for:</p>
 <ol class="arabic simple">
 <li><p>Update Lightcurve: Submit a job to obtain forced photometry from ATLAS or ZTF.</p></li>
-<li><p>Update Host z: Submit a spectroscopic redshift measurement for one of the host galaxies in the galaxy table.</p></li>
+<li><p>Update Host z: Submit a spectroscopic redshift measurement for one of the host
+galaxies in the galaxy table. (See: <a class="reference external" href="updatingredshifts.html">Submitting Galaxy Spec-z’s</a>)</p></li>
+<li><p>Vet: Vet the target / candidate.</p></li>
 </ol>
-<p>On the right, see details of the subscores that are general to the target, and others specific to a
-NLE-target pair. For example, crossmatching with point sources, asteroids from the Minor Planet Center (MPC), and AGN
-is possible for all targets, while other scores (2D localization, distance, and photometry) are dependent on the NLE.</p>
-<p>Below the score details is a table of potential host galaxies. These are determined based on a probability of chance
-coincidence calculation (Pcc), where a lower Pcc indicates a more likely host galaxy. In TROVE we make a cut on Pcc &lt; 0.15,
-so only low Pcc galaxies should appear in this table. The distances, redshifts, and type of distance measurement
-(redshift-independent, spectroscopic redshift, photometric redshift) of these individual host galaxies are also
-shown in this table. An atlas viewer at bottom left shows the position of the target and these potential hosts:</p>
+<p>On the right, in the Score Details tab, see details of the subscores that are general
+to the target, and others specific to a PLE-target pair. For example, crossmatching
+with point sources and solar system objects from the Minor Planet Center (MPC) is
+possible for all targets, while other scores (2D localization, distance, and
+photometry) are dependent on the PLE and the class of transient you are vetting in
+search of.</p>
+<p>Below the score details is a table of potential host galaxies. These are determined
+based on a probability of chance coincidence (<span class="math notranslate nohighlight">\(P_{\rm cc}\)</span>) calculation, where a
+lower <span class="math notranslate nohighlight">\(P_{cc}\)</span> indicates a more likely host galaxy. In TROVE we make a cut on
+<span class="math notranslate nohighlight">\(P_{\rm cc} &lt; 0.15\)</span>, so only low-<span class="math notranslate nohighlight">\(P_{cc}\)</span> galaxies should appear in this
+table. The distances, redshifts, and type of distance measurement
+(redshift-independent, spectroscopic redshift, photometric redshift) of these
+individual host galaxies are also shown in this table.</p>
+<p>An atlas viewer at bottom left shows the position of the target (red circle) and these
+potential hosts (pink circle):</p>
 <img alt="_images/target-atlas.png" src="_images/target-atlas.png" />
 <div class="line-block">
 <div class="line"><br /></div>
 </div>
-<p>Finally, on the right side below the host galaxy table is the light curve, including photometry from TNS and forced photometry
-servers. This light curve looks like the following:</p>
+<p>Next, click the <strong>Photometry</strong> tab to see the lightcurves:</p>
 <img alt="_images/target-photometry.png" src="_images/target-photometry.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Playing with the filters on bands, sources (telescopes) and minimum SNR will affect
+both the plotted lightcurve and the photometry table.</p>
+<p>Finally, click the <strong>Comments</strong> tab to view or submit a comment to share with the
+community. A comment could include some plan to observe a candidate or its potential
+host.</p>
+<p>This is just a brief overview of the pages most users will access in the web app. Dive
+in to the TROVE to see for yourself!</p>
 </section>
 </section>
 
@@ -519,9 +579,9 @@ servers. This light curve looks like the following:</p>
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#getting-started">Getting Started</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#viewing-nonlocalized-events">Viewing Nonlocalized Events</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-list-page">Target List Page</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#the-target-page">The Target Page</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#viewing-poorly-localized-nonlocalized-events">Viewing Poorly Localized (“Nonlocalized”) Events</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-candidate-table">Target / Candidate Table</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#target-candidate-page">Target / Candidate Page</a></li>
 </ul>
   </nav></div>
 
