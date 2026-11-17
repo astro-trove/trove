@@ -47,8 +47,8 @@
     <script src="_static/design-tabs.js?v=f930bc37"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'api';</script>
-    <script src="_static/dynamic_urls.js?v=4324230a"></script>
-    <link rel="canonical" href="https://datatrove.as.arizona.edu/api.html" />
+    <script src="_static/dynamic_urls.js?v=5f038d73"></script>
+    <link rel="canonical" href="https://trove.as.arizona.edu/api.html" />
     <link rel="icon" href="_static/favicon.ico"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -158,7 +158,7 @@
 <li class="toctree-l1"><a class="reference internal" href="updatingredshifts.html">Submitting Galaxy Spec-z’s</a></li>
 <li class="toctree-l1 current active has-children"><a class="current reference internal" href="#">API Docs</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="nbs/basic_usage.html">Example Notebook</a></li>
-<li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/api/docs">API Reference</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://trove.as.arizona.edu/api/docs">API Reference</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
@@ -379,15 +379,15 @@
 <section id="api-quickstart">
 <h2>API Quickstart<a class="headerlink" href="#api-quickstart" title="Link to this heading">#</a></h2>
 <p>Details and examples with curl commands to access the endpoints are on the RESTful API Reference docs
-page: <a class="reference external" href="https://datatrove.as.arizona.edu/api/docs">https://datatrove.as.arizona.edu/api/docs</a></p>
+page: <a class="reference external" href="https://trove.as.arizona.edu/api/docs">https://trove.as.arizona.edu/api/docs</a></p>
 <p>An example curl command is:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>curl<span class="w"> </span>-X<span class="w"> </span><span class="s1">&#39;GET&#39;</span><span class="w"> </span><span class="se">\</span>
-<span class="w">    </span><span class="s1">&#39;https://datatrove.as.arizona.edu/api/score/S251112cm&#39;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">    </span><span class="s1">&#39;https://trove.as.arizona.edu/api/score/S251112cm&#39;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">    </span>-H<span class="w"> </span><span class="s1">&#39;Authorization: Bearer &lt;api_token&gt;&#39;</span>
 </pre></div>
 </div>
 <p>where you replace &lt;api_token&gt; with the API token listed on your user profile page,
-<a class="reference external" href="https://datatrove.as.arizona.edu/users/profile/">https://datatrove.as.arizona.edu/users/profile/</a>. If your token is ever exposed, you can
+<a class="reference external" href="https://trove.as.arizona.edu/users/profile/">https://trove.as.arizona.edu/users/profile/</a>. If your token is ever exposed, you can
 click the “edit” button in the top right corner, then scroll down and click
 “Regenerate API Token” on that page; the old token stops working immediately and it will display a new token.
 If you are doing this in python, see the <a class="reference external" href="nbs/basic_usage.html">Example Jupyter Notebooks</a>.</p>

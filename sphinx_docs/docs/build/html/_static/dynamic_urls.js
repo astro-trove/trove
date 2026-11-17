@@ -3,7 +3,7 @@
   console.log("dynamic_urls.js loaded, hostname:", window.location.hostname);
 
   document.addEventListener("DOMContentLoaded", function () {
-    const productionBase = "https://datatrove.as.arizona.edu";
+    const productionBase = "https://trove.as.arizona.edu";
     const currentBase = window.location.origin;
 
     console.log("currentBase:", currentBase);

@@ -3,7 +3,7 @@ Developer Documentation
 
 Interested in developing? Welcome aboard! You should do the following:
 
-1. Make an account on https://datatrove.as.arizona.edu
+1. Make an account on https://trove.as.arizona.edu
 2. Join our `Slack workspace <https://join.slack.com/t/astrotrove/shared_invite/zt-4fgc3msme-31VxfdBs_HYYcMpBJ0_UrQ>`_
 3. Read and follow the ``README.md`` file on our 
    `github <https://github.com/astro-trove/trove/>`_ to get set up locally

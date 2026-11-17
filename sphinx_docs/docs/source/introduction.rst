@@ -7,7 +7,7 @@ designed for real-time object vetting of new transients for optimizing follow-up
 Quickstart
 ----------
 
-1. Navigate to https://datatrove.as.arizona.edu
+1. Navigate to https://trove.as.arizona.edu
 2. Login or register for an account. Registration may take 1-2 days to be approved. You should receive an email when your registration is confirmed.
 3. See GW events by clicking the "Events" → "Gravitational Waves" tab in the navigation bar at the top of the website. Find your favorite event. You may also search for them with the search bar.
 4. Click on any of the GW event names to navigate to an "Event Candidate" page that contains a ranked list of scores 

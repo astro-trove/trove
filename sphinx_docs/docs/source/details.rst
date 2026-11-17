@@ -4,7 +4,7 @@ Web App Details
 Getting Started
 ---------------
 
-TROVE is located at https://datatrove.as.arizona.edu. When you first arrive at the page 
+TROVE is located at https://trove.as.arizona.edu. When you first arrive at the page 
 you will see the home page, with no content, and you should either register for an 
 account or login. If you are registering for the first time, it may take 1-2 days for 
 your account to be approved by an administrator. If it has not been approved in that 

@@ -64,7 +64,7 @@ html_theme_options = {
     "show_toc_level": 3,
 }
 
-html_baseurl = "https://datatrove.as.arizona.edu"
+html_baseurl = "https://trove.as.arizona.edu"
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
