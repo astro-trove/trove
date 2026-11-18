@@ -51,7 +51,7 @@ Frequently Asked Questions (FAQ)
 
 .. dropdown:: How should I interpret a score?
 
-    A high score for a candidate means that a candidate is not inconsistent with the 
+    A high score for a candidate means that a candidate is consistent with the 
     expected counterpart based on currently available data, and merits follow-up. 
     
     Importantly, scores for candidates should *not* be compared across different poorly 
@@ -69,8 +69,8 @@ Frequently Asked Questions (FAQ)
         
 .. dropdown:: Should I go after the highest-ranked candidate on TROVE?
 
-    Not necessarily! Except in exceptional cases (e.g., AT2017gfo and GW170817), as a 
-    *community*, we are more likely to find the next kilonova if we collectively curate 
+    Not necessarily! Other than exceptional cases (e.g., AT2017gfo and GW170817), as a 
+    *community* we are more likely to find the next kilonova if we collectively curate 
     a dataset for the top decile of candidates such that we rule out interlopers and 
     build conclusive datasets for promising candidates.
 
@@ -108,7 +108,7 @@ Frequently Asked Questions (FAQ)
     ZTF, and ATLAS forced photometry (as long as it will be constraining for the light 
     curve of the transient).
     
-    Unautomated at present, due to technical limitations: ZTF forced photometry, 
+    Unautomated at present, due to technical limitations that are out of our control: ZTF forced photometry, 
     updates to TNS light curves, re-vetting of *all* candidates associated with a PLE, 
     ingestion of photometry from all-sky surveys without some Kafka stream, and 
     ingestion of galaxies' spectroscopic redshifts obtained by various teams during a 
@@ -164,7 +164,7 @@ Glossary of Frequently Used Terms
     interchangably with *super-kilonova*.
     
     **LSST**: The Legacy Survey of Space and Time. The primary survey being conducted 
-    by the Vera Rubin Observatory. 
+    by the Vera C. Rubin Observatory. 
     
     **neutrino**: Elementary particle (lepton) with no charge, which interacts via the 
     weak force. Produced in a variety of scenarios, such as a fusion in the core of the 
