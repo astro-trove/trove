@@ -153,8 +153,8 @@ search of.
 
 Below the score details is a table of potential host galaxies. These are determined 
 based on a probability of chance coincidence (:math:`P_{\rm cc}`) calculation, where a 
-lower :math:`P_{cc}` indicates a more likely host galaxy. In TROVE we make a cut on 
-:math:`P_{\rm cc} < 0.15`, so only low-:math:`P_{cc}` galaxies should appear in this 
+lower :math:`P_{\rm cc}` indicates a more likely host galaxy. In TROVE we make a cut on 
+:math:`P_{\rm cc} < 0.15`, so only low-:math:`P_{\rm cc}` galaxies should appear in this 
 table. The distances, redshifts, and type of distance measurement 
 (redshift-independent, spectroscopic redshift, photometric redshift) of these 
 individual host galaxies are also shown in this table. 

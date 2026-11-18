@@ -46,6 +46,8 @@
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'scoringexplained';</script>
     <script src="_static/dynamic_urls.js?v=5f038d73"></script>
     <link rel="canonical" href="https://trove.as.arizona.edu/scoringexplained.html" />
@@ -356,10 +358,10 @@
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-skymap-localization-scores">2D (Skymap/Localization) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-distance-scores">3D (Distance) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-minor-planet-scores">Point Source and Minor Planet Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-scores">AGN Scores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#localization-2d-subscores">Localization (2D) Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#distance-3d-subscores">Distance (3D) Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-solar-system-object-subcores">Point Source and Solar System Object Subcores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-subscores">AGN Subscores</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-scores">Photometry Scores</a></li>
 </ul>
             </nav>
@@ -374,18 +376,60 @@
                   
   <section id="how-scoring-works">
 <h1>How Scoring Works<a class="headerlink" href="#how-scoring-works" title="Link to this heading">#</a></h1>
-<p>Coming soon!</p>
-<section id="d-skymap-localization-scores">
-<h2>2D (Skymap/Localization) Scores<a class="headerlink" href="#d-skymap-localization-scores" title="Link to this heading">#</a></h2>
+<p>This page very briefly describes the various subscores which go into the total, overall
+score. This overall score is a number between 0 and 1, and is a product of several other
+numbers (subsocres) which themselves are between 0 and 1. For details, see Franz et
+al., in prep.</p>
+<section id="localization-2d-subscores">
+<h2>Localization (2D) Subscores<a class="headerlink" href="#localization-2d-subscores" title="Link to this heading">#</a></h2>
+<p>The 2D, skymap, or localization subscore quantifies whether a candidate sits squarely in the
+localization region of some event or on the edge. We compute this score by finding the
+HEALPix in which a candidate lies, extracting the probability density from the skymap
+at that pixel, and then integrating over pixels at a higher probability density.
+Integration over all pixels is normalized to 1, such that the 2D subscore lies
+between 0 and 1.</p>
+<p>The following cartoon explains the 2D score graphically:</p>
+<img alt="_images/2D_scoring.png" src="_images/2D_scoring.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Darker colors denote higher probability density.</p>
 </section>
-<section id="d-distance-scores">
-<h2>3D (Distance) Scores<a class="headerlink" href="#d-distance-scores" title="Link to this heading">#</a></h2>
+<section id="distance-3d-subscores">
+<h2>Distance (3D) Subscores<a class="headerlink" href="#distance-3d-subscores" title="Link to this heading">#</a></h2>
+<p>The distance subscore quantifies whether the estimated distance to a candidate is
+consistent with the distance of some event such as a gravitational wave. Distances to
+candidates are primarily estimated by associating them with a potential host galaxy
+at some measured distance. We perform this galaxy association using about 10 billion
+galaxies over several catalogs. Distances may also come from spectroscopy of individual
+candidates themselves.</p>
+<p>The computation of the distance subscore has two regimes:</p>
+<ol class="arabic simple">
+<li><p>Uncertainty on galaxy distance <span class="math notranslate nohighlight">\(\ll\)</span> uncertainty on event distance (<span class="math notranslate nohighlight">\(\sigma_{\rm gal} \ll \sigma_{\rm event}\)</span>):
+The distance subscore roughly depends on how many standard deviations <span class="math notranslate nohighlight">\(\sigma_{\rm event}\)</span> away from the median the
+distance to the galaxy lies. This is the case for most spectroscopic redshifts given
+their tight uncertainties.</p></li>
+<li><p>Uncertainty on galaxy distance &gt; uncertainty on event distance (<span class="math notranslate nohighlight">\(\sigma_{\rm gal} &gt; \sigma_{\rm event}\)</span>):
+We use the Bhattacharyya coefficient, which computes something like the overlap of
+the two distance posterior distributions. This is the case for most photometric redshifts,
+as they have broader uncertainties.</p></li>
+</ol>
+<p>The following figure from Franz et al., in prep explains this distance score
+graphically:</p>
+<img alt="_images/distance_scoring.png" src="_images/distance_scoring.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>We see a comparison of the galaxy / event distance posteriors and the resultant scores.
+The four scenarios shown are seen across candidates during a follow-up campaign.</p>
 </section>
-<section id="point-source-and-minor-planet-scores">
-<h2>Point Source and Minor Planet Scores<a class="headerlink" href="#point-source-and-minor-planet-scores" title="Link to this heading">#</a></h2>
+<section id="point-source-and-solar-system-object-subcores">
+<h2>Point Source and Solar System Object Subcores<a class="headerlink" href="#point-source-and-solar-system-object-subcores" title="Link to this heading">#</a></h2>
+<p>Candidates are disfavored (receive a subscore of 0) or favored (receive a subscore of 1)
+based on their association with point sources or solar system objects (SSOs).</p>
 </section>
-<section id="agn-scores">
-<h2>AGN Scores<a class="headerlink" href="#agn-scores" title="Link to this heading">#</a></h2>
+<section id="agn-subscores">
+<h2>AGN Subscores<a class="headerlink" href="#agn-subscores" title="Link to this heading">#</a></h2>
 </section>
 <section id="photometry-scores">
 <h2>Photometry Scores<a class="headerlink" href="#photometry-scores" title="Link to this heading">#</a></h2>
@@ -439,10 +483,10 @@
   </div>
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-skymap-localization-scores">2D (Skymap/Localization) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-distance-scores">3D (Distance) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-minor-planet-scores">Point Source and Minor Planet Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-scores">AGN Scores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#localization-2d-subscores">Localization (2D) Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#distance-3d-subscores">Distance (3D) Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-solar-system-object-subcores">Point Source and Solar System Object Subcores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-subscores">AGN Subscores</a></li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-scores">Photometry Scores</a></li>
 </ul>
   </nav></div>

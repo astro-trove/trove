@@ -86,7 +86,6 @@ Frequently Asked Questions (FAQ)
     reach. This will reduce waste and redundant observations, and a member of the 
     community might tweak their own observing strategy based on what you share.
 
-
 .. dropdown:: I've obtained photometry for a candidate in TROVE. What is the best way to share it?
 
     Upload that photometry to the TNS and re-vet the candidate on its page. 
@@ -108,11 +107,11 @@ Frequently Asked Questions (FAQ)
     ZTF, and ATLAS forced photometry (as long as it will be constraining for the light 
     curve of the transient).
     
-    Unautomated at present, due to technical limitations that are out of our control: ZTF forced photometry, 
-    updates to TNS light curves, re-vetting of *all* candidates associated with a PLE, 
-    ingestion of photometry from all-sky surveys without some Kafka stream, and 
-    ingestion of galaxies' spectroscopic redshifts obtained by various teams during a 
-    follow-up campaign (see `Submitting Galaxy Spec-z's & Glossary <updatingredshifts.html>`_).
+    Unautomated at present, due to technical limitations that are out of our control: 
+    ZTF forced photometry, updates to TNS light curves, re-vetting of *all* candidates 
+    associated with a PLE, ingestion of photometry from all-sky surveys without some 
+    Kafka stream, and ingestion of galaxies' spectroscopic redshifts obtained by
+    various teams during a follow-up campaign (see `Submitting Galaxy Spec-z's & Glossary <updatingredshifts.html>`_).
 
 
 Glossary of Frequently Used Terms
@@ -155,6 +154,11 @@ Glossary of Frequently Used Terms
     
     **GW**: Gravitational wave
     
+    **HEALPix**: Hierarchical Equal Area isoLatitude 
+    Pixelisation. A scheme which divides a sphere into pixels. For HEALPix skymaps, 
+    these pixels may then have values attached such as a probability that an event 
+    originated from that location on the sky. 
+    
     **kilonova (KN)**: Ultraviolet/optical/infrared transient powered by the radioactive 
     decay of freshly synthesized heavy elements. The expected electromagnetic 
     counterpart to *BNS* and *NSBH* events. 
@@ -165,6 +169,9 @@ Glossary of Frequently Used Terms
     
     **LSST**: The Legacy Survey of Space and Time. The primary survey being conducted 
     by the Vera C. Rubin Observatory. 
+    
+    **MPC**: Minor Planet Center. A source of the ephemerides for many solar system 
+    objects (*SSOs*). 
     
     **neutrino**: Elementary particle (lepton) with no charge, which interacts via the 
     weak force. Produced in a variety of scenarios, such as a fusion in the core of the 
@@ -181,6 +188,8 @@ Glossary of Frequently Used Terms
     transients.)
     
     **SSM**: Subsolar mass merger; merger involving at least one object subsolar in mass
+    
+    **SSO**: Solar system object. An asteroid.
     
     **supernova**: Explosive death of a star, either from thermonuclear detonation or 
     the collapse of a massive star.
