@@ -372,10 +372,6 @@ class Command(BaseCommand):
                 lookback_days_nle=lookback_days_nle,
                 first_det_min=first_det_min,
                 first_det_max=first_det_max,
-                # then only vet if there is new photometry and no updates to this target
-                skip_vet_if_no_new_phot=(
-                    trove_target.basetarget_ptr_id not in new_or_updated
-                ),
                 use_async_mpc=True,
             )
             single_vetting_time = time.time() - single_vetting_start
