@@ -304,7 +304,7 @@ Questions? Reach out! You can reach current developers at
 
 ## Additional Resources
 
-- [Project Documentation](https://datatrove.as.arizona.edu/docs)
+- [Project Documentation](https://trove.as.arizona.edu/docs)
 - [Issue Tracker](https://github.com/astro-trove/trove/issues)
 
 ---

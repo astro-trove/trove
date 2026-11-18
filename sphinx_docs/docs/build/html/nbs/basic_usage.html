@@ -50,7 +50,8 @@
     <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
     <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'nbs/basic_usage';</script>
-    <link rel="canonical" href="https://datatrove.as.arizona.edu/nbs/basic_usage.html" />
+    <script src="../_static/dynamic_urls.js?v=5f038d73"></script>
+    <link rel="canonical" href="https://trove.as.arizona.edu/nbs/basic_usage.html" />
     <link rel="icon" href="../_static/favicon.ico"/>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -160,12 +161,12 @@
 <li class="toctree-l1"><a class="reference internal" href="../updatingredshifts.html">Submitting Galaxy Spec-z’s</a></li>
 <li class="toctree-l1 current active has-children"><a class="reference internal" href="../api.html">API Docs</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
 <li class="toctree-l2 current active"><a class="current reference internal" href="#">Example Notebook</a></li>
-<li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/api/docs">API Reference</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://trove.as.arizona.edu/api/docs">API Reference</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="../dev.html">Developer Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../faq.html">FAQ &amp; Glossary</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../citations.html">Citing TROVE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citations.html">Publications &amp; Citing TROVE</a></li>
 </ul>
 
     </div>
@@ -378,7 +379,7 @@
 <p>This notebook contains some basic examples with python code for accessing the TROVE API</p>
 <p>It assumes you have the requests and pandas packages installed and the following environment variable defined</p>
 <ol class="arabic simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">TROVE_TOKEN</span> <span class="pre">=</span> <span class="pre">&lt;your_api_token&gt;</span></code> (from <a class="reference external" href="https://datatrove.as.arizona.edu/users/profile/">https://datatrove.as.arizona.edu/users/profile/</a>)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">TROVE_TOKEN</span> <span class="pre">=</span> <span class="pre">&lt;your_api_token&gt;</span></code> (from <a class="reference external" href="https://trove.as.arizona.edu/users/profile/">https://trove.as.arizona.edu/users/profile/</a>)</p></li>
 </ol>
 <section id="Imports-&amp;-Useful-Variables">
 <h2>Imports &amp; Useful Variables<a class="headerlink" href="#Imports-&-Useful-Variables" title="Link to this heading">#</a></h2>
@@ -390,7 +391,7 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="n">trove_url</span> <span class="o">=</span> <span class="s2">&quot;https://datatrove-test.as.arizona.edu/api/&quot;</span>
+<span class="n">trove_url</span> <span class="o">=</span> <span class="s2">&quot;https://trove.as.arizona.edu/api/&quot;</span>
 <span class="n">token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;TROVE_TOKEN&quot;</span><span class="p">)</span>
 <span class="n">nle_name</span> <span class="o">=</span> <span class="s2">&quot;GW190814&quot;</span> <span class="c1"># a nonlocalized event (e.g., GW event) name</span>
 </pre></div>
