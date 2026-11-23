@@ -302,6 +302,20 @@ class TestStaticCatalogStandardization:
         assert "default_mag" in result.columns
 
 
+class TestCatalogBaseQueryset:
+    @pytest.mark.parametrize(
+        "catalog_name", ["DelveDr3", "DesiDr1", "DesiSpec", "LsDr9North", "LsDr10South", "Milliquas"]
+    )
+    def test_catalog_base_filters_do_not_accumulate(self, catalog_name):
+        """Instantiating a catalog must not add filters to the shared model manager."""
+        from candidate_vetting.public_catalogs import static_catalogs
+
+        catalog = getattr(static_catalogs, catalog_name)
+        sqls = [str(catalog().query(10, 10, 1).query) for _ in range(3)]
+
+        assert sqls[0] == sqls[1] == sqls[2]
+
+
 class TestAtlasForcedPhotParsing:
     """Tests for ATLAS forced photometry data parsing."""
 
