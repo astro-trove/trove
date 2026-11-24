@@ -130,6 +130,9 @@ def score(
         update_score_factor(candidate, "agn_score", agn_assoc_score)
 
 
+    # None means the newest localization; set below when the skymap is scored so
+    # that the distance score reads the same localization
+    max_time = None
     if params.localization_score:
         ## check skymap association
         if np.isfinite(params.t_post):
@@ -157,13 +160,15 @@ def score(
         if target.redshift is not None and not np.isnan(target.redshift):
             # use target redshift, so no need to compute distance scores for galaxies
             host_score, host_name = get_distance_score(
-                host_df, target_id, nonlocalized_event_name
+                host_df, target_id, nonlocalized_event_name, max_time=max_time
             )
             update_score_factor(candidate, "host_distance_score", host_score)
 
         elif len(host_df) != 0:
             # then run the distance comparison for each of these hosts
-            host_df = host_distance_match(host_df, target_id, nonlocalized_event_name)
+            host_df = host_distance_match(
+                host_df, target_id, nonlocalized_event_name, max_time=max_time
+            )
 
             # choose the maximum score
             if nle_type not in {"FXT", "LGRB", "SGRB"}: # These don't have distances

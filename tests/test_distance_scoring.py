@@ -199,3 +199,38 @@ class TestHybridBehaviour:
         centred = float(hybrid_distance_score(300, 300, 100, 0.0, 300.0))
         far = float(hybrid_distance_score(300, 300 + 3 * 100, 100, 0.0, 300.0))
         assert far < centred
+
+
+class TestDistanceAtHealpixLookup:
+    """_distance_at_healpix must look up the target's own nested pixel.
+
+    Passing a bare int to Tile.contains() runs it through Tile's bind
+    processor, which decodes it as a UNIQ index. For AT2020afis that moved
+    the lookup ~60 deg across the sky and gave S190521g's distance as
+    748 +/- 265 Mpc instead of 3170 +/- 826 Mpc.
+    """
+
+    def test_binds_target_pixel_not_uniq_decoded_range(self):
+        from unittest.mock import MagicMock, patch
+        from sqlalchemy.dialects import postgresql
+        from scoring import scoring
+
+        healpix = 758330797902311204  # AT2020afis, nested nside=2**29
+        session = MagicMock()
+        session.__enter__.return_value = session
+        session.execute.return_value.scalar.return_value = healpix
+        session.execute.return_value.fetchall.return_value = [(3170.4, 825.9)]
+
+        with patch.object(scoring, "Session", return_value=session), patch.object(
+            scoring, "_localization_from_name", return_value=MagicMock(id=1)
+        ):
+            assert scoring._distance_at_healpix("S190521g", 1) == (3170.4, 825.9)
+
+        query = session.execute.call_args_list[-1].args[0]
+        binds = query.compile(dialect=postgresql.dialect()).binds.values()
+        bound = [
+            b.type.process_bind_param(b.value, None)
+            if hasattr(b.type, "process_bind_param") else b.value
+            for b in binds
+        ]
+        assert healpix in bound
