@@ -180,7 +180,7 @@ def host_distance_match(
     return host_df
 
 
-def get_distance_score(host_df, target_id, nonlocalized_event_name):
+def get_distance_score(host_df, target_id, nonlocalized_event_name, max_time=None):
     """
     This gets the host score from the input host_df by first prioritizing target specific redshifts,
     then spec-z's, and then photo-z's. It assumes that any potential host within a
@@ -191,9 +191,9 @@ def get_distance_score(host_df, target_id, nonlocalized_event_name):
     targ = Target.objects.get(id=target_id)
     if targ.redshift is not None and not np.isnan(targ.redshift):
         nle_dist, nle_dist_err = _distance_at_healpix(
-            nonlocalized_event_name, target_id
+            nonlocalized_event_name, target_id, max_time=max_time
         )
-        targ_dist = cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
+        targ_dist =cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
         targ_dist_err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
         targ_score = hybrid_distance_score(
             nle_dist, targ_dist, nle_dist_err, targ_dist_err, targ_dist_err
@@ -416,17 +416,18 @@ def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):
 
     localization = _localization_from_name(nonlocalized_event_name, max_time=max_time)
 
-    # pre-fetch healpix to ensure the UNIQ-decoded range check is used rather than
-    # raw @> check
     with Session(sa_engine) as session:
         healpix = session.execute(
             sa.select(SaTarget.healpix).filter(SaTarget.basetarget_ptr_id == target_id)
         ).scalar()
 
-    # find the distance at the healpix
+    # find the distance at the healpix. Target.healpix is a nested nside=2**29
+    # pixel, so it must be bound as a plain bigint: a bare Python int passed to
+    # tile.contains() goes through Tile's bind processor, which decodes it as a
+    # UNIQ index and checks a pixel elsewhere on the sky.
     query = sa.select(SaSkymapTile.distance_mean, SaSkymapTile.distance_std).filter(
         SaSkymapTile.localization_id == localization.id,
-        SaSkymapTile.tile.contains(healpix),
+        SaSkymapTile.tile.contains(sa.literal(healpix, type_=sa.BigInteger)),
     )
 
     # execute the query

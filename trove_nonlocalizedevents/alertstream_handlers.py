@@ -48,6 +48,7 @@ from scoring.models import ScoreFactor
 from scoring.scoring import _localization_from_name
 from scoring.tasks import vet_multi_async
 from trove_targets.alertstream_handlers import vet_or_post_error
+from trove_targets.hooks import target_hook_options
 from trove_targets.models import Target
 
 import logging
@@ -296,7 +297,9 @@ def handle_einstein_probe_alert(message, metadata):
     ep_ra = alert.get("ra")
     ep_dec = alert.get("dec")
     ep_name = alert["id"][0]
-    t_ep = Target.objects.create(name=ep_name, type="SIDEREAL", ra=ep_ra, dec=ep_dec, permissions="PUBLIC")
+    # skip vetting on create; vet_or_post_error vets once the EventCandidate exists
+    with target_hook_options(skip_vetting=True):
+        t_ep = Target.objects.create(name=ep_name, type="SIDEREAL", ra=ep_ra, dec=ep_dec, permissions="PUBLIC")
     # Get or create is safer and prevents the 500 crash here
     EventCandidate.objects.get_or_create(target=t_ep, nonlocalizedevent=nonlocalizedevent)
     vet_or_post_error(t_ep)

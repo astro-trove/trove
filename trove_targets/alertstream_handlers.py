@@ -55,9 +55,18 @@ def vet_or_post_error(
     **kwargs,
 ):
     try:
-        with target_hook_options(created=True, **kwargs):
+        with target_hook_options(skip_vetting=True, **kwargs):
             target.save()  # to do coordinate conversions
-                    
+
+        # now run target post save for real and do the vetting we need to do
+        target_post_save(
+            target,
+            created=True,
+            skip_vetting=False,
+            **kwargs
+        )
+
+            
     except Exception as e:
         logger.error("".join(traceback.format_exception(e)))
         # slack_client.chat_postMessage(channel=channel, text=f'Error vetting target {target.name}:\n{e}')

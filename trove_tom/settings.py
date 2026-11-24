@@ -441,19 +441,18 @@ def _load_dust_map():
         "DUSTMAPS_CONFIG_FNAME", os.path.join(BASE_DIR, ".dustmapsrc")
     )
 
-    from dustmaps.config import config
-
     # these parameters are not defined by default but may be set by the user
-    if os.getenv("SKIP_DUSTMAP", "").lower() in ("1", "true", "yes"):
-        print(f"SKIP_DUSTMAP={SKIP_DUSTMAP} so we are skipping loading the dustmap "+
+    skip_dustmap = os.getenv("SKIP_DUSTMAP", "")
+    fetch_dustmaps = os.getenv("FETCH_DUSTMAPS", "")
+    if skip_dustmap.lower() in ("1", "true", "yes"):
+        print(f"SKIP_DUSTMAP={skip_dustmap} so we are skipping loading the dustmap "+
               "and setting extinction to None!")
-        return _dust_map_noop
-    if os.getenv("FETCH_DUSTMAPS", "").lower() not in ("1", "true", "yes"):
-        print(f"FETCH_DUSTMAPS={FETCH_DUSTMAPS} so we are skipping loading the " +
-              "dustmap and setting extinction to 0!")
         return _dust_map_noop
 
     # point dustmaps to the local version if the path is defined
+    # (pass it to SFDQuery directly rather than setting config["data_dir"], which
+    # rewrites .dustmapsrc on every import)
+    map_dir = None
     if ("DUSTMAPS_DIR" in globals() or "DUSTMAPS_DIR" in locals()) and DUSTMAPS_DIR is not None:
         # some checks
         if not os.path.exists(DUSTMAPS_DIR):
@@ -461,9 +460,8 @@ def _load_dust_map():
         if not os.path.exists(os.path.join(DUSTMAPS_DIR, "sfd")):
             raise FileNotFoundError(f"DUSTMAPS_DIR is set in settings_local to {DUSTMAPS_DIR} but the sfd subdirectory does not exist!")
 
-        # if the file exists, update the config
-        config["data_dir"] = DUSTMAPS_DIR
-        print(f"Set the dustmaps directory to the local copy at {config['data_dir']}")
+        map_dir = os.path.join(DUSTMAPS_DIR, "sfd")
+        print(f"Using the local copy of the SFD dustmap at {map_dir}")
 
     else:
         print(f"DUSTMAPS_DIR is not set in settings_local, we will try to use cached "+
@@ -472,8 +470,12 @@ def _load_dust_map():
 
     # fetch the dustmap
     try:
-        sfd_query = sfd.SFDQuery()
+        sfd_query = sfd.SFDQuery(map_dir=map_dir)
     except FileNotFoundError:
+        if fetch_dustmaps.lower() not in ("1", "true", "yes"):
+            print(f"No SFD dustmap found and FETCH_DUSTMAPS={fetch_dustmaps!r}, so we are " +
+                  "skipping loading the dustmap and setting extinction to None!")
+            return _dust_map_noop
         print("Trying to fetch the SFD dustmap from dataverse...")
         sfd.fetch()
         sfd_query = sfd.SFDQuery()
