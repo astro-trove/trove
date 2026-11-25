@@ -520,33 +520,51 @@ class TestAssociatedAgn:
             p.stop()
 
 
-class TestBasicLightCurveRows:
-    """Light curve rows in the Basic Scores card"""
+class TestLightCurveSummary:
+    """Photometry-tab Light Curve Summary box"""
+
+    def _ctx(self, metrics=None, side_effect=None):
+        from trove_nonlocalizedevents.templatetags import event_candidate_extras as ece
+        with patch.object(ece, "_basic_light_curve_metrics_cached",
+                          return_value=metrics, side_effect=side_effect):
+            return ece.light_curve_summary(MagicMock())
 
     def _rows(self, metrics):
-        from trove_nonlocalizedevents.templatetags import event_candidate_extras as ece
-        with patch.object(ece, "_basic_light_curve_metrics_cached", return_value=metrics):
-            return {r["label"]: r["value"] for r in ece._basic_light_curve_rows(MagicMock())}
+        return {r["label"]: r["value"] for r in self._ctx(metrics)["rows"]}
 
     def test_all_rows(self):
         rows = self._rows(dict(t0=60000, t0_is_fallback=False, lum=2e42,
                                peak_time=4.0, decay_rate=0.05))
         assert rows == {
+            "Transient Start (t<sub>0</sub>)":
+                "MJD 60000.00 (2023-02-25)<br>midpoint of the last non-detection and the first detection",
             "Maximum Luminosity": "2.00 x 10<sup>42</sup> erg/s",
-            "Rise Time (from last non-detection)": "4.00 days",
+            "Rise Time (t<sub>0</sub> to peak)": "4.00 days",
             "Light Curve Slope": "0.05 mag/day",
         }
 
     def test_missing_values_are_left_out_and_fallback_is_noted(self):
         rows = self._rows(dict(t0=60000, t0_is_fallback=True, lum=None,
                                peak_time=4.0, decay_rate=None))
-        assert list(rows) == ["Rise Time (from last non-detection)"]
-        assert "no non-detection before first detection" in rows["Rise Time (from last non-detection)"]
+        assert list(rows) == ["Transient Start (t<sub>0</sub>)", "Rise Time (t<sub>0</sub> to peak)"]
+        assert "no non-detection before the first detection" in rows["Transient Start (t<sub>0</sub>)"]
 
     def test_no_detections(self):
-        assert self._rows(None) == {}
+        assert self._ctx(None) == {"rows": []}
 
     def test_errors_do_not_break_the_page(self):
-        from trove_nonlocalizedevents.templatetags import event_candidate_extras as ece
-        with patch.object(ece, "_basic_light_curve_metrics_cached", side_effect=RuntimeError):
-            assert ece._basic_light_curve_rows(MagicMock()) == []
+        assert self._ctx(side_effect=RuntimeError) == {"rows": []}
+
+    def test_render_says_event_independent(self):
+        from django.template.loader import render_to_string
+        ctx = self._ctx(dict(t0=60000, t0_is_fallback=False, lum=None,
+                             peak_time=4.0, decay_rate=0.05))
+        html = render_to_string("tom_targets/partials/light_curve_summary.html", ctx)
+        assert "Light Curve Summary" in html
+        assert "Independent of any associated GW or other poorly localized event" in html
+        assert "<sub>0</sub>" in html  # labels are not escaped
+
+    def test_render_nothing_without_rows(self):
+        from django.template.loader import render_to_string
+        html = render_to_string("tom_targets/partials/light_curve_summary.html", {"rows": []})
+        assert html.strip() == ""

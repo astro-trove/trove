@@ -70,6 +70,7 @@
       </div>
       <div class="tab-pane" id="photometry">
 	{% photometry_for_target target %}
+	{% light_curve_summary object %}
 	<details>
 	  <summary><h5 style="display:inline-block">Photometry Table</h5></summary>
 	  {% get_photometry_data object %}

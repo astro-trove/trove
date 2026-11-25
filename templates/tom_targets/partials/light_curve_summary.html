@@ -1,0 +1,24 @@
+{% if rows %}
+<div class="card mt-3 mb-3">
+  <div class="card-header"><h5 class="mb-0">Light Curve Summary</h5></div>
+  <div class="card-body">
+    <div class="alert alert-info py-2 mb-3" role="alert">
+      <strong>Independent of any associated GW or other poorly localized event.</strong>
+      These are measured from this transient's own light curve, with times counted from
+      its own start (t<sub>0</sub>), not from an event trigger time. They will differ from
+      the event-specific values on the Score Details tab, which are measured from each
+      event's trigger time.
+    </div>
+    <table class="table table-sm mb-0">
+      <tbody>
+      {% for row in rows %}
+        <tr>
+          <th scope="row" style="width: 40%;">{{ row.label|safe }}</th>
+          <td>{{ row.value|safe }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}

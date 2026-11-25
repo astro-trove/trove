@@ -9,6 +9,7 @@ import numpy as np
 from collections import OrderedDict
 from decimal import Decimal, InvalidOperation
 from functools import partial
+from astropy.time import Time
 from django import template
 from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
@@ -287,7 +288,6 @@ def display_score_details(context, target_id):
         "label": "Associated AGN?",
         "value": "Yes" if _has_associated_agn(target_id) else "No",
     })
-    basic_card["details"] += _basic_light_curve_rows(target)
 
     cards.append(basic_card)
 
@@ -586,35 +586,42 @@ def _basic_light_curve_metrics_cached(target):
     return metrics
 
 
-def _basic_light_curve_rows(target):
-    """Basic Scores card rows for the light curve metrics measured from the
-    target's own t0, so they don't need a GW event"""
+@register.inclusion_tag("tom_targets/partials/light_curve_summary.html")
+def light_curve_summary(target):
+    """Photometry-tab box of light curve metrics measured from the target's
+    own t0, independent of any associated poorly localized event"""
     try:
         metrics = _basic_light_curve_metrics_cached(target)
     except Exception:
         # a bad fit or odd photometry should never break the target page
         logger.exception("Could not compute light curve metrics for %s", target)
-        return []
+        metrics = None
     if metrics is None:
-        return []
+        return {"rows": []}
 
-    rows = []
+    t0 = f"MJD {metrics['t0']:.2f} ({Time(metrics['t0'], format='mjd').iso[:10]})"
+    if metrics["t0_is_fallback"]:
+        t0 += (f"<br>no non-detection before the first detection, so set "
+               f"{T0_FALLBACK_DAYS} day before it")
+    else:
+        t0 += "<br>midpoint of the last non-detection and the first detection"
+    rows = [{"label": "Transient Start (t<sub>0</sub>)", "value": t0}]
     if metrics["lum"] is not None:
         rows.append({
             "label": "Maximum Luminosity",
             "value": _sci_format(metrics["lum"], unit="erg/s"),
         })
     if metrics["peak_time"] is not None:
-        rise = _float_format(metrics["peak_time"], unit="days")
-        if metrics["t0_is_fallback"]:
-            rise += f" (no non-detection before first detection; t0 set {T0_FALLBACK_DAYS} day earlier)"
-        rows.append({"label": "Rise Time (from last non-detection)", "value": rise})
+        rows.append({
+            "label": "Rise Time (t<sub>0</sub> to peak)",
+            "value": _float_format(metrics["peak_time"], unit="days"),
+        })
     if metrics["decay_rate"] is not None:
         rows.append({
             "label": "Light Curve Slope",
             "value": _float_format(metrics["decay_rate"], unit="mag/day"),
         })
-    return rows
+    return {"rows": rows}
 
 
 def _safe_format(value, fmter):
