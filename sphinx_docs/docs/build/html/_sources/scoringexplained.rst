@@ -26,7 +26,7 @@ a higher probability density. Integration over all pixels is normalized to 1, su
 the 2D subscore lies between 0 and 1.
 
 
-Distance (3D) Subscores
+Distance Subscores
 -----------------------
 
 The distance subscore quantifies whether the estimated distance to a candidate is 

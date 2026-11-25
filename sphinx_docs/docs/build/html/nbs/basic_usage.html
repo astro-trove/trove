@@ -393,9 +393,9 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="n">trove_url</span> <span class="o">=</span> <span class="s2">&quot;https://trove.as.arizona.edu/api/&quot;</span>
-<span class="n">token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;TROVE_TOKEN&quot;</span><span class="p">)</span>
-<span class="n">nle_name</span> <span class="o">=</span> <span class="s2">&quot;GW190814&quot;</span> <span class="c1"># a nonlocalized event (e.g., GW event) name</span>
+<span class="n">trove_url</span> <span class="o">=</span> <span class="s2">"https://trove.as.arizona.edu/api/"</span>
+<span class="n">token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"TROVE_TOKEN"</span><span class="p">)</span>
+<span class="n">nle_name</span> <span class="o">=</span> <span class="s2">"GW190814"</span> <span class="c1"># a nonlocalized event (e.g., GW event) name</span>
 </pre></div>
 </div>
 </div>
@@ -408,8 +408,8 @@
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -605,8 +605,8 @@
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck&quot;</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck"</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">at2019pck_score</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -639,8 +639,8 @@
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck,AT2019odc&quot;</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck,AT2019odc"</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -691,8 +691,8 @@
 <span class="n">radius</span> <span class="o">=</span> <span class="mi">3600</span> <span class="c1"># 5 arcmin</span>
 
 <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">/cone_search?ra=</span><span class="si">{</span><span class="n">ra_ctr</span><span class="si">}</span><span class="s2">&amp;dec=</span><span class="si">{</span><span class="n">dec_ctr</span><span class="si">}</span><span class="s2">&amp;radius=</span><span class="si">{</span><span class="n">radius</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">/cone_search?ra=</span><span class="si">{</span><span class="n">ra_ctr</span><span class="si">}</span><span class="s2">&amp;dec=</span><span class="si">{</span><span class="n">dec_ctr</span><span class="si">}</span><span class="s2">&amp;radius=</span><span class="si">{</span><span class="n">radius</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -717,20 +717,20 @@
 <div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">upload_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/target/upload&quot;</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">upload_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/target/upload"</span>
 
 <span class="n">target_data</span> <span class="o">=</span> <span class="p">[</span>
     <span class="p">{</span>
-        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;test&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;ra&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-        <span class="s2">&quot;dec&quot;</span><span class="p">:</span> <span class="mi">0</span>
+        <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"test"</span><span class="p">,</span>
+        <span class="s2">"ra"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">"dec"</span><span class="p">:</span> <span class="mi">0</span>
     <span class="p">}</span>
 <span class="p">]</span>
 
 <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
     <span class="n">upload_url</span><span class="p">,</span>
     <span class="n">json</span><span class="o">=</span><span class="n">target_data</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">)</span>
@@ -752,22 +752,22 @@
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">target_data</span> <span class="o">=</span> <span class="p">[</span>
   <span class="p">{</span>
-    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;test&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;ra&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s2">&quot;dec&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s2">&quot;photometry&quot;</span><span class="p">:</span> <span class="p">[</span>
+    <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"test"</span><span class="p">,</span>
+    <span class="s2">"ra"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s2">"dec"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s2">"photometry"</span><span class="p">:</span> <span class="p">[</span>
       <span class="p">{</span>
-        <span class="s2">&quot;jd&quot;</span><span class="p">:</span> <span class="mf">2461134.3933751667</span><span class="p">,</span>
-        <span class="s2">&quot;telescope&quot;</span><span class="p">:</span> <span class="s2">&quot;TEST&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;filter&quot;</span><span class="p">:</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;magnitude&quot;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
-        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="mf">0.1</span>
+        <span class="s2">"jd"</span><span class="p">:</span> <span class="mf">2461134.3933751667</span><span class="p">,</span>
+        <span class="s2">"telescope"</span><span class="p">:</span> <span class="s2">"TEST"</span><span class="p">,</span>
+        <span class="s2">"filter"</span><span class="p">:</span> <span class="s2">"r"</span><span class="p">,</span>
+        <span class="s2">"magnitude"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+        <span class="s2">"error"</span><span class="p">:</span> <span class="mf">0.1</span>
       <span class="p">},</span>
       <span class="p">{</span>
-        <span class="s2">&quot;jd&quot;</span><span class="p">:</span> <span class="mf">2461133.3933751667</span><span class="p">,</span>
-        <span class="s2">&quot;telescope&quot;</span><span class="p">:</span> <span class="s2">&quot;TEST&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;filter&quot;</span><span class="p">:</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span>
-        <span class="s2">&quot;limit&quot;</span><span class="p">:</span> <span class="mf">23.1</span>
+        <span class="s2">"jd"</span><span class="p">:</span> <span class="mf">2461133.3933751667</span><span class="p">,</span>
+        <span class="s2">"telescope"</span><span class="p">:</span> <span class="s2">"TEST"</span><span class="p">,</span>
+        <span class="s2">"filter"</span><span class="p">:</span> <span class="s2">"r"</span><span class="p">,</span>
+        <span class="s2">"limit"</span><span class="p">:</span> <span class="mf">23.1</span>
       <span class="p">}</span>
     <span class="p">]</span>
   <span class="p">}</span>
@@ -776,7 +776,7 @@
 <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
     <span class="n">upload_url</span><span class="p">,</span>
     <span class="n">json</span><span class="o">=</span><span class="n">target_data</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">)</span>
