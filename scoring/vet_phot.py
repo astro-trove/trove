@@ -823,9 +823,9 @@ def find_public_phot(
         query_atlas = False
 
     if query_atlas:
-        print(
+        logger.info(
             "Asynchronously obtaining ATLAS forced photometry with "
-            + f"days_ago = {min(days_ago_max, days_ago):.2f}\n\n"
+            + f"days_ago = {min(days_ago_max, days_ago):.2f}"
         )
         async_atlas_query.using(
             priority=queue_priority  # this sets the priority to whatever is passed in
