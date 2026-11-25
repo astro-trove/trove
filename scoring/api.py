@@ -69,7 +69,7 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
     - Simple
     ```
     curl -X 'GET' \
-    'https://datatrove.as.arizona.edu/api/score/GW190814' \
+    'https://trove.as.arizona.edu/api/score/GW190814' \
     -H 'accept: */*' \
     -H 'Authorization: Bearer <api_token>'
     ```
@@ -78,7 +78,7 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
 
     ```
     curl -X 'GET' \
-    'https://datatrove.as.arizona.edu/api/score/S251112cm?candidate_names=S251112cm_X78,AT2025adht' \
+    'https://trove.as.arizona.edu/api/score/S251112cm?candidate_names=S251112cm_X78,AT2025adht' \
     -H 'accept: */*' \
     -H 'Authorization: Bearer <api_token>'
     ```
@@ -86,7 +86,7 @@ def get_scores_from_nle_name(request, nle_name:str, candidate_names:str|None=Non
     - For just one event
     ```
     curl -X 'GET' \
-    'https://datatrove.as.arizona.edu/api/score/S251112cm?candidate_names=S251112cm_X78' \
+    'https://trove.as.arizona.edu/api/score/S251112cm?candidate_names=S251112cm_X78' \
     -H 'accept: */*' \
     -H 'Authorization: Bearer <api_token>'
     ```
@@ -127,14 +127,14 @@ def get_scores_from_cone_search(request, nle_name:str, ra:float, dec:float, radi
 
     ```
     curl -X 'GET' \
-    'https://datatrove.as.arizona.edu/api/score/S251112cm/cone_search?ra=147.47566&dec=0.616566666' \
+    'https://trove.as.arizona.edu/api/score/S251112cm/cone_search?ra=147.47566&dec=0.616566666' \
     -H 'accept: */*' \
     -H 'Authorization: Bearer <api_token>'
     ```
     Or, to provide a search radius
     ```
     curl -X 'GET' \
-    'https://datatrove.as.arizona.edu/api/score/S251112cm/cone_search?ra=147.475&dec=0.6165&radius=10' \
+    'https://trove.as.arizona.edu/api/score/S251112cm/cone_search?ra=147.475&dec=0.6165&radius=10' \
     -H 'accept: */*' \
     -H 'Authorization: Bearer <api_token>'
     ```

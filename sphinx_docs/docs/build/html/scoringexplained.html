@@ -32,6 +32,7 @@
 
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
     <link rel="stylesheet" type="text/css" href="_static/styles/sphinx-book-theme.css?v=3c74b3bc" />
+    <link rel="stylesheet" type="text/css" href="_static/sphinx-new-tab-link.css?v=d87cb1ac" />
     <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
   
   <!-- So that users can add custom icons -->
@@ -46,12 +47,15 @@
     <script src="_static/scripts/sphinx-book-theme.js?v=fab101a9"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
     <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+    <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
     <script>DOCUMENTATION_OPTIONS.pagename = 'scoringexplained';</script>
-    <link rel="canonical" href="https://datatrove.as.arizona.edu/scoringexplained.html" />
+    <script src="_static/dynamic_urls.js?v=5f038d73"></script>
+    <link rel="canonical" href="https://trove.as.arizona.edu/scoringexplained.html" />
     <link rel="icon" href="_static/favicon.ico"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Submitting Galaxy Spec-z’s" href="updatingredshifts.html" />
+    <link rel="next" title="Catalogs Used in TROVE" href="catalogs.html" />
     <link rel="prev" title="Web App Details" href="details.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -154,15 +158,16 @@
 <li class="toctree-l1"><a class="reference internal" href="rules.html">Rules for using TROVE</a></li>
 <li class="toctree-l1"><a class="reference internal" href="details.html">Web App Details</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">How Scoring Works</a></li>
+<li class="toctree-l1"><a class="reference internal" href="catalogs.html">Catalogs Used in TROVE</a></li>
 <li class="toctree-l1"><a class="reference internal" href="updatingredshifts.html">Submitting Galaxy Spec-z’s</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="api.html">API Docs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="nbs/basic_usage.html">Example Notebook</a></li>
-<li class="toctree-l2"><a class="reference external" href="https://datatrove.as.arizona.edu/api/docs">API Reference</a></li>
+<li class="toctree-l2"><a class="reference external" href="https://trove.as.arizona.edu/api/docs" rel="noreferrer" target="_blank">API Reference</a></li>
 </ul>
 </details></li>
 <li class="toctree-l1"><a class="reference internal" href="dev.html">Developer Documentation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ &amp; Glossary</a></li>
-<li class="toctree-l1"><a class="reference internal" href="citations.html">Citing TROVE</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citations.html">Publications &amp; Citing TROVE</a></li>
 </ul>
 
     </div>
@@ -355,11 +360,17 @@
             </div>
             <nav aria-label="Page">
                 <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-skymap-localization-scores">2D (Skymap/Localization) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-distance-scores">3D (Distance) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-minor-planet-scores">Point Source and Minor Planet Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-scores">AGN Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-scores">Photometry Scores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#localization-2d-subscores">Localization (2D) Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#distance-subscores">Distance Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-solar-system-object-subcores">Point Source and Solar System Object Subcores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-subscores">AGN Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-subscores">Photometry Subscores</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#light-curve-metrics">Light Curve Metrics</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kilonovascorer"><code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-flare-significance">AGN Flare Significance</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nuclear-offset-subscore">Nuclear Offset Subscore</a></li>
 </ul>
             </nav>
         </div>
@@ -373,21 +384,247 @@
                   
   <section id="how-scoring-works">
 <h1>How Scoring Works<a class="headerlink" href="#how-scoring-works" title="Link to this heading">#</a></h1>
-<p>Coming soon!</p>
-<section id="d-skymap-localization-scores">
-<h2>2D (Skymap/Localization) Scores<a class="headerlink" href="#d-skymap-localization-scores" title="Link to this heading">#</a></h2>
+<p>This page very briefly describes the various subscores which go into the total, overall
+score. This overall score is a number between 0 and 1, and is a product of several other
+numbers (subsocres) which themselves are between 0 and 1. For details, see Franz et
+al., in prep.</p>
+<section id="localization-2d-subscores">
+<h2>Localization (2D) Subscores<a class="headerlink" href="#localization-2d-subscores" title="Link to this heading">#</a></h2>
+<p>The 2D, skymap, or localization subscore quantifies whether a candidate sits squarely
+in the localization region of some event or on the edge.</p>
+<p>The following cartoon explains the 2D score graphically:</p>
+<img alt="_images/2D_scoring.png" src="_images/2D_scoring.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>Darker colors denote higher probability density in the localization region. We compute
+this subscore by finding the HEALPix in which a candidate lies, extracting the
+probability density from the skymap at that pixel, and then integrating over pixels at
+a higher probability density. Integration over all pixels is normalized to 1, such that
+the 2D subscore lies between 0 and 1.</p>
 </section>
-<section id="d-distance-scores">
-<h2>3D (Distance) Scores<a class="headerlink" href="#d-distance-scores" title="Link to this heading">#</a></h2>
+<section id="distance-subscores">
+<h2>Distance Subscores<a class="headerlink" href="#distance-subscores" title="Link to this heading">#</a></h2>
+<p>The distance subscore quantifies whether the estimated distance to a candidate is
+consistent with the distance of some event such as a gravitational wave. Distances to
+candidates are primarily estimated by associating them with a potential host galaxy
+at some measured distance. We perform this galaxy association using about 10 billion
+galaxies over several catalogs. For a table of galaxy catalogs used, see
+<a class="reference internal" href="catalogs.html"><span class="doc">Catalogs Used in TROVE</span></a>. Distances may also come from spectroscopy of
+individual candidates themselves.</p>
+<p>The computation of the distance subscore has two regimes:</p>
+<ol class="arabic simple">
+<li><p>Uncertainty on galaxy distance <span class="math notranslate nohighlight">\(\ll\)</span> uncertainty on event distance (<span class="math notranslate nohighlight">\(\sigma_{\rm gal} \ll \sigma_{\rm event}\)</span>):
+The distance subscore roughly depends on how many standard deviations <span class="math notranslate nohighlight">\(\sigma_{\rm event}\)</span> away from the median the
+distance to the galaxy lies. This is the case for most spectroscopic redshifts given
+their tight uncertainties.</p></li>
+<li><p>Uncertainty on galaxy distance &gt; uncertainty on event distance (<span class="math notranslate nohighlight">\(\sigma_{\rm gal} &gt; \sigma_{\rm event}\)</span>):
+We use the Bhattacharyya coefficient, which computes something like the overlap of
+the two distance posterior distributions. This is the case for most photometric redshifts,
+as they have broader uncertainties.</p></li>
+</ol>
+<p>The following figure from Franz et al., in prep explains this distance score
+graphically, where the event in question is a gravitational wave:</p>
+<img alt="_images/distance_scoring.png" src="_images/distance_scoring.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>We see a comparison of the galaxy / event distance posteriors and the resultant scores
+in four scenarios (a), (b), (c), and (d). The four scenarios shown are seen across
+candidates during a follow-up campaign.</p>
 </section>
-<section id="point-source-and-minor-planet-scores">
-<h2>Point Source and Minor Planet Scores<a class="headerlink" href="#point-source-and-minor-planet-scores" title="Link to this heading">#</a></h2>
+<section id="point-source-and-solar-system-object-subcores">
+<h2>Point Source and Solar System Object Subcores<a class="headerlink" href="#point-source-and-solar-system-object-subcores" title="Link to this heading">#</a></h2>
+<p>Candidates are disfavored (receive a subscore of 0) or favored (receive a subscore of 1)
+if they are associated or unassociated with a point source, respectively. These point
+sources are typically stars or variable stars; we perform cross-matching against the
+AGN included in some of these point source catalogs separately. For a table of point
+source catalogs used, see <a class="reference internal" href="catalogs.html"><span class="doc">Catalogs Used in TROVE</span></a>.</p>
+<p>Candidates are disfavored (receive a subscore of 0) or favored (receive a subscore of 1)
+if associated or unassociated with a solar system object (SSO), respectively. SSOs and
+their ephemerides from the Minor Planet Center (MPC).</p>
+<p>We only perform SSO association if a candidate is limited to a single photometric
+detection, as multiple detections at the same RA and Dec. (within uncertainties of ~2”
+for the astrometric precision of a candidates’ coordinates) would be inconsistent with
+an SSO, which moves on the sky over time.</p>
+<p>If any SSOs are within 10° of a candidate at time of its initial (and sole) detection,
+we compute the full <span class="math notranslate nohighlight">\(N\)</span>-body dynamics of these SSOs. We consider a candidate
+associated with an SSO if it is within 25” of an SSO at the time of its initial (and
+sole) detection.</p>
 </section>
-<section id="agn-scores">
-<h2>AGN Scores<a class="headerlink" href="#agn-scores" title="Link to this heading">#</a></h2>
+<section id="agn-subscores">
+<h2>AGN Subscores<a class="headerlink" href="#agn-subscores" title="Link to this heading">#</a></h2>
+<p>Candidates are disfavored (receive a subscore of 0.1) or favored (receive a subscore
+of 1) based on their association within 2” with AGN and the overall score we are
+computing:</p>
+<ol class="arabic simple">
+<li><p>When computing the overall score that a candidate is consistent with a
+kilonova (KN), kilonova-in-supernova (KN-in-SN), or super-kilonova (super-KN),
+association with an AGN disfavors the candidate, and a subscore of 0.1 is set. This
+subscore is 0.1 rather than a hard 0 as there remains some uncertainty whether it is
+completely impossible for these classes of transient to lie within an AGN. (The host
+for GW170817, NGC 4993, was an active galaxy, though GW170817/AT2017gfo lay much
+more than 2” from the center of the galaxy.)</p></li>
+<li><p>When computing the overall score that a candidate is consistent with a binary black
+hole (BBH) merger-induced AGN flare, association with an AGN should clearly <em>favor</em>
+rather than disfavor a candidate. A <em>lack</em> of association with an AGN disfavors the
+canddiate, and a subscore of 0.1 is set. This subscore is 0.1 rather than 0 due to
+the uncertain incompleteness of our AGN catalogs.</p></li>
+</ol>
+<p>For a table of AGN catalogs used, see <a class="reference internal" href="catalogs.html"><span class="doc">Catalogs Used in TROVE</span></a>.</p>
 </section>
-<section id="photometry-scores">
-<h2>Photometry Scores<a class="headerlink" href="#photometry-scores" title="Link to this heading">#</a></h2>
+<section id="photometry-subscores">
+<h2>Photometry Subscores<a class="headerlink" href="#photometry-subscores" title="Link to this heading">#</a></h2>
+<p>Users may compute the photometry subscore in three ways, depending on the overall score
+in question:</p>
+<ol class="arabic simple">
+<li><p>Based on <strong>light curve metrics</strong>. When scoring for KNe, KNe-in-SNe, or super-KNe, we
+(1) determine whether a candidate is detected earlier than expected given the time
+of the event (e.g., GW alert time) and estimate (2) the peak luminosity, (3) rise
+time, and (4) decay rate of the candidate’s light curve.</p></li>
+<li><p>Using the <code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code> tool to assess a candidate’s consistency with a suite of
+KN models.</p></li>
+<li><p>According to the significance of a post-GW flare in an AGN, when scoring for BBH-
+induced AGN flares.</p></li>
+</ol>
+<section id="light-curve-metrics">
+<h3>Light Curve Metrics<a class="headerlink" href="#light-curve-metrics" title="Link to this heading">#</a></h3>
+<p>The following table describes the metrics used in computing score factors which
+combine to set the overall photometry subscore, when using light curve metrics for
+computing this subscore:</p>
+<div class="pst-scrollable-table-container"><span id="tab-photom-metrics"></span><table class="table" id="id1">
+<caption><span class="caption-text">Score Factors for Computing Photometry Subscores</span><a class="headerlink" href="#id1" title="Link to this table">#</a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>GW Event Type</p></th>
+<th class="head"><p>EM Signature</p></th>
+<th class="head"><div class="line-block">
+<div class="line"><span class="math notranslate nohighlight">\(t_{\mathrm{GW}} - t_0\)</span></div>
+<div class="line">[days]</div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line"><span class="math notranslate nohighlight">\(L_{\mathrm{peak}}\)</span></div>
+<div class="line"><span class="math notranslate nohighlight">\([\mathrm{erg~s^{-1}}]\)</span></div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line"><span class="math notranslate nohighlight">\(t_{\mathrm{peak}} - t_{\mathrm{GW}}\)</span></div>
+<div class="line">[days]</div>
+</div>
+</th>
+<th class="head"><div class="line-block">
+<div class="line"><span class="math notranslate nohighlight">\(\Delta m\)</span></div>
+<div class="line"><span class="math notranslate nohighlight">\([\mathrm{mag~day^{-1}}]\)</span></div>
+</div>
+</th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>BNS/NSBH/SSM</p></td>
+<td><p>KN</p></td>
+<td><p><span class="math notranslate nohighlight">\(\leqslant 0\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(&lt; 10^{43}\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(&lt; 4\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(&gt; 0.1\)</span></p></td>
+</tr>
+<tr class="row-odd"><td><p>SSM</p></td>
+<td><p>KN-in-SN<sup>†</sup></p></td>
+<td><p><span class="math notranslate nohighlight">\(&lt; 1\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(5\times10^{41} \rightarrow 10^{44}\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(&lt; 35\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(-2.0 \rightarrow +0.1\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p>SSM</p></td>
+<td><p>super-KN<sup>‡</sup></p></td>
+<td><p><span class="math notranslate nohighlight">\(&lt; 1\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(10^{41} \rightarrow 10^{43}\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(10 \rightarrow 70\)</span></p></td>
+<td><p>–</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Constraints on photometry metrics are based on a review of the literature on
+each type of EM transient. The metrics include (1) the GW event trigger date
+minus the first detection of the candidate EM counterpart (<span class="math notranslate nohighlight">\(t_{\mathrm{GW}} - t_0\)</span>), which is used as the threshold for selecting
+photometry for checking for pre-detections, the peak luminosity
+(<span class="math notranslate nohighlight">\(L_{\mathrm{peak}}\)</span>), the light curve rise time
+(<span class="math notranslate nohighlight">\(t_{\mathrm{peak}} - t_{\mathrm{GW}}\)</span>), and the decay rate
+(<span class="math notranslate nohighlight">\(\Delta m\)</span>). A positive <span class="math notranslate nohighlight">\(\Delta m\)</span> indicates fading. This table is
+adapted from Vieira et al. (2026).</p>
+<div class="line-block">
+<div class="line"><sup>†</sup> B. D. Metzger (2024) and Y.-X. Chen &amp; B. D. Metzger (2025)</div>
+<div class="line"><sup>‡</sup> D. M. Siegel et al. (2022)</div>
+</div>
+<p>That is, a candidate will be disfavored if it is pre-detected, too dim/too
+luminous, rises too early or too late, or fades too slowly/too quickly, depending on the
+EM signature of interest. If a candidate’s photometry does not meet one of these
+criteria, a score factor of 0.1 is introduced. The photometry subscore may therefore be
+as small as <span class="math notranslate nohighlight">\(10^{-4}\)</span> or as large as 1.</p>
+<p>Two important notes:</p>
+<ol class="arabic simple">
+<li><p>A candidate is considered pre-detected if the photometry contains three or more
+<span class="math notranslate nohighlight">\(5\sigma\)</span> detections within any 10 day window prior to the GW detection
+(minus one day, for KNe-in-SNe and super-KNe).</p></li>
+<li><p>Available models do not place any useful constraints on the decay rate of super-KNe,
+nor have super-KNe been observed in nature.</p></li>
+</ol>
+<p>These constraints can also be understood graphically:</p>
+<img alt="_images/phot-scoring-vis.png" src="_images/phot-scoring-vis.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>On the left, we see <span class="math notranslate nohighlight">\(r/R\)</span>-band light curves for SN 1998bw and AT2017gfo, a SN
+Ic-BL and KN, respectively. The figure is annotated with estimates for the peak
+luminosity, rise time, and decay rate. On the right, we see how these estimates compare
+to our imposed constraints. AT2017gfo lies confidently in the ranges imposed for KNe.
+SN 1998bw, as a SN Ic-BL (a type of stripped-envelope SN), lies in the KN-in-SN and
+super-KN ranges.</p>
+</section>
+<section id="kilonovascorer">
+<h3><code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code><a class="headerlink" href="#kilonovascorer" title="Link to this heading">#</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code> assesses whether a candidate’s photometry is consistent with a suite
+of synthetic KN light curves. At present, we test whether a candidate is
+consistent with the simple two-component KN model of A. Villar et al. (2017).
+See <a class="reference external" href="https://scixplorer.org/abs/2026PASP..138h4502D/abstract" rel="noreferrer" target="_blank">P. Darc et al. (2026)</a>
+for more details.</p>
+</section>
+<section id="agn-flare-significance">
+<h3>AGN Flare Significance<a class="headerlink" href="#agn-flare-significance" title="Link to this heading">#</a></h3>
+<p>Due to the huge variety in predictions for the EM counterpart to a BBH-induced AGN
+flare, we adopt a model-agnostic approach to compute a photometry subscore in the
+overall score for BBH-induced AGN flares. We split the photometry for the candidate into
+pre- and post-GW photometry. The pre-GW photometry is used to estimate the baseline
+variability of the AGN according to the median absolute deviation (MAD). The magnitude
+of each post-GW photometry is then used to compute a Z-score per band, quantifying the
+significance of any flare above the pre-GW MAD. This Z-score per band is computed by
+smoothing and taking the median of a Z-score per photometry point.</p>
+<p>The significance of a flare can also be understood graphically:</p>
+<img alt="_images/agn-flare-phot-score.png" src="_images/agn-flare-phot-score.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>For candidate AT2020afis (ZTF19abanrhr), a candidate for an AGN flare induced by BBH
+merger GW190521, there is a flare at ~50 days post-GW with <span class="math notranslate nohighlight">\(Z_{\rm flare} = 4.44\)</span>.</p>
+<p>This <span class="math notranslate nohighlight">\(Z_{\rm flare}\)</span> is converted to a photometry subscore according to:</p>
+<div class="math notranslate nohighlight">
+\[S_{\mathrm{phot,T(AGN\,flare)}} = 0.1 + 0.9\times\Phi\left(\frac{Z_{\mathrm{flare}} - 3.25}{0.8125}\right)\;,\]</div>
+<p>Where <span class="math notranslate nohighlight">\(\Phi\)</span> is the standard normal distribution’s cumulative distribution
+function. For the above example, <span class="math notranslate nohighlight">\(S_{\mathrm{phot,T(AGN\,flare)}} = 0.9\)</span>.</p>
+</section>
+</section>
+<section id="nuclear-offset-subscore">
+<h2>Nuclear Offset Subscore<a class="headerlink" href="#nuclear-offset-subscore" title="Link to this heading">#</a></h2>
+<p>When vetting for BBH-induced AGN flaring, we include an additional subscore quantifying
+the distance of a candidate from the nucleus of a host galaxy. For nearby sources,
+for which astrometry is precise, our fidudical desired offset is ~0.5 kpc. For more
+distant sources, our fiducial desired offset is an angular offset of 2”. Concretely:</p>
+<div class="math notranslate nohighlight">
+\[S_{\mathrm{NO}} = \max\left[0.1, \frac{\sigma}{\sigma + \delta}\right]\;\]</div>
+<p><span class="math notranslate nohighlight">\(\delta\)</span> is always the projected offset. <span class="math notranslate nohighlight">\(\sigma = 0.5~\mathrm{kpc}\)</span> for
+nearby sources and 2” for distant sources.</p>
+<p>As with other subscores, rather than allowing the subscore to drop to a hard 0, the
+subscore is at minimum 0.1.</p>
 </section>
 </section>
 
@@ -412,11 +649,11 @@
       </div>
     </a>
     <a class="right-next"
-       href="updatingredshifts.html"
+       href="catalogs.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Submitting Galaxy Spec-z’s</p>
+        <p class="prev-next-title">Catalogs Used in TROVE</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
@@ -438,11 +675,17 @@
   </div>
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="visible nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-skymap-localization-scores">2D (Skymap/Localization) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#d-distance-scores">3D (Distance) Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-minor-planet-scores">Point Source and Minor Planet Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-scores">AGN Scores</a></li>
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-scores">Photometry Scores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#localization-2d-subscores">Localization (2D) Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#distance-subscores">Distance Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#point-source-and-solar-system-object-subcores">Point Source and Solar System Object Subcores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-subscores">AGN Subscores</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-subscores">Photometry Subscores</a><ul class="visible nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#light-curve-metrics">Light Curve Metrics</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kilonovascorer"><code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-flare-significance">AGN Flare Significance</a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nuclear-offset-subscore">Nuclear Offset Subscore</a></li>
 </ul>
   </nav></div>
 
