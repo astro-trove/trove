@@ -30,6 +30,7 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx_design",
+    "sphinx_new_tab_link",
 ]
 
 templates_path = ["_templates"]

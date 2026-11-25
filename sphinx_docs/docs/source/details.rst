@@ -141,7 +141,7 @@ shown on the left sidebar. At top, see buttons for:
 
 1. Update Lightcurve: Submit a job to obtain forced photometry from ATLAS or ZTF.
 2. Update Host z: Submit a spectroscopic redshift measurement for one of the host 
-   galaxies in the galaxy table. (See: `Submitting Galaxy Spec-z's <updatingredshifts.html>`_)
+   galaxies in the galaxy table. (See: :doc:`updatingredshifts`)
 3. Vet: Vet the target / candidate.
 
 On the right, in the Score Details tab, see details of the subscores that are general 
