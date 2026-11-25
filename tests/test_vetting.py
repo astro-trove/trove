@@ -590,7 +590,11 @@ class TestScorePhotUnchanged:
             for name, (df, expected) in self._cases().items():
                 got = vet_phot._score_phot(df, MagicMock(id=1),
                                            MagicMock(event_id="S1"), self.RANGES)[:4]
-                assert got == pytest.approx(expected, rel=1e-6), name
+                # None marks an output that wasn't computed; check those exactly
+                assert [g is None for g in got] == [e is None for e in expected], name
+                # loose enough for curve_fit differences across machines
+                nums = [(g, e) for g, e in zip(got, expected) if e is not None]
+                assert [g for g, _ in nums] == pytest.approx([e for _, e in nums], rel=1e-4), name
 
 
 class TestTargetDefaultDistance:
