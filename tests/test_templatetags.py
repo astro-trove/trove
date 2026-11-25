@@ -536,7 +536,7 @@ class TestLightCurveSummary:
         rows = self._rows(dict(t0=60000, t0_is_fallback=False, lum=2e42,
                                peak_time=4.0, decay_rate=0.05))
         assert rows == {
-            "Transient Start (t<sub>0</sub>)":
+            "Assumed Transient Start (t<sub>0</sub>)":
                 "MJD 60000.00 (2023-02-25)<br>midpoint of the last non-detection and the first detection",
             "Maximum Luminosity": "2.00 x 10<sup>42</sup> erg/s",
             "Rise Time (t<sub>0</sub> to peak)": "4.00 days",
@@ -546,8 +546,8 @@ class TestLightCurveSummary:
     def test_missing_values_are_left_out_and_fallback_is_noted(self):
         rows = self._rows(dict(t0=60000, t0_is_fallback=True, lum=None,
                                peak_time=4.0, decay_rate=None))
-        assert list(rows) == ["Transient Start (t<sub>0</sub>)", "Rise Time (t<sub>0</sub> to peak)"]
-        assert "no non-detection before the first detection" in rows["Transient Start (t<sub>0</sub>)"]
+        assert list(rows) == ["Assumed Transient Start (t<sub>0</sub>)", "Rise Time (t<sub>0</sub> to peak)"]
+        assert "no non-detection before the first detection" in rows["Assumed Transient Start (t<sub>0</sub>)"]
 
     def test_no_detections(self):
         assert self._ctx(None) == {"rows": []}
