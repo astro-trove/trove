@@ -2,20 +2,27 @@
 Some functions for accessing the EventCandidate table inside a django template
 """
 
+import hashlib
+import json
+import logging
 import numpy as np
 from collections import OrderedDict
 from decimal import Decimal, InvalidOperation
 from functools import partial
+from astropy.time import Time
 from django import template
 from django.core.cache import cache
 from django.template.defaultfilters import linebreaks
 from django.conf import settings
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+from django.db.models import Count, Max
+from tom_dataproducts.models import PhotometryReducedDatum
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.models import ScoreFactor
 from scoring.scoring import mpc_score_from_match
+from scoring.vet_phot import T0_FALLBACK_DAYS, basic_light_curve_metrics
 from scoring.util import (
     agn_counts_toward,
     get_agn_toggle as _get_agn_toggle,
@@ -38,6 +45,13 @@ from scoring.phot_method import (
 )
 
 register = template.Library()
+logger = logging.getLogger(__name__)
+
+# light curve metrics only change with the cache key, so this just ages out
+# keys for targets nobody is looking at anymore
+BASIC_LC_CACHE_TIMEOUT = 7 * 24 * 3600  # seconds
+# distinguishes "not cached" from a cached None (a target with no detections)
+BASIC_LC_CACHE_MISS = object()
 
 
 @register.simple_tag(takes_context=True)
@@ -270,7 +284,11 @@ def display_score_details(context, target_id):
             "label": label,
             "value": _safe_format(raw_value, fmter),
         })
-    
+    basic_card["details"].append({
+        "label": "Associated AGN?",
+        "value": "Yes" if _has_associated_agn(target_id) else "No",
+    })
+
     cards.append(basic_card)
 
     # Event Cards
@@ -538,6 +556,72 @@ def _baseline_format(mag, std):
         return text if std is None else f"{text} ± {float(std):.2f}"
     except (TypeError, ValueError):
         return str(mag)
+
+
+def _has_associated_agn(target_id):
+    # vet_basic saves the AGN crossmatch matches to this TargetExtra (only when
+    # there is at least one), whether or not the target is tied to an event
+    te = TargetExtra.objects.filter(target_id=target_id, key="Associated AGN").first()
+    return bool(te and json.loads(te.value))
+
+
+def _basic_light_curve_metrics_cached(target):
+    """`basic_light_curve_metrics` for this target, cached until its
+    photometry, redshift or host galaxies change"""
+    phot = PhotometryReducedDatum.objects.filter(target_id=target.id).aggregate(
+        n=Count("id"), last_id=Max("id"), last_time=Max("timestamp")
+    )
+    hosts = TargetExtra.objects.filter(
+        target_id=target.id, key="Host Galaxies"
+    ).values_list("value", flat=True).first()
+    fingerprint = hashlib.sha256(
+        repr((phot, target.redshift, hosts)).encode()
+    ).hexdigest()
+    key = f"basic_lc_metrics:{target.id}:{fingerprint}"
+
+    metrics = cache.get(key, BASIC_LC_CACHE_MISS)
+    if metrics is BASIC_LC_CACHE_MISS:
+        metrics = basic_light_curve_metrics(target.id)
+        cache.set(key, metrics, BASIC_LC_CACHE_TIMEOUT)
+    return metrics
+
+
+@register.inclusion_tag("tom_targets/partials/light_curve_summary.html")
+def light_curve_summary(target):
+    """Photometry-tab box of light curve metrics measured from the target's
+    own t0, independent of any associated poorly localized event"""
+    try:
+        metrics = _basic_light_curve_metrics_cached(target)
+    except Exception:
+        # a bad fit or odd photometry should never break the target page
+        logger.exception("Could not compute light curve metrics for %s", target)
+        metrics = None
+    if metrics is None:
+        return {"rows": []}
+
+    t0 = f"MJD {metrics['t0']:.2f} ({Time(metrics['t0'], format='mjd').iso[:10]})"
+    if metrics["t0_is_fallback"]:
+        t0 += (f"<br>no non-detection before the first detection, so set "
+               f"{T0_FALLBACK_DAYS} day before it")
+    else:
+        t0 += "<br>midpoint of the last non-detection and the first detection"
+    rows = [{"label": "Assumed Transient Start (t<sub>0</sub>)", "value": t0}]
+    if metrics["lum"] is not None:
+        rows.append({
+            "label": "Maximum Luminosity",
+            "value": _sci_format(metrics["lum"], unit="erg/s"),
+        })
+    if metrics["peak_time"] is not None:
+        rows.append({
+            "label": "Rise Time (t<sub>0</sub> to peak)",
+            "value": _float_format(metrics["peak_time"], unit="days"),
+        })
+    if metrics["decay_rate"] is not None:
+        rows.append({
+            "label": "Light Curve Slope",
+            "value": _float_format(metrics["decay_rate"], unit="mag/day"),
+        })
+    return {"rows": rows}
 
 
 def _safe_format(value, fmter):

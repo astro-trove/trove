@@ -111,3 +111,15 @@ details table.table.galaxies th {
   color: #333;
   font-weight: bold;
 }
+
+/* the AGN table has too few columns to fill the width as a block, and its
+   names are long survey designations that shouldn't be squeezed to 170px */
+table.table.galaxies.agn {
+  display: table;
+  width: 100%;
+}
+
+table.table.galaxies.agn td:nth-child(2),
+table.table.galaxies.agn th:nth-child(2) {
+  max-width: none;
+}

@@ -52,6 +52,16 @@ OPTICAL_FILTS = [
 ]
 
 PHOT_SCORE_MIN = 0.1
+
+# light curve metrics for targets without a GW event, measured from the
+# target's own t0 (see `estimate_t0`) rather than an EM model's window
+BASIC_LC_T_PRE = 0  # days since t0
+BASIC_LC_T_POST = 200  # days since t0
+BASIC_LC_SNR_MIN = 3
+BASIC_LC_MIN_TIME_SEPARATION = 0.0417  # days, same as the KN model
+# t0 is set this many days before the first detection when there is no earlier
+# non-detection, so the first detection is still inside the fit (dt > 0)
+T0_FALLBACK_DAYS = 1
 PREDETECTION_SNR_THRESHOLD = (
     5  # require a S/N of 5 for a predetection to be considered real
 )
@@ -202,9 +212,10 @@ def _mean_decline(popt, mag_slope_per_dex, t_data, window=None):
 
     return mag_slope_per_dex * np.log10(t_end / t_start) / (t_end - t_start)
 
-def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataFrame:
+def load_phot_df(target_id: int) -> pd.DataFrame:
     """
-    Get the photometry for this target_id and parse into a dataframe for further analysis
+    Get the photometry for this target_id and parse into a dataframe for further
+    analysis. Has no `dt` column, since that depends on which time it is measured from
     """
     target = Target.objects.filter(id=target_id)[0]
 
@@ -264,7 +275,21 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
     # as a worst case scenario
     photdf["magerr"] = photdf.magerr.replace(0, 2.5 / (3 * np.log(10)))
 
-    # compute the days since the nonlocalized event passed in
+    # add a SNR column to the dataframe
+    photdf["snr"] = error_to_snr(photdf.magerr)
+
+    return photdf
+
+
+def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataFrame:
+    """
+    The photometry for this target_id, with a `dt` column of days since the
+    nonlocalized event
+    """
+    photdf = load_phot_df(target_id)
+    if not len(photdf):
+        return photdf
+
     # get the GW event discovery date
     gw_disc_date = Time(
         EventSequence.objects.filter(nonlocalizedevent_id=nonlocalized_event.id)
@@ -274,11 +299,58 @@ def _get_phot(target_id: int, nonlocalized_event: NonLocalizedEvent) -> pd.DataF
 
     # add a dt column to the dataframe
     photdf["dt"] = photdf.mjd - gw_disc_date
-
-    # add a SNR column to the dataframe
-    photdf["snr"] = error_to_snr(photdf.magerr)
-
     return photdf
+
+
+def drop_unreliable_forced_phot(photdf: pd.DataFrame) -> pd.DataFrame:
+    """
+    Drop ATLAS / ZTF forced photometry below FORCEDPHOT_SNR_THRESHOLD (which
+    includes all of their non-detections, since those have no SNR)
+    """
+    return photdf[~(
+        (
+            (photdf.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(photdf.snr)
+        ) & (
+            (photdf.telescope == "ATLAS") |
+            (photdf.telescope == "ATLAS FP") |
+            (photdf.telescope == "ZTF FP")
+        )
+    )
+    ]
+
+
+def estimate_t0(photdf: pd.DataFrame, snr_min: float) -> Tuple[Optional[float], bool]:
+    """
+    Estimate when a transient began, for a target without a GW event to time it from.
+
+    The first detection is the earliest non-upper-limit with SNR >= snr_min after
+    dropping unreliable forced photometry. t0 is the midpoint between it and the
+    last non-detection before it (an upper limit or a point below snr_min, forced
+    photometry included). With no earlier non-detection, t0 falls back to
+    T0_FALLBACK_DAYS before the first detection.
+
+    RETURNS
+    -------
+    t0: float or None
+        The MJD of t0, None if there are no detections
+    is_fallback: bool
+        True when there was no earlier non-detection to constrain t0
+    """
+    if not len(photdf):
+        return None, False
+
+    dets = drop_unreliable_forced_phot(photdf)
+    dets = dets[~dets.upperlimit & (dets.snr >= snr_min)]
+    if not len(dets):
+        return None, False
+    first_det = dets.mjd.min()
+
+    nondets = photdf[
+        (photdf.mjd < first_det) & (photdf.upperlimit | (photdf.snr < snr_min))
+    ]
+    if len(nondets):
+        return (nondets.mjd.max() + first_det) / 2, False
+    return first_det - T0_FALLBACK_DAYS, True
 
 
 def _get_post_disc_phot(
@@ -751,9 +823,9 @@ def find_public_phot(
         query_atlas = False
 
     if query_atlas:
-        print(
+        logger.info(
             "Asynchronously obtaining ATLAS forced photometry with "
-            + f"days_ago = {min(days_ago_max, days_ago):.2f}\n\n"
+            + f"days_ago = {min(days_ago_max, days_ago):.2f}"
         )
         async_atlas_query.using(
             priority=queue_priority  # this sets the priority to whatever is passed in
@@ -877,18 +949,20 @@ def fit_agn_baseline(
     return baseline
 
 
-def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
-
+def _detections_for_fit(allphot, snr_min, filt=None):
+    """
+    The detections (no upper limits) with SNR >= snr_min in the filter(s) we
+    use for the light curve analysis, or None if there aren't any to use
+    """
     if allphot is None:  # this is if there is no photometry
-        return 1, None, None, None, None, None
+        return None
 
-    # allphot will have already been filtered not to extend beyond param_ranges['t_post']
-    # we still need to toss out (1) upper limits (2) detections below a SNR threshold
+    # we need to toss out (1) upper limits (2) detections below a SNR threshold
     phot = allphot[~allphot.upperlimit]
-    phot = phot[phot.snr >= param_ranges["phot_score_snr_min"]]
+    phot = phot[phot.snr >= snr_min]
     if not len(phot):
         # then there is no photometry for this object and we're done!
-        return 1, None, None, None, None, None
+        return None
 
     # find the filter we will use for the photometry analysis
     if filt is None:
@@ -897,14 +971,52 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
                 break
         else:
             # This target does not have any photometry with the correct filters!
-            # so we return a score of 1
-            return 1, None, None, None, None, None
+            return None
 
     # now filter down the photometry
     if isinstance(filt, list) or isinstance(filt, set):
         phot = phot[phot["filter"].isin(filt)]
     elif filt != "all" and isinstance(filt, str):
         phot = phot[phot["filter"] == filt]
+    return phot
+
+
+def _fit_peak_and_decay(phot, t_pre, t_post, min_time_separation, target_id):
+    """
+    Fit the light curve for its peak time and decay rate. Returns
+    (model, best_fit_params, max_time, decay_rate), or None when there is too
+    little photometry or the fit fails
+    """
+    # has to be at least 2 distinct EPOCHS before t_post to fit powerlaw
+    _in_window = phot.dt[phot.dt < t_post]
+    if _in_window.nunique() <= 1:
+        return None
+
+    try:
+        return estimate_max_find_decay_rate(
+            phot.dt,
+            phot.mag,
+            phot.magerr,
+            t_pre=t_pre,
+            t_post=t_post,
+            min_time_separation=min_time_separation,
+        )
+    except RuntimeError as exc:
+        logger.warning(
+            "Not setting peak_time or decay_rate for target %s: %s",
+            target_id,
+            exc,
+        )
+        return None
+
+
+def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
+
+    # allphot will have already been filtered not to extend beyond param_ranges['t_post']
+    phot = _detections_for_fit(allphot, param_ranges["phot_score_snr_min"], filt)
+    if phot is None:
+        # no usable photometry, so we return a score of 1
+        return 1, None, None, None, None, None
 
     # if we've made it to this point we have at least one detection so
     # we can calculate the luminosity
@@ -925,46 +1037,86 @@ def _score_phot(allphot, target, nonlocalized_event, param_ranges, filt=None):
 
     # then we can only do the next stuff if there is more than one photometry point
     # at this filter
-    # has to be at least 2 distinct EPOCHS before t_post to fit powerlaw
-    _in_window = phot.dt[phot.dt < param_ranges["t_post"]]
-    if _in_window.nunique() > 1:
-        # find the maximum and decay rate
-        try:
-            _model, _best_fit_params, max_time, decay_rate = (
-                estimate_max_find_decay_rate(
-                    phot.dt,
-                    phot.mag,
-                    phot.magerr,
-                    t_pre=param_ranges["t_pre"],
-                    t_post=param_ranges["t_post"],
-                    min_time_separation=param_ranges["min_time_separation"],
-                )
-            )
-        except RuntimeError as exc:
-            logger.warning(
-                "Not setting peak_time or decay_rate for target %s: %s",
-                target.id,
-                exc,
-            )
-            return phot_score, lum, None, None, None, None
+    fit = _fit_peak_and_decay(
+        phot,
+        t_pre=param_ranges["t_pre"],
+        t_post=param_ranges["t_post"],
+        min_time_separation=param_ranges["min_time_separation"],
+        target_id=target.id,
+    )
+    if fit is None:
+        return phot_score, lum, None, None, None, None
+    _model, _best_fit_params, max_time, decay_rate = fit
 
-        # check if these are within the appropriate ranges
-        if (
-            max_time < param_ranges["peak_time"][0]
-            or max_time > param_ranges["peak_time"][1]
-        ):
-            # this is to make sure we don't bias the score if there are no observations in the peak_time time range
-            if phot.dt.min() > param_ranges["peak_time"][1]:
-                max_time = None
-            else:
-                phot_score *= PHOT_SCORE_MIN
-
-        if (
-            decay_rate < param_ranges["decay_rate"][0]
-            or decay_rate > param_ranges["decay_rate"][1]
-        ):
+    # check if these are within the appropriate ranges
+    if (
+        max_time < param_ranges["peak_time"][0]
+        or max_time > param_ranges["peak_time"][1]
+    ):
+        # this is to make sure we don't bias the score if there are no observations in the peak_time time range
+        if phot.dt.min() > param_ranges["peak_time"][1]:
+            max_time = None
+        else:
             phot_score *= PHOT_SCORE_MIN
 
-        return phot_score, lum, max_time, decay_rate, _model, _best_fit_params
+    if (
+        decay_rate < param_ranges["decay_rate"][0]
+        or decay_rate > param_ranges["decay_rate"][1]
+    ):
+        phot_score *= PHOT_SCORE_MIN
 
-    return phot_score, lum, None, None, None, None
+    return phot_score, lum, max_time, decay_rate, _model, _best_fit_params
+
+
+def basic_light_curve_metrics(target_id: int) -> Optional[dict]:
+    """
+    The light curve metrics (peak luminosity, rise time, decay rate) for a
+    target without needing a GW event, measured from the target's own t0 (see
+    `estimate_t0`) with the BASIC_LC_* settings. Nothing is scored.
+
+    Returns None when the target has no detections, otherwise a dict with
+    `t0` (MJD), `t0_is_fallback`, `lum` (erg/s, None without a distance),
+    `peak_time` (days since t0) and `decay_rate` (mag/day), the last two None
+    when the light curve can't be fit
+    """
+    from .scoring import target_default_distance  # avoid circular import
+
+    photdf = load_phot_df(target_id)
+    t0, t0_is_fallback = estimate_t0(photdf, BASIC_LC_SNR_MIN)
+    if t0 is None:
+        return None
+
+    photdf["dt"] = photdf.mjd - t0
+    photdf = drop_unreliable_forced_phot(photdf)
+    photdf = photdf[
+        (photdf.dt >= BASIC_LC_T_PRE) & (photdf.dt <= BASIC_LC_T_POST)
+    ]
+    phot = _detections_for_fit(photdf, BASIC_LC_SNR_MIN, OPTICAL_FILTS)
+    if phot is None or not len(phot):
+        return None
+
+    dist, _ = target_default_distance(target_id)
+    lum = None
+    if dist is not None:
+        lum = compute_peak_lum(
+            phot.mag, phot.magerr, phot["filter"].tolist(), dist * u.Mpc
+        )
+
+    peak_time = decay_rate = None
+    fit = _fit_peak_and_decay(
+        phot,
+        t_pre=BASIC_LC_T_PRE,
+        t_post=BASIC_LC_T_POST,
+        min_time_separation=BASIC_LC_MIN_TIME_SEPARATION,
+        target_id=target_id,
+    )
+    if fit is not None:
+        _, _, peak_time, decay_rate = fit
+
+    return dict(
+        t0=t0,
+        t0_is_fallback=t0_is_fallback,
+        lum=lum,
+        peak_time=peak_time,
+        decay_rate=decay_rate,
+    )

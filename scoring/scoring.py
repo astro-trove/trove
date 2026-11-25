@@ -351,35 +351,20 @@ def _host_used_for_distance_scoring(host_df, target_id, nonlocalized_event_name)
     return row
 
 
-def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name: str):
-
-    # first check if this target has a redshift associated with it
+def _target_redshift_distance(target_id: int):
+    """(distance, error) in Mpc from the target's own redshift, or None without one"""
     targ = Target.objects.get(id=target_id)
     if targ.redshift is not None and not np.isnan(targ.redshift):
         targ_dist = cosmo.luminosity_distance(targ.redshift).to(u.Mpc).value
         targ_dist_err = cosmo.luminosity_distance(1e-3).to(u.Mpc).value
         return targ_dist, targ_dist_err
+    return None
 
-    # then try to get out the host galaxy json file from target extra
-    hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
-    if not hosts.count():
-        return _distance_at_healpix(nonlocalized_event_name, target_id)
-    host_df = read_host_galaxies_json(hosts[0].value)
 
-    # clean up dataframe
-    host_df = clean_host_df(host_df)
-
-    if not len(host_df):
-        return _distance_at_healpix(nonlocalized_event_name, target_id)
-
-    scored_host = _host_used_for_distance_scoring(
-        host_df, target_id, nonlocalized_event_name
-    )
-    if scored_host is not None:
-        return scored_host.Dist, scored_host.DistErr
-
-    # otherwise fall back to a rank ordering of the various catalogs,
-    # this will help later
+def _ranked_host_distance(host_df: pd.DataFrame):
+    """(distance, error) of the preferred host in a cleaned, non-empty host_df,
+    by catalog ranking and then distance type"""
+    # fall back to a rank ordering of the various catalogs
     host_df["_rank_order"] = host_df.Source.replace(GALAXY_CATALOG_RANKING)
     host_df = host_df.sort_values(by=["_rank_order", "PCC"])
 
@@ -409,6 +394,54 @@ def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name:
         to_ret = host_df.iloc[0]
 
     return to_ret.Dist, to_ret.DistErr
+
+
+def target_default_distance(target_id: int):
+    """
+    The (distance, error) in Mpc to use for a target without a GW event: its
+    redshift, else its preferred host galaxy (see `_ranked_host_distance`),
+    else (None, None)
+    """
+    redshift_dist = _target_redshift_distance(target_id)
+    if redshift_dist is not None:
+        return redshift_dist
+
+    hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
+    if not hosts.count():
+        return None, None
+    host_df = clean_host_df(read_host_galaxies_json(hosts[0].value))
+    if not len(host_df):
+        return None, None
+    return _ranked_host_distance(host_df)
+
+
+def get_eventcandidate_default_distance(target_id: int, nonlocalized_event_name: str):
+
+    # first check if this target has a redshift associated with it
+    redshift_dist = _target_redshift_distance(target_id)
+    if redshift_dist is not None:
+        return redshift_dist
+
+    # then try to get out the host galaxy json file from target extra
+    hosts = TargetExtra.objects.filter(target_id=target_id, key="Host Galaxies")
+    if not hosts.count():
+        return _distance_at_healpix(nonlocalized_event_name, target_id)
+    host_df = read_host_galaxies_json(hosts[0].value)
+
+    # clean up dataframe
+    host_df = clean_host_df(host_df)
+
+    if not len(host_df):
+        return _distance_at_healpix(nonlocalized_event_name, target_id)
+
+    scored_host = _host_used_for_distance_scoring(
+        host_df, target_id, nonlocalized_event_name
+    )
+    if scored_host is not None:
+        return scored_host.Dist, scored_host.DistErr
+
+    # otherwise fall back to a rank ordering of the various catalogs
+    return _ranked_host_distance(host_df)
 
 
 def _distance_at_healpix(nonlocalized_event_name, target_id, max_time=None):

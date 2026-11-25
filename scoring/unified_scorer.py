@@ -55,7 +55,7 @@ from .vet_phot import (
     OPTICAL_FILTS,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
-    FORCEDPHOT_SNR_THRESHOLD,
+    drop_unreliable_forced_phot,
     _get_post_disc_phot,
     _get_pre_disc_phot,
     _score_phot,
@@ -209,27 +209,9 @@ def score(
 
     # only use SNR > FORCEDPHOT_SNR_THRESHOLD ATLAS / ZTF FP for scoring
     if prephot is not None: # if we found any pre photometry to begin with
-        prephot = prephot[~(
-            (
-                (prephot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(prephot.snr)
-            ) & (
-                (prephot.telescope == "ATLAS") |
-                (prephot.telescope == "ATLAS FP") |
-                (prephot.telescope == "ZTF FP")
-            )
-        )
-        ]
+        prephot = drop_unreliable_forced_phot(prephot)
     if postphot is not None: # if we found any post photometry to begin with
-        postphot = postphot[~(
-            (
-                (postphot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(postphot.snr)
-            ) & (
-                (postphot.telescope == "ATLAS") |
-                (postphot.telescope == "ATLAS FP") |
-                (postphot.telescope == "ZTF FP")
-            )
-        )
-        ]
+        postphot = drop_unreliable_forced_phot(postphot)
 
     if params.phot_method.knscorer and phot_method=="kilonovascorer":
         try:
@@ -392,7 +374,7 @@ def vet_basic(
     This should be called before any photometry vetting in the NLE-related
     vetting modules. That way we can reduce the code duplication between them!
     """
-    logger.info("Running basic vetting")
+    logger.info("RUNNING BASIC VETTING")
 
     target = Target.objects.get(id=target_id)
     te = TargetExtra.objects.filter(target_id=target.id)
@@ -409,11 +391,18 @@ def vet_basic(
         if stop_on_zero and ps_score == 0:
             logger.info(
                 f"{target.name} matches a known point source, so it scores 0 "
-                +"regardless of anything else; skipping rest of vetting"
+                "regardless of anything else; skipping rest of vetting"
             )
             return pd.DataFrame(), pd.DataFrame(), False
+    else:
+        logger.info(
+            f"Skipping point source association association (run_ps={run_ps}, "
+            f"overwrite={overwrite}, and "+
+            f"the target's ps_score={te.filter(key='ps_score')[0].value})" if te.filter(key="ps_score").exists() else "no ps_score)"
+        )
 
     # (1) check for new photometry
+    logger.info("Finding public photometry")
     phot_query_start = time.time()
     created_new_phot = find_public_phot(
         target=target,
@@ -433,7 +422,7 @@ def vet_basic(
         if skip_vet_if_no_new_phot and not created_new_phot: # ... but stop if skip_vet_if_no_new_phot **AND** no new phot created
             logger.info(
                         "Skipping Minor Planet Center association because no new "
-                        +"photometry and skip_vet_if_no_new_phot=True"
+                        "photometry and skip_vet_if_no_new_phot=True"
             )
         else: # ... proceed otherwise
             mpc_score = _minor_planet_score(
@@ -445,6 +434,12 @@ def vet_basic(
                     +"scores 0 regardless of anything else; skipping rest of vetting"
                 )
                 return pd.DataFrame(), pd.DataFrame(), False
+    else:
+        logger.info(
+            f"Skipping Minor Planet Center association (run_mpc={run_mpc}, "
+            f"overwrite={overwrite}, and "+
+            f"the target's mpc_match_name={te.filter(key='mpc_match_name')[0].value})" if te.filter(key="mpc_match_name").exists() else "no mpc_match_name)"
+        )
 
     # (3), (4) get associated AGN, host galaxies
     with warnings.catch_warnings():
@@ -454,6 +449,8 @@ def vet_basic(
         if run_agn:
             # search for an AGN associated with the target
             agn_df = agn_association_2d(target_id)
+        else:
+            logger.info("Skipping AGN association as run_agn=False")
 
         host_df = pd.DataFrame({})
         if run_host_association:
@@ -472,13 +469,15 @@ def vet_basic(
                 else:
                     logger.warning(
                         f"Not saving the host galaxy fingerprint for {target.name}: "
-                        + "couldn't confirm the galaxy catalogs are unchanged"
+                        "couldn't confirm the galaxy catalogs are unchanged"
                     )
             else:
                 logger.info(
                     f"Reusing the saved host galaxy association for {target.name}, "
-                    + "nothing it depends on has changed"
+                    "nothing it depends on has changed"
                 )
+        else:
+            logger.info("Skipping host association as run_host_association=False")
 
     # return both agn_df and host_df
     return host_df, agn_df, True

@@ -448,3 +448,123 @@ class TestEventCandidateExtras:
         """Test _bool_format with fractional value."""
         from trove_nonlocalizedevents.templatetags.event_candidate_extras import _bool_format_yesno
         assert _bool_format_yesno(0.7) == "No"
+
+
+class TestAssociatedAgn:
+    """Tests for the "Associated AGN" display on the target page."""
+
+    AGN_JSON = (
+        '[{"ID": "far", "RA": 150.0, "Dec": 30.001, "Dist": null, "DistErr": null,'
+        ' "z": 0.1, "zErr": null, "Source": "Milliquas"},'
+        ' {"ID": "near", "RA": 150.0, "Dec": 30.0001, "Dist": 400.0, "DistErr": 20.0,'
+        ' "z": 0.09, "zErr": 0.001, "Source": "DesiDr1Quasar"}]'
+    )
+
+    def _patch_te(self, module, value):
+        te = None if value is None else MagicMock(value=value)
+        mock_te = patch(f"{module}.TargetExtra")
+        m = mock_te.start()
+        m.objects.filter.return_value.first.return_value = te
+        return mock_te
+
+    def test_load_associated_agn_sorted_with_offset(self, mock_target):
+        from trove_targets.templatetags.target_list_extras import load_associated_agn
+        p = self._patch_te("trove_targets.templatetags.target_list_extras", self.AGN_JSON)
+        try:
+            agns = load_associated_agn(mock_target)
+        finally:
+            p.stop()
+        assert [a["ID"] for a in agns] == ["near", "far"]
+        assert agns[0]["Offset"] == pytest.approx(0.36, abs=0.01)
+        assert agns[1]["Offset"] == pytest.approx(3.6, abs=0.01)
+
+    def test_load_associated_agn_blanks_sentinel_redshift(self, mock_target):
+        from trove_targets.templatetags.target_list_extras import load_associated_agn
+        value = ('[{"ID": "pso", "RA": 150.0, "Dec": 30.0, "Dist": null, "DistErr": null,'
+                 ' "z": -999.0, "zErr": 1000.0, "Source": "Ps1Qso"}]')
+        p = self._patch_te("trove_targets.templatetags.target_list_extras", value)
+        try:
+            agn, = load_associated_agn(mock_target)
+        finally:
+            p.stop()
+        assert agn["z"] is None and agn["zErr"] is None
+
+    @pytest.mark.parametrize("value", [None, "[]"])
+    def test_load_associated_agn_empty(self, mock_target, value):
+        from trove_targets.templatetags.target_list_extras import load_associated_agn
+        p = self._patch_te("trove_targets.templatetags.target_list_extras", value)
+        try:
+            assert load_associated_agn(mock_target) == []
+        finally:
+            p.stop()
+
+    def test_agn_table_renders(self, mock_target):
+        from django.template.loader import render_to_string
+        from trove_targets.templatetags.target_list_extras import load_associated_agn
+        p = self._patch_te("trove_targets.templatetags.target_list_extras", self.AGN_JSON)
+        try:
+            html = render_to_string("tom_targets/partials/agn_table.html",
+                                    {"agns": load_associated_agn(mock_target)})
+        finally:
+            p.stop()
+        assert "near" in html and "DesiDr1Quasar" in html
+        assert "400.0&nbsp;&plusmn;&nbsp;20.0" in html
+
+    @pytest.mark.parametrize("value,expected", [(AGN_JSON, True), ("[]", False), (None, False)])
+    def test_has_associated_agn(self, value, expected):
+        from trove_nonlocalizedevents.templatetags.event_candidate_extras import _has_associated_agn
+        p = self._patch_te("trove_nonlocalizedevents.templatetags.event_candidate_extras", value)
+        try:
+            assert _has_associated_agn(1) is expected
+        finally:
+            p.stop()
+
+
+class TestLightCurveSummary:
+    """Photometry-tab Light Curve Summary box"""
+
+    def _ctx(self, metrics=None, side_effect=None):
+        from trove_nonlocalizedevents.templatetags import event_candidate_extras as ece
+        with patch.object(ece, "_basic_light_curve_metrics_cached",
+                          return_value=metrics, side_effect=side_effect):
+            return ece.light_curve_summary(MagicMock())
+
+    def _rows(self, metrics):
+        return {r["label"]: r["value"] for r in self._ctx(metrics)["rows"]}
+
+    def test_all_rows(self):
+        rows = self._rows(dict(t0=60000, t0_is_fallback=False, lum=2e42,
+                               peak_time=4.0, decay_rate=0.05))
+        assert rows == {
+            "Assumed Transient Start (t<sub>0</sub>)":
+                "MJD 60000.00 (2023-02-25)<br>midpoint of the last non-detection and the first detection",
+            "Maximum Luminosity": "2.00 x 10<sup>42</sup> erg/s",
+            "Rise Time (t<sub>0</sub> to peak)": "4.00 days",
+            "Light Curve Slope": "0.05 mag/day",
+        }
+
+    def test_missing_values_are_left_out_and_fallback_is_noted(self):
+        rows = self._rows(dict(t0=60000, t0_is_fallback=True, lum=None,
+                               peak_time=4.0, decay_rate=None))
+        assert list(rows) == ["Assumed Transient Start (t<sub>0</sub>)", "Rise Time (t<sub>0</sub> to peak)"]
+        assert "no non-detection before the first detection" in rows["Assumed Transient Start (t<sub>0</sub>)"]
+
+    def test_no_detections(self):
+        assert self._ctx(None) == {"rows": []}
+
+    def test_errors_do_not_break_the_page(self):
+        assert self._ctx(side_effect=RuntimeError) == {"rows": []}
+
+    def test_render_says_event_independent(self):
+        from django.template.loader import render_to_string
+        ctx = self._ctx(dict(t0=60000, t0_is_fallback=False, lum=None,
+                             peak_time=4.0, decay_rate=0.05))
+        html = render_to_string("tom_targets/partials/light_curve_summary.html", ctx)
+        assert "Light Curve Summary" in html
+        assert "Independent of any associated GW or other poorly localized event" in html
+        assert "<sub>0</sub>" in html  # labels are not escaped
+
+    def test_render_nothing_without_rows(self):
+        from django.template.loader import render_to_string
+        html = render_to_string("tom_targets/partials/light_curve_summary.html", {"rows": []})
+        assert html.strip() == ""

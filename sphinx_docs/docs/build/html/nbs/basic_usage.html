@@ -386,16 +386,17 @@
 <section id="Imports-&amp;-Useful-Variables">
 <h2>Imports &amp; Useful Variables<a class="headerlink" href="#Imports-&-Useful-Variables" title="Link to this heading">#</a></h2>
 <div class="nbinput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">time</span><span class="w"> </span><span class="kn">import</span> <span class="n">strftime</span>
 
-<span class="n">trove_url</span> <span class="o">=</span> <span class="s2">"https://trove.as.arizona.edu/api/"</span>
-<span class="n">token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"TROVE_TOKEN"</span><span class="p">)</span>
-<span class="n">nle_name</span> <span class="o">=</span> <span class="s2">"GW190814"</span> <span class="c1"># a nonlocalized event (e.g., GW event) name</span>
+<span class="n">trove_url</span> <span class="o">=</span> <span class="s2">&quot;https://trove.as.arizona.edu/api/&quot;</span>
+<span class="n">token</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;TROVE_TOKEN&quot;</span><span class="p">)</span>
+<span class="n">nle_name</span> <span class="o">=</span> <span class="s2">&quot;GW190814&quot;</span> <span class="c1"># a nonlocalized event (e.g., GW event) name</span>
 </pre></div>
 </div>
 </div>
@@ -404,12 +405,12 @@
 <h2>Getting Scores<a class="headerlink" href="#Getting-Scores" title="Link to this heading">#</a></h2>
 <p>The primary thing users want to do is download the scores via the API to help them prioritize follow-up. To get all scores of candidates associated with a transient we can use the “score” endpoint:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -419,22 +420,22 @@
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-{&#39;id&#39;: 3845,
- &#39;target&#39;: {&#39;id&#39;: 1368128219,
-  &#39;name&#39;: &#39;RAPTORS-blu&#39;,
-  &#39;ra&#39;: 12.22920833,
-  &#39;dec&#39;: -25.06973472,
+{&#39;id&#39;: 3075,
+ &#39;target&#39;: {&#39;id&#39;: 41709156,
+  &#39;name&#39;: &#39;AT2019nyw&#39;,
+  &#39;ra&#39;: 12.154324533074,
+  &#39;dec&#39;: -23.980024160676,
   &#39;tns_redshift&#39;: None,
   &#39;tns_classification&#39;: None},
  &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
   &#39;event_id&#39;: &#39;GW190814&#39;,
   &#39;event_type&#39;: &#39;GW&#39;},
- &#39;score&#39;: {&#39;KN&#39;: 0.780326475350289}}
+ &#39;score&#39;: {&#39;KN&#39;: 0.6396198048370905}}
 </pre></div></div>
 </div>
 <p>Which is the highest scoring candidate. The dictionary has a few important keys</p>
@@ -446,7 +447,7 @@
 </ol>
 <p>But, we can also get the lowest scoring candidate:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">scores</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
@@ -454,7 +455,7 @@
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -464,8 +465,8 @@
   &#39;name&#39;: &#39;AT2019nuy&#39;,
   &#39;ra&#39;: 12.7099877991,
   &#39;dec&#39;: -25.4915413351,
-  &#39;tns_redshift&#39;: nan,
-  &#39;tns_classification&#39;: &#39;&#39;},
+  &#39;tns_redshift&#39;: None,
+  &#39;tns_classification&#39;: None},
  &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
   &#39;event_id&#39;: &#39;GW190814&#39;,
   &#39;event_type&#39;: &#39;GW&#39;},
@@ -474,7 +475,7 @@
 </div>
 <p>Or, the top ten scores:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">scores</span><span class="p">[:</span><span class="mi">10</span><span class="p">]</span>
@@ -482,131 +483,131 @@
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[12]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-[{&#39;id&#39;: 3845,
-  &#39;target&#39;: {&#39;id&#39;: 1368128219,
-   &#39;name&#39;: &#39;RAPTORS-blu&#39;,
-   &#39;ra&#39;: 12.22920833,
-   &#39;dec&#39;: -25.06973472,
+[{&#39;id&#39;: 3075,
+  &#39;target&#39;: {&#39;id&#39;: 41709156,
+   &#39;name&#39;: &#39;AT2019nyw&#39;,
+   &#39;ra&#39;: 12.154324533074,
+   &#39;dec&#39;: -23.980024160676,
    &#39;tns_redshift&#39;: None,
    &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.780326475350289}},
- {&#39;id&#39;: 3846,
-  &#39;target&#39;: {&#39;id&#39;: 1368128220,
-   &#39;name&#39;: &#39;RAPTORS-red&#39;,
-   &#39;ra&#39;: 12.22920833,
-   &#39;dec&#39;: -25.06973472,
+  &#39;score&#39;: {&#39;KN&#39;: 0.6396198048370905}},
+ {&#39;id&#39;: 3082,
+  &#39;target&#39;: {&#39;id&#39;: 41709262,
+   &#39;name&#39;: &#39;AT2019nuz&#39;,
+   &#39;ra&#39;: 12.4677684328,
+   &#39;dec&#39;: -25.5237821721,
    &#39;tns_redshift&#39;: None,
    &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.780326475350289}},
- {&#39;id&#39;: 3853,
-  &#39;target&#39;: {&#39;id&#39;: 1368500633,
-   &#39;name&#39;: &#39;mock&#39;,
-   &#39;ra&#39;: 12.1,
-   &#39;dec&#39;: -25.3,
+  &#39;score&#39;: {&#39;KN&#39;: 0.568923428074759}},
+ {&#39;id&#39;: 3078,
+  &#39;target&#39;: {&#39;id&#39;: 41709427,
+   &#39;name&#39;: &#39;AT2019noq&#39;,
+   &#39;ra&#39;: 12.1995075422,
+   &#39;dec&#39;: -25.3065162788,
    &#39;tns_redshift&#39;: None,
    &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.562660740049493}},
- {&#39;id&#39;: 3064,
-  &#39;target&#39;: {&#39;id&#39;: 41708423,
-   &#39;name&#39;: &#39;AT2019pck&#39;,
-   &#39;ra&#39;: 11.851431586385,
-   &#39;dec&#39;: -25.226056630082,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 0.4280890575048045}},
+ {&#39;id&#39;: 3071,
+  &#39;target&#39;: {&#39;id&#39;: 41709122,
+   &#39;name&#39;: &#39;AT2019oae&#39;,
+   &#39;ra&#39;: 12.318312693987,
+   &#39;dec&#39;: -23.861279415064,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.5441244282667317}},
- {&#39;id&#39;: 3036,
-  &#39;target&#39;: {&#39;id&#39;: 41709056,
-   &#39;name&#39;: &#39;AT2019odc&#39;,
-   &#39;ra&#39;: 11.507039,
-   &#39;dec&#39;: -25.45915,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 0.39957242422456435}},
+ {&#39;id&#39;: 3070,
+  &#39;target&#39;: {&#39;id&#39;: 41709364,
+   &#39;name&#39;: &#39;AT2019nqz&#39;,
+   &#39;ra&#39;: 11.693398097382,
+   &#39;dec&#39;: -24.336682330023,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.258832951381733}},
- {&#39;id&#39;: 3016,
-  &#39;target&#39;: {&#39;id&#39;: 41709396,
-   &#39;name&#39;: &#39;SN2019npv&#39;,
-   &#39;ra&#39;: 13.3846192596,
-   &#39;dec&#39;: -23.832956847,
-   &#39;tns_redshift&#39;: 0.056,
-   &#39;tns_classification&#39;: &#39;SN Ib&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 0.33354136434005255}},
+ {&#39;id&#39;: 3042,
+  &#39;target&#39;: {&#39;id&#39;: 41709277,
+   &#39;name&#39;: &#39;AT2019nuk&#39;,
+   &#39;ra&#39;: 13.7415544289,
+   &#39;dec&#39;: -26.1344487865,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.1280749101535552}},
- {&#39;id&#39;: 3052,
-  &#39;target&#39;: {&#39;id&#39;: 41700303,
-   &#39;name&#39;: &#39;AT2019zzc&#39;,
-   &#39;ra&#39;: 13.8182507965,
-   &#39;dec&#39;: -25.9960846545,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 0.322799861493612}},
+ {&#39;id&#39;: 3031,
+  &#39;target&#39;: {&#39;id&#39;: 41709327,
+   &#39;name&#39;: &#39;AT2019nsl&#39;,
+   &#39;ra&#39;: 11.418097339151,
+   &#39;dec&#39;: -23.302180819975,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.12629513074023943}},
- {&#39;id&#39;: 3043,
-  &#39;target&#39;: {&#39;id&#39;: 13585305,
-   &#39;name&#39;: &#39;AT2019zzb&#39;,
-   &#39;ra&#39;: 13.7765859139,
-   &#39;dec&#39;: -26.2138172051,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 0.32131611484634925}},
+ {&#39;id&#39;: 3059,
+  &#39;target&#39;: {&#39;id&#39;: 41709240,
+   &#39;name&#39;: &#39;AT2019nvs&#39;,
+   &#39;ra&#39;: 13.1573295584,
+   &#39;dec&#39;: -26.1948338209,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.11537495313513682}},
- {&#39;id&#39;: 3069,
-  &#39;target&#39;: {&#39;id&#39;: 41696262,
-   &#39;name&#39;: &#39;AT2019aacd&#39;,
-   &#39;ra&#39;: 13.547,
-   &#39;dec&#39;: -24.93824,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 0.3132976239075163}},
+ {&#39;id&#39;: 3067,
+  &#39;target&#39;: {&#39;id&#39;: 41709202,
+   &#39;name&#39;: &#39;AT2019nxe&#39;,
+   &#39;ra&#39;: 11.570058,
+   &#39;dec&#39;: -24.372554,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.09969122011010419}},
- {&#39;id&#39;: 3029,
-  &#39;target&#39;: {&#39;id&#39;: 41697253,
-   &#39;name&#39;: &#39;AT2019aabz&#39;,
-   &#39;ra&#39;: 13.631072,
-   &#39;dec&#39;: -24.286258,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 0.23651007644109376}},
+ {&#39;id&#39;: 3037,
+  &#39;target&#39;: {&#39;id&#39;: 41708478,
+   &#39;name&#39;: &#39;AT2019pag&#39;,
+   &#39;ra&#39;: 11.221737029831,
+   &#39;dec&#39;: -24.288200794749,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.0971368034573441}}]
+  &#39;score&#39;: {&#39;KN&#39;: 0.2364283515489337}}]
 </pre></div></div>
 </div>
 <p>If we instead only want the score of a specific transient we can use some query parameters in the URL.</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck"</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck&quot;</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">at2019pck_score</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -615,7 +616,7 @@
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[13]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -625,22 +626,22 @@
    &#39;name&#39;: &#39;AT2019pck&#39;,
    &#39;ra&#39;: 11.851431586385,
    &#39;dec&#39;: -25.226056630082,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.5441244282667317}}]
+  &#39;score&#39;: {&#39;KN&#39;: 2.1622736642161166e-13}}]
 </pre></div></div>
 </div>
 <p>Or, say we are interested in a few different targets</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck,AT2019odc"</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">?candidate_names=AT2019pck,AT2019odc&quot;</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -649,33 +650,33 @@
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[14]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
-[{&#39;id&#39;: 3064,
-  &#39;target&#39;: {&#39;id&#39;: 41708423,
-   &#39;name&#39;: &#39;AT2019pck&#39;,
-   &#39;ra&#39;: 11.851431586385,
-   &#39;dec&#39;: -25.226056630082,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
-  &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
-   &#39;event_id&#39;: &#39;GW190814&#39;,
-   &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.5441244282667317}},
- {&#39;id&#39;: 3036,
+[{&#39;id&#39;: 3036,
   &#39;target&#39;: {&#39;id&#39;: 41709056,
    &#39;name&#39;: &#39;AT2019odc&#39;,
    &#39;ra&#39;: 11.507039,
    &#39;dec&#39;: -25.45915,
-   &#39;tns_redshift&#39;: nan,
-   &#39;tns_classification&#39;: &#39;&#39;},
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
   &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
    &#39;event_id&#39;: &#39;GW190814&#39;,
    &#39;event_type&#39;: &#39;GW&#39;},
-  &#39;score&#39;: {&#39;KN&#39;: 0.258832951381733}}]
+  &#39;score&#39;: {&#39;KN&#39;: 0.025883295138173296}},
+ {&#39;id&#39;: 3064,
+  &#39;target&#39;: {&#39;id&#39;: 41708423,
+   &#39;name&#39;: &#39;AT2019pck&#39;,
+   &#39;ra&#39;: 11.851431586385,
+   &#39;dec&#39;: -25.226056630082,
+   &#39;tns_redshift&#39;: None,
+   &#39;tns_classification&#39;: None},
+  &#39;nonlocalizedevent&#39;: {&#39;id&#39;: 21085,
+   &#39;event_id&#39;: &#39;GW190814&#39;,
+   &#39;event_type&#39;: &#39;GW&#39;},
+  &#39;score&#39;: {&#39;KN&#39;: 2.1622736642161166e-13}}]
 </pre></div></div>
 </div>
 </section>
@@ -683,7 +684,7 @@
 <h2>Getting Scores with a Cone Search<a class="headerlink" href="#Getting-Scores-with-a-Cone-Search" title="Link to this heading">#</a></h2>
 <p>Say you are trying to plan an observing follow-up campaign and you want to prioritize the top 10 targets that are visible to your telescope. To do this, you can get a ranked list of candidates with a cone search:</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">ra_ctr</span> <span class="o">=</span> <span class="mf">13.163209</span>
@@ -691,8 +692,8 @@
 <span class="n">radius</span> <span class="o">=</span> <span class="mi">3600</span> <span class="c1"># 5 arcmin</span>
 
 <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">/cone_search?ra=</span><span class="si">{</span><span class="n">ra_ctr</span><span class="si">}</span><span class="s2">&amp;dec=</span><span class="si">{</span><span class="n">dec_ctr</span><span class="si">}</span><span class="s2">&amp;radius=</span><span class="si">{</span><span class="n">radius</span><span class="si">}</span><span class="s2">"</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
+    <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/score/</span><span class="si">{</span><span class="n">nle_name</span><span class="si">}</span><span class="s2">/cone_search?ra=</span><span class="si">{</span><span class="n">ra_ctr</span><span class="si">}</span><span class="s2">&amp;dec=</span><span class="si">{</span><span class="n">dec_ctr</span><span class="si">}</span><span class="s2">&amp;radius=</span><span class="si">{</span><span class="n">radius</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 <span class="p">)</span>
 
 <span class="n">scores</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
@@ -701,7 +702,7 @@
 </div>
 </div>
 <div class="nboutput nblast docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[15]:
 </pre></div>
 </div>
 <div class="output_area docutils container">
@@ -713,26 +714,32 @@
 <section id="Uploading-New-Targets-&amp;-Photometry">
 <h2>Uploading New Targets &amp; Photometry<a class="headerlink" href="#Uploading-New-Targets-&-Photometry" title="Link to this heading">#</a></h2>
 <p>Finally, another common use case is reporting new targets and/or photometry that you got! For this, we can use the <code class="docutils literal notranslate"><span class="pre">target</span></code> endpoint.</p>
+<p>Please <strong>do not</strong> change the RA, Dec in the example below!</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[23]:
 </pre></div>
 </div>
-<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">upload_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/target/upload"</span>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">upload_url</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">trove_url</span><span class="si">}</span><span class="s2">/target/upload&quot;</span>
+<span class="n">now_yymmdd_hhmmss</span> <span class="o">=</span> <span class="n">strftime</span><span class="p">(</span><span class="s2">&quot;%y%m</span><span class="si">%d</span><span class="s2">_%H%M%S&quot;</span><span class="p">)</span> <span class="c1"># timestamp, for easy cleanup of test candidates later</span>
 
 <span class="n">target_data</span> <span class="o">=</span> <span class="p">[</span>
     <span class="p">{</span>
-        <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"test"</span><span class="p">,</span>
-        <span class="s2">"ra"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-        <span class="s2">"dec"</span><span class="p">:</span> <span class="mi">0</span>
+        <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;test_api_</span><span class="si">{</span><span class="n">now_yymmdd_hhmmss</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;ra&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="s2">&quot;dec&quot;</span><span class="p">:</span> <span class="mi">0</span>
     <span class="p">}</span>
 <span class="p">]</span>
+
+<span class="k">assert</span> <span class="n">target_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;ra&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+<span class="k">assert</span> <span class="n">target_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;dec&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
 
 <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
     <span class="n">upload_url</span><span class="p">,</span>
     <span class="n">json</span><span class="o">=</span><span class="n">target_data</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 <span class="p">)</span>
 
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created new target test_api_</span><span class="si">{</span><span class="n">now_yymmdd_hhmmss</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -742,43 +749,48 @@
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
+Created new target test_api_261125_174559
 200
 </pre></div></div>
 </div>
 <p>Or, if you want to also provide photometry</p>
 <div class="nbinput docutils container">
-<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[25]:
 </pre></div>
 </div>
 <div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">target_data</span> <span class="o">=</span> <span class="p">[</span>
   <span class="p">{</span>
-    <span class="s2">"name"</span><span class="p">:</span> <span class="s2">"test"</span><span class="p">,</span>
-    <span class="s2">"ra"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s2">"dec"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
-    <span class="s2">"photometry"</span><span class="p">:</span> <span class="p">[</span>
+    <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;test_api_</span><span class="si">{</span><span class="n">now_yymmdd_hhmmss</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;ra&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s2">&quot;dec&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="s2">&quot;photometry&quot;</span><span class="p">:</span> <span class="p">[</span>
       <span class="p">{</span>
-        <span class="s2">"jd"</span><span class="p">:</span> <span class="mf">2461134.3933751667</span><span class="p">,</span>
-        <span class="s2">"telescope"</span><span class="p">:</span> <span class="s2">"TEST"</span><span class="p">,</span>
-        <span class="s2">"filter"</span><span class="p">:</span> <span class="s2">"r"</span><span class="p">,</span>
-        <span class="s2">"magnitude"</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
-        <span class="s2">"error"</span><span class="p">:</span> <span class="mf">0.1</span>
+        <span class="s2">&quot;jd&quot;</span><span class="p">:</span> <span class="mf">2461134.3933751667</span><span class="p">,</span>
+        <span class="s2">&quot;telescope&quot;</span><span class="p">:</span> <span class="s2">&quot;TEST&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;filter&quot;</span><span class="p">:</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;magnitude&quot;</span><span class="p">:</span> <span class="mi">20</span><span class="p">,</span>
+        <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="mf">0.1</span>
       <span class="p">},</span>
       <span class="p">{</span>
-        <span class="s2">"jd"</span><span class="p">:</span> <span class="mf">2461133.3933751667</span><span class="p">,</span>
-        <span class="s2">"telescope"</span><span class="p">:</span> <span class="s2">"TEST"</span><span class="p">,</span>
-        <span class="s2">"filter"</span><span class="p">:</span> <span class="s2">"r"</span><span class="p">,</span>
-        <span class="s2">"limit"</span><span class="p">:</span> <span class="mf">23.1</span>
+        <span class="s2">&quot;jd&quot;</span><span class="p">:</span> <span class="mf">2461133.3933751667</span><span class="p">,</span>
+        <span class="s2">&quot;telescope&quot;</span><span class="p">:</span> <span class="s2">&quot;TEST&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;filter&quot;</span><span class="p">:</span> <span class="s2">&quot;r&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;limit&quot;</span><span class="p">:</span> <span class="mf">23.1</span>
       <span class="p">}</span>
     <span class="p">]</span>
   <span class="p">}</span>
 <span class="p">]</span>
 
+<span class="k">assert</span> <span class="n">target_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;ra&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+<span class="k">assert</span> <span class="n">target_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;dec&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="mi">0</span>
+
 <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span>
     <span class="n">upload_url</span><span class="p">,</span>
     <span class="n">json</span><span class="o">=</span><span class="n">target_data</span><span class="p">,</span>
-    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">"accept"</span><span class="p">:</span> <span class="s2">"*/*"</span><span class="p">,</span> <span class="s2">"Authorization"</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">"</span><span class="p">}</span>
+    <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;accept&quot;</span><span class="p">:</span> <span class="s2">&quot;*/*&quot;</span><span class="p">,</span> <span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="sa">f</span><span class="s2">&quot;Bearer </span><span class="si">{</span><span class="n">token</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">}</span>
 <span class="p">)</span>
 
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Created new target with photometry test_api_</span><span class="si">{</span><span class="n">now_yymmdd_hhmmss</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">status_code</span><span class="p">)</span>
 </pre></div>
 </div>
@@ -788,6 +800,7 @@
 </div>
 <div class="output_area docutils container">
 <div class="highlight"><pre>
+Created new target with photometry test_api_261125_174559
 200
 </pre></div></div>
 </div>

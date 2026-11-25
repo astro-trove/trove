@@ -1,0 +1,46 @@
+{% load tom_common_extras target_list_extras %}
+
+<table class="table galaxies agn">
+    <tr>
+      <th scope="col"></th>
+      <th scope="col">Name</th>
+      <th scope="col">Off.  <br/> (")</th>
+      <th scope="col">Dist. <br/> (Mpc)</th>
+      <th scope="col">Redshift</th>
+    </tr>
+  {% for agn in agns %}
+    <tr>
+      <td>{{ forloop.counter }}</td>
+      <td><a href="https://ned.ipac.caltech.edu/conesearch?search_type=Near%20Position%20Search&in_csys=Equatorial&in_equinox=J2000&ra={{agn.RA}}d&dec={{agn.Dec}}d&radius=0.02" target="_blank">{{ agn.ID }}</a> ({{ agn.Source }})</td>
+      <td>{{ agn.Offset|floatformat:2 }}</td>
+      {% if agn.Dist and agn.Dist|floatformat != 'nan' %}
+        {% if agn.DistErr|islist %}
+          <td style='min-width:8em;'>
+	      {{ agn.Dist|floatformat:1 }}<span class="supsubdist"><sub>-{{ agn.DistErr.0|floatformat:1 }}</sub><sup>+{{ agn.DistErr.1|floatformat:1 }}</sup></span>
+	      </td>
+        {% else %}
+	      {% if agn.DistErr is None or agn.DistErr|floatformat == 'nan' %}
+	        <td>{{ agn.Dist|floatformat:1 }} (no err.)</td>
+      	  {% else %}
+            <td>{{ agn.Dist|floatformat:1 }}&nbsp;&plusmn;&nbsp;{{ agn.DistErr|floatformat:1 }} </td>
+	      {% endif %}
+	    {% endif %}
+      {% else %}
+        <td> </td>
+      {% endif %}
+      {% if agn.z and agn.z|floatformat != 'nan'%}
+        {% if agn.zErr|islist %}
+          <td> {{ agn.z }}<span class="supsubz"><sup>+{{ agn.zErr.1 }}</sup><sub>-{{ agn.zErr.0 }}</sub></span> </td>
+	    {% else %}
+	      {% if agn.zErr|floatformat == 'nan' %}
+	        <td> {{ agn.z|floatformat:2 }} (no err.) </td>
+	      {% else %}
+            <td> {{ agn.z }}&nbsp;&plusmn;&nbsp;{{ agn.zErr }} </td>
+	      {% endif %}
+	    {% endif %}
+      {% else %}
+        <td> </td>
+      {% endif %}
+    </tr>
+  {% endfor %}
+</table>
