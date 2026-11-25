@@ -14,6 +14,7 @@
    rules
    details
    scoringexplained
+   catalogs
    updatingredshifts
    api
    dev

@@ -33,8 +33,9 @@ The distance subscore quantifies whether the estimated distance to a candidate i
 consistent with the distance of some event such as a gravitational wave. Distances to 
 candidates are primarily estimated by associating them with a potential host galaxy 
 at some measured distance. We perform this galaxy association using about 10 billion 
-galaxies over several catalogs. Distances may also come from spectroscopy of individual 
-candidates themselves. 
+galaxies over several catalogs. For a table of which galaxy catalogs are used, see 
+`Catalogs Used in TROVE <catalogs.html>`_. Distances may also come from spectroscopy of 
+individual candidates themselves. 
 
 The computation of the distance subscore has two regimes:
 
@@ -49,7 +50,7 @@ The computation of the distance subscore has two regimes:
 
 
 The following figure from Franz et al., in prep explains this distance score 
-graphically: 
+graphically, where the event in question is a gravitational wave: 
 
 .. image:: explainedimg/distance_scoring.png
 
@@ -63,7 +64,21 @@ Point Source and Solar System Object Subcores
 ---------------------------------------------
 
 Candidates are disfavored (receive a subscore of 0) or favored (receive a subscore of 1) 
-based on their association with point sources or solar system objects (SSOs).
+based on their association with point sources. These point sources are typically stars 
+or variable stars; we perform cross-matching against the AGN included in some of these 
+point source catalogs separately. For a table of which point source catalogs are used, 
+see `Catalogs Used in TROVE <catalogs.html>`_.
+
+Candidates are disfavored (receive a subscore of 0) or favored (receive a subscore of 1) 
+based on their association with solar system objects (SSOs). We obtain a list of 
+SSOs and their ephemerides from the Minor Planet Center (MPC). We only perform SSO 
+association if a candidate is limited to a single photometric detection, as multiple 
+detections at the same RA and Dec. (within uncertainties of ~2" for the 
+astrometric precision of a candidates' coordinates) would be inconsistent with an SSO. 
+If any SSOs are within 10° of a candidate at time of its initial (and sole) detection, 
+we compute the full :math:`N`-body dynamics of the SSOs. We consider a candidate 
+associated with an SSO if it is within 25" of an SSO at the time of its initial (and 
+sole) detection. 
 
 AGN Subscores
 -------------

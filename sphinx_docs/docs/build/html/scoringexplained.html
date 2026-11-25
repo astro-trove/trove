@@ -54,7 +54,7 @@
     <link rel="icon" href="_static/favicon.ico"/>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Submitting Galaxy Spec-z’s" href="updatingredshifts.html" />
+    <link rel="next" title="Catalogs Used in TROVE" href="catalogs.html" />
     <link rel="prev" title="Web App Details" href="details.html" />
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <meta name="docsearch:language" content="en"/>
@@ -157,6 +157,7 @@
 <li class="toctree-l1"><a class="reference internal" href="rules.html">Rules for using TROVE</a></li>
 <li class="toctree-l1"><a class="reference internal" href="details.html">Web App Details</a></li>
 <li class="toctree-l1 current active"><a class="current reference internal" href="#">How Scoring Works</a></li>
+<li class="toctree-l1"><a class="reference internal" href="catalogs.html">Catalogs Used in TROVE</a></li>
 <li class="toctree-l1"><a class="reference internal" href="updatingredshifts.html">Submitting Galaxy Spec-z’s</a></li>
 <li class="toctree-l1 has-children"><a class="reference internal" href="api.html">API Docs</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
 <li class="toctree-l2"><a class="reference internal" href="nbs/basic_usage.html">Example Notebook</a></li>
@@ -401,8 +402,9 @@ between 0 and 1.</p>
 consistent with the distance of some event such as a gravitational wave. Distances to
 candidates are primarily estimated by associating them with a potential host galaxy
 at some measured distance. We perform this galaxy association using about 10 billion
-galaxies over several catalogs. Distances may also come from spectroscopy of individual
-candidates themselves.</p>
+galaxies over several catalogs. For a table of which galaxy catalogs are used, see
+<a class="reference external" href="catalogs.html">Catalogs Used in TROVE</a>. Distances may also come from spectroscopy of
+individual candidates themselves.</p>
 <p>The computation of the distance subscore has two regimes:</p>
 <ol class="arabic simple">
 <li><p>Uncertainty on galaxy distance <span class="math notranslate nohighlight">\(\ll\)</span> uncertainty on event distance (<span class="math notranslate nohighlight">\(\sigma_{\rm gal} \ll \sigma_{\rm event}\)</span>):
@@ -415,7 +417,7 @@ the two distance posterior distributions. This is the case for most photometric 
 as they have broader uncertainties.</p></li>
 </ol>
 <p>The following figure from Franz et al., in prep explains this distance score
-graphically:</p>
+graphically, where the event in question is a gravitational wave:</p>
 <img alt="_images/distance_scoring.png" src="_images/distance_scoring.png" />
 <div class="line-block">
 <div class="line"><br /></div>
@@ -426,7 +428,20 @@ The four scenarios shown are seen across candidates during a follow-up campaign.
 <section id="point-source-and-solar-system-object-subcores">
 <h2>Point Source and Solar System Object Subcores<a class="headerlink" href="#point-source-and-solar-system-object-subcores" title="Link to this heading">#</a></h2>
 <p>Candidates are disfavored (receive a subscore of 0) or favored (receive a subscore of 1)
-based on their association with point sources or solar system objects (SSOs).</p>
+based on their association with point sources. These point sources are typically stars
+or variable stars; we perform cross-matching against the AGN included in some of these
+point source catalogs separately. For a table of which point source catalogs are used,
+see <a class="reference external" href="catalogs.html">Catalogs Used in TROVE</a>.</p>
+<p>Candidates are disfavored (receive a subscore of 0) or favored (receive a subscore of 1)
+based on their association with solar system objects (SSOs). We obtain a list of
+SSOs and their ephemerides from the Minor Planet Center (MPC). We only perform SSO
+association if a candidate is limited to a single photometric detection, as multiple
+detections at the same RA and Dec. (within uncertainties of ~2” for the
+astrometric precision of a candidates’ coordinates) would be inconsistent with an SSO.
+If any SSOs are within 10° of a candidate at time of its initial (and sole) detection,
+we compute the full <span class="math notranslate nohighlight">\(N\)</span>-body dynamics of the SSOs. We consider a candidate
+associated with an SSO if it is within 25” of an SSO at the time of its initial (and
+sole) detection.</p>
 </section>
 <section id="agn-subscores">
 <h2>AGN Subscores<a class="headerlink" href="#agn-subscores" title="Link to this heading">#</a></h2>
@@ -457,11 +472,11 @@ based on their association with point sources or solar system objects (SSOs).</p
       </div>
     </a>
     <a class="right-next"
-       href="updatingredshifts.html"
+       href="catalogs.html"
        title="next page">
       <div class="prev-next-info">
         <p class="prev-next-subtitle">next</p>
-        <p class="prev-next-title">Submitting Galaxy Spec-z’s</p>
+        <p class="prev-next-title">Catalogs Used in TROVE</p>
       </div>
       <i class="fa-solid fa-angle-right"></i>
     </a>
