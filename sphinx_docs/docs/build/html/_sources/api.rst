@@ -10,18 +10,18 @@ TROVE provides a few useful API endpoints:
 API Quickstart
 --------------
 Details and examples with curl commands to access the endpoints are on the RESTful API Reference docs
-page: https://datatrove.as.arizona.edu/api/docs. [#f1]_
+page: https://trove.as.arizona.edu/api/docs
 
 An example curl command is:
 
 .. code-block:: bash
 		
    curl -X 'GET' \
-       'https://datatrove.as.arizona.edu/api/score/S251112cm' \
+       'https://trove.as.arizona.edu/api/score/S251112cm' \
        -H 'Authorization: Bearer <api_token>'
 
 where you replace <api_token> with the API token listed on your user profile page,
-https://datatrove.as.arizona.edu/users/profile/. If your token is ever exposed, you can
+https://trove.as.arizona.edu/users/profile/. If your token is ever exposed, you can
 click the "edit" button in the top right corner, then scroll down and click
 "Regenerate API Token" on that page; the old token stops working immediately and it will display a new token.
 If you are doing this in python, see the `Example Jupyter Notebooks <nbs/basic_usage.html>`_.
@@ -31,8 +31,4 @@ If you are doing this in python, see the `Example Jupyter Notebooks <nbs/basic_u
    :hidden:
 
    Example Notebook <nbs/basic_usage>
-   API Reference <https://datatrove.as.arizona.edu/api/docs>
-   
-   
-.. rubric:: Footnotes
-.. [#f1] If you're a developer working on the :file:`integration` branch, you'll want https://datatrove-test.as.arizona.edu/api/docs. If on :file:`staging`, go to https://datatrove-staging.as.arizona.edu/api/docs.  
+   API Reference <https://trove.as.arizona.edu/api/docs>
