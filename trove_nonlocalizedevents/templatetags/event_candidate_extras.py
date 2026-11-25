@@ -2,6 +2,7 @@
 Some functions for accessing the EventCandidate table inside a django template
 """
 
+import json
 import numpy as np
 from collections import OrderedDict
 from decimal import Decimal, InvalidOperation
@@ -270,7 +271,11 @@ def display_score_details(context, target_id):
             "label": label,
             "value": _safe_format(raw_value, fmter),
         })
-    
+    basic_card["details"].append({
+        "label": "Associated AGN?",
+        "value": "Yes" if _has_associated_agn(target_id) else "No",
+    })
+
     cards.append(basic_card)
 
     # Event Cards
@@ -538,6 +543,13 @@ def _baseline_format(mag, std):
         return text if std is None else f"{text} ± {float(std):.2f}"
     except (TypeError, ValueError):
         return str(mag)
+
+
+def _has_associated_agn(target_id):
+    # vet_basic saves the AGN crossmatch matches to this TargetExtra (only when
+    # there is at least one), whether or not the target is tied to an event
+    te = TargetExtra.objects.filter(target_id=target_id, key="Associated AGN").first()
+    return bool(te and json.loads(te.value))
 
 
 def _safe_format(value, fmter):

@@ -1,6 +1,7 @@
 from django import template
 from django.utils.safestring import mark_safe
 from tom_targets.models import TargetExtra
+from astropy.coordinates import SkyCoord
 import math
 import numpy as np
 import json
@@ -145,3 +146,36 @@ def galaxy_table(target):
     else:
         galaxies = None
     return {"galaxies": galaxies}
+
+
+def load_associated_agn(target):
+    """
+    The target's saved "Associated AGN" matches, nearest first, each with its
+    offset from the target (arcsec) and its redshift formatted for display.
+    """
+    te = TargetExtra.objects.filter(target=target, key="Associated AGN").first()
+    agns = json.loads(te.value) if te else []
+    if not agns:
+        return []
+    coords = SkyCoord([a["RA"] for a in agns], [a["Dec"] for a in agns], unit="deg")
+    seps = SkyCoord(target.ra, target.dec, unit="deg").separation(coords).arcsec
+    for agn, sep in zip(agns, seps):
+        agn["Offset"] = float(sep)
+        # some catalogs (e.g. PS1 QSO) store -999 for "no redshift"
+        if agn.get("z") is not None and agn["z"] < 0:
+            agn["z"] = agn["zErr"] = None
+        _apply_redshift_formatting(agn)
+    return sorted(agns, key=lambda a: a["Offset"])
+
+
+@register.simple_tag
+def associated_agn(target):
+    return load_associated_agn(target)
+
+
+@register.inclusion_tag("tom_targets/partials/agn_table.html")
+def agn_table(agns):
+    """
+    Displays the AGN associated with a target (from `associated_agn`).
+    """
+    return {"agns": agns}

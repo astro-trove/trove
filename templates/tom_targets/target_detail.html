@@ -60,6 +60,13 @@
 	  <summary><h5 style="display:inline-block">Host Galaxies</h5></summary>
 	  {% galaxy_table object %}
 	</details>
+	{% associated_agn object as agns %}
+	{% if agns %}
+	<details open>
+	  <summary><h5 style="display:inline-block">Associated AGN</h5></summary>
+	  {% agn_table agns %}
+	</details>
+	{% endif %}
       </div>
       <div class="tab-pane" id="photometry">
 	{% photometry_for_target target %}
