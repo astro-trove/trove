@@ -367,7 +367,7 @@
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-subscores">Photometry Subscores</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#light-curve-metrics">Light Curve Metrics</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kilonovascorer"><code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#flare">Flare</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-flare-significance">AGN Flare Significance</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nuclear-offset-subscore">Nuclear Offset Subscore</a></li>
@@ -484,7 +484,8 @@ of the event (e.g., GW alert time) and estimate (2) the peak luminosity, (3) ris
 time, and (4) decay rate of the candidate’s light curve.</p></li>
 <li><p>Using the <code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code> tool to assess a candidate’s consistency with a suite of
 KN models.</p></li>
-<li><p>AGN flare</p></li>
+<li><p>According to the significance of a post-GW flare in an AGN, when scoring for BBH-
+induced AGN flares.</p></li>
 </ol>
 <section id="light-curve-metrics">
 <h3>Light Curve Metrics<a class="headerlink" href="#light-curve-metrics" title="Link to this heading">#</a></h3>
@@ -555,16 +556,19 @@ adapted from Vieira et al. (2026).</p>
 <div class="line"><sup>†</sup> B. D. Metzger (2024) and Y.-X. Chen &amp; B. D. Metzger (2025)</div>
 <div class="line"><sup>‡</sup> D. M. Siegel et al. (2022)</div>
 </div>
-<p>That is, a candidate will also be disfavored if it is pre-detected, too dim/too
+<p>That is, a candidate will be disfavored if it is pre-detected, too dim/too
 luminous, rises too early or too late, or fades too slowly/too quickly, depending on the
-electromagnetic signature of interest. A candidate is considered pre-detected if the
-photometry contains three or more <span class="math notranslate nohighlight">\(5\sigma\)</span> detections within any 10 day window
-prior to the GW detection (minus one day, for KNe-in-SNe and super-KNe). Available
-models do not place any useful constraints on the decay rate of super-KNe, nor have
-super-KNe been observed in nature.</p>
-<p>If a candidate’s photometry does not meet one of these criteria, a score factor of 0.1
-is introduced. The photometry subscore may therefore be as small as <span class="math notranslate nohighlight">\(10^{-4}\)</span> or
-as large as 1.</p>
+EM signature of interest. If a candidate’s photometry does not meet one of these
+criteria, a score factor of 0.1 is introduced. The photometry subscore may therefore be
+as small as <span class="math notranslate nohighlight">\(10^{-4}\)</span> or as large as 1.</p>
+<p>Two important notes:</p>
+<ol class="arabic simple">
+<li><p>A candidate is considered pre-detected if the photometry contains three or more
+<span class="math notranslate nohighlight">\(5\sigma\)</span> detections within any 10 day window prior to the GW detection
+(minus one day, for KNe-in-SNe and super-KNe).</p></li>
+<li><p>Available models do not place any useful constraints on the decay rate of super-KNe,
+nor have super-KNe been observed in nature.</p></li>
+</ol>
 <p>These constraints can also be understood graphically:</p>
 <img alt="_images/phot-scoring-vis.png" src="_images/phot-scoring-vis.png" />
 <div class="line-block">
@@ -585,13 +589,42 @@ consistent with the simple two-component KN model of A. Villar et al. (2017).
 See <a class="reference external" href="https://scixplorer.org/abs/2026PASP..138h4502D/abstract" rel="noreferrer" target="_blank">P. Darc et al. (2026)</a>
 for more details.</p>
 </section>
-<section id="flare">
-<h3>Flare<a class="headerlink" href="#flare" title="Link to this heading">#</a></h3>
+<section id="agn-flare-significance">
+<h3>AGN Flare Significance<a class="headerlink" href="#agn-flare-significance" title="Link to this heading">#</a></h3>
+<p>Due to the huge variety in predictions for the EM counterpart to a BBH-induced AGN
+flare, we adopt a model-agnostic approach to compute a photometry subscore in the
+overall score for BBH-induced AGN flares. We split the photometry for the candidate into
+pre- and post-GW photometry. The pre-GW photometry is used to estimate the baseline
+variability of the AGN according to the median absolute deviation (MAD). The magnitude
+of each post-GW photometry is then used to compute a Z-score per band, quantifying the
+significance of any flare above the pre-GW MAD. This Z-score per band is computed by
+smoothing and taking the median of a Z-score per photometry point.</p>
+<p>The significance of a flare can also be understood graphically:</p>
+<img alt="_images/agn-flare-phot-score.png" src="_images/agn-flare-phot-score.png" />
+<div class="line-block">
+<div class="line"><br /></div>
+</div>
+<p>For candidate AT2020afis (ZTF19abanrhr), a candidate for an AGN flare induced by BBH
+merger GW190521, there is a flare at ~50 days post-GW with <span class="math notranslate nohighlight">\(Z_{\rm flare} = 4.44\)</span>.</p>
+<p>This <span class="math notranslate nohighlight">\(Z_{\rm flare}\)</span> is converted to a photometry subscore according to:</p>
+<div class="math notranslate nohighlight">
+\[S_{\mathrm{phot,T(AGN\,flare)}} = 0.1 + 0.9\times\Phi\left(\frac{Z_{\mathrm{flare}} - 3.25}{0.8125}\right)\;,\]</div>
+<p>Where <span class="math notranslate nohighlight">\(\Phi\)</span> is the standard normal distribution’s cumulative distribution
+function. For the above example, <span class="math notranslate nohighlight">\(S_{\mathrm{phot,T(AGN\,flare)}} = 0.9\)</span>.</p>
 </section>
 </section>
 <section id="nuclear-offset-subscore">
 <h2>Nuclear Offset Subscore<a class="headerlink" href="#nuclear-offset-subscore" title="Link to this heading">#</a></h2>
-<p>X</p>
+<p>When vetting for BBH-induced AGN flaring, we include an additional subscore quantifying
+the distance of a candidate from the nucleus of a host galaxy. For nearby sources,
+for which astrometry is precise, our fidudical desired offset is ~0.5 kpc. For more
+distant sources, our fiducial desired offset is an angular offset of 2”. Concretely:</p>
+<div class="math notranslate nohighlight">
+\[S_{\mathrm{NO}} = \max\left[0.1, \frac{\sigma}{\sigma + \delta}\right]\;\]</div>
+<p><span class="math notranslate nohighlight">\(\delta\)</span> is always the projected offset. <span class="math notranslate nohighlight">\(\sigma = 0.5~\mathrm{kpc}\)</span> for
+nearby sources and 2” for distant sources.</p>
+<p>As with other subscores, rather than allowing the subscore to drop to a hard 0, the
+subscore is at minimum 0.1.</p>
 </section>
 </section>
 
@@ -649,7 +682,7 @@ for more details.</p>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#photometry-subscores">Photometry Subscores</a><ul class="visible nav section-nav flex-column">
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#light-curve-metrics">Light Curve Metrics</a></li>
 <li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#kilonovascorer"><code class="docutils literal notranslate"><span class="pre">KilonovaSCORER</span></code></a></li>
-<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#flare">Flare</a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#agn-flare-significance">AGN Flare Significance</a></li>
 </ul>
 </li>
 <li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#nuclear-offset-subscore">Nuclear Offset Subscore</a></li>

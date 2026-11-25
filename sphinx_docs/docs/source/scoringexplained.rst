@@ -120,7 +120,8 @@ in question:
    time, and (4) decay rate of the candidate's light curve.
 2. Using the ``KilonovaSCORER`` tool to assess a candidate's consistency with a suite of 
    KN models.
-3. AGN flare
+3. According to the significance of a post-GW flare in an AGN, when scoring for BBH-
+   induced AGN flares.
 
 
 Light Curve Metrics
@@ -178,17 +179,19 @@ adapted from Vieira et al. (2026).
 | :sup:`‡` D. M. Siegel et al. (2022)
 
 
-That is, a candidate will also be disfavored if it is pre-detected, too dim/too 
+That is, a candidate will be disfavored if it is pre-detected, too dim/too 
 luminous, rises too early or too late, or fades too slowly/too quickly, depending on the 
-electromagnetic signature of interest. A candidate is considered pre-detected if the 
-photometry contains three or more :math:`5\sigma` detections within any 10 day window 
-prior to the GW detection (minus one day, for KNe-in-SNe and super-KNe). Available 
-models do not place any useful constraints on the decay rate of super-KNe, nor have 
-super-KNe been observed in nature. 
+EM signature of interest. If a candidate's photometry does not meet one of these 
+criteria, a score factor of 0.1 is introduced. The photometry subscore may therefore be 
+as small as :math:`10^{-4}` or as large as 1. 
 
-If a candidate's photometry does not meet one of these criteria, a score factor of 0.1 
-is introduced. The photometry subscore may therefore be as small as :math:`10^{-4}` or 
-as large as 1. 
+Two important notes:
+
+1. A candidate is considered pre-detected if the photometry contains three or more 
+   :math:`5\sigma` detections within any 10 day window prior to the GW detection 
+   (minus one day, for KNe-in-SNe and super-KNe). 
+2. Available models do not place any useful constraints on the decay rate of super-KNe, 
+   nor have super-KNe been observed in nature. 
 
 These constraints can also be understood graphically:
 
@@ -215,11 +218,51 @@ See `P. Darc et al. (2026) <https://scixplorer.org/abs/2026PASP..138h4502D/abstr
 for more details. 
 
 
-Flare
-^^^^^
+AGN Flare Significance
+^^^^^^^^^^^^^^^^^^^^^^
 
+Due to the huge variety in predictions for the EM counterpart to a BBH-induced AGN 
+flare, we adopt a model-agnostic approach to compute a photometry subscore in the 
+overall score for BBH-induced AGN flares. We split the photometry for the candidate into 
+pre- and post-GW photometry. The pre-GW photometry is used to estimate the baseline 
+variability of the AGN according to the median absolute deviation (MAD). The magnitude 
+of each post-GW photometry is then used to compute a Z-score per band, quantifying the 
+significance of any flare above the pre-GW MAD. This Z-score per band is computed by 
+smoothing and taking the median of a Z-score per photometry point.
+
+The significance of a flare can also be understood graphically:
+
+
+.. image:: explainedimg/agn-flare-phot-score.png
+
+|
+
+For candidate AT2020afis (ZTF19abanrhr), a candidate for an AGN flare induced by BBH 
+merger GW190521, there is a flare at ~50 days post-GW with :math:`Z_{\rm flare} = 4.44`. 
+
+This :math:`Z_{\rm flare}` is converted to a photometry subscore according to:
+
+.. math::
+
+   S_{\mathrm{phot,T(AGN\,flare)}} = 0.1 + 0.9\times\Phi\left(\frac{Z_{\mathrm{flare}} - 3.25}{0.8125}\right)\;,
+
+Where :math:`\Phi` is the standard normal distribution's cumulative distribution 
+function. For the above example, :math:`S_{\mathrm{phot,T(AGN\,flare)}} = 0.9`.
 
 Nuclear Offset Subscore
 -----------------------
 
-X
+When vetting for BBH-induced AGN flaring, we include an additional subscore quantifying 
+the distance of a candidate from the nucleus of a host galaxy. For nearby sources, 
+for which astrometry is precise, our fidudical desired offset is ~0.5 kpc. For more 
+distant sources, our fiducial desired offset is an angular offset of 2". Concretely:
+
+.. math::
+
+   S_{\mathrm{NO}} = \max\left[0.1, \frac{\sigma}{\sigma + \delta}\right]\;
+   
+:math:`\delta` is always the projected offset. :math:`\sigma = 0.5~\mathrm{kpc}` for 
+nearby sources and 2" for distant sources.
+
+As with other subscores, rather than allowing the subscore to drop to a hard 0, the 
+subscore is at minimum 0.1.
