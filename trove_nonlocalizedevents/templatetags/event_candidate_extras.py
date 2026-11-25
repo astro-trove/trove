@@ -605,7 +605,7 @@ def light_curve_summary(target):
                f"{T0_FALLBACK_DAYS} day before it")
     else:
         t0 += "<br>midpoint of the last non-detection and the first detection"
-    rows = [{"label": "Transient Start (t<sub>0</sub>)", "value": t0}]
+    rows = [{"label": "Assumed Transient Start (t<sub>0</sub>)", "value": t0}]
     if metrics["lum"] is not None:
         rows.append({
             "label": "Maximum Luminosity",
