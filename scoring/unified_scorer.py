@@ -55,7 +55,7 @@ from .vet_phot import (
     OPTICAL_FILTS,
     PHOT_SCORE_MIN,
     PREDETECTION_SNR_THRESHOLD,
-    FORCEDPHOT_SNR_THRESHOLD,
+    drop_unreliable_forced_phot,
     _get_post_disc_phot,
     _get_pre_disc_phot,
     _score_phot,
@@ -209,27 +209,9 @@ def score(
 
     # only use SNR > FORCEDPHOT_SNR_THRESHOLD ATLAS / ZTF FP for scoring
     if prephot is not None: # if we found any pre photometry to begin with
-        prephot = prephot[~(
-            (
-                (prephot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(prephot.snr)
-            ) & (
-                (prephot.telescope == "ATLAS") |
-                (prephot.telescope == "ATLAS FP") |
-                (prephot.telescope == "ZTF FP")
-            )
-        )
-        ]
+        prephot = drop_unreliable_forced_phot(prephot)
     if postphot is not None: # if we found any post photometry to begin with
-        postphot = postphot[~(
-            (
-                (postphot.snr < FORCEDPHOT_SNR_THRESHOLD) | np.isnan(postphot.snr)
-            ) & (
-                (postphot.telescope == "ATLAS") |
-                (postphot.telescope == "ATLAS FP") |
-                (postphot.telescope == "ZTF FP")
-            )
-        )
-        ]
+        postphot = drop_unreliable_forced_phot(postphot)
 
     if params.phot_method.knscorer and phot_method=="kilonovascorer":
         try:

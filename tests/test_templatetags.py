@@ -518,3 +518,35 @@ class TestAssociatedAgn:
             assert _has_associated_agn(1) is expected
         finally:
             p.stop()
+
+
+class TestBasicLightCurveRows:
+    """Light curve rows in the Basic Scores card"""
+
+    def _rows(self, metrics):
+        from trove_nonlocalizedevents.templatetags import event_candidate_extras as ece
+        with patch.object(ece, "_basic_light_curve_metrics_cached", return_value=metrics):
+            return {r["label"]: r["value"] for r in ece._basic_light_curve_rows(MagicMock())}
+
+    def test_all_rows(self):
+        rows = self._rows(dict(t0=60000, t0_is_fallback=False, lum=2e42,
+                               peak_time=4.0, decay_rate=0.05))
+        assert rows == {
+            "Maximum Luminosity": "2.00 x 10<sup>42</sup> erg/s",
+            "Rise Time (from last non-detection)": "4.00 days",
+            "Light Curve Slope": "0.05 mag/day",
+        }
+
+    def test_missing_values_are_left_out_and_fallback_is_noted(self):
+        rows = self._rows(dict(t0=60000, t0_is_fallback=True, lum=None,
+                               peak_time=4.0, decay_rate=None))
+        assert list(rows) == ["Rise Time (from last non-detection)"]
+        assert "no non-detection before first detection" in rows["Rise Time (from last non-detection)"]
+
+    def test_no_detections(self):
+        assert self._rows(None) == {}
+
+    def test_errors_do_not_break_the_page(self):
+        from trove_nonlocalizedevents.templatetags import event_candidate_extras as ece
+        with patch.object(ece, "_basic_light_curve_metrics_cached", side_effect=RuntimeError):
+            assert ece._basic_light_curve_rows(MagicMock()) == []

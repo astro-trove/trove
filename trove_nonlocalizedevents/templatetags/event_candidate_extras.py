@@ -2,7 +2,9 @@
 Some functions for accessing the EventCandidate table inside a django template
 """
 
+import hashlib
 import json
+import logging
 import numpy as np
 from collections import OrderedDict
 from decimal import Decimal, InvalidOperation
@@ -13,10 +15,13 @@ from django.template.defaultfilters import linebreaks
 from django.conf import settings
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
+from django.db.models import Count, Max
+from tom_dataproducts.models import PhotometryReducedDatum
 from trove_targets.models import Target
 from tom_targets.models import TargetExtra
 from scoring.models import ScoreFactor
 from scoring.scoring import mpc_score_from_match
+from scoring.vet_phot import T0_FALLBACK_DAYS, basic_light_curve_metrics
 from scoring.util import (
     agn_counts_toward,
     get_agn_toggle as _get_agn_toggle,
@@ -39,6 +44,13 @@ from scoring.phot_method import (
 )
 
 register = template.Library()
+logger = logging.getLogger(__name__)
+
+# light curve metrics only change with the cache key, so this just ages out
+# keys for targets nobody is looking at anymore
+BASIC_LC_CACHE_TIMEOUT = 7 * 24 * 3600  # seconds
+# distinguishes "not cached" from a cached None (a target with no detections)
+BASIC_LC_CACHE_MISS = object()
 
 
 @register.simple_tag(takes_context=True)
@@ -275,6 +287,7 @@ def display_score_details(context, target_id):
         "label": "Associated AGN?",
         "value": "Yes" if _has_associated_agn(target_id) else "No",
     })
+    basic_card["details"] += _basic_light_curve_rows(target)
 
     cards.append(basic_card)
 
@@ -550,6 +563,58 @@ def _has_associated_agn(target_id):
     # there is at least one), whether or not the target is tied to an event
     te = TargetExtra.objects.filter(target_id=target_id, key="Associated AGN").first()
     return bool(te and json.loads(te.value))
+
+
+def _basic_light_curve_metrics_cached(target):
+    """`basic_light_curve_metrics` for this target, cached until its
+    photometry, redshift or host galaxies change"""
+    phot = PhotometryReducedDatum.objects.filter(target_id=target.id).aggregate(
+        n=Count("id"), last_id=Max("id"), last_time=Max("timestamp")
+    )
+    hosts = TargetExtra.objects.filter(
+        target_id=target.id, key="Host Galaxies"
+    ).values_list("value", flat=True).first()
+    fingerprint = hashlib.sha256(
+        repr((phot, target.redshift, hosts)).encode()
+    ).hexdigest()
+    key = f"basic_lc_metrics:{target.id}:{fingerprint}"
+
+    metrics = cache.get(key, BASIC_LC_CACHE_MISS)
+    if metrics is BASIC_LC_CACHE_MISS:
+        metrics = basic_light_curve_metrics(target.id)
+        cache.set(key, metrics, BASIC_LC_CACHE_TIMEOUT)
+    return metrics
+
+
+def _basic_light_curve_rows(target):
+    """Basic Scores card rows for the light curve metrics measured from the
+    target's own t0, so they don't need a GW event"""
+    try:
+        metrics = _basic_light_curve_metrics_cached(target)
+    except Exception:
+        # a bad fit or odd photometry should never break the target page
+        logger.exception("Could not compute light curve metrics for %s", target)
+        return []
+    if metrics is None:
+        return []
+
+    rows = []
+    if metrics["lum"] is not None:
+        rows.append({
+            "label": "Maximum Luminosity",
+            "value": _sci_format(metrics["lum"], unit="erg/s"),
+        })
+    if metrics["peak_time"] is not None:
+        rise = _float_format(metrics["peak_time"], unit="days")
+        if metrics["t0_is_fallback"]:
+            rise += f" (no non-detection before first detection; t0 set {T0_FALLBACK_DAYS} day earlier)"
+        rows.append({"label": "Rise Time (from last non-detection)", "value": rise})
+    if metrics["decay_rate"] is not None:
+        rows.append({
+            "label": "Light Curve Slope",
+            "value": _float_format(metrics["decay_rate"], unit="mag/day"),
+        })
+    return rows
 
 
 def _safe_format(value, fmter):
